@@ -1,0 +1,4 @@
+|        | verifiziert               | falsifiziert                  |
+|--------+---------------------------+-------------------------------|
+| wahr   | bestätigt (wahr+verifiziert) | scheinwiderlegt (wahr+falsifiziert) |
+| falsch  | widerlegt (falsch+verifiziert)  | bestätigt (falsch+falsifiziert)    |
