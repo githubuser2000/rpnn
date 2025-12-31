@@ -1,0 +1,20 @@
+​#+TITLE: Die 45-Grad-Achse (Resonanz-Vektoren)
+#+AUTHOR: Gemini System-Ontologie
+​| Grad | Vektor-ID | Resonanz-Kern (Die Diagonale) | Systemischer Zustand |
+|------+-----------+-------------------------------+----------------------|
+| 0°   | [1/1]     | Wahrheits-Identität | Absolute Basis       |
+| 45°  | [2/2]     | Negations-Stabilität | Gesicherte Ablehnung |
+| 90°  | [3/3]     | Offenheits-Raum | Potentialität        |
+| 135° | [4/4]     | Konflikt-Zentrum | Dynamik              |
+| 180° | [5/5]     | Materie-Präsenz | Dinglichkeit         |
+| 225° | [6/6]     | Modularitäts-Gleichgewicht | Stapelbarkeit        |
+| 270° | [7/7]     | Retrospektiv-Fokus | Ursprungs-Analytik   |
+| 315° | [8/8]     | Netzwerk-Kohärenz | System-Vernetzung    |
+| 360° | [9/9]     | Autopoietische Wahrheit | Meta-Validierung     |
+| +45° | [10/10]   | Meta-Veto | Meta-Fehlerkontrolle |
+| +90° | [11/11]   | Epistemische Transparenz | Meta-Unschärfe       |
+| 135° | [12/12]   | Dialektische Symmetrie | Meta-Widerspruch     |
+| 180° | [13/13]   | Digitale Entsprechung | Meta-Dinglichkeit    |
+| 225° | [14/14]   | Rekursive Optimierung | Meta-Stapelbarkeit   |
+| 270° | [15/15]   | Archaische Rekursion | Meta-Ursprung        |
+| 315° | [16/16]   | Holistische JIT-Fusion | Meta-System          |
