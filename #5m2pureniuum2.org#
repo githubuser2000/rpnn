@@ -1,0 +1,53 @@
+* 16×16 Kreismatrix der Interpretationen
+
+** Kreisanordnung (Uhrzeigersinn, beginnend bei falsch, endend bei wahr)
+
+1. klar falsch  
+2. unbestimmt  
+3. widersprüchlich  
+4. dinglich  
+5. stapelbar  
+6. ursprungsanalytisch  
+7. systemisch-vernetzt  
+8. meta-wahr  
+9. meta-falsch  
+10. meta-unbestimmt  
+11. meta-widersprüchlich  
+12. meta-dinglich  
+13. meta-stapelbar  
+14. meta-ursprünglich  
+15. meta-systemisch  
+16. klar wahr  
+
+** Matrix (Zeilen und Spalten folgen exakt dieser Kreisfolge)
+
+Jeder Eintrag (i,j) ist das Verbundwort aus Interpretation i – Interpretation j  
+Diagonale = originales Einzelwort
+://
+#+BEGIN_SRC csv :tangle interpretation_kreismatrix.csv
+Nr;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16
+1;klar falsch;klarfalsch-unbestimmt;klarfalsch-widersprüchlich;klarfalsch-dinglich;klarfalsch-stapelbar;klarfalsch-ursprungsanalytisch;klarfalsch-systemischvernetzt;klarfalsch-metawahr;klarfalsch-metafalsch;klarfalsch-metaunbestimmt;klarfalsch-metawidersprüchlich;klarfalsch-metadinglich;klarfalsch-metastapelbar;klarfalsch-metaursprünglich;klarfalsch-metasystemisch;klarfalsch-klarwahr
+2;unbestimmt-klarfalsch;unbestimmt;unbestimmt-widersprüchlich;unbestimmt-dinglich;unbestimmt-stapelbar;unbestimmt-ursprungsanalytisch;unbestimmt-systemischvernetzt;unbestimmt-metawahr;unbestimmt-metafalsch;unbestimmt-metaunbestimmt;unbestimmt-metawidersprüchlich;unbestimmt-metadinglich;unbestimmt-metastapelbar;unbestimmt-metaursprünglich;unbestimmt-metasystemisch;unbestimmt-klarwahr
+3;widersprüchlich-klarfalsch;widersprüchlich-unbestimmt;widersprüchlich;widersprüchlich-dinglich;widersprüchlich-stapelbar;widersprüchlich-ursprungsanalytisch;widersprüchlich-systemischvernetzt;widersprüchlich-metawahr;widersprüchlich-metafalsch;widersprüchlich-metaunbestimmt;widersprüchlich-metawidersprüchlich;widersprüchlich-metadinglich;widersprüchlich-metastapelbar;widersprüchlich-metaursprünglich;widersprüchlich-metasystemisch;widersprüchlich-klarwahr
+4;dinglich-klarfalsch;dinglich-unbestimmt;dinglich-widersprüchlich;dinglich;dinglich-stapelbar;dinglich-ursprungsanalytisch;dinglich-systemischvernetzt;dinglich-metawahr;dinglich-metafalsch;dinglich-metaunbestimmt;dinglich-metawidersprüchlich;dinglich-metadinglich;dinglich-metastapelbar;dinglich-metaursprünglich;dinglich-metasystemisch;dinglich-klarwahr
+5;stapelbar-klarfalsch;stapelbar-unbestimmt;stapelbar-widersprüchlich;stapelbar-dinglich;stapelbar;stapelbar-ursprungsanalytisch;stapelbar-systemischvernetzt;stapelbar-metawahr;stapelbar-metafalsch;stapelbar-metaunbestimmt;stapelbar-metawidersprüchlich;stapelbar-metadinglich;stapelbar-metastapelbar;stapelbar-metaursprünglich;stapelbar-metasystemisch;stapelbar-klarwahr
+6;ursprungsanalytisch-klarfalsch;ursprungsanalytisch-unbestimmt;ursprungsanalytisch-widersprüchlich;ursprungsanalytisch-dinglich;ursprungsanalytisch-stapelbar;ursprungsanalytisch;ursprungsanalytisch-systemischvernetzt;ursprungsanalytisch-metawahr;ursprungsanalytisch-metafalsch;ursprungsanalytisch-metaunbestimmt;ursprungsanalytisch-metawidersprüchlich;ursprungsanalytisch-metadinglich;ursprungsanalytisch-metastapelbar;ursprungsanalytisch-metaursprünglich;ursprungsanalytisch-metasystemisch;ursprungsanalytisch-klarwahr
+7;systemischvernetzt-klarfalsch;systemischvernetzt-unbestimmt;systemischvernetzt-widersprüchlich;systemischvernetzt-dinglich;systemischvernetzt-stapelbar;systemischvernetzt-ursprungsanalytisch;systemisch-vernetzt;systemischvernetzt-metawahr;systemischvernetzt-metafalsch;systemischvernetzt-metaunbestimmt;systemischvernetzt-metawidersprüchlich;systemischvernetzt-metadinglich;systemischvernetzt-metastapelbar;systemischvernetzt-metaursprünglich;systemischvernetzt-metasystemisch;systemischvernetzt-klarwahr
+8;metawahr-klarfalsch;metawahr-unbestimmt;metawahr-widersprüchlich;metawahr-dinglich;metawahr-stapelbar;metawahr-ursprungsanalytisch;metawahr-systemischvernetzt;meta-wahr;metawahr-metafalsch;metawahr-metaunbestimmt;metawahr-metawidersprüchlich;metawahr-metadinglich;metawahr-metastapelbar;metawahr-metaursprünglich;metawahr-metasystemisch;metawahr-klarwahr
+9;metafalsch-klarfalsch;metafalsch-unbestimmt;metafalsch-widersprüchlich;metafalsch-dinglich;metafalsch-stapelbar;metafalsch-ursprungsanalytisch;metafalsch-systemischvernetzt;metafalsch-metawahr;meta-falsch;metafalsch-metaunbestimmt;metafalsch-metawidersprüchlich;metafalsch-metadinglich;metafalsch-metastapelbar;metafalsch-metaursprünglich;metafalsch-metasystemisch;metafalsch-klarwahr
+10;metaunbestimmt-klarfalsch;metaunbestimmt-unbestimmt;metaunbestimmt-widersprüchlich;metaunbestimmt-dinglich;metaunbestimmt-stapelbar;metaunbestimmt-ursprungsanalytisch;metaunbestimmt-systemischvernetzt;metaunbestimmt-metawahr;metaunbestimmt-metafalsch;meta-unbestimmt;metaunbestimmt-metawidersprüchlich;metaunbestimmt-metadinglich;metaunbestimmt-metastapelbar;metaunbestimmt-metaursprünglich;metaunbestimmt-metasystemisch;metaunbestimmt-klarwahr
+11;metawidersprüchlich-klarfalsch;metawidersprüchlich-unbestimmt;metawidersprüchlich-widersprüchlich;metawidersprüchlich-dinglich;metawidersprüchlich-stapelbar;metawidersprüchlich-ursprungsanalytisch;metawidersprüchlich-systemischvernetzt;metawidersprüchlich-metawahr;metawidersprüchlich-metafalsch;metawidersprüchlich-metaunbestimmt;meta-widersprüchlich;metawidersprüchlich-metadinglich;metawidersprüchlich-metastapelbar;metawidersprüchlich-metaursprünglich;metawidersprüchlich-metasystemisch;metawidersprüchlich-klarwahr
+12;metadinglich-klarfalsch;metadinglich-unbestimmt;metadinglich-widersprüchlich;metadinglich-dinglich;metadinglich-stapelbar;metadinglich-ursprungsanalytisch;metadinglich-systemischvernetzt;metadinglich-metawahr;metadinglich-metafalsch;metadinglich-metaunbestimmt;metadinglich-metawidersprüchlich;meta-dinglich;metadinglich-metastapelbar;metadinglich-metaursprünglich;metadinglich-metasystemisch;metadinglich-klarwahr
+13;metastapelbar-klarfalsch;metastapelbar-unbestimmt;metastapelbar-widersprüchlich;metastapelbar-dinglich;metastapelbar-stapelbar;metastapelbar-ursprungsanalytisch;metastapelbar-systemischvernetzt;metastapelbar-metawahr;metastapelbar-metafalsch;metastapelbar-metaunbestimmt;metastapelbar-metawidersprüchlich;metastapelbar-metadinglich;meta-stapelbar;metastapelbar-metaursprünglich;metastapelbar-metasystemisch;metastapelbar-klarwahr
+14;metaursprünglich-klarfalsch;metaursprünglich-unbestimmt;metaursprünglich-widersprüchlich;metaursprünglich-dinglich;metaursprünglich-stapelbar;metaursprünglich-ursprungsanalytisch;metaursprünglich-systemischvernetzt;metaursprünglich-metawahr;metaursprünglich-metafalsch;metaursprünglich-metaunbestimmt;metaursprünglich-metawidersprüchlich;metaursprünglich-metadinglich;metaursprünglich-metastapelbar;meta-ursprünglich;metaursprünglich-metasystemisch;metaursprünglich-klarwahr
+15;metasystemisch-klarfalsch;metasystemisch-unbestimmt;metasystemisch-widersprüchlich;metasystemisch-dinglich;metasystemisch-stapelbar;metasystemisch-ursprungsanalytisch;metasystemisch-systemischvernetzt;metasystemisch-metawahr;metasystemisch-metafalsch;metasystemisch-metaunbestimmt;metasystemisch-metawidersprüchlich;metasystemisch-metadinglich;metasystemisch-metastapelbar;metasystemisch-metaursprünglich;meta-systemisch;metasystemisch-klarwahr
+16;klarwahr-klarfalsch;klarwahr-unbestimmt;klarwahr-widersprüchlich;klarwahr-dinglich;klarwahr-stapelbar;klarwahr-ursprungsanalytisch;klarwahr-systemischvernetzt;klarwahr-metawahr;klarwahr-metafalsch;klarwahr-metaunbestimmt;klarwahr-metawidersprüchlich;klarwahr-metadinglich;klarwahr-metastapelbar;klarwahr-metaursprünglich;klarwahr-metasystemisch;klar wahr
+#+END_SRC
+
+** Eigenschaften dieser Matrix
+- Vollständig zyklisch (Kreis im Kreis)
+- Jede Zeile und jede Spalte durchläuft den gesamten Interpretationskreis
+- Verbundwörter verbinden je zwei Stufen semantisch
+- Beginn und Ende des Kreises liegen direkt nebeneinander: klar falsch ↔ klar wahr
+
+Du kannst den gesamten Org-Block kopieren und in Emacs oder einer anderen Org-Mode-fähigen Umgebung einfügen. Der CSV-Block lässt sich mit =C-c C-c= direkt tanglen (exportieren) in eine Datei.
