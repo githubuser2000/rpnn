@@ -1,0 +1,101 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{hyperref}
+
+\title{p-adische Zahlen — strukturelle Beschreibung ohne Zahlenschreibweise}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Kernidee ohne Zahlenschreibweise}
+
+Eine p-adische Zahl ist ein Äquivalenz- und Vollständigkeitsobjekt: 
+Man startet mit den rationalen Zahlen $\mathbb{Q}$.
+Man misst Größen nicht nach ihrer absoluten Größe, sondern nach ihrer
+Teilbarkeit durch $p$. Daraus entsteht eine Metrik, und $\mathbb{Q}$
+wird komplettiert — das Resultat ist $\mathbb{Q}_p$.
+
+\subsection*{1. p-adische Bewertung}
+
+Für eine rationale Zahl $x \ne 0$ gibt es eine Darstellung
+\[
+x = p^k \frac{a}{b}, \qquad \gcd(a,p)=\gcd(b,p)=1,
+\]
+und man definiert
+\[
+v_p(x)=k.
+\]
+
+\subsection*{2. p-adische Norm}
+
+\[
+|x|_p = p^{-v_p(x)}.
+\]
+
+\subsection*{3. p-adische Metrik}
+
+\[
+d_p(x,y)=|x-y|_p.
+\]
+
+\subsection*{4. Vervollständigung}
+
+\[
+\mathbb{Q}_p = \text{Komplettierung von } (\mathbb{Q},d_p).
+\]
+Damit ist eine p-adische Zahl kein Ziffern-String, sondern ein Grenzwert
+von Cauchy-Folgen bezüglich $d_p$.
+
+\section*{Alternative, gleichwertige Beschreibungen}
+
+\subsection*{(1) Als Inverses Limes-Objekt}
+
+\[
+\mathbb{Z}_p = \varprojlim \mathbb{Z} / p^n \mathbb{Z}.
+\]
+Eine p-adische ganze Zahl ist eine konsistente Familie von Restklassen
+mod $p, p^2, p^3, \dots$
+
+\subsection*{(2) Als kompakter topologischer Ring}
+
+\begin{itemize}
+\item $\mathbb{Z}_p$ ist kompakt, vollständig und total unzusammenhängend.
+\item $\mathbb{Q}_p = \mathbb{Z}_p[p^{-1}]$.
+\end{itemize}
+
+\subsection*{(3) Als lokaler Körper}
+
+\begin{itemize}
+\item Maximales Ideal: $p \mathbb{Z}_p$
+\item Restklassenkörper: $\mathbb{F}_p$
+\item Diskreter Bewertungsring mit Uniformisator $p$
+\end{itemize}
+
+\subsection*{(4) Archimedisch vs.\ nicht-archimedisch}
+
+\begin{align*}
+\text{Reelle Zahlen} & = \text{Komplettierung nach der archimedischen Norm}, \\
+\text{p-adische Zahlen} & = \text{Komplettierung nach einer nicht-archimedischen Norm}.
+\end{align*}
+
+Die Dreiecksungleichung wird ultrametrisch:
+\[
+|x+y|_p \le \max(|x|_p,|y|_p).
+\]
+
+\section*{Intuitive Kurzform}
+
+\begin{itemize}
+\item Reelle Zahlen messen „Größe im Unendlichen“.
+\item p-adische Zahlen messen „Tiefe der Teilbarkeit durch $p$“.
+\item Zwei Zahlen sind p-adisch nahe, wenn ihre Differenz stark durch $p$ teilbar ist.
+\end{itemize}
+
+\end{document}
+    
