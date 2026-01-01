@@ -1,0 +1,92 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\geometry{margin=1in}
+
+\title{Perfektoide Darstellung einer 3-adischen Zahl}
+\author{Alexander Kern \& ChatGPT}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{Gesprächszusammenfassung}
+Hier dokumentieren wir die Konversation und die Umsetzung einer 3-adischen Zahl …210 in perfektoide ganze Zahlen.
+
+\section{3-adische Zahl in Dezimal}
+Die 3-adische Zahl …210 (Ziffern von rechts nach links: $a_0=0$, $a_1=1$, $a_2=2$) entspricht in Dezimal:
+
+\[
+x = 0 \cdot 3^0 + 1 \cdot 3^1 + 2 \cdot 3^2 = 21
+\]
+
+\section{Perfektoide Darstellung}
+Jede Zahl kann in positive ganze Zahlen zerlegt werden. Beispiele für 21:
+
+\[
+[21], [18,3], [9,9,3], [1,1,\dots,1]
+\]
+
+\section{Python-Algorithmus}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small, keywordstyle=\color{blue}]
+# Python-Algorithmus für perfektoide Arrays
+
+import numpy as np
+import pandas as pd
+import sympy as sp
+import itertools
+import math
+import functools
+import operator
+import networkx as nx
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+from rich import print
+from more_itertools import distinct_permutations, powerset
+from typing import List
+
+def all_partitions(n: int) -> List[List[int]]:
+    if n == 0:
+        return [[0]]
+    result = []
+    for i in range(1, n + 1):
+        for tail in all_partitions(n - i):
+            if tail == [0]:
+                result.append([i])
+            else:
+                result.append([i] + tail)
+    return result
+
+def perfektoid_arrays_3adic(digits: List[int]) -> List[List[int]]:
+    result = [[0]]
+    for i, d in enumerate(digits):
+        power = 3**i
+        new_result = []
+        for partition in all_partitions(d):
+            scaled = [x * power for x in partition]
+            for r in result:
+                new_result.append(r + scaled)
+        result = new_result
+    return result
+
+digits = [0,1,2]
+arrays = perfektoid_arrays_3adic(digits)
+print(arrays[:20])
+\end{lstlisting}
+
+\section{Ergebnisse}
+Die ersten 20 perfektoiden Arrays der 3-adischen Zahl …210:
+
+\[
+[0,1,18], [0,1,9,9], [0,1,9,5,4], \dots
+\]
+
+\end{document}
+
