@@ -1,0 +1,72 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,mathtools}
+\title{Zweiseitige $p$-adische Darstellung perfektoider Zahlen}
+\date{}
+\begin{document}
+\maketitle
+
+\section*{Zweiseitige $p$-adische Darstellung}
+
+Eine **perfektoide Zahl** kann vollständig durch eine **zweiseitige $p$-adische Reihe** dargestellt werden:
+
+\[
+x
+=
+\underbrace{\cdots + a_2 p^2 + a_1 p + a_0}_{\text{$p$-adische Richtung nach links}}
+\;\Big|\;
+\underbrace{a_{-1} p^{-1} + a_{-2} p^{-2} + \cdots}_{\text{negative / Laurent-Richtung nach rechts}}
+\]
+
+oder formal als **zweiseitige Laurent-Reihe**:
+
+\[
+x = \sum_{n=-\infty}^{+\infty} a_n p^n,
+\qquad a_n \in A,
+\]
+
+wobei \(A\) ein perfektoider Ring ist.
+
+\bigskip
+
+\section*{Begründung}
+
+Diese Darstellung enthält **alle Informationen**, die zur eindeutigen Beschreibung einer perfektoiden Zahl nötig sind:
+
+\begin{itemize}
+    \item Die linke Seite ($n\ge 0$) erfasst die **klassische $p$-adische Expansion**.
+    \item Die rechte Seite ($n<0$) erfasst die **negativen Potenzen** bzw. eine Laurent-ähnliche Richtung.
+    \item Über beide Richtungen werden **beliebige perfektoide Zahlen eindeutig kodiert**, ohne dass zusätzliche Marker, Operatoren oder Informationen nötig sind.
+\end{itemize}
+
+\bigskip
+
+\section*{Rechenoperationen}
+
+Addition, Subtraktion, Multiplikation und Division können direkt über die Koeffizienten durchgeführt werden:
+
+\[
+\sum_{n} a_n p^n \;\pm\; \sum_{n} b_n p^n = \sum_{n} (a_n \pm b_n) p^n,
+\]
+
+\[
+\left(\sum_{i} a_i p^i\right) \cdot \left(\sum_{j} b_j p^j\right)
+=
+\sum_{n} \left(\sum_{i+j=n} a_i b_j\right) p^n,
+\]
+
+\[
+\frac{1}{\sum_{n\ge 0} a_n p^n} = \sum_{k=0}^{\infty} (-1)^k \left(\sum_{n\ge1} a_n p^n\right)^k.
+\]
+
+Damit sind alle **Grundoperationen in perfektoiden Zahlen** konsistent und vollständig über diese Darstellung ausführbar.
+
+\bigskip
+
+\section*{Schlussfolgerung}
+
+\begin{quote}
+Die zweiseitige $p$-adische Darstellung mit zwei Kommas (linke $p$-adische Richtung, rechte negative Richtung) ist **hinreichend**, um eine perfektoide Zahl vollständig zu repräsentieren.  
+Es werden keine weiteren Informationen benötigt.
+\end{quote}
+
+\end{document}
