@@ -1,0 +1,85 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb}
+
+\title{Umwandlung ganzer Zahlen in perfektoide Zahlen über p-adische Zahlen}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Einleitung}
+Wir betrachten eine Menge ganzer Zahlen 
+\[
+\{ n_1, n_2, \dots, n_k \} \subset \mathbb{Z},
+\] 
+die wir in \emph{perfektoide Zahlen} überführen möchten. 
+Dazu verwenden wir klassische Werkzeuge der Zahlentheorie wie Primfaktorzerlegung, 
+den größten gemeinsamen Teiler (ggT) und das kleinste gemeinsame Vielfache (kgV).
+
+\section*{1. Primfaktorzerlegung}
+Jede Zahl \(n_i\) wird in Primfaktoren zerlegt:
+\[
+n_i = \prod_{j} p_j^{\alpha_{i,j}}, \quad p_j \text{ Primzahl}, \quad \alpha_{i,j} \in \mathbb{Z}_{\ge 0}.
+\]
+Damit haben wir jede Zahl als Produkt von Potenzen verschiedener Primzahlen geschrieben, 
+was die Grundlage für die p-adische Betrachtung bildet.
+
+\section*{2. Größter gemeinsamer Teiler und kleinstes gemeinsames Vielfaches}
+\subsection*{Größter gemeinsamer Teiler (ggT)}
+\[
+\gcd(n_1, n_2, \dots, n_k) = \prod_j p_j^{\min(\alpha_{1,j}, \dots, \alpha_{k,j})}.
+\]
+Der ggT entspricht den minimalen Exponenten jeder Primzahl, die in allen Zahlen vorkommen.
+
+\subsection*{Kleinstes gemeinsames Vielfaches (kgV)}
+\[
+\mathrm{lcm}(n_1, n_2, \dots, n_k) = \prod_j p_j^{\max(\alpha_{1,j}, \dots, \alpha_{k,j})}.
+\]
+Das kgV entspricht den maximalen Exponenten jeder Primzahl, die in mindestens einer Zahl vorkommen.
+
+\section*{3. Überführung in p-adische Zahlen}
+Für jede Primzahl \(p_j\) definieren wir eine p-adische Zahl:
+\[
+n_i \mapsto n_i^{(p_j)} \in \mathbb{Z}_{p_j}, \quad
+n_i^{(p_j)} = \sum_{k \ge 0} a_k p_j^k, \quad a_k \in \{0,1,\dots,p_j-1\}.
+\]
+\begin{itemize}
+    \item Der ggT entspricht den minimalen Exponentenwerten.
+    \item Das kgV entspricht den maximalen Exponentenwerten.
+\end{itemize}
+
+\section*{4. Bildung der perfektoiden Zahl}
+Perfektoide Zahlen sind das Projektivlimit der p-adischen Zahlen über alle Primzahlen:
+\[
+\mathbb{Z}^{\mathrm{perf}} \simeq \varprojlim_{p} \mathbb{Z}_p.
+\]
+
+Daher können wir aus der Menge \(\{n_i\}\) eine perfektoide Zahl konstruieren:
+\[
+\mathbf{n} = (n_1^{(p_1)}, n_1^{(p_2)}, \dots) \in \prod_p \mathbb{Z}_p \longrightarrow \mathbb{Z}^{\mathrm{perf}}.
+\]
+Die ggT-Exponenten liefern die minimalen Bausteine, 
+die kgV-Exponenten die maximalen, und alles dazwischen wird über das p-adische System konsistent dargestellt.
+
+\section*{5. Zusammenfassung}
+\begin{enumerate}
+    \item Zerlege die ganzen Zahlen in Primfaktoren.  
+    \item Bestimme für jede Primzahl die minimalen (ggT) und maximalen (kgV) Exponenten.  
+    \item Wandle jede Zahl in jede \(\mathbb{Z}_p\) um.  
+    \item Setze die p-adischen Komponenten als Projektivsystem zusammen, um die perfektoide Zahl zu erhalten.
+\end{enumerate}
+
+\section*{Mathematische Kompaktdarstellung}
+\[
+\begin{aligned}
+n_i &= \prod_{j} p_j^{\alpha_{i,j}}, \\
+\gcd(n_1, \dots, n_k) &= \prod_j p_j^{\min(\alpha_{1,j}, \dots, \alpha_{k,j})}, \\
+\mathrm{lcm}(n_1, \dots, n_k) &= \prod_j p_j^{\max(\alpha_{1,j}, \dots, \alpha_{k,j})}, \\
+\mathbf{n} &= \varprojlim_p n_i^{(p)} \in \mathbb{Z}^{\mathrm{perf}}.
+\end{aligned}
+\]
+
+\end{document}
+
