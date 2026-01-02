@@ -1,0 +1,130 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,mathtools}
+
+\title{Zahlendarstellung mit zwei Unendlichkeitsrichtungen
+als perfektoide $p$-adische Struktur}
+\date{}
+\begin{document}
+\maketitle
+
+\section*{Idee der Darstellung}
+
+Wir betrachten eine Darstellung
+\[
+x
+=
+\cdots + a_2 p^2 + a_1 p + a_0
+\;\;\Big|\;\;
+a_{-1}p^{-1} + a_{-2}p^{-2} + \cdots ,
+\]
+wobei der linke Teil eine $p$-adische Richtung (hohe Potenzen $p^n$)
+und der rechte Teil eine Richtung negativer Potenzen beschreibt.
+Formal schreiben wir
+\[
+x
+=
+\sum_{n=-\infty}^{+\infty} a_n p^n,
+\qquad
+a_n \in A,
+\]
+also eine \emph{zweiseitige $p$-adische Laurent-Reihe}.
+
+\bigskip
+
+\section*{Definition}
+
+Sei $A$ ein perfektoider Ring.
+Wir definieren den Ring
+\[
+\mathcal{L}_p(A)
+=
+\left\{
+\sum_{n=-\infty}^{+\infty} a_n p^n
+\;\middle|\;
+a_n \in A,\;
+a_n \to 0 \text{ für } n\to +\infty
+\right\},
+\]
+mit
+\[
+p\text{-adischer Konvergenz nach links}
+\quad\text{und}\quad
+\text{Laurent-Struktur nach rechts}.
+\]
+
+Addition und Multiplikation erfolgen formal koeffizientenweise:
+\[
+\left(\sum a_n p^n\right)
++
+\left(\sum b_n p^n\right)
+=
+\sum (a_n+b_n)p^n,
+\]
+\[
+\left(\sum a_i p^i\right)
+\left(\sum b_j p^j\right)
+=
+\sum_{n\in\mathbb{Z}}
+\left(\sum_{i+j=n} a_i b_j\right)p^n.
+\]
+
+\bigskip
+
+\section*{Zwei ``Kommas'' als Strukturmarker}
+
+Wir interpretieren die Darstellung symbolisch als
+\[
+\underbrace{
+\cdots + a_2p^2 + a_1p + a_0
+}_{\text{$p$-adische Richtung}}
+\;\;\Vert\;\;
+\underbrace{
+a_{-1}p^{-1}+a_{-2}p^{-2}+\cdots
+}_{\text{negative / archimedische Richtung}}.
+\]
+
+Damit wird eine Zahl durch zwei Unendlichkeitsrichtungen
+zwischen zwei Strukturmarkern beschrieben.
+
+\bigskip
+
+\section*{Bezug zu perfektoiden Körpern}
+
+Aus einem perfektoiden Ring $A$ erhält man den Tilt
+\[
+A^\flat = \varprojlim_{x\mapsto x^p} A/p.
+\]
+Die zugehörigen Fontaine-Körper tragen Darstellungen der Form
+\[
+\sum_{n\gg -\infty} a_n t^n,
+\]
+also Laurent-Reihen mit positiver und negativer Richtung,
+analytisch vergleichbar zur obigen Struktur.
+Insbesondere liegt
+\[
+\mathcal{L}_p(A)
+\]
+konzeptionell nahe an perfektoiden Erweiterungen wie
+\[
+\mathbf{B}_{\mathrm{dR}}.
+\]
+
+\bigskip
+
+\section*{Interpretation}
+
+Die Darstellung mit zwei ``Kommas'' beschreibt somit ein Element,
+das gleichzeitig
+
+\begin{itemize}
+\item $p$-adisch nach oben vervollständigt ist und
+\item eine zweite, nach unten offene Laurent-Richtung besitzt.
+\end{itemize}
+
+Dies realisiert eine kombinierte
+\[
+\text{$p$-adische} \;+\; \text{Laurent-/archimedische Skala}
+\]
+als perfektoid motivierte Zahlstruktur.
+
+\end{document}
