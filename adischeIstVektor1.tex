@@ -1,0 +1,61 @@
+\section*{Zahl--Vektor--Korrespondenz in Basis $n$}
+
+Sei $n \in \mathbb{N}$ mit $n \ge 2$.
+Wir definieren den Koeffizientenraum
+\[
+C_n = \{(a_0,a_1,\dots,a_k)\mid k\in\mathbb{N},\; a_i\in\{0,\dots,n-1\}\}.
+\]
+
+\subsection*{1. Abbildung Zahl $\rightarrow$ Vektor (Basisexpansion)}
+Für $x\in\mathbb{N}$ definieren wir die Ziffern
+\[
+a_i = \left\lfloor \frac{x}{n^i}\right\rfloor \bmod n,
+\qquad i\ge 0,
+\]
+so dass
+\[
+x = \sum_{i=0}^{k} a_i n^i
+\]
+für ein minimales $k$ gilt.
+Die Abbildung
+\[
+\Phi_n:\ \mathbb{N}\to C_n,\qquad
+\Phi_n(x)=(a_0,\dots,a_k)
+\]
+heißt \emph{Basisexpansion (Zahl $\rightarrow$ Vektor)}.
+
+\subsection*{2. Abbildung Vektor $\rightarrow$ Zahl (Synthese)}
+Sei $(a_0,\dots,a_k)\in C_n$.
+Wir definieren
+\[
+\Psi_n(a_0,\dots,a_k)=\sum_{i=0}^{k} a_i n^i.
+\]
+Dies ist die \emph{Syntheseabbildung (Vektor $\rightarrow$ Zahl)}.
+
+\subsection*{3. Isomorphie im endlichen Fall}
+Für alle $x\in\mathbb{N}$ und alle $(a_0,\dots,a_k)\in C_n$ gilt
+\[
+\Psi_n(\Phi_n(x)) = x,
+\qquad
+\Phi_n(\Psi_n(a_0,\dots,a_k)) = (a_0,\dots,a_k).
+\]
+Damit sind $\Phi_n$ und $\Psi_n$ zueinander inverse Bijektionen\\
+zwischen endlichen Basisdarstellungen und ganzen Zahlen.
+
+\subsection*{4. p-adische Erweiterung}
+Für eine Primzahl $p$ definieren wir den Raum unendlicher Koeffizientenfolgen
+\[
+\mathbb{Z}_p=\left\{
+(a_0,a_1,a_2,\dots)\ \bigg|\ a_i\in\{0,\dots,p-1\}
+\right\},
+\]
+mit der p-adischen Auswertung
+\[
+x=\sum_{i=0}^{\infty} a_i p^i
+\]
+und der ultrametrischen Norm
+\[
+|p^k u|_p = p^{-k},\qquad u\in\mathbb{Z},\; p\nmid u.
+\]
+Damit wird $\mathbb{Z}_p$ ein vollständiger normierter Raum
+(ultrametrischer Vektorraum über $\mathbb{Z}_p$).

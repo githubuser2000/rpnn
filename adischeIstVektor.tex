@@ -1,0 +1,76 @@
+\section*{Beispiele zur Zahl--Vektor--Korrespondenz}
+
+\subsection*{Beispiel 1: Zahl $\rightarrow$ Vektor in Basis $5$}
+
+Gegeben sei
+\[
+x = 347.
+\]
+Wir bestimmen die Ziffern $a_i$ durch sukzessive Division mit Rest.
+
+\[
+a_0 = 347 \bmod 5 = 2,
+\qquad
+\left\lfloor \frac{347}{5}\right\rfloor = 69,
+\]
+\[
+a_1 = 69 \bmod 5 = 4,
+\qquad
+\left\lfloor \frac{69}{5}\right\rfloor = 13,
+\]
+\[
+a_2 = 13 \bmod 5 = 3,
+\qquad
+\left\lfloor \frac{13}{5}\right\rfloor = 2,
+\]
+\[
+a_3 = 2 \bmod 5 = 2,
+\qquad
+\left\lfloor \frac{2}{5}\right\rfloor = 0.
+\]
+
+Damit endet die Expansion und es gilt
+\[
+\Phi_5(347) = (a_0,a_1,a_2,a_3) = (2,4,3,2)_5.
+\]
+
+\paragraph{Verifikation.}
+\[
+2 + 4\cdot 5 + 3\cdot 5^2 + 2\cdot 5^3
+= 2 + 20 + 75 + 250 = 347.
+\]
+Also stimmt die Darstellung.
+
+
+\subsection*{Beispiel 2: Vektor $\rightarrow$ Zahl in Basis $7$}
+
+Gegeben sei der Koeffizientenvektor
+\[
+(a_0,a_1,a_2,a_3) = (3,5,2,1)_7.
+\]
+
+Die Syntheseabbildung lautet
+\[
+x = \Psi_7(3,5,2,1)
+   = 3 + 5\cdot 7 + 2\cdot 7^2 + 1\cdot 7^3.
+\]
+
+Wir berechnen die Terme:
+\[
+5\cdot 7 = 35,\qquad
+2\cdot 7^2 = 2\cdot 49 = 98,\qquad
+1\cdot 7^3 = 343.
+\]
+
+Somit
+\[
+x = 3 + 35 + 98 + 343 = 479.
+\]
+
+\paragraph{Verifikation.}
+Die Rückabbildung ergibt
+\[
+\Phi_7(479) = (3,5,2,1)_7,
+\]
+also sind $\Phi_7$ und $\Psi_7$ hier invers zueinander.
+
