@@ -1,0 +1,127 @@
+\section*{Spieltheorie und Simulation auf p-adischer Entscheidungsstruktur}
+
+\subsection*{1. Entscheidungsraum und Metrik}
+
+Sei $X$ die Menge aller unendlichen Pfade in einem hierarchischen
+Entscheidungsbaum
+\[
+x = (x_0,x_1,x_2,\dots),
+\qquad x_k \in L_k,
+\]
+wobei $L_k$ die politische Ebene der Tiefe $k$ bezeichnet
+(Dorf, Bezirk, Bundesland, Nation, \dots).
+
+Die p-adische Konsenstiefe zweier Entscheidungen $x,y \in X$ ist
+\[
+k(x,y)
+=
+\max\{\,k \mid x_j = y_j \text{ für alle } j \ge k\,\}.
+\]
+
+Die zugehörige Ultrametrik lautet
+\[
+d(x,y)=p^{-k(x,y)}.
+\]
+
+\subsection*{2. Konfliktkosten nach Hierarchieebenen}
+
+Seien $w_0 < w_1 < w_2 < \dots$ monoton wachsende
+Gewichte politischer Konflikte.
+Für zwei Entscheidungen definieren wir
+\[
+C(x,y)
+=
+\sum_{k\ge 0}
+w_k \,\mathbf{1}[x_k \neq y_k],
+\]
+wobei Konflikte auf höheren Ebenen stärker gewichtet werden.
+
+\subsection*{3. Nutzenfunktion der Spieler}
+
+Es gebe $N$ Spieler mit Entscheidungen
+$x^{(1)},\dots,x^{(N)} \in X$.
+Der Nutzen von Spieler $i$ ist
+\[
+U_i(x^{(i)},x^{-i})
+=
+\alpha
+\sum_{j\neq i}
+f\!\bigl(d(x^{(i)},x^{(j)})\bigr)
+\;+\;
+\beta\, g\!\bigl(x^{(i)}\bigr),
+\]
+wobei
+\begin{itemize}
+\item $f$ eine fallende Funktion der Distanz ist
+      (Kohärenzpräferenz),
+\item $g$ eine individuelle Präferenzfunktion ist,
+\item $\alpha,\beta>0$ die Gewichtung
+      von Konsens vs.~Autonomie steuern.
+\end{itemize}
+
+Ein Spezialfall ist die konfliktbasierte Form
+\[
+f(d) = -C(x^{(i)},x^{(j)}),
+\qquad
+U_i = -\frac{1}{N-1}
+\sum_{j\neq i} C(x^{(i)},x^{(j)}).
+\]
+
+\subsection*{4. p-adische Anpassungsdynamik (Best Response)}
+
+Diskrete Zeit $t=0,1,2,\dots$.
+Jeder Spieler passt ausschließlich die \emph{niedrigste Ebene} an,
+auf der kein Konsens besteht.
+
+Sei $k_i(t)$ die höchste Ebene,
+auf der $x^{(i)}_t$ von der Mehrheitsentscheidung abweicht.
+Dann gilt
+\[
+x^{(i)}_{t+1}
+=
+\operatorname*{arg\,max}_{y \in N_p^{(k_i(t))}(x^{(i)}_t)}
+U_i\!\left(y, x^{-i}_t\right),
+\]
+wobei $N_p^{(k)}(x)$
+die Menge der Alternativen bezeichnet,
+die sich ausschließlich auf Ebene $k$
+vom aktuellen Pfad unterscheiden.
+
+Damit entstehen:
+\begin{itemize}
+\item stabile hohe Ebenen (träge Struktur),
+\item flexible lokale Ebenen (Basisdynamik),
+\item sprunghafte Phasenübergänge bei Konsensbruch oben.
+\end{itemize}
+
+\subsection*{5. Beispielinstanz}
+
+Für $p=5$ und drei Ebenen
+\[
+k=0:\text{Dorf},\quad
+k=1:\text{Bezirk},\quad
+k=2:\text{Bundesland},
+\]
+mit Gewichten $w_0=1,\;w_1=3,\;w_2=9$
+ergibt sich
+\[
+C(x,y)
+=
+\sum_{k=0}^2 w_k\,
+\mathbf{1}[x_k\neq y_k],
+\qquad
+U_i = -\frac{1}{N-1}
+\sum_{j\neq i} C(x^{(i)},x^{(j)}).
+\]
+
+\medskip
+\noindent
+\textbf{Interpretation:}
+\[
+\text{Kohärenz} \;\sim\; k(x,y)
+\quad\text{(gemeinsame Konsenstiefe)};
+\qquad
+\text{Fragmentierung} \;\sim\; d(x,y)
+\quad\text{(Ultrametrik-Abstand)}.
+\]
+
