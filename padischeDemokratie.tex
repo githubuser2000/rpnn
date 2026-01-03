@@ -1,0 +1,83 @@
+\section*{Formales Modell einer hierarchischen Demokratie auf p-adischer Struktur}
+
+\subsection*{1. Entscheidungsbaum}
+
+Sei $T$ ein geordneter, wurzelbehafteter Baum mit Ebenen
+\[
+L_0, L_1, L_2, \dots
+\]
+die den politischen Hierarchieebenen entsprechen:
+\[
+L_0 = \text{Dorf},\quad
+L_1 = \text{Bezirk},\quad
+L_2 = \text{Bundesland},\quad
+L_3 = \text{Nation},\ \dots
+\]
+
+Jeder Knoten $v \in L_k$ besitzt eine endliche Menge von Kindern
+$\mathrm{Child}(v) \subseteq L_{k-1}$.
+
+Eine \emph{Entscheidungskonfiguration} ist ein unendlicher Pfad
+\[
+x = (x_0,x_1,x_2,\dots)
+\]
+mit $x_k \in L_k$ und $x_{k-1} \in \mathrm{Child}(x_k)$.
+
+\subsection*{2. Kodierung als $p$-adische Expansion}
+
+Jedem Knoten $x_k$ wird ein lokaler Entscheidungswert
+\[
+a_k(x) \in \{0,1,\dots,p-1\}
+\]
+zugeordnet. Damit definieren wir die Abbildung
+\[
+\Phi(x)
+  = \sum_{k=0}^{\infty} a_k(x)\,p^k
+\]
+als p-adische Repräsentation der Entscheidung $x$.
+
+\subsection*{3. Konsenstiefe}
+
+Für zwei Entscheidungen $x,y$ sei
+\[
+k(x,y)
+= \max\{\,k \mid x_j = y_j \text{ für alle } j \ge k\,\}
+\]
+die größte gemeinsame Hierarchieebene
+(\emph{Tiefe des gemeinsamen politischen Konsenses}).
+
+\subsection*{4. p-adische Entscheidungsmetrik}
+
+Die Distanz wird definiert als
+\[
+d(x,y)
+= p^{-k(x,y)}.
+\]
+
+Damit gilt:
+\[
+d(x,y) \text{ ist klein} \;\Longleftrightarrow\;
+\text{tiefer Konsens auf höheren Ebenen.}
+\]
+
+\subsection*{5. Eigenschaften}
+
+\begin{itemize}
+\item $d$ ist eine Ultrametrik:
+\[
+d(x,z) \le \max\{d(x,y),d(y,z)\}.
+\]
+\item Konflikte auf unteren Ebenen sind strukturell klein,
+solange höhere Ebenen übereinstimmen.
+\item Systeminstabilität entsteht, wenn Konsens auf hoher Ebene bricht.
+\end{itemize}
+
+\subsection*{6. Interpretation}
+
+\[
+\text{Stabilität}(x,y)
+\;\sim\;
+k(x,y)
+\quad\text{(gemeinsame Entscheidungstiefe)}.
+\]
+
