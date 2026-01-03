@@ -1,0 +1,128 @@
+\section*{Erweiterter Entscheidungsraum mit drei Dimensionen}
+
+\subsection*{1. Mehrdimensionaler p-adischer Entscheidungsraum}
+
+Jede Entscheidung besitzt nun drei unabhängige Komponenten
+\[
+x = (x^{(S)},\,x^{(G)},\,x^{(V)}),
+\]
+wobei
+\[
+x^{(S)} = (x^{(S)}_0,x^{(S)}_1,\dots)
+\quad\text{(Stärke / Kampfkraft)},
+\]
+\[
+x^{(G)} = (x^{(G)}_0,x^{(G)}_1,\dots)
+\quad\text{(Geldmenge / ökonomische Ressourcen)},
+\]
+\[
+x^{(V)} = (x^{(V)}_0,x^{(V)}_1,\dots)
+\quad\text{(Vote / Stimmwahl)}.
+\]
+
+Jede Komponente ist ein Pfad im Hierarchiebaum mit Ebenen
+(Dorf, Bezirk, Bundesland, Nation, \dots).
+
+\subsection*{2. p-adische Konsenstiefe je Dimension}
+
+Für zwei Entscheidungen $x,y$ definieren wir die
+dimensionale Konsenstiefe
+\[
+k_D(x,y)
+=
+\max\{\,k \mid x^{(D)}_j = y^{(D)}_j
+\ \text{für alle } j \ge k\,\},
+\qquad
+D \in \{S,G,V\}.
+\]
+
+Daraus entstehen drei Ultrametriken
+\[
+d_D(x,y)=p^{-k_D(x,y)}.
+\]
+
+\subsection*{3. Gesamtmetrik (gewichtete politische Struktur)}
+
+Die gesellschaftliche Distanz ergibt sich als
+gewichtete Kombination der Dimensionen:
+\[
+d(x,y)
+=
+\lambda_S\, d_S(x,y)
+\;+\;
+\lambda_G\, d_G(x,y)
+\;+\;
+\lambda_V\, d_V(x,y),
+\]
+mit Gewichten
+\[
+\lambda_S,\lambda_G,\lambda_V > 0,
+\qquad
+\lambda_S+\lambda_G+\lambda_V = 1,
+\]
+die die Relevanz von
+Kampfkraft, Geldmenge und Stimmwahl ausdrücken.
+
+\subsection*{4. Konfliktkosten pro Dimension}
+
+\[
+C(x,y)
+=
+\sum_{D\in\{S,G,V\}}
+\sum_{k\ge 0}
+w_{D,k}\,
+\mathbf{1}\!\bigl[
+x^{(D)}_k \neq y^{(D)}_k
+\bigr],
+\]
+mit hierarchie- und dimensionsspezifischen Gewichten
+\[
+w_{S,k}:\text{Macht-/Sicherheitskonflikte},\qquad
+w_{G,k}:\text{ökonomische Konflikte},\qquad
+w_{V,k}:\text{demokratische Abstimmungskonflikte}.
+\]
+
+\subsection*{5. Nutzenfunktion im dreidimensionalen Raum}
+
+\[
+U_i
+=
+\alpha
+\sum_{j\neq i}
+F\!\bigl(d(x^{(i)},x^{(j)})\bigr)
+\;+\;
+\beta_S\, g_S(x^{(i)})
+\;+\;
+\beta_G\, g_G(x^{(i)})
+\;+\;
+\beta_V\, g_V(x^{(i)}),
+\]
+wobei
+\begin{itemize}
+\item $g_S$ = strategischer Nutzen (Kampfkraft / Sicherheit),
+\item $g_G$ = ökonomischer Nutzen (Ressourcen / Wohlstand),
+\item $g_V$ = politischer Nutzen (Wahlpräferenz / Repräsentation),
+\item $\beta_S,\beta_G,\beta_V>0$ die Prioritäten der Dimensionen steuern.
+\end{itemize}
+
+\subsection*{6. Interpretation}
+
+\[
+\text{Stabilität}
+\;\sim\;
+\text{gemeinsame Konsenstiefe in } (S,G,V),
+\qquad
+\text{Machtverschiebung}
+\;\sim\;
+\text{Bruch auf hoher Ebene in } S,
+\]
+\[
+\text{ökonomische Fragmentierung}
+\;\sim\;
+\text{Bruch in } G,
+\qquad
+\text{demokratische Polarisierung}
+\;\sim\;
+\text{Bruch in } V.
+\]
+
