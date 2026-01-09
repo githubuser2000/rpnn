@@ -1,0 +1,138 @@
+\section{Implementierungen mit Steuer-Zweckbindung}
+
+\subsection{C++: Infrastruktur vs. Transfer}
+
+\begin{lstlisting}[language=C++]
+#include <iostream>
+#include <vector>
+#include <string>
+#include <openssl/sha.h>
+#include <sstream>
+
+struct Node {
+    std::string name;
+    double localTax = 0.0;
+    double taxInfra = 0.0;
+    double taxTransfer = 0.0;
+    std::string hash;
+    std::vector<Node> children;
+};
+
+std::string sha256(const std::string &str){
+    unsigned char hashBytes[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)str.c_str(), str.size(), hashBytes);
+    std::stringstream ss;
+    for(int i=0;i<SHA256_DIGEST_LENGTH;i++)
+        ss << std::hex << (int)hashBytes[i];
+    return ss.str();
+}
+
+double computeTax(Node& node){
+    node.taxInfra = node.localTax * 0.6;    // Beispiel: 60\% Infrastruktur
+    node.taxTransfer = node.localTax * 0.4; // 40\% Transfer
+    for(auto& c : node.children){
+        computeTax(c);
+        node.taxInfra += c.taxInfra;
+        node.taxTransfer += c.taxTransfer;
+    }
+    return node.taxInfra + node.taxTransfer;
+}
+
+void computeHash(Node& node, const std::string& parentHash=""){
+    std::string data = node.name + parentHash;
+    for(auto& c : node.children)
+        data += c.hash;
+    node.hash = sha256(data);
+    for(auto& c : node.children)
+        computeHash(c, node.hash);
+}
+\end{lstlisting}
+
+\subsection{Java: Infrastruktur vs. Transfer}
+
+\begin{lstlisting}[language=Java]
+class Node {
+    String name;
+    double localTax;
+    double taxInfra;
+    double taxTransfer;
+    String hash;
+    List<Node> children = new ArrayList<>();
+
+    double computeTax(){
+        taxInfra = 0.6 * localTax;      // 60% Infrastruktur
+        taxTransfer = 0.4 * localTax;   // 40% Transfer
+        for(Node c : children){
+            c.computeTax();
+            taxInfra += c.taxInfra;
+            taxTransfer += c.taxTransfer;
+        }
+        return taxInfra + taxTransfer;
+    }
+
+    void computeHash(String parentHash){
+        StringBuilder data = new StringBuilder(name + parentHash);
+        for(Node c : children) data.append(c.hash);
+        hash = sha256(data.toString());
+        for(Node c : children) c.computeHash(hash);
+    }
+
+    static String sha256(String base){
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(base.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for(byte b : hashBytes){
+                String hex = Integer.toHexString(0xff & b);
+                if(hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch(Exception e) { throw new RuntimeException(e); }
+    }
+}
+\end{lstlisting}
+
+\subsection{Haskell: Infrastruktur vs. Transfer}
+
+\begin{lstlisting}[language=Haskell]
+data Node = Node {
+    name :: String,
+    localTax :: Double,
+    taxInfra :: Double,
+    taxTransfer :: Double,
+    hashVal :: String,
+    children :: [Node]
+} deriving Show
+
+computeTax :: Node -> Node
+computeTax n =
+    let infra = 0.6 * localTax n
+        transfer = 0.4 * localTax n
+        updatedChildren = map computeTax (children n)
+        totalInfra = infra + sum (map taxInfra updatedChildren)
+        totalTransfer = transfer + sum (map taxTransfer updatedChildren)
+    in n { taxInfra = totalInfra, taxTransfer = totalTransfer, children = updatedChildren }
+
+-- SHA256 Hash als String
+import Crypto.Hash.SHA256 (hash)
+import qualified Data.ByteString.Char8 as BS
+import Data.ByteString.Base16 (encode)
+
+computeHash :: Node -> String -> Node
+computeHash n parentHash =
+    let childHashes = concatMap hashVal (children n)
+        h = BS.unpack $ encode $ hash $ BS.pack (name n ++ parentHash ++ childHashes)
+        updatedChildren = map (\c -> computeHash c h) (children n)
+    in n { hashVal = h, children = updatedChildren }
+\end{lstlisting}
+
+\subsection{Kommentar}
+Dieses Setup erlaubt:
+\begin{itemize}
+    \item Trennung von Infrastruktur- und Transfer-Steuern
+    \item Rekursive Aggregation von Dorf bis Land
+    \item Optionales Routing von Transfers auf EU-Länder
+    \item Blockchain-ähnliche Integritätsprüfung über Hashes
+\end{itemize}
+

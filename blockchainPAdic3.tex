@@ -1,0 +1,67 @@
+\section{Politökonomisches Steuer-Routing}
+
+\subsection{Zweckbindung}
+Jedes Dorf kann die lokale Steuer in zwei Kategorien aufteilen:
+\begin{itemize}
+    \item \textbf{Infrastruktur} ($\text{tax}_\text{infra}$)
+    \item \textbf{Transfer} ($\text{tax}_\text{transfer}$)
+\end{itemize}
+
+\begin{equation}
+\text{tax}_\text{dorf} = \text{tax}_\text{infra} + \text{tax}_\text{transfer}
+\end{equation}
+
+Dabei gilt ein festgelegter Anteil $p_\text{infra}$ für Infrastruktur:
+
+\begin{equation}
+\text{tax}_\text{infra} = p_\text{infra} \cdot \text{tax}_\text{dorf}, \quad
+\text{tax}_\text{transfer} = (1 - p_\text{infra}) \cdot \text{tax}_\text{dorf}, \quad 0 \le p_\text{infra} \le 1
+\end{equation}
+
+\subsection{Aggregation nach oben}
+Für jede Ebene aggregieren wir Infrastruktur- und Transfer-Steuern getrennt:
+
+\begin{align}
+\text{tax}_\text{infra}^{\text{node}} &= \text{tax}_\text{infra}^{\text{local}} + \sum_{c \in \text{children}} \text{tax}_\text{infra}^c \\
+\text{tax}_\text{transfer}^{\text{node}} &= \text{tax}_\text{transfer}^{\text{local}} + \sum_{c \in \text{children}} \text{tax}_\text{transfer}^c
+\end{align}
+
+\subsection{EU-Verteilung der Transfers}
+Die Transfer-Steuern eines Landes können auf 1--3 EU-Länder verteilt werden:
+
+\begin{equation}
+\text{tax}_\text{transfer}^{\text{EU-Land}} = \frac{\text{tax}_\text{transfer}^{\text{Land}}}{n_\text{EU-Länder}}, \quad 1 \le n_\text{EU-Länder} \le 3
+\end{equation}
+
+\subsection{Algorithmus-Erweiterung: Zweckbindung}
+
+\begin{algorithm}
+\caption{Baum erzeugen mit Hashes, Steuern und Zweckbindung}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} Ebenen: Land $\rightarrow$ Bundesland $\rightarrow$ Bezirk $\rightarrow$ Dorf
+\STATE \textbf{Function} GenerateNode(level, depth, parentHash)
+\STATE \quad Erzeuge Name für Knoten
+\STATE \quad Falls Dorf:
+\STATE \quad \quad Berechne localTax
+\STATE \quad \quad Teile localTax auf: 
+\STATE \quad \quad \quad tax\_infra = p\_infra * localTax
+\STATE \quad \quad \quad tax\_transfer = (1-p\_infra) * localTax
+\STATE \quad Falls depth > 0:
+\STATE \quad \quad Wähle 1--3 Kinder
+\STATE \quad \quad Rekursiv: GenerateNode(childLevel, depth-1, parentHash)
+\STATE \quad Berechne node.hash = Hash(Name $\|$ parentHash $\|$ Kinderhashes)
+\STATE \quad Aggregiere node.tax\_infra = localTax\_infra + Summe Kinder
+\STATE \quad Aggregiere node.tax\_transfer = localTax\_transfer + Summe Kinder
+\STATE \quad \textbf{return} node
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Kommentar}
+Dieses System erlaubt:
+\begin{itemize}
+    \item \textbf{Zweckbindung} der Steuern von Dorf bis Land
+    \item \textbf{Separierte Aggregation} für Infrastruktur und Transfers
+    \item \textbf{EU-kompatible Transfers} auf 1--3 Länder
+    \item \textbf{Blockchain-Hash} zur Integritätsprüfung jeder Ebene
+\end{itemize}
+
