@@ -1,0 +1,71 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{11-adischer Blocktree mit Bezirken, Kreisstädten und Hauptstädten}
+\author{Alexander Kern}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Struktur}
+
+\begin{itemize}
+\item EU-Land  
+\item Bundesland  
+\item Bundesland-Hauptstadt  
+\item Bezirk  
+\item Kreisstadt  
+\item Dörfer (11 pro Bezirk)  
+\item Steueraufteilung: Infrastruktur (60\%) / Transfer (40\%)  
+\item Summe Bundesland / EU-Verteilung
+\end{itemize}
+
+\section{Tabelle der Steuerverteilung}
+
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+
+\begin{tabular}{c c c c c c c c}
+\toprule
+EU-Land & Land-Hauptstadt & Bundesland & BL-Hauptstadt & Bezirk & Kreisstadt & Dorf & Steuer (Infra / Transfer) \\
+\midrule
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D1 & 100 / 40 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D2 & 120 / 48 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D3 & 90 / 36 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D4 & 110 / 44 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D5 & 80 / 32 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D6 & 95 / 38 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D7 & 105 / 42 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D8 & 100 / 40 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D9 & 115 / 46 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D10 & 90 / 36 \\
+EU1 & LH1 & BL1 & BLH1 & BZ1 & KS1 & D11 & 100 / 40 \\
+\midrule
+\multicolumn{7}{r}{\textbf{Summe Bezirk}} & 1115 / 444 \\
+\midrule
+EU1 & LH1 & BL1 & BLH1 & BZ2 & KS2 & D1 & 95 / 38 \\
+EU1 & LH1 & BL1 & BLH1 & BZ2 & KS2 & D2 & 105 / 42 \\
+\multicolumn{7}{r}{\textbf{Summe Bezirk}} & 200 / 80 \\
+\midrule
+\multicolumn{7}{r}{\textbf{Summe Bundesland}} & 1315 / 524 \\
+\midrule
+\multicolumn{7}{r}{\textbf{EU-Verteilung}} & 47.6 pro EU-Land \\
+\bottomrule
+\end{tabular}
+
+\section{Berechnung}
+
+\begin{itemize}
+\item Infrastruktur = 60\% der Dorfsteuer  
+\item Transfer = 40\% der Dorfsteuer  
+\item Summe Bezirk = Summe aller Dörfer im Bezirk  
+\item Summe Bundesland = Summe aller Bezirke im Bundesland  
+\item EU-Verteilung = Summe Transfer Bundesland / 11 EU-Länder
+\end{itemize}
+
+\end{document}
+

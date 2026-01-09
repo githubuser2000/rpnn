@@ -1,0 +1,77 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{11-adischer Blocktree: Steueraufteilung von Dörfern bis EU-Ländern}
+\author{Alexander Kern}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Erläuterung}
+
+In dieser Tabelle sind die Steuern eines 11-adischen Blocktrees dargestellt:
+
+\begin{itemize}
+\item \textbf{11 Dörfer pro Bundesland}  
+\item \textbf{11 Bundesländer pro EU-Land}  
+\item Steuern werden aufgeteilt in \textbf{Infrastruktur} und \textbf{Transfer}  
+\item Transfers werden gleichmäßig auf alle 11 EU-Länder verteilt  
+\end{itemize}
+
+\section{Tabelle der Steuerverteilung}
+
+\renewcommand{\arraystretch}{1.2} % Zeilenabstand
+\setlength{\tabcolsep}{4pt} % Spaltenabstand
+
+\begin{tabular}{c c c c c c}
+\toprule
+EU-Land & Bundesland & Dorf & Steuer Dorf & Infrastruktur & Transfer \\
+\midrule
+\multicolumn{6}{c}{Beispiel für 1 EU-Land, 1 Bundesland} \\
+\midrule
+EU1 & BL1 & D1 & 100 & 60 & 40 \\
+EU1 & BL1 & D2 & 120 & 72 & 48 \\
+EU1 & BL1 & D3 & 90 & 54 & 36 \\
+EU1 & BL1 & D4 & 110 & 66 & 44 \\
+EU1 & BL1 & D5 & 80 & 48 & 32 \\
+EU1 & BL1 & D6 & 95 & 57 & 38 \\
+EU1 & BL1 & D7 & 105 & 63 & 42 \\
+EU1 & BL1 & D8 & 100 & 60 & 40 \\
+EU1 & BL1 & D9 & 115 & 69 & 46 \\
+EU1 & BL1 & D10 & 90 & 54 & 36 \\
+EU1 & BL1 & D11 & 100 & 60 & 40 \\
+\midrule
+\multicolumn{3}{r}{\textbf{Summe Bundesland}} & 1205 & 723 & 482 \\
+\midrule
+\multicolumn{6}{c}{Verteilung auf 11 EU-Länder} \\
+\midrule
+EU1 & - & - & - & - & 43.8 \\
+EU2 & - & - & - & - & 43.8 \\
+EU3 & - & - & - & - & 43.8 \\
+EU4 & - & - & - & - & 43.8 \\
+EU5 & - & - & - & - & 43.8 \\
+EU6 & - & - & - & - & 43.8 \\
+EU7 & - & - & - & - & 43.8 \\
+EU8 & - & - & - & - & 43.8 \\
+EU9 & - & - & - & - & 43.8 \\
+EU10 & - & - & - & - & 43.8 \\
+EU11 & - & - & - & - & 43.8 \\
+\bottomrule
+\end{tabular}
+
+\section{Erklärung der Berechnung}
+
+\begin{itemize}
+\item \textbf{Dorfsteuer} = beliebiger Betrag (z.B. in Geldeinheiten)  
+\item \textbf{Infrastruktur} = 60\% der Dorfsteuer  
+\item \textbf{Transfer} = 40\% der Dorfsteuer  
+\item \textbf{Summe Bundesland} = Summe aller Dörfer  
+\item \textbf{EU-Verteilung} = Summe Transfers Bundesland $\div$ 11 EU-Länder  
+\end{itemize}
+
+\end{document}
+
