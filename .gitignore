@@ -1,0 +1,17 @@
+.~lock.*.csv#
+*.png
+__pycache__
+# alle build-Ordner rekursiv ignorieren
+build/
+**/build/
+**/cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.a
+*.so
+*.exe
+/bin//
