@@ -1,0 +1,175 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Bedeutung der Abbildungen \texttt{perfektoid\_to\_lp} und \texttt{lp\_to\_perfektoid}}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Kurzüberblick}
+
+Es existieren zwei zentrale Abbildungen:
+\[
+\texttt{perfektoid\_to\_lp}
+\quad\text{und}\quad
+\texttt{lp\_to\_perfektoid}.
+\]
+
+\begin{itemize}
+\item \textbf{\texttt{perfektoid\_to\_lp}} übersetzt eine endliche perfektoide (p-adische) Darstellung
+      in ein lineares Optimierungsproblem, das vom Simplex-Algorithmus verarbeitet werden kann.
+\item \textbf{\texttt{lp\_to\_perfektoid}} interpretiert eine Lösung dieses Optimierungsproblems
+      wieder als perfektoide Darstellung.
+\end{itemize}
+
+Diese Abbildungen sind \emph{keine Inversen}, sondern bilden ein
+\emph{Modellierungs-- und Interpretationspaar}.
+
+\section*{1. Mathematische Ausgangsstruktur}
+
+Eine endliche p-adische (perfektoide) Approximation wird beschrieben durch
+\[
+x \approx \sum_{i=0}^{n} a_i \, p^{k_0 + i},
+\]
+wobei
+\[
+p \text{ eine Primzahl}, \quad
+k_0 \in \mathbb{Z}, \quad
+a_i \in \{0,\dots,p-1\}.
+\]
+
+Diese Daten werden zusammengefasst als
+\[
+\text{PerfektoidApprox} = (p, k_0, (a_0,\dots,a_n)).
+\]
+
+\section*{2. Bedeutung von \texttt{perfektoid\_to\_lp}}
+
+Die Abbildung
+\[
+\texttt{perfektoid\_to\_lp} :
+(p, k_0, a_0,\dots,a_n)
+\longmapsto
+\text{LinearProgram}
+\]
+übersetzt arithmetische Struktur in Optimierungsstruktur.
+
+\subsection*{2.1 Variablen}
+
+Für jede p-adische Ziffer wird eine LP-Variable eingeführt:
+\[
+a_i \longleftrightarrow x_i.
+\]
+
+\subsection*{2.2 Zielfunktion}
+
+Die Zielfunktion minimiert die p-adische Bewertung:
+\[
+\min \sum_{i=0}^{n} (k_0 + i)\, x_i.
+\]
+
+Dies bevorzugt Lösungen mit niedriger Bewertung und modelliert p-adische
+``Kleinheit''.
+
+\subsection*{2.3 Nebenbedingungen}
+
+\paragraph{Ziffernbeschränkung}
+\[
+0 \le x_i \le p-1.
+\]
+
+\paragraph{Frobenius-Kohärenz (perfektoide Struktur)}
+\[
+x_{i+p} - x_i = 0,
+\quad \text{für alle zulässigen } i.
+\]
+
+Diese Bedingung modelliert diskret die Surjektivität des Frobenius
+\[
+x \mapsto x^p.
+\]
+
+\subsection*{2.4 Ergebnis}
+
+Das Resultat ist ein lineares Programm
+\[
+\min c^\top x \quad \text{unter} \quad A x = b, \; l \le x \le u,
+\]
+welches direkt vom Simplex-Algorithmus behandelt werden kann.
+
+\section*{3. Bedeutung von \texttt{lp\_to\_perfektoid}}
+
+Die Abbildung
+\[
+\texttt{lp\_to\_perfektoid} :
+x^\ast \longmapsto (p, k_0, a_0,\dots,a_n)
+\]
+interpretiert eine numerische Lösung wieder arithmetisch.
+
+\subsection*{3.1 Eingabe}
+
+Eine Simplex-Lösung liefert einen reellen Vektor
+\[
+x^\ast = (x_0^\ast, \dots, x_n^\ast).
+\]
+
+\subsection*{3.2 Diskretisierung}
+
+Die kontinuierlichen Werte werden gerundet:
+\[
+a_i := \operatorname{round}(x_i^\ast).
+\]
+
+Dadurch entsteht wieder eine zulässige p-adische Ziffernfolge.
+
+\subsection*{3.3 Ergebnis}
+
+Die rekonstruierte perfektoide Approximation lautet
+\[
+x_{\text{neu}} = \sum_{i=0}^{n} a_i \, p^{k_0 + i}.
+\]
+
+\section*{4. Warum dies keine echte Inversion ist}
+
+Im Allgemeinen gilt:
+\[
+\texttt{lp\_to\_perfektoid} \circ \texttt{perfektoid\_to\_lp}
+\neq \mathrm{id}.
+\]
+
+Gründe:
+\begin{itemize}
+\item Relaxierung von Ganzzahligkeit (LP statt MILP),
+\item Rundungsfehler,
+\item endliche Trunkierung,
+\item linearisierte Frobenius-Bedingungen.
+\end{itemize}
+
+Die Abbildungen bilden daher keinen Isomorphismus, sondern einen
+\emph{Modellierungszyklus}.
+
+\section*{5. Intuitive Zusammenfassung}
+
+\[
+\begin{array}{ccl}
+\text{p-adische Zahl} & \longrightarrow & \text{Optimierungsproblem} \\
+\text{Bewertung}     & \longrightarrow & \text{Zielfunktion} \\
+\text{Frobenius}     & \longrightarrow & \text{Nebenbedingungen} \\
+\text{Lösung}        & \longrightarrow & \text{neue Ziffernfolge}
+\end{array}
+\]
+
+\section*{6. Fazit}
+
+\texttt{perfektoid\_to\_lp} kodiert perfektoide Struktur als lineare Geometrie,  
+\texttt{lp\_to\_perfektoid} dekodiert numerische Lösungen wieder als Zahlen.
+
+Optimiert wird nicht die Zahl selbst, sondern ihre
+arithmetisch motivierte Darstellung.
+
+\end{document}
+
