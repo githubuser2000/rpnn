@@ -1,0 +1,167 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Perfektoide Zahlen als lineare Optimierungsprobleme}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Vorabklärung}
+
+Es gibt \emph{keine kanonische mathematische Äquivalenz} zwischen perfektoiden Zahlen und linearen Optimierungsproblemen.
+Was hier beschrieben wird, ist eine \emph{strukturtreue Modellierung}:
+Eine perfektoide bzw.\ p-adische Zahl wird in eine endliche Menge linearer Variablen,
+eine Hauptbedingung und mehrere Nebenbedingungen übersetzt,
+sodass ein Simplex- oder MILP-Verfahren darauf anwendbar ist.
+
+\section*{1. p-adische und perfektoide Struktur}
+
+Eine p-adische Zahl besitzt eine Darstellung
+\[
+x = \sum_{k \ge k_0} a_k p^k,
+\qquad a_k \in \{0,1,\dots,p-1\}.
+\]
+
+Die zugehörige p-adische Bewertung ist
+\[
+v_p(x) = \min\{k \mid a_k \neq 0\}.
+\]
+
+Perfektoide Strukturen sind zusätzlich durch die Surjektivität des Frobenius
+\[
+\varphi(x) = x^p
+\]
+charakterisiert.
+
+Die Geometrie ist nicht-archimedisch:
+\[
+|x+y|_p \le \max(|x|_p, |y|_p).
+\]
+
+\section*{2. Variablenwahl für das Optimierungsproblem}
+
+Wir fixieren eine endliche Approximation
+\[
+x \approx \sum_{k=k_0}^{k_1} a_k p^k.
+\]
+
+Daraus entstehen die Optimierungsvariablen
+\[
+\mathbf{a} = (a_{k_0}, a_{k_0+1}, \dots, a_{k_1}) \in \mathbb{R}^{n}.
+\]
+
+\section*{3. Hauptbedingung (Zielfunktion oder Gleichung)}
+
+\subsection*{Variante A: Rekonstruktion einer Zielzahl}
+
+Für einen gegebenen Zielwert \(X\):
+\[
+\sum_{k=k_0}^{k_1} a_k p^k = X.
+\]
+
+Dies ist eine lineare Gleichung und kann als Hauptbedingung dienen.
+
+\subsection*{Variante B: Minimierung der p-adischen Bewertung}
+
+Die p-adische Tiefe wird linear approximiert durch
+\[
+\min \sum_{k=k_0}^{k_1} k \cdot a_k.
+\]
+
+Diese Zielfunktion bevorzugt niedrige Bewertungen
+und modelliert p-adische ``Kleinheit''.
+
+\section*{4. Nebenbedingungen}
+
+\subsection*{(1) Ziffernbeschränkung}
+
+Die p-adische Ziffernstruktur erzwingt
+\[
+0 \le a_k \le p-1
+\quad \text{für alle } k.
+\]
+
+\subsection*{(2) Frobenius-Kohärenz (perfektoide Approximation)}
+
+Perfektoidheit verlangt die Existenz eines p-ten Wurzelelements.
+Diskret modelliert:
+\[
+a_{k+p} \approx a_k.
+\]
+
+Linear relaxiert:
+\[
+a_{k+p} - a_k = 0
+\quad \text{oder} \quad
+|a_{k+p} - a_k| \le \varepsilon.
+\]
+
+\subsection*{(3) Ultrametrische Dominanz}
+
+Für eine Summe \(x = y + z\) gilt p-adisch:
+\[
+v_p(x) = \min(v_p(y), v_p(z)).
+\]
+
+Linear relaxiert ergibt sich:
+\[
+a_k \le b_k + c_k.
+\]
+
+\subsection*{(4) Endlichkeits- und Trunkierungsbedingung}
+
+Zur Sicherstellung eines endlichen Problems:
+\[
+\sum_{k=k_0}^{k_1} a_k \le M,
+\]
+wobei \(M\) eine feste Schranke ist.
+
+\section*{5. Vollständiges lineares Optimierungsproblem}
+
+\paragraph{Variablen:}
+\[
+a_{k_0}, \dots, a_{k_1}.
+\]
+
+\paragraph{Zielfunktion (Beispiel):}
+\[
+\min \sum_k k a_k.
+\]
+
+\paragraph{Nebenbedingungen:}
+\begin{align*}
+0 &\le a_k \le p-1, \\
+a_{k+p} - a_k &= 0, \\
+\sum_k a_k &\le M.
+\end{align*}
+
+Dieses Problem ist ein lineares Programm (LP)
+oder bei Ganzzahligkeit der \(a_k\) ein MILP,
+und damit direkt vom Simplex-Algorithmus behandelbar.
+
+\section*{6. Interpretation}
+
+\begin{itemize}
+\item Es wird nicht über perfekte Zahlen optimiert,
+      sondern über ihre endlichen Darstellungen.
+\item Die p-adische und perfektoide Struktur
+      erscheint als Nebenbedingungsgeometrie.
+\item Die Abbildung ist keine Isomorphie,
+      sondern eine strukturtreue Relaxierung.
+\end{itemize}
+
+\section*{7. Fazit}
+
+Perfektoide Zahlen können sinnvoll als
+lineare Optimierungsprobleme modelliert werden,
+wenn man ihre Bewertung, Ziffernstruktur und Frobenius-Eigenschaften
+in Zielfunktionen und Nebenbedingungen übersetzt.
+Der Simplex-Algorithmus optimiert dabei nicht Zahlen,
+sondern ihre algebraisch motivierten Repräsentationen.
+
+\end{document}
+
