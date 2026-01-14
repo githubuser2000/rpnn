@@ -1,0 +1,146 @@
+---
+
+# 📘 Org-Mode-Version
+
+```org
+#+TITLE: Sicherheit von Diff-Patches vs. direkter Codeänderung
+
+* Kurzfassung
+
+Diff-Patches sind *nicht unsicher per se*, sondern verschieben Risiken:
+- + Reproduzierbarkeit
+- + Auditierbarkeit
+- - Lokale Kontrollsicherheit bei schlechter Disziplin
+
+Sicherheit entsteht durch *Kontextkontrolle, Disziplin und Tooling*.
+
+---
+
+* 1. Was ein Diff-Patch wirklich ist
+
+Ein Diff-Patch ist eine *deklarative Transformationsbeschreibung*:
+
+#+BEGIN_QUOTE
+Wenn der Code diesen Kontext hat, transformiere ihn so.
+#+END_QUOTE
+
+Eigenschaften:
+- Patch ist selbst *Code*
+- Implizite Vorbedingungen (Hunk-Kontext)
+- Partielle Funktion: f : Code → Code
+
+---
+
+* 2. Sicherheitsdimensionen
+
+** 2.1 Integrität
+
+*** Direkte Codeänderung
+- + Exakter Repo-Zustand sichtbar
+- - Lokale Abweichungen möglich
+- - "Works on my machine"
+
+*** Diff-Patch
+- + Explizite, minimale Änderungen
+- + Signierbar (Hash, GPG)
+- - Gefahr falscher Anwendung
+
+*Bewertung:* Patch gewinnt bei verifizierter Anwendung.
+
+---
+
+** 2.2 Reproduzierbarkeit
+
+*** Direkt
+- - Entwicklerzustand relevant
+- - Schwer reproduzierbar
+
+*** Patch
+- + Deterministisch
+- + Automatisierbar
+- + Ideal für CI, Nix, Guix, Debian, Yocto
+
+*Bewertung:* Patch klar überlegen.
+
+---
+
+** 2.3 Angriffsmöglichkeiten
+
+Reale Risiken:
+1. Context-Drift
+2. Hunk-Fuzz
+3. Patch-Injection
+4. Supply-Chain-Manipulation
+
+Hinweis:
+Pull Requests haben dieselben Risiken – oft weniger sichtbar.
+
+---
+
+* 3. Zentrale Sicherheitsfrage
+
+Wer kontrolliert den *Anwendungskontext* des Patches?
+
+Unsicher:
+#+BEGIN_SRC bash
+patch -p1 < irgendwas.patch
+#+END_SRC
+
+Sicher:
+#+BEGIN_SRC bash
+git apply --check --index --whitespace=error patch.diff
+git apply --3way --reject patch.diff
+git diff --stat
+git diff
+#+END_SRC
+
+---
+
+* 4. Wann Patches unsicherer sind
+
+- Einzelentwicklung
+- Starker Code-Drift
+- Kein Versionsanker
+- Blindes Anwenden
+- Fuzz akzeptiert
+- Kein Review
+
+→ Direktes Editieren + Commit sicherer.
+
+---
+
+* 5. Wann Patches sicherer sind
+
+- Mehrere Targets
+- Buildsysteme (Yocto, Debian, Gentoo)
+- Fremdcode / Vendor
+- Forensik
+- Deterministische Builds
+- Eingeschränkte Schreibrechte
+
+---
+
+* 6. Meta-Bewertung
+
+Diff-Patches sind kein Sicherheitsproblem,
+sie sind ein *Sicherheitsinstrument*.
+
+Direkt:
+- Annahmen verborgen
+
+Patch:
+- Annahmen explizit
+
+---
+
+* 7. Praxisempfehlung
+
+Wenn du Patches nutzt:
+1. Nur gegen bekannte Commits
+2. --check vor Anwendung
+3. Kein Fuzz ohne Review
+4. Danach diffen
+5. Automatisieren
+6. Externe Patches signieren
+
+Sonst: direkt editieren, aber sauber committen.
