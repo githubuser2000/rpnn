@@ -34,7 +34,8 @@ fn main() {
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
     let args: Vec<String> = env::args().collect();
-    deep_match(&args, &meine_liste, 0);
+    //deep_match(&args, &meine_liste, 0);
+    deep_match_proper(&args, &meine_liste);
 }
 
 fn print_recursive(el: &Element, tiefe: usize) {
@@ -116,7 +117,7 @@ fn deep_match(args: &[String], element: &Element) -> Option<Vec<String>> {
     }
 }*/
 
-
+/*
 fn deep_match(args: &[String], element: &Element, tiefe: usize) -> Option<Vec<String>> {
     println!("{}Tiefe {}: Prüfe {:?}", "  ".repeat(tiefe), tiefe, element);
 
@@ -183,4 +184,115 @@ fn deep_match(args: &[String], element: &Element, tiefe: usize) -> Option<Vec<St
             None
         }
     }
+}
+*/
+/*
+
+fn deep_match_final(args: &[String], element: &Element) -> Option<Vec<String>> {
+    // Rekursive Suche mit aktueller Argument-Position
+    fn rec(args: &[String], element: &Element, arg_idx: usize) -> Option<Vec<String>> {
+        match element {
+            // TEXT: Prüfe aktuelles Argument, erhöhe Index bei Match
+            Element::Text(t) => {
+                args.get(arg_idx)
+                    .filter(|arg| *arg == t)
+                    .map(|_| {
+                        vec![t.clone()]
+                    })
+            }
+            
+            // LISTE: Durchsuche Elemente
+            Element::Liste(items) => {
+                for item in items {
+                    match item {
+                        // Text in Liste: Prüfe und gehe tiefer
+                        Element::Text(t) if args.get(arg_idx) == Some(t) => {
+                            let mut pfad = vec![t.clone()];
+                            if let Some(rest) = rec(args, item, arg_idx + 1) {
+                                pfad.extend(rest);
+                            }
+                            return Some(pfad);
+                        }
+                        
+                        // Unter-Liste: Gleichen Index beibehalten
+                        Element::Liste(_) => {
+                            if let Some(pfad) = rec(args, item, arg_idx) {
+                                return Some(pfad);
+                            }
+                        }
+                        
+                        _ => continue,
+                    }
+                }
+                None
+            }
+        }
+    }
+    
+    rec(args, element, 0)
+}
+
+*/
+
+
+fn deep_match_proper(args: &[String], element: &Element) -> Option<Vec<String>> {
+    fn inner(args: &[String], element: &Element, arg_index: usize) -> Option<Vec<String>> {
+        println!("Arg[{}] = {:?}, Element: {:?}", 
+                arg_index, 
+                args.get(arg_index), 
+                element);
+        
+        match element {
+            Element::Text(t) => {
+                // Prüfe ob wir ein Argument haben und es matcht
+                match args.get(arg_index) {
+                    Some(arg) if arg == t => {
+                        println!("✓ Text match: Arg[{}] '{}' == '{}'", arg_index, arg, t);
+                        Some(vec![t.clone()])
+                    }
+                    Some(arg) => {
+                        println!("✗ Text mismatch: Arg[{}] '{}' != '{}'", arg_index, arg, t);
+                        None
+                    }
+                    None => {
+                        println!("⚠ Kein Arg[{}] für Text '{}'", arg_index, t);
+                        None
+                    }
+                }
+            }
+            
+            Element::Liste(items) => {
+                for item in items {
+                    match item {
+                        Element::Text(t) => {
+                            // Text matcht aktuelles Argument
+                            if let Some(arg) = args.get(arg_index) {
+                                if arg == t {
+                                    println!("Liste-Text match: '{}'", t);
+                                    let mut pfad = vec![t.clone()];
+                                    
+                                    // Rekursiv mit NÄCHSTEM Argument
+                                    if let Some(rest) = inner(args, item, arg_index + 1) {
+                                        pfad.extend(rest);
+                                    }
+                                    return Some(pfad);
+                                }
+                            }
+                        }
+                        
+                        Element::Liste(_) => {
+                            // Liste: Gehe tiefer mit GLEICHEM Argument-Index
+                            // (weil wir noch kein Argument konsumiert haben)
+                            if let Some(pfad) = inner(args, item, arg_index) {
+                                return Some(pfad);
+                            }
+                        }
+                    }
+                }
+                None
+            }
+        }
+    }
+    
+    inner(args, element, 0)
 }
