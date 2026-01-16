@@ -243,7 +243,7 @@ fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
     let mut params2: Vec<&String>;
-    let mut paramsPerParam: Vec<Vec<&Element>> = Vec::new();
+    let mut paramsPerParam: Vec<Vec<&String>> = Vec::new();
     let mut dash_count_before = 0;
     
     for (i, arg) in args.iter().enumerate() {
@@ -257,14 +257,16 @@ fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
                 break;
             }
         }
-        if dash_count > dash_count_before {
-            paramsPerParam.last().push(arg);
-        }
-        else {
-            params2 = Vec::new();
-            params2.push(Vec::new());
-            paramsPerParam.last().push(arg);
-            paramsPerParam.push(params2);
+        if let Some(letztes) = paramsPerParam.last_mut() {
+            if dash_count > dash_count_before {
+                letztes.push(arg);
+            }
+            else {
+                params2 = Vec::new();
+                params2.push(arg);
+                letztes.push(arg);
+                paramsPerParam.push(params2);
+            }
         }
         
         // Extrahiere Parameter ohne Minuszeichen
