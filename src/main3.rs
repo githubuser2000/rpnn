@@ -21,38 +21,40 @@ fn main() {
 
     // 2. Argumente verarbeiten
     let args: Vec<String> = env::args().collect();
-    
+
     // Wir erwarten Paare, z.B.: -zeile 1 -spalte 2
     // args[0] ist immer der Programmname, daher fangen wir bei 1 an.
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
-        
+
         // ... innerhalb der while-Schleife ...
-match arg.as_str() {
-    "-zeile" | "--zeile" | "-spalte" | "--spalte" => {
-        if i + 1 < args.len() {
-            let wert = &args[i + 1];
-            // Prüfung: Lässt sich der String in eine positive Ganzzahl umwandeln?
-            if wert.parse::<usize>().is_ok() {
-                println!("Filter gesetzt: {} = {}", arg, wert);
-                i += 2; // Argument UND Wert überspringen
-            } else {
-                eprintln!("Fehler: Nach {} muss eine positive Nummer folgen, nicht '{}'.", arg, wert);
+        match arg.as_str() {
+            "-zeile" | "--zeile" | "-spalte" | "--spalte" => {
+                if i + 1 < args.len() {
+                    let wert = &args[i + 1];
+                    // Prüfung: Lässt sich der String in eine positive Ganzzahl umwandeln?
+                    if wert.parse::<usize>().is_ok() {
+                        println!("Filter gesetzt: {} = {}", arg, wert);
+                        i += 2; // Argument UND Wert überspringen
+                    } else {
+                        eprintln!(
+                            "Fehler: Nach {} muss eine positive Nummer folgen, nicht '{}'.",
+                            arg, wert
+                        );
+                        return;
+                    }
+                } else {
+                    eprintln!("Fehler: {} benötigt einen Wert.", arg);
+                    return;
+                }
+            }
+            _ => {
+                eprintln!("Fehler: Unbekanntes Argument '{}'. Erlaubt sind: -zeile, --zeile, -spalte, --spalte.", arg);
                 return;
             }
-        } else {
-            eprintln!("Fehler: {} benötigt einen Wert.", arg);
-            return;
         }
     }
-    _ => {
-        eprintln!("Fehler: Unbekanntes Argument '{}'. Erlaubt sind: -zeile, --zeile, -spalte, --spalte.", arg);
-        return;
-    }
-}
-
-            }
 
     println!("Erfolgreich validiert. Matrix-Vorschau:");
     //print_recursive(&matrix, 0);
@@ -80,9 +82,10 @@ fn print_recursive(el: &Element, tiefe: usize) {
         Element::Text(t) => print!("\"{}\" ", t),
         Element::Liste(l) => {
             println!("\n{}[", einrückung);
-            for kind in l { print_recursive(kind, tiefe + 1); }
+            for kind in l {
+                print_recursive(kind, tiefe + 1);
+            }
             print!("\n{}]", einrückung);
         }
     }
 }
-

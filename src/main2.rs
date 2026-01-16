@@ -6,23 +6,30 @@ enum Element {
 
 fn main() {
     // Erstellung der Struktur: [["zeilen", ["nummer"]], ["spalten", ["nummer"]]]
-    let meine_liste = Element::Liste(vec![
-        // Erste Haupt-Gruppe: ["zeilen", ["nummer"]]
-        Element::Liste(vec![
-            Element::Text(String::from("zeilen")),
-            Element::Liste(vec![
-                Element::Text(String::from("nummer"))
+    // Hilfsfunktionen definieren
+    fn text(s: &str) -> Element {
+        Element::Text(String::from(s))
+    }
+
+    fn list(elements: Vec<Element>) -> Element {
+        Element::Liste(elements)
+    }
+
+    // Jetzt viel lesbarer
+    let meine_liste = list(vec![
+    list(vec![
+        text("zeilen"),
+            list(vec![
+                text("nummer")
             ]),
         ]),
-        // Zweite Haupt-Gruppe: ["spalten", ["nummer"]]
-        Element::Liste(vec![
-            Element::Text(String::from("spalten")),
-            Element::Liste(vec![
-                Element::Text(String::from("nummer"))
+        list(vec![
+           text("spalten"),
+          list(vec![
+                text("nummer")
             ]),
         ]),
     ]);
-
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
 }
