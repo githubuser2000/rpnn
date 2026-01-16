@@ -8,6 +8,11 @@ enum Element {
 fn main() {
     // Erstellung der Struktur: [["zeilen", ["nummer"]], ["spalten", ["nummer"]]]
     // Hilfsfunktionen definieren
+    let hauptParameter = vec!["zeilen1", "zeilen2", "spalten","ausgabe"];
+    let zeilenParameter  = vec!["von", "bis", "ohnevon", "ohnebis"];
+    let spaltenParameter = vec!["spaltennummer", "universum", "cluster", "galaxie", "kontinuum"];
+    let ausgabeParameter = vec!["nichtsleeres", "unfarbig"];
+
     fn text(s: &str) -> Element {
         Element::Text(String::from(s))
     }
