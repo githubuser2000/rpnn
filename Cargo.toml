@@ -1,0 +1,12 @@
+[package]
+name = "rekursive_liste"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Keine externen Abhängigkeiten nötig
+
+[[bin]]
+name = "mein-listen-programm"
+path = "src/main.rs"
+
