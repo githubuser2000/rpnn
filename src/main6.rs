@@ -242,6 +242,9 @@ fn deep_match_final(args: &[String], element: &Element) -> Option<Vec<String>> {
 fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
+    let mut params2: Vec<&String>;
+    let mut paramsPerParam: Vec<Vec<&Element>> = Vec::new();
+    let mut dash_count_before = 0;
     
     for (i, arg) in args.iter().enumerate() {
         let mut dash_count = 0;
@@ -253,6 +256,15 @@ fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
             } else {
                 break;
             }
+        }
+        if dash_count > dash_count_before {
+            paramsPerParam.last().push(arg);
+        }
+        else {
+            params2 = Vec::new();
+            params2.push(Vec::new());
+            paramsPerParam.last().push(arg);
+            paramsPerParam.push(params2);
         }
         
         // Extrahiere Parameter ohne Minuszeichen
@@ -268,6 +280,7 @@ fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
         
         minuses.push(dash_count);
         params.push(param);  // Jetzt okay, da param danach nicht mehr verwendet wird
+        dash_count_before=dash_count;
     }
     
     (minuses, params)
