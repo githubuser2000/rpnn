@@ -46,9 +46,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
     // Oder: &args[..]
     // let (dashes, params) = parse_cli_args(&args[..]);
     let pfad = "/data/data/com.termux/files/home/Eigene-Dateien/rpnn/csv/religion.csv";
-                                                                                match lese_csv_in_matrix(pfad) {
+    // 1. Einlesen (bei Fehler sofortiger Abbruch der main)
+    let matrix = lese_csv_in_matrix(pfad)?; 
+    println!("csv Datei erfolgreich eingelesen.");
+
+    // 2. Datenbank-Setup
+    let mut conn = Connection::open_in_memory()?;
+    
+    if matrix.is_empty() { return Ok(()); }
+    let spalten = &matrix[0];
+
+    // 3. Tabelle bauen
+    let create_columns = spalten.iter()
+        .map(|s| format!("\"{}\" TEXT", s))
+        .collect::<Vec<_>>()
+        .join(", ");
+    conn.execute(&format!("CREATE TABLE csv_data ({})", create_columns), [])?;
+
+    // 4. Daten einfügen (Transaktion)
+    let tx = conn.transaction()?;
+    {
+        let placeholders = vec!["?"; spalten.len()].join(", ");
+        let mut stmt = tx.prepare(&format!("INSERT INTO csv_data VALUES ({})", placeholders))?;
+        for zeile in matrix.iter().skip(1) {
+            stmt.execute(params_from_iter(zeile))?;
+        }
+    } 
+    tx.commit()?;
+
+    println!("Erfolg: {} Zeilen geladen.", matrix.len() - 1);
+    Ok(())
+
+    /*                                                                                match lese_csv_in_matrix(pfad) {
         Ok(matrix) => {
-        println!("csv Datei erfolgreich eingelesen:");
+        println!("csv Datei in vec vec string erfolgreich eingelesen:");
 
         // 1. Verbindung richtig öffnen (mit ?)
         let mut conn = Connection::open_in_memory()?; 
@@ -73,63 +104,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
         
         println!("Tabelle erfolgreich erstellt.");
         
-        // ... hier geht es weiter mit der Transaktion und dem Insert ...
-    //}
-    //Err(e) => eprintln!("Fehler beim Lesen der CSV: {}", e),
+        // 2. Transaktion starten (EXTREM wichtig für Performance)
+        let tx = conn.transaction()?;
 
-
-
-/*
-
-        Ok(matrix) => {                                                                 println!("csv Datei erfolgreich eingelesen:");                              //print_recursive(&matrix, 0);
-                                                                                                                                                                    let conn = Connection::open_in_memory();
-                                                                                                                                                                    // richtig?
-                                                                                                                        
-                                                                                                                                                                    //let spalten = &matrix[0];
-                                                                                                                                                                    let spalten = &matrix;
-    let create_columns = spalten.iter()
-        .map(|s| format!("{} TEXT", s))
-        .collect::<Vec<_>>()
-        .join(", ");
-    
-    let create_table_sql = format!("CREATE TABLE csv_data ({})", create_columns);
-    conn.execute(&create_table_sql, [])?;
-
-    // 2. Transaktion starten (EXTREM wichtig für Performance)
-    let tx = conn.transaction()?;
-
-    // 3. Insert Statement vorbereiten
-    let placeholders = vec!["?"; spalten.len()].join(", ");
-    let insert_sql = format!("INSERT INTO csv_data VALUES ({})", placeholders);
-
-    {
-        let mut stmt = tx.prepare(&insert_sql)?;
+        // 3. Insert Statement vorbereiten
+        let placeholders = vec!["?"; spalten.len()].join(", ");
+        let insert_sql = format!("INSERT INTO csv_data VALUES ({})", placeholders);
+        {
+            let mut stmt = tx.prepare(&insert_sql)?;
         
-        // Über die Daten iterieren (Header überspringen)
-        for zeile in matrix.iter().skip(1) {
-            // params_from_iter erlaubt es, einen Vector von Strings direkt zu übergeben
-            stmt.execute(params_from_iter(zeile))?;
-        }
-    } // stmt muss hier zerstört werden, bevor tx.commit() gerufen wird
+            // Über die Daten iterieren (Header überspringen)
+            for zeile in matrix.iter().skip(1) {
+                // params_from_iter erlaubt es, einen Vector von Strings direkt zu übergeben
+                stmt.execute(params_from_iter(zeile))?;
+            }
+        } // stmt muss hier zerstört werden, bevor tx.commit() gerufen wird
 
-    // 4. Alles auf einmal in den RAM schreiben
-    tx.commit()?;
+        // 4. Alles auf einmal in den RAM schreiben
+        tx.commit()?;
 
-    println!("Erfolg: {} Zeilen in RAM-DB geladen.", matrix.len() - 1);
-    Ok(())
-
-*/
-
-
-// richtig???
-
-
-
-
-
+        println!("Erfolg: {} Zeilen in RAM-DB geladen.", matrix.len() - 1);
+        Ok(())
         }                                                                           Err(e) => eprintln!("Fehler beim Lesen der Datei: {}", e),
     }
     Ok(())
+    */
 }
 
 fn print_recursive(el: &Element, tiefe: usize) {
