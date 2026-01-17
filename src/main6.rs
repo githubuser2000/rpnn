@@ -1,5 +1,7 @@
 use std::fs::File;                                                          use std::io::{self, BufRead};                                               use std::path::Path;
 use std::env;
+use std::error::Error;
+use csv::ReaderBuilder;
 use rusqlite::{params_from_iter, Connection, Result};
 #[derive(Debug)]
 enum Element {
@@ -55,13 +57,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
     
     if matrix.is_empty() { return Ok(()); }
     let spalten = &matrix[0];
-
+/*
     // 3. Tabelle bauen
     let create_columns = spalten.iter()
         .map(|s| format!("\"{}\" TEXT", s))
         .collect::<Vec<_>>()
         .join(", ");
     conn.execute(&format!("CREATE TABLE csv_data ({})", create_columns), [])?;
+*/
+    // 3. SQL Spalten-String bauen (mit Trim und Absicherung)
+    let create_columns = spalten.iter()
+    .enumerate()
+    .map(|(i, s)| {
+        let clean_name = s.trim().replace("\"", "\"\""); // Anführungszeichen im Namen verdoppeln
+        if clean_name.is_empty() {
+            format!("spalte_{} TEXT", i) // Falls Spaltenname leer ist
+        } else {
+            format!("\"{}\" TEXT", clean_name)
+        }
+    })
+    .collect::<Vec<_>>()
+    .join(", ");
+
+    let create_table_sql = format!("CREATE TABLE csv_data ({})", create_columns);
+
+// DEBUG: Gib das SQL einmal aus, bevor du es ausführst!
+// println!("DEBUG SQL: {}", create_table_sql);
+
+    conn.execute(&create_table_sql, [])?;
+
 
     // 4. Daten einfügen (Transaktion)
     let tx = conn.transaction()?;
@@ -76,59 +100,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
 
     println!("Erfolg: {} Zeilen geladen.", matrix.len() - 1);
     Ok(())
-
-    /*                                                                                match lese_csv_in_matrix(pfad) {
-        Ok(matrix) => {
-        println!("csv Datei in vec vec string erfolgreich eingelesen:");
-
-        // 1. Verbindung richtig öffnen (mit ?)
-        let mut conn = Connection::open_in_memory()?; 
-
-        // 2. Den Header (erste Zeile) holen
-        // Wir stellen sicher, dass die Matrix nicht leer ist
-        if matrix.is_empty() {
-            return Ok(()); 
-        }
-        let spalten = &matrix[0]; // Das ist jetzt ein Vec<String> (die erste Zeile)
-
-        // 3. SQL Spalten-String bauen
-        let create_columns = spalten.iter()
-            .map(|s| format!("\"{}\" TEXT", s)) // Anführungszeichen helfen bei Sonderzeichen
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let create_table_sql = format!("CREATE TABLE csv_data ({})", create_columns);
-        
-        // 4. Tabelle erstellen
-        conn.execute(&create_table_sql, [])?;
-        
-        println!("Tabelle erfolgreich erstellt.");
-        
-        // 2. Transaktion starten (EXTREM wichtig für Performance)
-        let tx = conn.transaction()?;
-
-        // 3. Insert Statement vorbereiten
-        let placeholders = vec!["?"; spalten.len()].join(", ");
-        let insert_sql = format!("INSERT INTO csv_data VALUES ({})", placeholders);
-        {
-            let mut stmt = tx.prepare(&insert_sql)?;
-        
-            // Über die Daten iterieren (Header überspringen)
-            for zeile in matrix.iter().skip(1) {
-                // params_from_iter erlaubt es, einen Vector von Strings direkt zu übergeben
-                stmt.execute(params_from_iter(zeile))?;
-            }
-        } // stmt muss hier zerstört werden, bevor tx.commit() gerufen wird
-
-        // 4. Alles auf einmal in den RAM schreiben
-        tx.commit()?;
-
-        println!("Erfolg: {} Zeilen in RAM-DB geladen.", matrix.len() - 1);
-        Ok(())
-        }                                                                           Err(e) => eprintln!("Fehler beim Lesen der Datei: {}", e),
-    }
-    Ok(())
-    */
 }
 
 fn print_recursive(el: &Element, tiefe: usize) {
@@ -213,7 +184,7 @@ fn lese_csv_in_matrix(dateipfad: &str) Result<Vec<Vec<String>>, Box<dyn std::err
     Ok(Element::Liste(haupt_liste))
 
 }
-*/
+
 
 fn lese_csv_in_matrix(dateipfad: &str) -> Result<Vec<Vec<String>>, Box<dyn std::error::Error>> {
     let datei = File::open(dateipfad)?;
@@ -235,5 +206,34 @@ fn lese_csv_in_matrix(dateipfad: &str) -> Result<Vec<Vec<String>>, Box<dyn std::
     }
 
     Ok(haupt_liste) // Gibt jetzt den fertigen Vec<Vec<String>> zurück
+}
+*/
+
+
+
+
+fn lese_csv_in_matrix(dateipfad: &str) -> Result<Vec<Vec<String>>, Box<dyn Error>> {
+    // Der ReaderBuilder erlaubt es, das Trennzeichen (Delimiter) einzustellen
+    let mut rdr = ReaderBuilder::new()
+        .delimiter(b';')      // Hier sagst du: Trenne bei Semikolon
+        .quoting(true)        // Beachte Anführungszeichen (Standard: true)
+        .trim(csv::Trim::All) // Entfernt Leerzeichen um die Werte
+        .from_path(dateipfad)?;
+
+    let mut matrix = Vec::new();
+
+    // 1. Header (erste Zeile) auslesen
+    let header = rdr.headers()?;
+    let header_vec: Vec<String> = header.iter().map(|s| s.to_string()).collect();
+    matrix.push(header_vec);
+
+    // 2. Datenzeilen auslesen
+    for result in rdr.records() {
+        let record = result?;
+        let zeile: Vec<String> = record.iter().map(|s| s.to_string()).collect();
+        matrix.push(zeile);
+    }
+
+    Ok(matrix)
 }
 
