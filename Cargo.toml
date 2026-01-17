@@ -1,12 +1,12 @@
 [package]
-name = "rekursive_liste"
+name = "mein-rpnn-paket"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-# Keine externen Abhängigkeiten nötig
+rusqlite = "0.31.0"
 
 [[bin]]
-name = "mein-listen-programm"
-path = "src/main.rs"
+name = "mein-rpnn"
+path = "src/main6.rs"
 
