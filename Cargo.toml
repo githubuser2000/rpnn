@@ -1,5 +1,5 @@
 [package]
-name = "mein-rpnn-paket"
+name = "mein-rpnn"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,5 +9,5 @@ rusqlite = { version = "0.31.0", features = ["bundled"] }
 
 [[bin]]
 name = "mein-rpnn"
-path = "src/main6.rs"
+path = "src/main.rs"
 

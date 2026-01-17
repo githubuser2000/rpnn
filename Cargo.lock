@@ -111,7 +111,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mein-rpnn-paket"
+name = "mein-rpnn"
 version = "0.1.0"
 dependencies = [
  "csv",

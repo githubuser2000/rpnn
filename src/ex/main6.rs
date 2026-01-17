@@ -99,26 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
     conn.execute(&sql, [])?;
 
 
-
-
-    /*
-    // Spaltennamen sicher machen (Anführungszeichen und Eindeutigkeit)
-    let create_columns = headers.iter()
-        .enumerate()
-        .map(|(i, s)| {
-            let name = s.trim();
-            if name.is_empty() {
-                format!("\"spalte_{}\" TEXT", i)
-            } else {
-                format!("\"{}\" TEXT", name.replace("\"", "\"\""))
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    conn.execute(&format!("CREATE TABLE csv_data ({})", create_columns), [])?;
-    */
-
     // 4. Daten streamen (Transaktion für Speed)
     let tx = conn.transaction()?;
     {
@@ -145,64 +125,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
         println!("{:?}", row); 
     }
 
-
-
-
-/*
-
-    // 1. Einlesen (bei Fehler sofortiger Abbruch der main)
-    let matrix = lese_csv_in_matrix(pfad)?; 
-    println!("csv Datei erfolgreich eingelesen.");
-
-    // 2. Datenbank-Setup
-    let mut conn = Connection::open_in_memory()?;
-    
-    if matrix.is_empty() { return Ok(()); }
-    let spalten = &matrix[0];
-/*
-    // 3. Tabelle bauen
-    let create_columns = spalten.iter()
-        .map(|s| format!("\"{}\" TEXT", s))
-        .collect::<Vec<_>>()
-        .join(", ");
-    conn.execute(&format!("CREATE TABLE csv_data ({})", create_columns), [])?;
-*/
-    // 3. SQL Spalten-String bauen (mit Trim und Absicherung)
-    let create_columns = spalten.iter()
-    .enumerate()
-    .map(|(i, s)| {
-        let clean_name = s.trim().replace("\"", "\"\""); // Anführungszeichen im Namen verdoppeln
-        if clean_name.is_empty() {
-            format!("spalte_{} TEXT", i) // Falls Spaltenname leer ist
-        } else {
-            format!("\"{}\" TEXT", clean_name)
-        }
-    })
-    .collect::<Vec<_>>()
-    .join(", ");
-
-    let create_table_sql = format!("CREATE TABLE csv_data ({})", create_columns);
-
-// DEBUG: Gib das SQL einmal aus, bevor du es ausführst!
-// println!("DEBUG SQL: {}", create_table_sql);
-
-    conn.execute(&create_table_sql, [])?;
-
-
-    // 4. Daten einfügen (Transaktion)
-    let tx = conn.transaction()?;
-    {
-        let placeholders = vec!["?"; spalten.len()].join(", ");
-        let mut stmt = tx.prepare(&format!("INSERT INTO csv_data VALUES ({})", placeholders))?;
-        for zeile in matrix.iter().skip(1) {
-            stmt.execute(params_from_iter(zeile))?;
-        }
-    } 
-    tx.commit()?;
-
-    println!("Erfolg: {} Zeilen geladen.", matrix.len() - 1);
-    Ok(())
-    */
     Ok(())
 }
 
@@ -271,73 +193,3 @@ fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
     
     (minuses, params)
 }
-
-//fn lese_csv_in_matrix(dateipfad: &str) -> io::Result<Element> {
-/*
-fn lese_csv_in_matrix(dateipfad: &str) Result<Vec<Vec<String>>, Box<dyn std::error::Error>>  {
-    let datei = File::open(dateipfad)?;
-    let reader = io::BufReader::new(datei);
-    let mut haupt_liste = Vec::new();                                       
-    for zeile_result in reader.lines() {                                            let zeile = zeile_result?;                                                  // Splitte die Zeile am Semikolon
-        let spalten: Vec<Element> = zeile                                               .split(';')
-            .map(|s| Element::Text(s.trim().to_string()))                               .collect();                                                     
-        // Füge die Zeile als Liste zur Hauptliste hinzu
-        haupt_liste.push(Element::Liste(spalten));
-    }
-
-    Ok(Element::Liste(haupt_liste))
-
-}
-
-
-fn lese_csv_in_matrix(dateipfad: &str) -> Result<Vec<Vec<String>>, Box<dyn std::error::Error>> {
-    let datei = File::open(dateipfad)?;
-    let reader = io::BufReader::new(datei);
-    
-    let mut haupt_liste = Vec::new();
-
-    for zeile_result in reader.lines() {
-        let zeile = zeile_result?;
-        
-        // Hier splitten wir und sammeln direkt Strings, keine "Elements"
-        let spalten: Vec<String> = zeile
-            .split(';')
-            .map(|s| s.trim().to_string())
-            .collect();
-        
-        // Füge die Zeile (Vec<String>) zur Hauptliste (Vec<Vec<String>>) hinzu
-        haupt_liste.push(spalten);
-    }
-
-    Ok(haupt_liste) // Gibt jetzt den fertigen Vec<Vec<String>> zurück
-}
-*/
-
-
-
-
-fn lese_csv_in_matrix(dateipfad: &str) -> Result<Vec<Vec<String>>, Box<dyn Error>> {
-    // Der ReaderBuilder erlaubt es, das Trennzeichen (Delimiter) einzustellen
-    let mut rdr = ReaderBuilder::new()
-        .delimiter(b';')      // Hier sagst du: Trenne bei Semikolon
-        .quoting(true)        // Beachte Anführungszeichen (Standard: true)
-        .trim(csv::Trim::All) // Entfernt Leerzeichen um die Werte
-        .from_path(dateipfad)?;
-
-    let mut matrix = Vec::new();
-
-    // 1. Header (erste Zeile) auslesen
-    let header = rdr.headers()?;
-    let header_vec: Vec<String> = header.iter().map(|s| s.to_string()).collect();
-    matrix.push(header_vec);
-
-    // 2. Datenzeilen auslesen
-    for result in rdr.records() {
-        let record = result?;
-        let zeile: Vec<String> = record.iter().map(|s| s.to_string()).collect();
-        matrix.push(zeile);
-    }
-
-    Ok(matrix)
-}
-

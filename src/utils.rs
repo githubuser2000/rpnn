@@ -1,0 +1,16 @@
+use crate::data::Element;
+
+pub fn print_recursive(el: &Element, tiefe: usize) {
+    let einrückung = "  ".repeat(tiefe);
+    match el {
+        Element::Text(t) => {
+            println!("{}- {}", einrückung, t);
+        }
+        Element::Liste(l) => {
+            println!("{}[Liste]:", einrückung);
+            for kind in l {
+                print_recursive(kind, tiefe + 1);
+            }
+        }
+    }
+}
