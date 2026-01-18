@@ -15,3 +15,5 @@ Makefile
 *.so
 *.exe
 /bin//
+/target
+
