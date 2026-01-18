@@ -2,6 +2,7 @@ use std::env;
 use cli::parse_cli_args;
 use data::Element;
 use db::import_csv_to_sqlite;
+use db::query_column_by_index;
 use utils::print_recursive;
 
 mod cli;
@@ -21,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // CSV in SQLite importieren
     let pfad = "/data/data/com.termux/files/home/Eigene-Dateien/rpnn/csv/religion.csv";
-    import_csv_to_sqlite(pfad)?;
-    
+    let conn = import_csv_to_sqlite(pfad)?;
+    query_column_by_index(&conn, 1)?; // Fragt die 1. Spalte ab
     Ok(())
 }
