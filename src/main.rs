@@ -1,10 +1,10 @@
+use std::path::PathBuf;
 use std::env;
 use cli::parse_cli_args;
 use data::Element;
 use db::import_csv_to_sqlite;
 use db::query_column_by_index;
 use utils::print_recursive;
-
 mod cli;
 mod data;
 mod db;
@@ -21,8 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_recursive(&meine_liste, 0);
     
     // CSV in SQLite importieren
-    let pfad = "/data/data/com.termux/files/home/Eigene-Dateien/rpnn/csv/religion.csv";
-    let conn = import_csv_to_sqlite(pfad)?;
+    let mut projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let pfad = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
+    let conn = import_csv_to_sqlite(&pfad)?;
     query_column_by_index(&conn, 1)?; // Fragt die 1. Spalte ab
     Ok(())
 }
