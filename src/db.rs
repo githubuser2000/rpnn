@@ -45,9 +45,23 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     let column_names: Vec<String> = stmt_info.query_map([], |row| row.get(1))?
         .collect::<Result<Vec<_>, _>>()?;
 
-    let target_name = column_names.get(col_index - 1)
-        .ok_or(format!("Tabelle hat keine Spalte Nummer {}", col_index))?;
 
+
+    // 1. Spaltennamen im Bereich sammeln
+    let mut selected_names = Vec::new();
+    
+    for i in bereich.von_spalte..=bereich.bis_spalte {
+        // Falls dein Index 1-basiert ist, nutzen wir i-1
+        if let Some(name) = column_names.get(i.saturating_sub(1)) {
+            // SQL-Escaping für jeden Namen
+            selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
+        } else {
+            return Err(format!("Spalte Nummer {} nicht gefunden", i).into());
+        }
+    }
+    
+    // 2. Die Namen mit Komma verbinden (z.B. "Spalte1", "Spalte2")
+    let targets_string = selected_names.join(", ");
 
     let anzahl = if bereich.bis_zeile >= bereich.von_zeile {
         bereich.bis_zeile - bereich.von_zeile
@@ -55,17 +69,37 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
         0
     };
 
+    // 3. Das SQL Statement bauen
     let query = format!(
+        "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
+        targets_string,
+        anzahl,
+        bereich.von_zeile
+    );
+
+    /*let target_name = column_names.get(col_index - 1)
+        .ok_or(format!("Tabelle hat keine Spalte Nummer {}", col_index))?;
+    */
+
+    /*let query = format!(
         "SELECT \"{}\" FROM csv_data LIMIT {} OFFSET {}",
         target_name.replace("\"", "\"\""),
         anzahl,
         bereich.von_zeile
     );
+    let query = format!(
+    "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
+    targets_string,
+    anzahl,
+    bereich.von_zeile
+    );*/
+
+
     //let query = format!("SELECT \"{}\" FROM csv_data LIMIT 10", target_name.replace("\"", "\"\""));
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
 
-    println!("Inhalt von Spalte {}:", target_name);
+    println!("Inhalt von Spalten {}:", targets_string);
     while let Some(row) = rows.next()? {
         let value: String = row.get(0)?;
         println!("> {}", value);
