@@ -40,7 +40,7 @@ pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error
     Ok(conn) // Hier geben wir die Connection zurück!
 }
 
-pub fn query_column_by_index(conn: &Connection, col_index: usize) -> Result<(), Box<dyn std::error::Error>> {
+pub fn query_column_by_index(conn: &Connection, col_index: usize, von_zeile : usize, bis_zeile: usize) -> Result<(), Box<dyn std::error::Error>> {
     let mut stmt_info = conn.prepare("PRAGMA table_info(csv_data)")?;
     let column_names: Vec<String> = stmt_info.query_map([], |row| row.get(1))?
         .collect::<Result<Vec<_>, _>>()?;

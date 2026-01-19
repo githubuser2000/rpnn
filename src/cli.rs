@@ -7,7 +7,7 @@ pub struct TextBereich {
 }
 
 
-pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
+pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
     let mut params2: Vec<String>;
@@ -117,5 +117,5 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
         dash_count_before = dash_count;
     }
 
-    (minuses, params)
+    (minuses, params, bereich)
 }
