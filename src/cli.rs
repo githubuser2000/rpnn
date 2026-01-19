@@ -59,6 +59,7 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
                         bereich.von_spalte = zahl;
+                        println!("Startspalte gesetzt auf: {}", zahl);
                     }
                 }
             }
@@ -66,6 +67,7 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
                         bereich.bis_spalte = zahl;
+                        println!("Endspalte gesetzt auf: {}", zahl);
                     }
                 }
             }
