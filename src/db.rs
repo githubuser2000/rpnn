@@ -3,6 +3,7 @@ use csv::ReaderBuilder;
 use std::collections::HashSet;
 use crate::cli::TextBereich;
 use comfy_table::{Table, ColumnConstraint, Width, ContentArrangement};
+use comfy_table::{TableComponent};
 use terminal_size::{Width as TermWidth, terminal_size};
 pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
@@ -127,6 +128,43 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
     let anzahl_spalten = selected_names.len();
+
+let mut table = Table::new();
+    
+    // 1. Terminal-Breite abfragen
+    let term_width = if let Some((TermWidth(w), _)) = terminal_size() {
+        w as u16
+    } else {
+        100 // Ein solider Standardwert
+    };
+
+    // 2. Dynamisches Layout aktivieren
+    table
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_width(term_width)
+        // Optional: Verschönere die Optik, damit die Trennung klar bleibt
+        .load_preset(comfy_table::presets::UTF8_FULL)
+        .set_header(&selected_names);
+
+    while let Some(row) = rows.next()? {
+        let mut row_cells = Vec::new();
+        for i in 0..selected_names.len() {
+            let value: String = row.get(i).unwrap_or_default();
+            row_cells.push(value);
+        }
+        table.add_row(row_cells);
+    }
+
+    // Falls die Tabelle immer noch zu gequetscht aussieht,
+    // kannst du eine Mindestbreite pro Spalte erzwingen:
+    // table.column_iter_mut().for_each(|c| { c.set_constraint(ColumnConstraint::LowerBoundary(Width::Fixed(10))); });
+
+    println!("\nErgebnis der Abfrage:\n{table}");
+
+    Ok(())
+}
+
+
 /*
     let mut table = Table::new();
     
@@ -147,7 +185,7 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     Ok(())
 }*/
 
-
+/*
 let mut table = Table::new();
     
     // 1. Terminal-Breite ermitteln
@@ -181,7 +219,7 @@ let mut table = Table::new();
     Ok(())
 }
 
-
+*/
 
 
     /*
