@@ -1,3 +1,12 @@
+#[derive(Debug, Clone, Copy)]
+pub struct TextBereich {
+    pub von_zeile: usize,
+    pub bis_zeile: usize,
+    pub von_spalte: usize,
+    pub bis_spalte: usize,
+}
+
+
 pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
@@ -14,6 +23,23 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
                 dash_count += 1;
             } else {
                 break;
+            }
+        }
+        let mut bereich = TextBereich {
+            von_zeile: 0,
+            bis_zeile: 0,
+            von_spalte: 0,
+            bis_spalte: 0,
+        };
+        match arg.as_str() {
+            "--zeilevon" => {
+                println!("Startzeile ausgewählt.");
+            }
+            "--zeilebis" => {
+                println!("Endzeile ausgewählt.");
+            }
+            _ => {
+                println!("Anderes oder unbekanntes Argument: {}", arg);
             }
         }
         

@@ -34,8 +34,22 @@ fn main() {
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
     let args: Vec<String> = env::args().collect();
-    //deep_match(&args, &meine_liste, 0);
-    deep_match_proper(&args, &meine_liste);
+    let result: Option<Vec<String>> = deep_match(&args, &meine_liste, 0, 2);
+    //deep_match_proper(&args, &meine_liste);
+    
+    match &result {
+        Some(pfad) => {
+            println!("✅ Gefundener Pfad:");
+            for (i, schritt) in pfad.iter().enumerate() {
+                println!("  {}. {}", i + 1, schritt);
+            }
+            // Oder kompakt:
+            println!("  {:?}", pfad);
+        }
+        None => {
+            println!("❌ Kein Pfad gefunden");
+        }
+    }
 }
 
 fn print_recursive(el: &Element, tiefe: usize) {
@@ -117,75 +131,78 @@ fn deep_match(args: &[String], element: &Element) -> Option<Vec<String>> {
     }
 }*/
 
-/*
-fn deep_match(args: &[String], element: &Element, tiefe: usize) -> Option<Vec<String>> {
+
+fn deep_match(args: &[String], element: &Element, tiefe: usize, argNr : usize) -> Option<Vec<String>> {
     println!("{}Tiefe {}: Prüfe {:?}", "  ".repeat(tiefe), tiefe, element);
-
-    match element {
-        Element::Text(t) => {
-            match args.first() {
-                Some(arg) if arg == t => {
-                    println!("{}✓ Tiefe {}: Text '{}' matcht Argument '{}'",
-                            "  ".repeat(tiefe), tiefe, t, arg);
-                    Some(vec![t.clone()])
-                }
-                Some(arg) => {
-                    println!("{}✗ Tiefe {}: Text '{}' matcht NICHT Argument '{}'",
-                            "  ".repeat(tiefe), tiefe, t, arg);
-                    None
-                }
-                None => {
-                    println!("{}⚠ Tiefe {}: Kein Argument mehr für Text '{}'",
-                            "  ".repeat(tiefe), tiefe, t);
-                    None
-                }
-            }
-        }
-
-        Element::Liste(items) => {
-            println!("{}Tiefe {}: Durchsuche Liste mit {} Elementen",
-                    "  ".repeat(tiefe), tiefe, items.len());
-
-            for (i, item) in items.iter().enumerate() {
-                println!("{}  Element {} von {}:", "  ".repeat(tiefe), i + 1, items.len());
-
-                match (args.first(), item) {
-                    (Some(arg), Element::Text(text)) if arg == text => {
-                        println!("{}  ✓ Text '{}' matcht Argument '{}'",
-                                "  ".repeat(tiefe), text, arg);
-                        let mut pfad = vec![text.clone()];
-
-                        if let Some(rest) = deep_match(&args[1..], item, tiefe + 1) {
-                            pfad.extend(rest);
-                            return Some(pfad);
-                        }
+    //let mut argsIter = args.iter();
+    for argoo in args.iter() {
+        let argo = argoo.clone();
+        match element {
+            Element::Text(t) => {
+                match argo {
+                    arg if arg == t => {
+                        println!("{}✓ Tiefe {}: Text '{}' matcht Argument '{}'",
+                                "  ".repeat(tiefe), tiefe, t, arg);
+                        Some(vec![t.clone()])
                     }
-
-                    (Some(_), Element::Liste(_)) => {
-                        println!("{}  → Gehe in Liste tiefer", "  ".repeat(tiefe));
-                        if let Some(pfad) = deep_match(args, item, tiefe + 1) {
-                            return Some(pfad);
-                        }
+                    arg => {
+                        println!("{}✗ Tiefe {}: Text '{}' matcht NICHT Argument '{}'",
+                                "  ".repeat(tiefe), tiefe, t, arg);
+                        None
                     }
-
-                    (Some(arg), Element::Text(text)) => {
-                        println!("{}  ✗ Text '{}' matcht NICHT Argument '{}'",
-                                "  ".repeat(tiefe), text, arg);
-                    }
-
-                    (None, _) => {
-                        println!("{}  ⚠ Keine Argumente mehr", "  ".repeat(tiefe));
-                    }
+                    /*None => {
+                        println!("{}⚠ Tiefe {}: Kein Argument mehr für Text '{}'",
+                                "  ".repeat(tiefe), tiefe, t);
+                        None
+                    }*/
                 }
             }
-
-            println!("{}✗ Tiefe {}: Kein Match in dieser Liste",
-                    "  ".repeat(tiefe), tiefe);
-            None
+    
+            Element::Liste(items) => {
+                println!("{}Tiefe {}: Durchsuche Liste mit {} Elementen",
+                        "  ".repeat(tiefe), tiefe, items.len());
+    
+                for (i, item) in items.iter().enumerate() {
+                    println!("{}  Element {} von {}:", "  ".repeat(tiefe), i + 1, items.len());
+    
+                    match (args.first(), item) {
+                        (arg, Element::Text(text)) if arg == text => {
+                            println!("{}  ✓ Text '{}' matcht Argument '{}'",
+                                    "  ".repeat(tiefe), text, arg);
+                            let mut pfad = vec![text.clone()];
+    
+                            if let Some(rest) = deep_match(&args[1..], item, tiefe + 1, argNr) {
+                                pfad.extend(rest);
+                                return Some(pfad);
+                            }
+                        }
+    
+                        (Some(_), Element::Liste(_)) => {
+                            println!("{}  → Gehe in Liste tiefer", "  ".repeat(tiefe));
+                            if let Some(pfad) = deep_match(args, item, tiefe + 1, argNr) {
+                                return Some(pfad);
+                            }
+                        }
+    
+                        (arg, Element::Text(text)) => {
+                            println!("{}  ✗ Text '{}' matcht NICHT Argument '{}'",
+                                    "  ".repeat(tiefe), text, arg);
+                        }
+    
+                        (None, _) => {
+                            println!("{}  ⚠ Keine Argumente mehr", "  ".repeat(tiefe));
+                        }
+                    }
+                }
+    
+                println!("{}✗ Tiefe {}: Kein Match in dieser Liste",
+                        "  ".repeat(tiefe), tiefe);
+                None
+            }
         }
     }
 }
-*/
+
 /*
 
 fn deep_match_final(args: &[String], element: &Element) -> Option<Vec<String>> {
@@ -234,7 +251,7 @@ fn deep_match_final(args: &[String], element: &Element) -> Option<Vec<String>> {
 
 */
 
-
+/*
 fn deep_match_proper(args: &[String], element: &Element) -> Option<Vec<String>> {
     fn inner(args: &[String], element: &Element, arg_index: usize) -> Option<Vec<String>> {
         println!("Arg[{}] = {:?}, Element: {:?}", 
@@ -296,3 +313,4 @@ fn deep_match_proper(args: &[String], element: &Element) -> Option<Vec<String>> 
     
     inner(args, element, 0)
 }
+*/
