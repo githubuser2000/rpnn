@@ -14,7 +14,16 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
     let mut paramsPerParam: Vec<Vec<String>> = vec![vec![String::new()]];
     let mut dash_count_before = 0;
 
-    for (i, arg) in args.iter().enumerate() {
+    let mut bereich = TextBereich {
+        von_zeile: 0,
+        bis_zeile: 0,
+        von_spalte: 0,
+        bis_spalte: 0,
+    };
+
+    let mut iter = args.iter().enumerate();
+    while let Some((i, arg)) = iter.next() {
+    //for (i, arg) in args.iter().enumerate() {
         let mut dash_count = 0;
 
         // Zähle aufeinanderfolgende Minuszeichen am Anfang
@@ -25,12 +34,46 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>) {
                 break;
             }
         }
-        let mut bereich = TextBereich {
-            von_zeile: 0,
-            bis_zeile: 0,
-            von_spalte: 0,
-            bis_spalte: 0,
-        };
+               let dash_count = arg.chars().take_while(|&c| c == '-').count();
+        match arg.as_str() {
+            "--zeilevon" => {
+                // Versuche das nächste Element zu holen
+                if let Some((_, nachfolger)) = iter.next() {
+                    if let Ok(zahl) = nachfolger.parse::<usize>() {
+                        bereich.von_zeile = zahl;
+                        println!("Startzeile gesetzt auf: {}", zahl);
+                    } else {
+                        println!("Fehler: '{}' ist keine gültige Zeilennummer.", nachfolger);
+                    }
+                }
+            }
+            "--zeilebis" => {
+                if let Some((_, nachfolger)) = iter.next() {
+                    if let Ok(zahl) = nachfolger.parse::<usize>() {
+                        bereich.bis_zeile = zahl;
+                        println!("Endzeile gesetzt auf: {}", zahl);
+                    }
+                }
+            }
+            "--spaltevon" => {
+                if let Some((_, nachfolger)) = iter.next() {
+                    if let Ok(zahl) = nachfolger.parse::<usize>() {
+                        bereich.von_spalte = zahl;
+                    }
+                }
+            }
+            "--spaltebis" => {
+                if let Some((_, nachfolger)) = iter.next() {
+                    if let Ok(zahl) = nachfolger.parse::<usize>() {
+                        bereich.bis_spalte = zahl;
+                    }
+                }
+            }
+            _ => {
+                // Logik für Argumente, die keine Flags sind
+                println!("Anderes Argument: {}", arg);
+            }
+        }
         match arg.as_str() {
             "--zeilevon" => {
                 println!("Startzeile ausgewählt.");
