@@ -48,7 +48,20 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, von_zeile : us
     let target_name = column_names.get(col_index - 1)
         .ok_or(format!("Tabelle hat keine Spalte Nummer {}", col_index))?;
 
-    let query = format!("SELECT \"{}\" FROM csv_data LIMIT 10", target_name.replace("\"", "\"\""));
+
+    let anzahl = if bis_zeile >= von_zeile {
+        bis_zeile - von_zeile
+    } else {
+        0
+    };
+
+    let query = format!(
+        "SELECT \"{}\" FROM csv_data LIMIT {} OFFSET {}",
+        target_name.replace("\"", "\"\""),
+        anzahl,
+        von_zeile
+    );
+    //let query = format!("SELECT \"{}\" FROM csv_data LIMIT 10", target_name.replace("\"", "\"\""));
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
 
