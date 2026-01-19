@@ -9,6 +9,7 @@ rusqlite = { version = "0.31.0", features = ["bundled"] }
 fluent-templates = "0.9"
 # Notwendig für die Sprach-Identifikation (z.B. langid!("de"))
 unic-langid = "0.9"
+comfy-table = "7.1"
 
 [[bin]]
 name = "mein-rpnn"

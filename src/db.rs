@@ -2,6 +2,7 @@ use rusqlite::{Connection, params_from_iter};
 use csv::ReaderBuilder;
 use std::collections::HashSet;
 use crate::cli::TextBereich;
+use comfy_table::Table;
 pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
         .delimiter(b';')
@@ -100,14 +101,14 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
 
     // ... (vorheriger Code bleibt gleich) ...
 
-    let mut stmt = conn.prepare(&query)?;
-    let mut rows = stmt.query([])?;
+    //let mut stmt = conn.prepare(&query)?;
+    //let mut rows = stmt.query([])?;
 
     // Wir berechnen, wie viele Spalten wir eigentlich angefordert haben
-    let anzahl_spalten = selected_names.len();
+    //let anzahl_spalten = selected_names.len();
 
     println!("Inhalt von Spalten {}:", targets_string);
-    
+   /* 
     while let Some(row) = rows.next()? {
         let mut zeile_ergebnis = Vec::new();
 
@@ -121,7 +122,27 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
         // Verbinde die Werte der Spalten für die Ausgabe, z.B. mit einem Trennstrich
         println!("> {}", zeile_ergebnis.join(" | "));
     }
+*/
+    let mut stmt = conn.prepare(&query)?;
+    let mut rows = stmt.query([])?;
+    let anzahl_spalten = selected_names.len();
 
+    let mut table = Table::new();
+    
+    // Header setzen (die Spaltennamen)
+    table.set_header(&selected_names);
+
+    while let Some(row) = rows.next()? {
+        let mut row_cells = Vec::new();
+        for i in 0..anzahl_spalten {
+            let value: String = row.get(i).unwrap_or_default();
+            row_cells.push(value);
+        }
+        table.add_row(row_cells);
+    }
+
+    // Die Tabelle formatiert sich selbst mit gleichen/passenden Breiten
+    println!("{table}");
     Ok(())
 }
 
