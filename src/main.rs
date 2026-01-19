@@ -29,6 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let pfad = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
     let conn = import_csv_to_sqlite(&pfad)?;
-    query_column_by_index(&conn, 1, bereich)?; // Fragt die 1. Spalte ab
+    query_column_by_index(&conn, bereich)?; // Fragt die 1. Spalte ab
     Ok(())
 }
