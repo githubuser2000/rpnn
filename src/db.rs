@@ -96,6 +96,40 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
 
 
     //let query = format!("SELECT \"{}\" FROM csv_data LIMIT 10", target_name.replace("\"", "\"\""));
+    
+
+    // ... (vorheriger Code bleibt gleich) ...
+
+    let mut stmt = conn.prepare(&query)?;
+    let mut rows = stmt.query([])?;
+
+    // Wir berechnen, wie viele Spalten wir eigentlich angefordert haben
+    let anzahl_spalten = selected_names.len();
+
+    println!("Inhalt von Spalten {}:", targets_string);
+    
+    while let Some(row) = rows.next()? {
+        let mut zeile_ergebnis = Vec::new();
+
+        // Iteriere über alle Spalten-Indizes dieser einen Zeile
+        for i in 0..anzahl_spalten {
+            // Hole den Wert der i-ten Spalte als String
+            let value: String = row.get(i).unwrap_or_else(|_| "NULL".to_string());
+            zeile_ergebnis.push(value);
+        }
+
+        // Verbinde die Werte der Spalten für die Ausgabe, z.B. mit einem Trennstrich
+        println!("> {}", zeile_ergebnis.join(" | "));
+    }
+
+    Ok(())
+}
+
+
+
+
+
+    /*
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
 
@@ -106,4 +140,4 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     }
     Ok(())
 }
-
+*/
