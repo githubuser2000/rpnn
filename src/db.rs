@@ -2,7 +2,8 @@ use rusqlite::{Connection, params_from_iter};
 use csv::ReaderBuilder;
 use std::collections::HashSet;
 use crate::cli::TextBereich;
-use comfy_table::Table;
+use comfy_table::{Table, ColumnConstraint, Width, ContentArrangement};
+use terminal_size::{Width as TermWidth, terminal_size};
 pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
         .delimiter(b';')
@@ -126,7 +127,7 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
     let anzahl_spalten = selected_names.len();
-
+/*
     let mut table = Table::new();
     
     // Header setzen (die Spaltennamen)
@@ -144,8 +145,41 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
     // Die Tabelle formatiert sich selbst mit gleichen/passenden Breiten
     println!("{table}");
     Ok(())
-}
+}*/
 
+
+let mut table = Table::new();
+    
+    // 1. Terminal-Breite ermitteln
+    let term_width = if let Some((TermWidth(w), _)) = terminal_size() {
+        w
+    } else {
+        80 // Fallback, falls Breite nicht ermittelbar
+    };
+
+    // 2. Tabellen-Layout konfigurieren
+    table
+        .set_content_arrangement(ContentArrangement::Dynamic) // Erlaubt Umbrüche
+        .set_width(term_width); // Begrenzt Tabelle auf Fensterbreite
+
+    // Header setzen
+    table.set_header(&selected_names);
+
+    // 3. Zeilen hinzufügen
+    while let Some(row) = rows.next()? {
+        let mut row_cells = Vec::new();
+        for i in 0..selected_names.len() {
+            let value: String = row.get(i).unwrap_or_default();
+            row_cells.push(value);
+        }
+        table.add_row(row_cells);
+    }
+
+    // 4. Ausgabe
+    println!("{table}");
+
+    Ok(())
+}
 
 
 
