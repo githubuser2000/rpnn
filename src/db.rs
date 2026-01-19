@@ -2,8 +2,7 @@ use rusqlite::{Connection, params_from_iter};
 use csv::ReaderBuilder;
 use std::collections::HashSet;
 use crate::cli::TextBereich;
-use comfy_table::{Table, ColumnConstraint, Width, ContentArrangement};
-use comfy_table::{TableComponent};
+use comfy_table::{Table, ColumnConstraint, Width, ContentArrangement, TableComponent};
 use terminal_size::{Width as TermWidth, terminal_size};
 pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
@@ -125,6 +124,143 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextB
         println!("> {}", zeile_ergebnis.join(" | "));
     }
 */
+
+
+
+
+
+
+
+    let mut stmt = conn.prepare(&query)?;
+    let mut rows = stmt.query([])?;
+
+    // --- START DER STATISTISCHEN MESSUNG ---
+    let mut all_data = Vec::new();
+    let mut max_lengths: Vec<usize> = selected_names.iter().map(|n| n.len()).collect();
+
+    while let Some(row) = rows.next()? {
+        let mut row_values = Vec::new();
+        for i in 0..selected_names.len() {
+            let val: String = row.get(i).unwrap_or_default();
+            // Wir messen die reale Länge (Unicode-sicher)
+            let current_len = val.chars().count();
+            if current_len > max_lengths[i] {
+                max_lengths[i] = current_len;
+            }
+            row_values.push(val);
+        }
+        all_data.push(row_values);
+    }
+
+    // --- TABELLEN-KONFIGURATION ---
+    let mut table = comfy_table::Table::new();
+    
+    // Terminalbreite ermitteln
+    let term_width = if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
+        w
+    } else { 100 };
+
+    table.set_content_arrangement(comfy_table::ContentArrangement::DynamicFullWidth)
+         .set_width(term_width)
+         .load_preset(comfy_table::presets::UTF8_FULL)
+         .set_header(&selected_names);
+
+    // Spaltenbreiten gewichtet verteilen
+    let gesamt_zeichen: usize = max_lengths.iter().sum();
+
+    for i in 0..selected_names.len() {
+        // Anteil dieser Spalte am Gesamtvorkommen berechnen
+        let anteil = max_lengths[i] as f32 / gesamt_zeichen as f32;
+        let prozent = (anteil * 100.0) as u16;
+        
+        // Mindestbreite von 5% garantieren, damit nichts verschwindet
+        let column = table.column_mut(i).unwrap();
+        column.set_constraint(ColumnConstraint::UpperBoundary(Width::Percentage(prozent.max(5))));
+    }
+
+    // Daten einfüllen
+    for row in all_data {
+        table.add_row(row);
+    }
+
+    // Finale Ausgabe
+    if !selected_names.is_empty() {
+        println!("{table}");
+    } else {
+        println!("Keine Daten für den gewählten Bereich gefunden.");
+    }
+
+    Ok(())
+}
+
+
+
+
+
+
+
+/*
+let mut stmt = conn.prepare(&query)?;
+    let mut rows = stmt.query([])?;
+
+    let anzahl_spalten = selected_names.len();
+    let mut all_data = Vec::new();
+    
+    // 1. Daten zwischenspeichern und Längen messen
+    // Initialisiere max_lengths mit der Länge der Header-Namen
+    let mut max_lengths: Vec<usize> = selected_names.iter().map(|s| s.len()).collect();
+
+    while let Some(row) = rows.next()? {
+        let mut row_values = Vec::new();
+        for i in 0..anzahl_spalten {
+            let val: String = row.get(i).unwrap_or_default();
+            // Statistisches Messen: Was ist der längste Text in dieser Spalte?
+            let len = val.chars().count();
+            if len > max_lengths[i] {
+                max_lengths[i] = len;
+            }
+            row_values.push(val);
+        }
+        all_data.push(row_values);
+    }
+
+    // 2. Terminalbreite für die Gewichtung nutzen
+    let term_width = if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
+        w as usize
+    } else { 100 };
+
+    let gesamt_zeichen: usize = max_lengths.iter().sum();
+
+    // 3. Tabelle erstellen
+    let mut table = comfy_table::Table::new();
+    table.set_content_arrangement(comfy_table::ContentArrangement::DynamicFullWidth)
+         .set_width(term_width as u16)
+         .set_header(&selected_names);
+
+    // 4. Spaltenbreiten gewichtet setzen
+    for i in 0..anzahl_spalten {
+        let anteil = max_lengths[i] as f32 / gesamt_zeichen as f32;
+        let berechnete_breite = (anteil * term_width as f32) as u16;
+        
+        let column = table.column_mut(i).unwrap();
+        // Wir setzen eine untere Grenze von 10, damit schmale Spalten lesbar bleiben
+        column.set_constraint(comfy_table::ColumnConstraint::Percentage((anteil * 100.0) as u16));
+    }
+
+    // 5. Daten in die Tabelle füllen
+    for row in all_data {
+        table.add_row(row);
+    }
+
+    println!("{table}");
+    Ok(())
+}
+*/
+
+
+
+
+/*
     let mut stmt = conn.prepare(&query)?;
     let mut rows = stmt.query([])?;
     let anzahl_spalten = selected_names.len();
@@ -164,7 +300,7 @@ let mut table = Table::new();
     Ok(())
 }
 
-
+*/
 /*
     let mut table = Table::new();
     

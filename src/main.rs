@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Wenn nur der Programmname vorhanden ist (Länge = 1)
     if args.len() == 1 {
         println!("Benutzung: mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
-        return; // Beendet das Programm frühzeitig
+        return Ok(());
     }
     let (dashes, params, bereich) = parse_cli_args(&args);
     
