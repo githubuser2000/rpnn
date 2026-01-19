@@ -1,7 +1,7 @@
 use rusqlite::{Connection, params_from_iter};
 use csv::ReaderBuilder;
 use std::collections::HashSet;
-
+use crate::cli::TextBereich;
 pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error::Error>> {
     let mut rdr = ReaderBuilder::new()
         .delimiter(b';')
@@ -40,7 +40,7 @@ pub fn import_csv_to_sqlite(pfad: &str) -> Result<Connection, Box<dyn std::error
     Ok(conn) // Hier geben wir die Connection zurück!
 }
 
-pub fn query_column_by_index(conn: &Connection, col_index: usize, von_zeile : usize, bis_zeile: usize) -> Result<(), Box<dyn std::error::Error>> {
+pub fn query_column_by_index(conn: &Connection, col_index: usize, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
     let mut stmt_info = conn.prepare("PRAGMA table_info(csv_data)")?;
     let column_names: Vec<String> = stmt_info.query_map([], |row| row.get(1))?
         .collect::<Result<Vec<_>, _>>()?;
@@ -49,8 +49,8 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, von_zeile : us
         .ok_or(format!("Tabelle hat keine Spalte Nummer {}", col_index))?;
 
 
-    let anzahl = if bis_zeile >= von_zeile {
-        bis_zeile - von_zeile
+    let anzahl = if bereich.bis_zeile >= bereich.von_zeile {
+        bereich.bis_zeile - bereich.von_zeile
     } else {
         0
     };
@@ -59,7 +59,7 @@ pub fn query_column_by_index(conn: &Connection, col_index: usize, von_zeile : us
         "SELECT \"{}\" FROM csv_data LIMIT {} OFFSET {}",
         target_name.replace("\"", "\"\""),
         anzahl,
-        von_zeile
+        bereich.von_zeile
     );
     //let query = format!("SELECT \"{}\" FROM csv_data LIMIT 10", target_name.replace("\"", "\"\""));
     let mut stmt = conn.prepare(&query)?;
