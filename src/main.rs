@@ -2,8 +2,7 @@ use std::path::PathBuf;
 use std::env;
 use cli::parse_cli_args;
 use data::Element;
-use db::import_csv_to_sqlite;
-use db::query_column_by_index;
+use db::{import_csv_to_sqlite, append_csv_right, query_column_by_index};
 use utils::print_recursive;
 mod cli;
 mod data;
@@ -28,7 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CSV in SQLite importieren
     let mut projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let pfad = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
-    let conn = import_csv_to_sqlite(&pfad)?;
+    let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/concat-reli-001.csv";
+    let mut conn = import_csv_to_sqlite(&pfad)?;
+    append_csv_right(&mut conn, &pfad2, 2)?;
     query_column_by_index(&conn, bereich)?; // Fragt die 1. Spalte ab
     Ok(())
 }
