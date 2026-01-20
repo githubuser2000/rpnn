@@ -16,4 +16,6 @@ Makefile
 *.exe
 /bin//
 /target
-
+nebenseite/target/
+nebenseite/target
+target/

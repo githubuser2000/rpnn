@@ -1,0 +1,12 @@
+[package]
+name = "rust_zeilen_validator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = "1.10"
+lazy_static = "1.4.0"
+
+[[bin]]
+name = "zeilen_validator"
+path = "src/main.rs"
