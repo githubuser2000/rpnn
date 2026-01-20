@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CSV in SQLite importieren
     let mut projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let pfad1 = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
-    let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/concat-reli-001.csv";
+    let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
     let dateien = [
         pfad1,
         pfad2,
