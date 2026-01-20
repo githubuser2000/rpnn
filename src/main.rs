@@ -2,13 +2,16 @@ use std::path::PathBuf;
 use std::env;
 use cli::parse_cli_args;
 use data::Element;
-use db::import_csv_to_sqlite;
-use db::query_column_by_index;
+use csv_importer::import_csv_to_sqlite;
+use table_printer::query_column_by_index;
 use utils::print_recursive;
 mod cli;
 mod data;
-mod db;
 mod utils;
+mod csv_importer;
+mod column_manager;
+mod data_fetcher;
+mod table_printer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CLI Argumente parsen
