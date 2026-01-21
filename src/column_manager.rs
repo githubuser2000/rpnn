@@ -24,6 +24,10 @@ pub fn build_column_query(
     }
 
     let anzahl = bereich.bis_zeile.saturating_sub(bereich.von_zeile);
+    println!( "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
+        selected_names.join(", "),
+        anzahl,
+        bereich.von_zeile);
     let query = format!(
         "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
         selected_names.join(", "),
