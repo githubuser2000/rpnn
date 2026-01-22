@@ -1,0 +1,109 @@
+use prettytable::{Cell, Row, Table, format};
+use rusqlite::Connection;
+use crate::cli::TextBereich;
+use crate::column_manager::{get_column_names, build_column_query};
+use crate::data_fetcher::fetch_data_with_stats;
+
+const MAX_COLUMNS_CAP: usize = 6;
+const MAX_COLUMN_WIDTH: usize = 34;
+
+#[derive(Copy, Clone)]
+enum ColumnKind {
+    Id,
+    Number,
+    ShortText,
+    LongText,
+}
+
+fn infer_column_kind(header: &str) -> ColumnKind {
+    let h = header.to_lowercase();
+    if h == "id" || h.ends_with("_id") {
+        ColumnKind::Id
+    } else if h.contains("count") || h.contains("num") {
+        ColumnKind::Number
+    } else if h.contains("name") || h.contains("title") {
+        ColumnKind::ShortText
+    } else {
+        ColumnKind::LongText
+    }
+}
+
+/// Kürzt einen String auf max Länge und fügt "…" hinzu
+fn truncate_cell(content: &str, max_width: usize) -> String {
+    let mut width = 0;
+    let mut truncated = String::new();
+
+    for ch in content.chars() {
+        let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + ch_width > max_width {
+            truncated.push('…');
+            break;
+        }
+        truncated.push(ch);
+        width += ch_width;
+    }
+
+    truncated
+}
+
+/// Printet eine Tabelle mit prettytable-rs
+pub fn print_table(headers: &[String], data: &[Vec<String>]) {
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+
+    // Header
+    let header_row = Row::new(
+        headers.iter()
+            .map(|h| Cell::new(&truncate_cell(h, MAX_COLUMN_WIDTH)))
+            .collect()
+    );
+    table.set_titles(header_row);
+
+    // Daten
+    for row in data {
+        let data_row = Row::new(
+            row.iter()
+                .map(|cell| Cell::new(&truncate_cell(cell, MAX_COLUMN_WIDTH)))
+                .collect()
+        );
+        table.add_row(data_row);
+    }
+
+    table.printstd();
+}
+
+/// Printet die Tabelle in Chunks (maximal MAX_COLUMNS_CAP Spalten pro Block)
+pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
+    let total_columns = headers.len();
+    let mut start = 0;
+
+    while start < total_columns {
+        let end = (start + MAX_COLUMNS_CAP).min(total_columns);
+
+        let headers_chunk = &headers[start..end];
+        let data_chunk: Vec<Vec<String>> = data.iter()
+            .map(|row| {
+                let mut r = row[start..end].to_vec();
+                r.resize(end - start, "".to_string());
+                r
+            })
+            .collect();
+
+        print_table(headers_chunk, &data_chunk);
+        println!(); // Leerzeile zwischen Chunks
+
+        start = end;
+    }
+}
+
+/// Query-Funktion bleibt gleich
+pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
+    let column_names = get_column_names(conn)?;
+    let (query, headers) = build_column_query(&column_names, bereich)?;
+    let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &vec![])?;
+
+    print_table_chunked(&headers, &data);
+
+    println!();
+    Ok(())
+}
