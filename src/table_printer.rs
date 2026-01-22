@@ -6,7 +6,7 @@ use rusqlite::Connection;
 const COLUMN_OVERHEAD: usize = 5;
 const MIN_COLUMN_WIDTH: usize = 10;
 const MAX_COLUMNS_CAP: usize = 6;
-const MAX_COLUMN_WIDTH: usize = 40; // Maximal sichtbare Breite einer Spalte
+const MAX_COLUMN_WIDTH: usize = 34; // Maximal sichtbare Breite einer Spalte
 
 #[derive(Copy, Clone)]
 enum ColumnKind {
@@ -102,31 +102,40 @@ pub fn print_table_chunked(
         .unwrap_or(100);
 
     let mut start = 0;
-
     while start < headers.len() {
         let remaining_headers = &headers[start..];
         let remaining_lengths = &max_lengths[start..];
 
-        // Neue Spaltenanzahl für jede Tabelle berechnen
+        // Zellenbreiten auf MAX_COLUMN_WIDTH begrenzen
+        let capped_max_lengths: Vec<usize> = remaining_lengths
+            .iter()
+            .map(|&w| w.min(MAX_COLUMN_WIDTH))
+            .collect();
+
+        // Neue Spaltenanzahl für diese Tabelle berechnen
         let cols_per_table = compute_columns_per_table(
             term_width,
             remaining_headers,
-            remaining_lengths,
+            &capped_max_lengths,
         );
-
         let end = (start + cols_per_table).min(headers.len());
 
-        println!();
-        // println!("Spalten {}–{}", start + 1, end);
-
+        // Slice für diese Tabelle
         let chunk_headers = &headers[start..end];
-        let chunk_max_lengths = &max_lengths[start..end];
+        let chunk_max_lengths = &capped_max_lengths[0..end-start];
 
+        // Daten synchron zur Chunk-Slice vorbereiten
         let chunk_data: Vec<Vec<String>> = data
             .iter()
-            .map(|row| row[start..end].to_vec())
+            .map(|row| {
+                let slice_end = row.len().min(end);
+                let mut r = row[start..slice_end].to_vec();
+                r.resize(end - start, "".to_string()); // fehlende Spalten auffüllen
+                r
+            })
             .collect();
 
+        // Tabelle drucken
         print_table(chunk_headers, chunk_data, chunk_max_lengths);
 
         start = end;
@@ -139,28 +148,35 @@ pub fn print_table(
     max_lengths: &[usize],
 ) {
     let mut table = Table::new();
-
     let term_width = terminal_size()
         .map(|(TermWidth(w), _)| w)
         .unwrap_or(100);
 
+    // Header abschneiden auf MAX_COLUMN_WIDTH
+    let display_headers: Vec<String> = headers
+        .iter()
+        .map(|h| truncate_cell(h, MAX_COLUMN_WIDTH))
+        .collect();
+    table.set_header(&display_headers);
+
+    // Table Setup
     table
         .set_content_arrangement(ContentArrangement::DynamicFullWidth)
         .set_width(term_width)
-        .load_preset(comfy_table::presets::UTF8_FULL)
-        .set_header(headers);
+        .load_preset(comfy_table::presets::UTF8_FULL);
 
+    // Berechne prozentuale Spaltenbreite auf Basis der max_lengths
     let total: usize = max_lengths.iter().sum::<usize>().max(1);
-
-    for (i, len) in max_lengths.iter().enumerate() {
-        let percent = ((*len as f32 / total as f32) * 100.0) as u16;
-        table
-            .column_mut(i)
-            .unwrap()
-            .set_constraint(ColumnConstraint::UpperBoundary(
-                Width::Percentage(percent.max(5)),
-            ));
-    }
+    for (i, &len) in max_lengths.iter().enumerate() {
+    let percent = ((len as f32 / total as f32 * 100.0) as u16).min(100 / MAX_COLUMNS_CAP as u16);
+    table
+        .column_mut(i)
+        .unwrap()
+        .set_constraint(ColumnConstraint::UpperBoundary(
+            Width::Percentage(percent.max(5)),
+        ));
+    } 
+    // Datenzeilen, Inhalte auf MAX_COLUMN_WIDTH kürzen
     for row in data {
         let truncated_row: Vec<String> = row
             .iter()
@@ -169,6 +185,7 @@ pub fn print_table(
         table.add_row(truncated_row);
     }
 
+    // Ausgabe
     if !headers.is_empty() {
         println!("{table}");
     } else {
