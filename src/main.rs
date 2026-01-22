@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::env;
 use cli::parse_cli_args;
-use data::Element;
 use csv_importer::import_csvs_to_sqlite;
 use table_printer::query_column_by_index;
 use column_manager::get_column_names;
@@ -13,6 +12,9 @@ mod csv_importer;
 mod column_manager;
 mod data_fetcher;
 mod table_printer;
+mod retaAusgabe;
+
+// Dann deine anderen Imports...
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CLI Argumente parsen

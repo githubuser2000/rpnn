@@ -1,8 +1,8 @@
-use rusqlite::{Connection, params_from_iter};
 use csv::ReaderBuilder;
 use std::error::Error;
 use std::path::Path;
 use std::collections::HashMap;
+use rusqlite::Connection;
 
 pub fn import_csvs_to_sqlite<P: AsRef<Path>>(pfade: &[P]) -> Result<Connection, Box<dyn Error>> {
     let mut all_headers = Vec::new();

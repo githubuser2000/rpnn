@@ -1,11 +1,11 @@
-use comfy_table::{ColumnConstraint, ContentArrangement, Table, Width};
 use terminal_size::{terminal_size, Width as TermWidth};
 use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
 use crate::data_fetcher::fetch_data_with_stats;
 use rusqlite::Connection;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
-
+use std::collections::BTreeSet;
+use crate::retaAusgabe::{CliOutput, Tables, OutputSyntax, TableRow, TableCell};
 const MIN_COLUMN_WIDTH: usize = 10;
 const MAX_COLUMNS_CAP: usize = 6;
 const MAX_COLUMN_WIDTH: usize = 34;
@@ -82,39 +82,101 @@ fn compute_columns_per_table(term_width: usize, headers: &[String], max_lengths:
     if headers.len() < 2 { headers.len() } else { cols.clamp(2, MAX_COLUMNS_CAP) }
 }
 
-// --- Print one table chunk ---
-pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize]) {
-    let mut table = Table::new();
-    let term_width = terminal_size().map(|(TermWidth(w), _)| w).unwrap_or(100);
-
-    let display_headers: Vec<String> = headers.iter().map(|h| truncate_cell(h, MAX_COLUMN_WIDTH)).collect();
-    table.set_header(&display_headers);
-
-    table
-        .set_content_arrangement(ContentArrangement::DynamicFullWidth)
-        .set_width(term_width)
-        .load_preset(comfy_table::presets::UTF8_FULL);
-
-    let total: usize = max_lengths.iter().sum::<usize>().max(1);
-    for (i, &len) in max_lengths.iter().enumerate() {
-        let percent = (len as f32 / total as f32 * 100.0) as u16;
-        table.column_mut(i).unwrap().set_constraint(ColumnConstraint::UpperBoundary(Width::Percentage(percent.max(5))));
+// --- Hilfsfunktion: Konvertiere Daten in TableRow-Strukturen ---
+fn convert_to_table_rows(
+    headers: &[String], 
+    data: &[Vec<String>], 
+    column_widths: &[usize]
+) -> Vec<TableRow> {
+    let mut table_rows = Vec::new();
+    
+    // Header-Zeile erstellen
+    let mut header_cells = Vec::new();
+    for (i, header) in headers.iter().enumerate() {
+        let width = if i < column_widths.len() { column_widths[i] } else { MAX_COLUMN_WIDTH };
+        let cell = TableCell::new(header.clone(), width);
+        header_cells.push(cell);
     }
-
-    for row in data {
-        let truncated_row: Vec<String> = row.iter().map(|c| truncate_cell(c, MAX_COLUMN_WIDTH)).collect();
-        table.add_row(truncated_row);
+    table_rows.push(TableRow::new(header_cells, 0, 0));
+    
+    // Datenzeilen erstellen
+    for (row_idx, row_data) in data.iter().enumerate() {
+        let mut cells = Vec::new();
+        for (i, cell_content) in row_data.iter().enumerate() {
+            let width = if i < column_widths.len() { column_widths[i] } else { MAX_COLUMN_WIDTH };
+            let cell = TableCell::new(cell_content.clone(), width);
+            cells.push(cell);
+        }
+        // Sicherstellen, dass alle Spalten vorhanden sind
+        while cells.len() < headers.len() {
+            let width = if cells.len() < column_widths.len() { 
+                column_widths[cells.len()] 
+            } else { 
+                MAX_COLUMN_WIDTH 
+            };
+            cells.push(TableCell::new("".to_string(), width));
+        }
+        table_rows.push(TableRow::new(cells, (row_idx + 1) as i32, (row_idx + 1) as i32));
     }
-
-    if !headers.is_empty() { println!("{table}"); }
+    
+    table_rows
 }
 
-// --- Print table in automatic chunks ---
+// --- Print one table chunk (mit retaAusgabe) ---
+pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize]) {
+    let tables = Tables::new(Some(100));
+    
+    // Bestimme Terminalbreite für die Ausgabe
+    let term_width = terminal_size().map(|(TermWidth(w), _)| w as usize).unwrap_or(80);
+    
+    // Berechne Spaltenbreiten unter Berücksichtigung von Unicode
+    let mut column_widths = Vec::new();
+    for (i, header) in headers.iter().enumerate() {
+        let header_width = UnicodeWidthStr::width(header.as_str());
+        let max_data_width = if i < max_lengths.len() { max_lengths[i] } else { 0 };
+        let kind = infer_column_kind(header);
+        let min_width = min_width_for_kind(kind);
+        
+        // Wähle die maximale Breite, berücksichtige aber Terminalgrenzen
+        let desired_width = header_width.max(max_data_width).max(min_width);
+        let capped_width = desired_width.min(MAX_COLUMN_WIDTH).min(term_width / 2);
+        column_widths.push(capped_width);
+    }
+    
+    // Konvertiere Daten in TableRow-Strukturen
+    let table_rows = convert_to_table_rows(headers, &data, &column_widths);
+    
+    // Erstelle CliOutput für Plain-Text mit Farben
+    let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
+    output.color_enabled = true;
+    output.table_width = term_width;
+    output.column_widths = column_widths.clone();
+    output.line_numbering = false; // Keine Zeilennummern für Datenbanktabellen
+    output.one_table = true; // Eine zusammenhängende Tabelle
+    
+    // Erstelle Display-Lines Set
+    let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
+    
+    // Bestimme maximale Zeilenanzahl pro Zelle für rows_range
+    let max_lines_in_cells = table_rows.iter()
+        .map(|row: &TableRow| row.max_line_count())
+        .max()
+        .unwrap_or(1);
+    let rows_range = 0..max_lines_in_cells;
+    
+    // Gib Tabelle aus
+    output.cli_out(&display_lines, &table_rows, rows_range);
+}
+
+// --- Print table in automatic chunks (angepasst für retaAusgabe) ---
 pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
     let term_width = terminal_size().map(|(TermWidth(w), _)| w as usize).unwrap_or(100);
 
-    // max_lengths automatisch berechnen
-    let mut max_lengths: Vec<usize> = headers.iter().map(|h| UnicodeWidthStr::width(h.as_str())).collect();
+    // max_lengths automatisch berechnen mit Unicode-Unterstützung
+    let mut max_lengths: Vec<usize> = headers.iter()
+        .map(|h| UnicodeWidthStr::width(h.as_str()))
+        .collect();
+    
     for row in data {
         for (i, cell) in row.iter().enumerate() {
             if i < max_lengths.len() {
@@ -124,39 +186,84 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
     }
 
     let mut start = 0;
+    let mut chunk_num = 0;
+    
     while start < headers.len() {
         let remaining_headers = &headers[start..];
         let remaining_lengths = &max_lengths[start..];
 
-        let capped_lengths: Vec<usize> = remaining_lengths.iter().map(|&w| w.min(MAX_COLUMN_WIDTH)).collect();
+        let capped_lengths: Vec<usize> = remaining_lengths.iter()
+            .map(|&w| w.min(MAX_COLUMN_WIDTH))
+            .collect();
+        
         let cols_per_table = compute_columns_per_table(term_width, remaining_headers, &capped_lengths);
         let end = (start + cols_per_table).min(headers.len());
 
         let chunk_headers = &headers[start..end];
         let chunk_max_lengths = &capped_lengths[..end - start];
 
+        // Extrahiere Daten für diesen Chunk
         let chunk_data: Vec<Vec<String>> = data.iter()
             .map(|row| {
-                let mut r = row[start..end].to_vec();
-                r.resize(end - start, "".to_string());
+                let mut r = row[start..end.min(row.len())].to_vec();
+                // Fülle fehlende Zellen mit leeren Strings
+                while r.len() < end - start {
+                    r.push("".to_string());
+                }
                 r
             })
             .collect();
 
+        // Gib Chunk als separate Tabelle aus
+        if chunk_num > 0 {
+            println!("\n{}", "─".repeat(term_width));
+            println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
+            println!("{}", "─".repeat(term_width));
+        }
+        
         print_table(chunk_headers, chunk_data, chunk_max_lengths);
-
+        
         start = end;
+        chunk_num += 1;
     }
 }
 
-// --- Query-Funktion bleibt gleich ---
+// --- Query-Funktion ---
 pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
     let (query, headers) = build_column_query(&column_names, bereich)?;
-    let header_lengths: Vec<usize> = headers.iter().map(|h| UnicodeWidthStr::width(h.as_str())).collect();
+    
+    // Berechne Header-Längen mit Unicode-Unterstützung
+    let header_lengths: Vec<usize> = headers.iter()
+        .map(|h| UnicodeWidthStr::width(h.as_str()))
+        .collect();
+    
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
     print_table_chunked(&headers, &data);
     println!();
     Ok(())
+}
+
+// --- Zusätzliche Hilfsfunktion für einfache Tabellen ---
+pub fn print_simple_table(headers: &[&str], data: &[Vec<&str>]) {
+    let headers_strings: Vec<String> = headers.iter().map(|s| s.to_string()).collect();
+    let data_strings: Vec<Vec<String>> = data.iter()
+        .map(|row| row.iter().map(|s| s.to_string()).collect())
+        .collect();
+    
+    // Berechne max_lengths
+    let mut max_lengths: Vec<usize> = headers_strings.iter()
+        .map(|h| UnicodeWidthStr::width(h.as_str()))
+        .collect();
+    
+    for row in &data_strings {
+        for (i, cell) in row.iter().enumerate() {
+            if i < max_lengths.len() {
+                max_lengths[i] = max_lengths[i].max(UnicodeWidthStr::width(cell.as_str()));
+            }
+        }
+    }
+    
+    print_table(&headers_strings, data_strings, &max_lengths);
 }
