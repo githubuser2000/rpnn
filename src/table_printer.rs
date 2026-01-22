@@ -16,6 +16,16 @@ enum ColumnKind {
     LongText,
 }
 
+fn truncate_cell(content: &str, max_width: usize) -> String {
+    if content.chars().count() > max_width {
+        let mut truncated: String = content.chars().take(max_width.saturating_sub(1)).collect();
+        truncated.push('…');
+        truncated
+    } else {
+        content.to_string()
+    }
+}
+
 fn infer_column_kind(header: &str) -> ColumnKind {
     let h = header.to_lowercase();
 
@@ -151,9 +161,12 @@ pub fn print_table(
                 Width::Percentage(percent.max(5)),
             ));
     }
-
     for row in data {
-        table.add_row(row);
+        let truncated_row: Vec<String> = row
+            .iter()
+            .map(|cell| truncate_cell(cell, MAX_COLUMN_WIDTH))
+            .collect();
+        table.add_row(truncated_row);
     }
 
     if !headers.is_empty() {
