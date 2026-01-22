@@ -76,10 +76,19 @@ pub fn print_table_chunked(
         .map(|(TermWidth(w), _)| w as usize)
         .unwrap_or(100);
 
-    let cols_per_table =
-        compute_columns_per_table(term_width, headers, max_lengths);
+    let mut start = 0;
 
-    for start in (0..headers.len()).step_by(cols_per_table) {
+    while start < headers.len() {
+        // 🔑 nur die noch verbleibenden Spalten betrachten
+        let remaining_headers = &headers[start..];
+        let remaining_lengths = &max_lengths[start..];
+
+        let cols_per_table = compute_columns_per_table(
+            term_width,
+            remaining_headers,
+            remaining_lengths,
+        );
+
         let end = (start + cols_per_table).min(headers.len());
 
         println!();
@@ -94,6 +103,8 @@ pub fn print_table_chunked(
             .collect();
 
         print_table(chunk_headers, chunk_data, chunk_max_lengths);
+
+        start = end;
     }
 }
 
