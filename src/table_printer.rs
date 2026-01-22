@@ -39,31 +39,35 @@ fn min_width_for_kind(kind: ColumnKind) -> usize {
 }
 
 
+
 fn compute_columns_per_table(
     term_width: usize,
     headers: &[String],
     max_lengths: &[usize],
 ) -> usize {
-    if headers.is_empty() {
-        return 1;
+    let mut used_width = 0;
+    let mut cols = 0;
+
+    for (h, &w) in headers.iter().zip(max_lengths) {
+        let kind = infer_column_kind(h);
+        let min = min_width_for_kind(kind).max(MIN_COLUMN_WIDTH);
+
+        let col_width = w.max(min) + COLUMN_OVERHEAD;
+
+        // mindestens eine Spalte MUSS reinpassen
+        if cols > 0 && used_width + col_width > term_width {
+            break;
+        }
+
+        used_width += col_width;
+        cols += 1;
+
+        if cols >= MAX_COLUMNS_CAP {
+            break;
+        }
     }
 
-    let effective_widths: Vec<usize> = headers
-        .iter()
-        .zip(max_lengths)
-        .map(|(h, &w)| {
-            let kind = infer_column_kind(h);
-            let min = min_width_for_kind(kind).max(MIN_COLUMN_WIDTH);
-            w.max(min) + COLUMN_OVERHEAD
-        })
-        .collect();
-
-    let avg_width =
-        effective_widths.iter().sum::<usize>() / effective_widths.len();
-
-    let cols = term_width / avg_width;
-
-    cols.clamp(1, MAX_COLUMNS_CAP)
+    cols.max(1)
 }
 
 
