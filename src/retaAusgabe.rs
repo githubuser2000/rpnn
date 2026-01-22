@@ -61,7 +61,6 @@ impl OutputSyntax {
     }
 }
 
-// Strukturen für Tabellendaten
 #[derive(Debug, Clone)]
 pub struct TableCell {
     lines: Vec<String>,
@@ -74,19 +73,17 @@ impl TableCell {
             .map(|line| line.to_string())
             .collect();
         
-        // Kürze oder fülle jede Zeile auf die gewünschte visuelle Breite
         let formatted_lines: Vec<String> = lines
             .iter()
             .map(|line| {
                 let line_width = UnicodeWidthStr::width(line.as_str());
                 
                 if line_width > width {
-                    // UTF-8 sichere Kürzung basierend auf visueller Breite
                     let mut result = String::new();
                     let mut current_width = 0;
                     
                     for ch in line.chars() {
-                        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0); // Verwende UnicodeWidthChar
+                        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
                         if current_width + ch_width > width {
                             result.push('…');
                             break;
@@ -97,7 +94,6 @@ impl TableCell {
                     
                     result
                 } else {
-                    // Auffüllen mit Leerzeichen
                     format!("{:<width$}", line, width = width)
                 }
             })
@@ -105,7 +101,7 @@ impl TableCell {
         
         TableCell { lines: formatted_lines }
     }
-        
+    
     pub fn get_line(&self, line_num: usize) -> Option<&str> {
         self.lines.get(line_num).map(|s| s.as_str())
     }
@@ -173,22 +169,11 @@ impl<'a> CliOutput<'a> {
         match self.out_type {
             OutputSyntax::Plain => {
                 if line_num == 0 {
-                    // Header-Zeile
-                    text.red().on_white().bold().to_string()
+                    format!("{}", text.red().bold())
                 } else if is_empty {
-                    // Leere Zellen
-                    if line_num % 2 == 0 {
-                        text.black().on_white().to_string()
-                    } else {
-                        text.white().on_black().to_string()
-                    }
+                    text.to_string()
                 } else {
-                    // Reguläre Zellen mit spezieller Farbcodierung
-                    if line_num % 2 == 0 {
-                        text.black().on_white().to_string()
-                    } else {
-                        text.white().on_black().to_string()
-                    }
+                    text.to_string()
                 }
             }
             _ => text.to_string(),
@@ -196,11 +181,13 @@ impl<'a> CliOutput<'a> {
     }
     
     pub fn cliout2(&mut self, text: &str) {
+        println!("[DEBUG cliout2] Ausgabe: '{}'", text);
         self.resulting_output.push(text.to_string());
         
-        // Nur ausgeben, wenn nicht NichtsSyntax
         if !matches!(self.out_type, OutputSyntax::Nichts) {
             println!("{}", text);
+        } else {
+            println!("[DEBUG] OutputSyntax::Nichts - keine Ausgabe");
         }
     }
     
@@ -210,21 +197,28 @@ impl<'a> CliOutput<'a> {
         table: &[TableRow],
         rows_range: std::ops::Range<usize>,
     ) -> Vec<String> {
-        // Kopiere hier die komplette Implementierung der cli_out-Methode
-        // aus deiner originalen retaAusgabe.rs Datei
-        // Stelle sicher, dass sie vollständig ist
+        println!("=== EINFACHE AUSGABE START ===");
         
-        // Hier nur ein Platzhalter - du musst die echte Implementierung einfügen
-        if finally_display_lines.is_empty() {
-            return Vec::new();
+        // Direkte Ausgabe
+        for &line_idx in finally_display_lines {
+            println!("Zeile {}:", line_idx);
+            if let Some(row) = table.get(line_idx) {
+                for line_num in rows_range.clone() {
+                    let mut line = String::new();
+                    for cell in &row.cells {
+                        if let Some(content) = cell.get_line(line_num) {
+                            line.push_str(content);
+                            line.push_str(" | ");
+                        }
+                    }
+                    if !line.trim().is_empty() {
+                        self.cliout2(&line);
+                    }
+                }
+            }
         }
         
-        // Beginne Tabelle falls benötigt
-        if matches!(self.out_type, OutputSyntax::HTML | OutputSyntax::BBCode) {
-            self.cliout2(self.out_type.begin_table());
-        }
-        
-        // Vereinfachte Rückgabe - ersetze durch echte Logik
+        println!("=== EINFACHE AUSGABE ENDE ===");
         self.resulting_output.clone()
     }
     
@@ -281,7 +275,6 @@ impl<'a> CliOutput<'a> {
     }
 }
 
-// Haupt-Tabellen-Struktur
 #[derive(Debug)]
 pub struct Tables {
     pub hoechste_zeile: HashMap<u32, i32>,
