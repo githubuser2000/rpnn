@@ -1,10 +1,11 @@
 use comfy_table::{ColumnConstraint, ContentArrangement, Table, Width};
 use terminal_size::{terminal_size, Width as TermWidth};
+use unicode_width::UnicodeWidthStr;
 use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
 use crate::data_fetcher::fetch_data_with_stats;
 use rusqlite::Connection;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
 const MIN_COLUMN_WIDTH: usize = 10;
 const MAX_COLUMNS_CAP: usize = 6;
 const MAX_COLUMN_WIDTH: usize = 34;
