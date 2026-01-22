@@ -61,6 +61,19 @@ impl OutputSyntax {
     }
 }
 
+// Einfachste Version: Nach Zeichenanzahl umbrechen
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    
+    text.chars()
+        .collect::<Vec<char>>()
+        .chunks(width)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 pub struct TableCell {
     lines: Vec<String>,
@@ -70,36 +83,10 @@ impl TableCell {
     pub fn new(content: String, width: usize) -> Self {
         let lines: Vec<String> = content
             .split('\n')
-            .map(|line| line.to_string())
+            .flat_map(|line| wrap_text(line, width))
             .collect();
         
-        let formatted_lines: Vec<String> = lines
-            .iter()
-            .map(|line| {
-                let line_width = UnicodeWidthStr::width(line.as_str());
-                
-                if line_width > width {
-                    let mut result = String::new();
-                    let mut current_width = 0;
-                    
-                    for ch in line.chars() {
-                        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
-                        if current_width + ch_width > width {
-                            result.push('…');
-                            break;
-                        }
-                        result.push(ch);
-                        current_width += ch_width;
-                    }
-                    
-                    result
-                } else {
-                    format!("{:<width$}", line, width = width)
-                }
-            })
-            .collect();
-        
-        TableCell { lines: formatted_lines }
+        TableCell { lines }
     }
     
     pub fn get_line(&self, line_num: usize) -> Option<&str> {
