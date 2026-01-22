@@ -61,17 +61,54 @@ impl OutputSyntax {
     }
 }
 
-// Einfachste Version: Nach Zeichenanzahl umbrechen
 fn wrap_text(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return vec![text.to_string()];
     }
     
-    text.chars()
-        .collect::<Vec<char>>()
-        .chunks(width)
-        .map(|chunk| chunk.iter().collect())
-        .collect()
+    let mut result = Vec::new();
+    let mut current_line = String::new();
+    let mut current_width = 0;
+    
+    for ch in text.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        
+        // Wenn das Zeichen nicht in die aktuelle Zeile passt
+        if current_width + ch_width > width {
+            if !current_line.is_empty() {
+                // Auffüllen auf volle Breite
+                let padded_line = format!("{:<width$}", current_line, width = width);
+                result.push(padded_line);
+                current_line.clear();
+                current_width = 0;
+            }
+            
+            // Falls ein einzelnes Zeichen breiter als die ganze Breite ist
+            if ch_width > width {
+                // Füge es trotzdem hinzu und starte neue Zeile
+                let single_char = ch.to_string();
+                let padded_char = format!("{:<width$}", single_char, width = width);
+                result.push(padded_char);
+                continue;
+            }
+        }
+        
+        current_line.push(ch);
+        current_width += ch_width;
+    }
+    
+    // Letzte Zeile nicht vergessen
+    if !current_line.is_empty() {
+        let padded_line = format!("{:<width$}", current_line, width = width);
+        result.push(padded_line);
+    }
+    
+    // Falls nach der Umwandlung nichts rauskam (leerer String)
+    if result.is_empty() {
+        result.push(" ".repeat(width));
+    }
+    
+    result
 }
 
 #[derive(Debug, Clone)]
