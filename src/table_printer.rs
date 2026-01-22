@@ -6,6 +6,7 @@ use rusqlite::Connection;
 const COLUMN_OVERHEAD: usize = 5;
 const MIN_COLUMN_WIDTH: usize = 10;
 const MAX_COLUMNS_CAP: usize = 6;
+const MAX_COLUMN_WIDTH: usize = 40; // Maximal sichtbare Breite einer Spalte
 
 #[derive(Copy, Clone)]
 enum ColumnKind {
@@ -39,12 +40,15 @@ fn min_width_for_kind(kind: ColumnKind) -> usize {
 }
 
 
-
 fn compute_columns_per_table(
     term_width: usize,
     headers: &[String],
     max_lengths: &[usize],
 ) -> usize {
+    if headers.is_empty() {
+        return 1;
+    }
+
     let mut used_width = 0;
     let mut cols = 0;
 
@@ -52,24 +56,31 @@ fn compute_columns_per_table(
         let kind = infer_column_kind(h);
         let min = min_width_for_kind(kind).max(MIN_COLUMN_WIDTH);
 
-        let col_width = w.max(min) + COLUMN_OVERHEAD;
+        // Effektive Spaltenbreite, begrenzt auf MAX_COLUMN_WIDTH
+        let col_width = w.max(min).min(MAX_COLUMN_WIDTH) + COLUMN_OVERHEAD;
 
-        // mindestens eine Spalte MUSS reinpassen
-        if cols > 0 && used_width + col_width > term_width {
+        // Mindestens 2 Spalten, danach abbrechen, wenn Terminalbreite überschritten
+        if cols >= 2 && used_width + col_width > term_width {
             break;
         }
 
         used_width += col_width;
         cols += 1;
 
+        // Obergrenze pro Tabelle
         if cols >= MAX_COLUMNS_CAP {
             break;
         }
     }
 
-    cols.max(1)
+    // Mindestens 2 Spalten, höchstens MAX_COLUMNS_CAP
+    let remaining = headers.len();
+    if remaining < 2 {
+        remaining
+    } else {
+        cols.clamp(2, MAX_COLUMNS_CAP)
+    }
 }
-
 
 pub fn print_table_chunked(
     headers: &[String],
@@ -83,10 +94,10 @@ pub fn print_table_chunked(
     let mut start = 0;
 
     while start < headers.len() {
-        // 🔑 nur die noch verbleibenden Spalten betrachten
         let remaining_headers = &headers[start..];
         let remaining_lengths = &max_lengths[start..];
 
+        // Neue Spaltenanzahl für jede Tabelle berechnen
         let cols_per_table = compute_columns_per_table(
             term_width,
             remaining_headers,
