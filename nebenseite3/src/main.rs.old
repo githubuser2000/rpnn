@@ -61,82 +61,32 @@ impl OutputSyntax {
     }
 }
 
-// Einfache Wortumbruch-Funktion
-fn word_wrap(text: &str, width: usize) -> Vec<String> {
-    if width == 0 {
-        return vec![text.to_string()];
-    }
-    
-    let mut result = Vec::new();
-    let words: Vec<&str> = text.split_whitespace().collect();
-    
-    if words.is_empty() {
-        return vec!["".to_string()];
-    }
-    
-    let mut current_line = String::new();
-    
-    for word in words {
-        if current_line.len() + word.len() + if current_line.is_empty() { 0 } else { 1 } <= width {
-            if !current_line.is_empty() {
-                current_line.push(' ');
-            }
-            current_line.push_str(word);
-        } else {
-            if !current_line.is_empty() {
-                result.push(current_line);
-            }
-            current_line = word.to_string();
-            
-            // Wenn ein einzelnes Wort länger als width ist, teile es hart
-            if word.len() > width {
-                let chunks: Vec<String> = word
-                    .chars()
-                    .collect::<Vec<char>>()
-                    .chunks(width)
-                    .map(|chunk| chunk.iter().collect())
-                    .collect();
-                
-                for (i, chunk) in chunks.into_iter().enumerate() {
-                    if i == 0 {
-                        current_line = chunk;
-                        result.push(current_line.clone());
-                    } else {
-                        result.push(chunk);
-                    }
-                }
-                current_line.clear();
-            }
-        }
-    }
-    
-    if !current_line.is_empty() {
-        result.push(current_line);
-    }
-    
-    if result.is_empty() {
-        result.push("".to_string());
-    }
-    
-    result
-}
-
-// Strukturen für Tabellendaten mit integriertem Wortumbruch
+// Strukturen für Tabellendaten
 #[derive(Debug, Clone)]
 struct TableCell {
     lines: Vec<String>,
-    original_content: String,
 }
 
 impl TableCell {
     fn new(content: String, width: usize) -> Self {
-        // Wende Wortumbruch an
-        let lines = word_wrap(&content, width);
+        let lines: Vec<String> = content
+            .split('\n')
+            .map(|line| line.to_string())
+            .collect();
         
-        TableCell { 
-            lines,
-            original_content: content,
-        }
+        // Kürze oder fülle jede Zeile auf die gewünschte Breite
+        let formatted_lines: Vec<String> = lines
+            .iter()
+            .map(|line| {
+                if line.len() > width {
+                    line[..width].to_string()
+                } else {
+                    format!("{:width$}", line, width = width)
+                }
+            })
+            .collect();
+        
+        TableCell { lines: formatted_lines }
     }
     
     fn get_line(&self, line_num: usize) -> Option<&str> {
@@ -445,38 +395,29 @@ impl<'a> CliOutput<'a> {
         max_cell_widths
     }
     
-    // Hilfsfunktion für einfachere Tabellenerstellung mit längeren Texten
-    fn create_test_table(&self) -> Vec<TableRow> {
-        // Breiten für die Spalten
-        let col_widths = vec![20, 15, 25];
+    // Hilfsfunktion für einfachere Tabellenerstellung
+    fn create_simple_table(&self) -> Vec<TableRow> {
+        let header_cell1 = TableCell::new("Name".to_string(), 15);
+        let header_cell2 = TableCell::new("Alter".to_string(), 10);
+        let header_cell3 = TableCell::new("Stadt".to_string(), 20);
         
-        let header_cell1 = TableCell::new("Name und Vorname".to_string(), col_widths[0]);
-        let header_cell2 = TableCell::new("Alter".to_string(), col_widths[1]);
-        let header_cell3 = TableCell::new("Wohnort und Beschreibung".to_string(), col_widths[2]);
+        let data_cell1_1 = TableCell::new("Hans".to_string(), 15);
+        let data_cell1_2 = TableCell::new("25".to_string(), 10);
+        let data_cell1_3 = TableCell::new("Berlin".to_string(), 20);
         
-        // Längere Texte zum Testen des Wortumbruchs
-        let data_cell1_1 = TableCell::new("Hans Mustermann".to_string(), col_widths[0]);
-        let data_cell1_2 = TableCell::new("25 Jahre".to_string(), col_widths[1]);
-        let data_cell1_3 = TableCell::new("Berlin, Hauptstadt von Deutschland, sehr schöne Stadt mit vielen Sehenswürdigkeiten".to_string(), col_widths[2]);
+        let data_cell2_1 = TableCell::new("Anna".to_string(), 15);
+        let data_cell2_2 = TableCell::new("30".to_string(), 10);
+        let data_cell2_3 = TableCell::new("München".to_string(), 20);
         
-        let data_cell2_1 = TableCell::new("Anna Schmidt".to_string(), col_widths[0]);
-        let data_cell2_2 = TableCell::new("30".to_string(), col_widths[1]);
-        let data_cell2_3 = TableCell::new("München in Bayern, bekannt für das Oktoberfest und die schönen Parks".to_string(), col_widths[2]);
-        
-        let data_cell3_1 = TableCell::new("Peter-Ludwig Meyer".to_string(), col_widths[0]);
-        let data_cell3_2 = TableCell::new("22 Jahre alt".to_string(), col_widths[1]);
-        let data_cell3_3 = TableCell::new("Hamburg, Hafenstadt, geboren am 15. März 2000, wohnt dort seit Geburt".to_string(), col_widths[2]);
-        
-        let data_cell4_1 = TableCell::new("Ein sehr langer Name der den Wortumbruch testen soll".to_string(), col_widths[0]);
-        let data_cell4_2 = TableCell::new("".to_string(), col_widths[1]); // Leere Zelle
-        let data_cell4_3 = TableCell::new("Superkalifragilistikexpialigetisch obwohl das eigentlich ein sehr sehr langes Wort ist das den Umbruch testet".to_string(), col_widths[2]);
+        let data_cell3_1 = TableCell::new("Peter".to_string(), 15);
+        let data_cell3_2 = TableCell::new("22".to_string(), 10);
+        let data_cell3_3 = TableCell::new("Hamburg\n(geboren)".to_string(), 20);
         
         vec![
             TableRow::new(vec![header_cell1, header_cell2, header_cell3], 0, 0),
             TableRow::new(vec![data_cell1_1, data_cell1_2, data_cell1_3], 1, 1),
             TableRow::new(vec![data_cell2_1, data_cell2_2, data_cell2_3], 2, 2),
             TableRow::new(vec![data_cell3_1, data_cell3_2, data_cell3_3], 3, 3),
-            TableRow::new(vec![data_cell4_1, data_cell4_2, data_cell4_3], 4, 4),
         ]
     }
 }
@@ -520,28 +461,6 @@ impl Tables {
     }
 }
 
-// Testfunktion für Wortumbruch
-fn test_word_wrap() {
-    println!("\n=== Test word_wrap() Funktion ===");
-    
-    let test_cases = vec![
-        ("Kurzer Text", 20),
-        ("Ein längerer Text der umgebrochen werden soll", 15),
-        ("Superkalifragilistikexpialigetisch", 10),
-        ("Mehrere     Leerzeichen     und   Tabs", 15),
-        ("", 10),
-        ("Einzelneslangeswortohneleerzeichen", 8),
-    ];
-    
-    for (text, width) in test_cases {
-        println!("\nText: '{}' (Breite: {})", text, width);
-        let wrapped = word_wrap(text, width);
-        for (i, line) in wrapped.iter().enumerate() {
-            println!("  Zeile {}: '{}' (Länge: {})", i + 1, line, line.len());
-        }
-    }
-}
-
 // Testfunktionen
 fn test_colorize() {
     println!("\n=== Test colorize() Funktion ===");
@@ -551,85 +470,140 @@ fn test_colorize() {
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;
     
-    // Testsammlung - mit Referenz verwenden
-    let tests = vec![
+    // Erste Testsammlung - mit Referenz verwenden
+    let tests1 = vec![
         ("Header Zeile", 0, false),
-        ("Gerade Zeile", 2, false),
+        ("GGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade ZeileGerade Zeileerade Zeile", 2, false),
         ("Ungerade Zeile", 3, false),
         ("Leere Zelle gerade", 4, true),
         ("Leere Zelle ungerade", 5, true),
     ];
     
+    // Erste Schleife - mit Referenz iterieren
     println!("--- Mit Farben (color_enabled = true) ---");
-    for &(text, line_num, is_empty) in &tests {
+    for &(text, line_num, is_empty) in &tests1 {
+        let colored = output.colorize(text, line_num, is_empty);
+        println!("Line {} (empty: {}): {}", line_num, is_empty, colored);
+    }
+    
+    // Test ohne Farben - neue Testsammlung
+    println!("\n--- Ohne Farben (color_enabled = false) ---");
+    output.color_enabled = false;
+    let tests2 = vec![
+        ("Test ohne Farben 1", 1, false),
+        ("Test ohne Farben 2", 2, true),
+        ("Test ohne Farben 3", 3, false),
+    ];
+    
+    for &(text, line_num, is_empty) in &tests2 {
         let colored = output.colorize(text, line_num, is_empty);
         println!("Line {} (empty: {}): {}", line_num, is_empty, colored);
     }
 }
 
-fn test_cli_out_plain_with_wrapping() {
-    println!("\n=== Test cli_out() mit Wortumbruch - Plain Format ===");
+fn test_cliout2() {
+    println!("\n=== Test cliout2() Funktion ===");
+    let tables = Tables::new(Some(100));
+    
+    println!("--- Mit Plain Output (sollte ausgegeben werden) ---");
+    let mut output1 = CliOutput::new(&tables, OutputSyntax::Plain);
+    output1.cliout2("Erste Zeile");
+    output1.cliout2("Zweite Zeile");
+    println!("Gespeicherte Ausgaben: {:?}", output1.resulting_output);
+    
+    println!("\n--- Mit Nichts Output (sollte NICHT ausgegeben werden) ---");
+    let mut output2 = CliOutput::new(&tables, OutputSyntax::Nichts);
+    output2.cliout2("Unsichtbare Zeile 1");
+    output2.cliout2("Unsichtbare Zeile 2");
+    println!("Gespeicherte Ausgaben trotzdem: {:?}", output2.resulting_output);
+}
+
+fn test_cli_out_plain() {
+    println!("\n=== Test cli_out() Funktion - Plain Format ===");
     let tables = Tables::new(Some(100));
     
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;
-    output.table_width = 80;
+    output.table_width = 60;
     output.line_numbering = true;
     
-    let table_data = output.create_test_table();
+    let table_data = output.create_simple_table();
+    let display_lines: BTreeSet<usize> = [0, 1, 2, 3].iter().copied().collect();
+    let rows_range = 0..2; // Zellen können bis zu 2 Zeilen haben
     
-    // Finde maximale Zeilenanzahl pro Zelle für rows_range
-    let max_lines = table_data.iter()
-        .map(|row| row.max_line_count())
-        .max()
-        .unwrap_or(1);
-    
-    let display_lines: BTreeSet<usize> = (0..table_data.len()).collect();
-    let rows_range = 0..max_lines;
-    
-    println!("\n--- Tabellenausgabe mit Wortumbruch (Plain mit Farben) ---");
-    println!("Maximale Zeilen pro Zelle: {}", max_lines);
+    println!("\n--- Tabellenausgabe (Plain mit Farben) ---");
     let result = output.cli_out(&display_lines, &table_data, rows_range);
     println!("\nGesamtanzahl ausgegebener Zeilen: {}", result.len());
 }
 
-fn test_cli_out_markdown_with_wrapping() {
-    println!("\n=== Test cli_out() mit Wortumbruch - Markdown Format ===");
+fn test_cli_out_markdown() {
+    println!("\n=== Test cli_out() Funktion - Markdown Format ===");
     let tables = Tables::new(Some(100));
     
     let mut output = CliOutput::new(&tables, OutputSyntax::Markdown);
-    output.color_enabled = false;
-    output.table_width = 70;
+    output.color_enabled = false; // Markdown braucht keine Terminalfarben
+    output.table_width = 60;
     output.line_numbering = true;
     
-    let table_data = output.create_test_table();
+    let table_data = output.create_simple_table();
+    let display_lines: BTreeSet<usize> = [0, 1, 2, 3].iter().copied().collect();
+    let rows_range = 0..2;
     
-    let max_lines = table_data.iter()
-        .map(|row| row.max_line_count())
-        .max()
-        .unwrap_or(1);
+    println!("\n--- Tabellenausgabe (Markdown) ---");
+    let result = output.cli_out(&display_lines, &table_data, rows_range);
+    println!("\nGesamtanzahl ausgegebener Zeilen: {}", result.len());
+}
+
+fn test_cli_out_csv() {
+    println!("\n=== Test cli_out() Funktion - CSV Format ===");
+    let tables = Tables::new(Some(100));
     
-    let display_lines: BTreeSet<usize> = (0..table_data.len()).collect();
-    let rows_range = 0..max_lines;
+    let mut output = CliOutput::new(&tables, OutputSyntax::CSV);
+    output.color_enabled = false; // CSV braucht keine Farben
+    output.table_width = 60;
+    output.line_numbering = true;
     
-    println!("\n--- Tabellenausgabe mit Wortumbruch (Markdown) ---");
+    let table_data = output.create_simple_table();
+    let display_lines: BTreeSet<usize> = [0, 1, 2, 3].iter().copied().collect();
+    let rows_range = 0..2;
+    
+    println!("\n--- Tabellenausgabe (CSV) ---");
+    let result = output.cli_out(&display_lines, &table_data, rows_range);
+    println!("\nGesamtanzahl ausgegebener Zeilen: {}", result.len());
+}
+
+fn test_cli_out_html() {
+    println!("\n=== Test cli_out() Funktion - HTML Format ===");
+    let tables = Tables::new(Some(100));
+    
+    let mut output = CliOutput::new(&tables, OutputSyntax::HTML);
+    output.color_enabled = false; // HTML hat eigene Farben
+    output.table_width = 60;
+    output.line_numbering = true;
+    output.one_table = true; // Für HTML eine Tabelle
+    
+    let table_data = output.create_simple_table();
+    let display_lines: BTreeSet<usize> = [0, 1, 2, 3].iter().copied().collect();
+    let rows_range = 0..2;
+    
+    println!("\n--- Tabellenausgabe (HTML) ---");
     let result = output.cli_out(&display_lines, &table_data, rows_range);
     println!("\nGesamtanzahl ausgegebener Zeilen: {}", result.len());
 }
 
 // Beispiel-Nutzung
 fn main() {
-    println!("=== TESTAUSGABEN FÜR TABELLEN-HANDLING MIT WORTUMBRUCH ===\n");
-    
-    // Teste Wortumbruch-Funktion
-    test_word_wrap();
+    println!("=== TESTAUSGABEN FÜR TABELLEN-HANDLING ===\n");
     
     // Teste einzelne Funktionen
     test_colorize();
+    test_cliout2();
     
-    // Teste Tabellenausgabe mit Wortumbruch
-    test_cli_out_plain_with_wrapping();
-    test_cli_out_markdown_with_wrapping();
+    // Teste verschiedene Ausgabeformate
+    test_cli_out_plain();
+    test_cli_out_markdown();
+    test_cli_out_csv();
+    test_cli_out_html();
     
     println!("\n=== ALLE TESTS ABGESCHLOSSEN ===");
 }
