@@ -61,7 +61,7 @@ impl OutputSyntax {
     }
 }
 
-// Übernommene word_wrap Funktion aus main.rs
+// Vollständig UTF8-taugliche word_wrap Funktion mit Unicode-Breiten
 fn word_wrap(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return vec![text.to_string()];
@@ -75,41 +75,70 @@ fn word_wrap(text: &str, width: usize) -> Vec<String> {
     }
     
     let mut current_line = String::new();
+    let mut current_width = 0;
     
     for word in words {
-        if current_line.len() + word.len() + if current_line.is_empty() { 0 } else { 1 } <= width {
+        // Berechne Unicode-Breite des Wortes
+        let word_width = UnicodeWidthStr::width(word);
+        
+        // Berechne benötigte Breite (Wort + ggf. Leerzeichen)
+        let needed_width = if current_line.is_empty() {
+            word_width
+        } else {
+            word_width + 1 // +1 für Leerzeichen
+        };
+        
+        // Wenn das Wort in die aktuelle Zeile passt
+        if current_width + needed_width <= width {
             if !current_line.is_empty() {
                 current_line.push(' ');
+                current_width += 1;
             }
             current_line.push_str(word);
+            current_width += word_width;
         } else {
+            // Füge aktuelle Zeile zum Ergebnis hinzu
             if !current_line.is_empty() {
                 result.push(current_line);
             }
-            current_line = word.to_string();
             
-            // Wenn ein einzelnes Wort länger als width ist, teile es hart
-            if word.len() > width {
-                let chunks: Vec<String> = word
-                    .chars()
-                    .collect::<Vec<char>>()
-                    .chunks(width)
-                    .map(|chunk| chunk.iter().collect())
-                    .collect();
+            // Starte neue Zeile mit dem aktuellen Wort
+            current_line = word.to_string();
+            current_width = word_width;
+            
+            // Wenn ein einzelnes Wort breiter als width ist, muss es geteilt werden
+            if word_width > width {
+                // Teile das Wort auf Zeichenebene mit Unicode-Breiten
+                let mut char_accumulator = String::new();
+                let mut char_width = 0;
                 
-                for (i, chunk) in chunks.into_iter().enumerate() {
-                    if i == 0 {
-                        current_line = chunk;
-                        result.push(current_line.clone());
-                    } else {
-                        result.push(chunk);
+                for ch in word.chars() {
+                    let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+                    
+                    if char_width + ch_width > width {
+                        if !char_accumulator.is_empty() {
+                            result.push(char_accumulator.clone());
+                        }
+                        char_accumulator.clear();
+                        char_width = 0;
                     }
+                    
+                    char_accumulator.push(ch);
+                    char_width += ch_width;
                 }
-                current_line.clear();
+                
+                if !char_accumulator.is_empty() {
+                    current_line = char_accumulator;
+                    current_width = char_width;
+                } else {
+                    current_line.clear();
+                    current_width = 0;
+                }
             }
         }
     }
     
+    // Letzte Zeile nicht vergessen
     if !current_line.is_empty() {
         result.push(current_line);
     }
@@ -119,6 +148,23 @@ fn word_wrap(text: &str, width: usize) -> Vec<String> {
     }
     
     result
+}
+
+// Hilfsfunktion für Padding mit Unicode-Unterstützung
+fn unicode_pad(text: &str, width: usize, align_left: bool) -> String {
+    let text_width = UnicodeWidthStr::width(text);
+    
+    if text_width >= width {
+        return text.to_string();
+    }
+    
+    let padding = width - text_width;
+    
+    if align_left {
+        format!("{}{}", text, " ".repeat(padding))
+    } else {
+        format!("{}{}", " ".repeat(padding), text)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +190,13 @@ impl TableCell {
     
     pub fn line_count(&self) -> usize {
         self.lines.len()
+    }
+    
+    // Neue Methode für Unicode-Breite einer Zeile
+    pub fn get_line_width(&self, line_num: usize) -> usize {
+        self.get_line(line_num)
+            .map(|line| UnicodeWidthStr::width(line))
+            .unwrap_or(0)
     }
 }
 
@@ -197,7 +250,6 @@ impl<'a> CliOutput<'a> {
         }
     }
     
-    // Übernommene colorize Funktion aus main.rs
     pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
         if !self.color_enabled {
             return text.to_string();
@@ -233,11 +285,10 @@ impl<'a> CliOutput<'a> {
         
         // Nur ausgeben, wenn nicht NichtsSyntax
         if !matches!(self.out_type, OutputSyntax::Nichts) {
-            print!("{}", text);
+            println!("{}", text);
         }
     }
     
-    // Übernommene cli_out Funktion aus main.rs
     pub fn cli_out(
         &mut self,
         finally_display_lines: &BTreeSet<usize>,
@@ -253,7 +304,7 @@ impl<'a> CliOutput<'a> {
             self.cliout2(self.out_type.begin_table());
         }
         
-        // Bestimme maximale Zellenbreiten
+        // Bestimme maximale Zellenbreiten mit Unicode-Unterstützung
         let max_cell_widths = self.find_max_cell_text_len(finally_display_lines, table, &rows_range);
         
         // Konvertiere Set zu sortierter Liste
@@ -308,6 +359,7 @@ impl<'a> CliOutput<'a> {
                                     *max_cell_widths.get(&col_idx).unwrap_or(&self.table_width)
                                 };
                                 
+                                // Verwende Unicode-Breite für die Berechnung
                                 total_width += cell_width + 1;
                                 
                                 if total_width < self.table_width || self.one_table {
@@ -324,7 +376,8 @@ impl<'a> CliOutput<'a> {
                                         let formatted_content = if matches!(self.out_type, OutputSyntax::CSV) {
                                             cell_content.to_string()
                                         } else {
-                                            let padded = format!("{:width$}", cell_content, width = cell_width);
+                                            // Verwende Unicode-Padding für korrekte Ausrichtung
+                                            let padded = unicode_pad(cell_content, cell_width, true);
                                             self.colorize(&padded, row.original_line_num, cell_content.trim().is_empty())
                                         };
                                         
@@ -419,7 +472,6 @@ impl<'a> CliOutput<'a> {
         self.resulting_output.clone()
     }
     
-    // Übernommene find_max_cell_text_len Funktion aus main.rs
     pub fn find_max_cell_text_len(
         &self,
         display_lines: &BTreeSet<usize>,
@@ -433,7 +485,8 @@ impl<'a> CliOutput<'a> {
                 for (col_idx, cell) in row.cells.iter().enumerate() {
                     for line_num in rows_range.clone() {
                         if let Some(cell_content) = cell.get_line(line_num) {
-                            let width = cell_content.len();
+                            // Verwende Unicode-Breite für die Berechnung
+                            let width = UnicodeWidthStr::width(cell_content);
                             let current_max = max_cell_widths.entry(col_idx).or_insert(0);
                             if width > *current_max {
                                 *current_max = width;
@@ -447,7 +500,6 @@ impl<'a> CliOutput<'a> {
         max_cell_widths
     }
     
-    // Übernommene create_test_table Funktion aus main.rs
     pub fn create_test_table(&self) -> Vec<TableRow> {
         // Breiten für die Spalten
         let col_widths = vec![20, 15, 25];
@@ -456,22 +508,27 @@ impl<'a> CliOutput<'a> {
         let header_cell2 = TableCell::new("Alter".to_string(), col_widths[1]);
         let header_cell3 = TableCell::new("Wohnort und Beschreibung".to_string(), col_widths[2]);
         
-        // Längere Texte zum Testen des Wortumbruchs
-        let data_cell1_1 = TableCell::new("Hans Mustermann".to_string(), col_widths[0]);
-        let data_cell1_2 = TableCell::new("25 Jahre".to_string(), col_widths[1]);
-        let data_cell1_3 = TableCell::new("Berlin, Hauptstadt von Deutschland, sehr schöne Stadt mit vielen Sehenswürdigkeiten".to_string(), col_widths[2]);
+        // Test mit verschiedenen Unicode-Zeichen
+        let data_cell1_1 = TableCell::new("Hans Mustermann 😊".to_string(), col_widths[0]);
+        let data_cell1_2 = TableCell::new("25 Jahre 🎂".to_string(), col_widths[1]);
+        let data_cell1_3 = TableCell::new("Berlin 🇩🇪, Hauptstadt von Deutschland, sehr schöne Stadt mit vielen Sehenswürdigkeiten 🏛️".to_string(), col_widths[2]);
         
-        let data_cell2_1 = TableCell::new("Anna Schmidt".to_string(), col_widths[0]);
+        let data_cell2_1 = TableCell::new("Anna Schmidt 👩".to_string(), col_widths[0]);
         let data_cell2_2 = TableCell::new("30".to_string(), col_widths[1]);
-        let data_cell2_3 = TableCell::new("München in Bayern, bekannt für das Oktoberfest und die schönen Parks".to_string(), col_widths[2]);
+        let data_cell2_3 = TableCell::new("München in Bayern, bekannt für das Oktoberfest 🍺 und die schönen Parks 🌳".to_string(), col_widths[2]);
         
-        let data_cell3_1 = TableCell::new("Peter-Ludwig Meyer".to_string(), col_widths[0]);
-        let data_cell3_2 = TableCell::new("22 Jahre alt".to_string(), col_widths[1]);
-        let data_cell3_3 = TableCell::new("Hamburg, Hafenstadt, geboren am 15. März 2000, wohnt dort seit Geburt".to_string(), col_widths[2]);
+        let data_cell3_1 = TableCell::new("Peter-Ludwig Meyer 👨‍💼".to_string(), col_widths[0]);
+        let data_cell3_2 = TableCell::new("22 Jahre alt ⭐".to_string(), col_widths[1]);
+        let data_cell3_3 = TableCell::new("Hamburg 🚢, Hafenstadt, geboren am 15. März 2000 📅, wohnt dort seit Geburt".to_string(), col_widths[2]);
         
-        let data_cell4_1 = TableCell::new("Ein sehr langer Name der den Wortumbruch testen soll".to_string(), col_widths[0]);
+        let data_cell4_1 = TableCell::new("Emoji-Test: 😀😃😄😁😆😅😂🤣🥲".to_string(), col_widths[0]);
         let data_cell4_2 = TableCell::new("".to_string(), col_widths[1]); // Leere Zelle
-        let data_cell4_3 = TableCell::new("Superkalifragilistikexpialigetisch obwohl das eigentlich ein sehr sehr langes Wort ist das den Umbruch testet".to_string(), col_widths[2]);
+        let data_cell4_3 = TableCell::new("Chinesisch: 你好世界 🌍 Japanisch: こんにちは世界 🇯🇵 Koreanisch: 안녕하세요 세상 🇰🇷".to_string(), col_widths[2]);
+        
+        // Test mit breiten Unicode-Zeichen
+        let data_cell5_1 = TableCell::new("𝕋𝕖𝕤𝕥 𝕨𝕚𝕥𝕙 𝔻𝕠𝕦𝕓𝕝𝕖-𝕊𝕥𝕣𝕦𝕔𝕜".to_string(), col_widths[0]);
+        let data_cell5_2 = TableCell::new("𝒮𝒸𝓇𝒾𝓅𝓉 𝒯ℯ𝓍𝓉".to_string(), col_widths[1]);
+        let data_cell5_3 = TableCell::new("Mathematik: ∀x∈ℝ, ∃y∈ℚ: x² + y² = z² ∫₀¹ f(x) dx".to_string(), col_widths[2]);
         
         vec![
             TableRow::new(vec![header_cell1, header_cell2, header_cell3], 0, 0),
@@ -479,10 +536,10 @@ impl<'a> CliOutput<'a> {
             TableRow::new(vec![data_cell2_1, data_cell2_2, data_cell2_3], 2, 2),
             TableRow::new(vec![data_cell3_1, data_cell3_2, data_cell3_3], 3, 3),
             TableRow::new(vec![data_cell4_1, data_cell4_2, data_cell4_3], 4, 4),
+            TableRow::new(vec![data_cell5_1, data_cell5_2, data_cell5_3], 5, 5),
         ]
     }
     
-    // Behalte die einfache Tabellenfunktion bei
     pub fn create_simple_table(&self) -> Vec<TableRow> {
         let header_cell1 = TableCell::new("Name".to_string(), 15);
         let header_cell2 = TableCell::new("Alter".to_string(), 10);
@@ -490,21 +547,27 @@ impl<'a> CliOutput<'a> {
         
         let data_cell1_1 = TableCell::new("Hans".to_string(), 15);
         let data_cell1_2 = TableCell::new("25".to_string(), 10);
-        let data_cell1_3 = TableCell::new("Berlin".to_string(), 20);
+        let data_cell1_3 = TableCell::new("Berlin 🇩🇪".to_string(), 20);
         
-        let data_cell2_1 = TableCell::new("Anna".to_string(), 15);
+        let data_cell2_1 = TableCell::new("Anna 👩".to_string(), 15);
         let data_cell2_2 = TableCell::new("30".to_string(), 10);
-        let data_cell2_3 = TableCell::new("München".to_string(), 20);
+        let data_cell2_3 = TableCell::new("München 🏙️".to_string(), 20);
         
-        let data_cell3_1 = TableCell::new("Peter".to_string(), 15);
+        let data_cell3_1 = TableCell::new("Peter 👨".to_string(), 15);
         let data_cell3_2 = TableCell::new("22".to_string(), 10);
-        let data_cell3_3 = TableCell::new("Hamburg\n(geboren)".to_string(), 20);
+        let data_cell3_3 = TableCell::new("Hamburg ⚓\n(geboren)".to_string(), 20);
+        
+        // Test mit kombinierten Emojis
+        let data_cell4_1 = TableCell::new("Familie: 👨‍👩‍👧‍👦".to_string(), 15);
+        let data_cell4_2 = TableCell::new("28".to_string(), 10);
+        let data_cell4_3 = TableCell::new("Köln 🏛️ mit Kathedrale".to_string(), 20);
         
         vec![
             TableRow::new(vec![header_cell1, header_cell2, header_cell3], 0, 0),
             TableRow::new(vec![data_cell1_1, data_cell1_2, data_cell1_3], 1, 1),
             TableRow::new(vec![data_cell2_1, data_cell2_2, data_cell2_3], 2, 2),
             TableRow::new(vec![data_cell3_1, data_cell3_2, data_cell3_3], 3, 3),
+            TableRow::new(vec![data_cell4_1, data_cell4_2, data_cell4_3], 4, 4),
         ]
     }
 }
