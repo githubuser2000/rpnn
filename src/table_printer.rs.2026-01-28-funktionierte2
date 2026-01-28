@@ -151,7 +151,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
     output.color_enabled = true;
     output.table_width = term_width;
     output.column_widths = column_widths.clone();
-    output.line_numbering = true; // Keine Zeilennummern für Datenbanktabellen
+    output.line_numbering = false; // Keine Zeilennummern für Datenbanktabellen
     output.one_table = true; // Eine zusammenhängende Tabelle
     
     // Erstelle Display-Lines Set
