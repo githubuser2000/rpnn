@@ -233,7 +233,7 @@ impl<'a> CliOutput<'a> {
         
         // Nur ausgeben, wenn nicht NichtsSyntax
         if !matches!(self.out_type, OutputSyntax::Nichts) {
-            println!("{}", text);
+            print!("{}", text);
         }
     }
     
