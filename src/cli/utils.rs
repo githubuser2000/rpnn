@@ -1,0 +1,72 @@
+// src/cli/utils.rs
+pub(crate) fn sortiere_und_fasse_zusammen(mut bereiche: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    if bereiche.is_empty() {
+        return Vec::new();
+    }
+    
+    // Sortiere nach Startwert
+    bereiche.sort_by(|a, b| a.0.cmp(&b.0));
+    
+    let mut result = Vec::new();
+    let mut aktuell = bereiche[0];
+    
+    for &(von, bis) in &bereiche[1..] {
+        // Prüfe auf Überlappung oder direkte Nachbarschaft
+        if von <= aktuell.1 + 1 {
+            // Zusammenfassen: erweitere aktuellen Bereich
+            if bis > aktuell.1 {
+                aktuell.1 = bis;
+            }
+        } else {
+            // Neuer Bereich beginnt
+            result.push(aktuell);
+            aktuell = (von, bis);
+        }
+    }
+    
+    result.push(aktuell);
+    result
+}
+
+// Optional: Weitere Hilfsfunktionen
+pub(crate) fn parse_einfache_zahl(text: &str) -> Option<usize> {
+    text.trim().parse::<usize>().ok()
+}
+
+pub(crate) fn extrahiere_zahlen_aus_string(text: &str) -> Vec<usize> {
+    text.split(|c: char| !c.is_numeric())
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse::<usize>().ok())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_sortiere_und_fasse_zusammen() {
+        let bereiche = vec![(5, 8), (1, 3), (10, 12), (2, 4)];
+        let erwartet = vec![(1, 8), (10, 12)];
+        assert_eq!(sortiere_und_fasse_zusammen(bereiche), erwartet);
+    }
+    
+    #[test]
+    fn test_sortiere_und_fasse_zusammen_benachbart() {
+        let bereiche = vec![(1, 3), (4, 6), (8, 10)];
+        let erwartet = vec![(1, 6), (8, 10)];
+        assert_eq!(sortiere_und_fasse_zusammen(bereiche), erwartet);
+    }
+    
+    #[test]
+    fn test_sortiere_und_fasse_zusammen_leer() {
+        assert_eq!(sortiere_und_fasse_zusammen(vec![]), vec![]);
+    }
+    
+    #[test]
+    fn test_parse_einfache_zahl() {
+        assert_eq!(parse_einfache_zahl("42"), Some(42));
+        assert_eq!(parse_einfache_zahl(" 123 "), Some(123));
+        assert_eq!(parse_einfache_zahl("abc"), None);
+    }
+}
