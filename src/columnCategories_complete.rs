@@ -596,11 +596,7 @@ pub fn finde_spaltennummern_fuer_kategorien_exakt(&self, ober: &str, unter: &str
         // KORREKTUR: Von 1-basiert zu 0-basiert konvertieren
         let korrigierte_ids: Vec<u32> = ids.iter()
             .map(|&id| {
-                if id > 0 {
-                    id - 1  // Von 1-basiert zu 0-basiert
-                } else {
-                    id  // Falls 0, behalte es (sollte nicht vorkommen)
-                }
+                id + 1  // Von 1-basiert zu 0-basiert
             })
             .collect();
         

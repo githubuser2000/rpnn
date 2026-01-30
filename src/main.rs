@@ -74,8 +74,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Beispiel:  mein-rpnn --spalten Menschliches Motive");
         println!("Beispiel:  mein-rpnn --spalten Universum Transzendentalien");
         println!("\nAlternative mit manuellen Bereichen:");
-        println!("  mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
-        println!("  mein-rpnn --vorhervonausschnitt 7,9 --spaltevon 2 --spaltebis 5");
+        println!("mein-rpnn --vorhervonausschnitt 7-12 --spaltenname Menschliches Motive");
+        println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive");
         return Ok(());
     }
 
