@@ -445,6 +445,7 @@ fn main() {
         println!("'1,2,3' -> {:?}", split_with_lookahead("1,2,3"));
         println!("'(1,2),3' -> {:?}", split_with_lookahead("(1,2),3"));
         println!("'[1,2],3' -> {:?}", split_with_lookahead("[1,2],3"));
-        println!("'{1,2},3' -> {:?}", split_with_lookahead("{1,2},3"));
+        // Hier müssen die geschweiften Klammern escaped werden:
+        println!("'{{1,2}},3' -> {:?}", split_with_lookahead("{1,2},3"));
     }
 }

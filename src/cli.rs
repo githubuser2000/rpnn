@@ -36,6 +36,14 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
         }
                let dash_count = arg.chars().take_while(|&c| c == '-').count();
         match arg.as_str() {
+            "--vorhervonausschnitt" => {
+                // Versuche das nächste Element zu holen
+                
+            }
+            "--spalten" => {
+                // Versuche das nächste Element zu holen
+                
+            }
             "--zeilevon" => {
                 // Versuche das nächste Element zu holen
                 if let Some((_, nachfolger)) = iter.next() {
