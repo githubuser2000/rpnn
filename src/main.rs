@@ -144,7 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                  bereich.spalten_bereiche, gefilterte.len());
 
         if !gefilterte.is_empty() {
-            let sql = kategorie_map.generiere_sql_selects(
+            let sql = kategorie_map.generiere_sql_inserts_nur(
                 &spalten_namen.oberkategorie,
                 &spalten_namen.unterkategorie,
                 Some(&spalten_nummern)
