@@ -15,6 +15,7 @@ mod column_manager;
 mod data_fetcher;
 mod table_printer;
 mod retaAusgabe;
+mod ifIsZeilenAngabe;
 
 pub fn test_simple_table() {
     // Direkt in main.rs testen

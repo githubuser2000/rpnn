@@ -18,7 +18,7 @@ lazy_static! {
 
 // Implementierung von Lookahead: r",(?![^\[\]\{\}\(\)]*[\]\}\)])"
 // Diese Regex sucht Kommas, die NICHT gefolgt werden von einem schließenden Bracket/Klammer ohne vorher ein öffnendes gesehen zu haben
-fn split_with_lookahead(text: &str) -> Vec<&str> {
+pub fn split_with_lookahead(text: &str) -> Vec<&str> {
     let mut result = Vec::new();
     let mut start = 0;
     let chars: Vec<char> = text.chars().collect();
@@ -44,7 +44,7 @@ fn split_with_lookahead(text: &str) -> Vec<&str> {
 
 // Prüft ob nach aktueller Position ein schließendes Bracket/Klammer kommt,
 // ohne dass vorher ein entsprechendes öffnendes im aktuellen Kontext war
-fn has_unmatched_closing_bracket_ahead(chars: &[char]) -> bool {
+pub fn has_unmatched_closing_bracket_ahead(chars: &[char]) -> bool {
     if chars.is_empty() {
         return false;
     }
@@ -100,7 +100,7 @@ fn has_unmatched_closing_bracket_ahead(chars: &[char]) -> bool {
 }
 
 // Alternative: Split mit vollständiger Bracket-Balance Berechnung
-fn split_with_bracket_balance(text: &str) -> Vec<&str> {
+pub fn split_with_bracket_balance(text: &str) -> Vec<&str> {
     let mut result = Vec::new();
     let mut start = 0;
     
@@ -135,7 +135,7 @@ fn split_with_bracket_balance(text: &str) -> Vec<&str> {
 }
 
 // Optimierte Version mit Lookahead-Simulation
-fn split_with_lookahead_optimized(text: &str) -> Vec<&str> {
+pub fn split_with_lookahead_optimized(text: &str) -> Vec<&str> {
     let mut result = Vec::new();
     let mut start = 0;
     
@@ -251,6 +251,43 @@ pub fn is_zeilen_angabe_between_kommas(g: &str) -> bool {
     (g.len() > 1 && str_as_generator_to_list_of_num_strs(&g[1..]).is_some())
 }
 
+pub fn str_as_generator_to_vec_i64(text: &str) -> Option<Vec<i64>> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // erlaubte Klammern
+    let (open, close) = match trimmed.chars().next()? {
+        '(' => ('(', ')'),
+        '[' => ('[', ']'),
+        '{' => ('{', '}'),
+        _ => return None,
+    };
+
+    if !trimmed.ends_with(close) {
+        return None;
+    }
+
+    let inner = &trimmed[1..trimmed.len() - 1];
+
+    let mut result = Vec::new();
+
+    for part in inner.split(',') {
+        let s = part.trim();
+
+        // explizit verbieten: Dezimalpunkte oder -kommas
+        if s.contains('.') {
+            return None;
+        }
+
+        let value: i64 = s.parse().ok()?;
+        result.push(value);
+    }
+
+    Some(result)
+}
+
 // Hilfsfunktion: strAsGeneratorToListOfNumStrs
 pub fn str_as_generator_to_list_of_num_strs(text: &str) -> Option<Vec<String>> {
     if text.is_empty() {
@@ -308,7 +345,7 @@ pub fn is_zeilen_angabe_between_kommas_optimized(g: &str) -> bool {
 }
 
 // Test der Lookahead-Implementierung
-fn test_lookahead_implementation() {
+pub fn test_lookahead_implementation() {
     println!("Testing Lookahead Implementation");
     println!("=================================");
     
