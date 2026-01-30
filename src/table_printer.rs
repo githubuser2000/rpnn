@@ -233,10 +233,9 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: 
     }
 }
 
-// --- Query-Funktion ---
 pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-    let (query, headers) = build_column_query(&column_names, bereich.clone())?; // NEU
+    let (query, headers) = build_column_query(&column_names, bereich.clone())?;
     
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
@@ -245,18 +244,84 @@ pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<
     
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    // Bestimme die Startzeilennummer für die Ausgabe
-    let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
-        // Erster Wert aus zeilen_bereiche
-        bereich.zeilen_bereiche[0].0
+    // NEUE LOGIK: Prüfe ob es sich um einzelne Zeilen handelt
+    let is_einzelne_zeilen = bereich.zeilen_bereiche.iter().all(|(start, end)| start == end);
+    
+    if is_einzelne_zeilen && bereich.zeilen_bereiche.len() > 1 {
+        // Fall: Einzelne Zeilen wie 7,10
+        // Wir müssen die tatsächlichen Zeilennummern in den Daten setzen
+        println!("🔍 Einzelne Zeilen erkannt: {:?}", bereich.zeilen_bereiche);
+        
+        // Erstelle eine spezielle Tabelle mit den korrekten Zeilennummern
+        print_table_with_exact_rows(&headers, &data, &bereich.zeilen_bereiche);
     } else {
-        // von_zeile
-        bereich.von_zeile
-    };
-
-    print_table_chunked(&headers, &data, start_row_num);
+        // Fall: Kontinuierlicher Bereich oder nur eine einzelne Zeile
+        let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
+            bereich.zeilen_bereiche[0].0
+        } else {
+            bereich.von_zeile
+        };
+        
+        print_table_chunked(&headers, &data, start_row_num);
+    }
+    
     println!();
     Ok(())
+}
+
+// Neue Funktion für einzelne Zeilen
+fn print_table_with_exact_rows(
+    headers: &[String], 
+    data: &[Vec<String>], 
+    zeilen_bereiche: &[(usize, usize)]
+) {
+    // Extrahiere die tatsächlichen Zeilennummern
+    let zeilennummern: Vec<usize> = zeilen_bereiche.iter()
+        .map(|(start, _)| *start)
+        .collect();
+    
+    println!("📋 Zeige Zeilen mit exakten Nummern: {:?}", zeilennummern);
+    
+    // Erstelle Tabellenzeilen mit den exakten Zeilennummern
+    let mut table_rows = Vec::new();
+    
+    // Header-Zeile (Zeile 0)
+    let mut header_cells = Vec::new();
+    for header in headers {
+        let cell = TableCell::new(header.clone(), 20); // Beispielbreite
+        header_cells.push(cell);
+    }
+    table_rows.push(TableRow::new(header_cells, 0, 0));
+    
+    // Datenzeilen mit exakten Zeilennummern
+    for (i, row_data) in data.iter().enumerate() {
+        if i < zeilennummern.len() {
+            let actual_line_num = zeilennummern[i];
+            let mut cells = Vec::new();
+            for cell_content in row_data {
+                let cell = TableCell::new(cell_content.clone(), 20);
+                cells.push(cell);
+            }
+            table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
+        }
+    }
+    
+    // Ausgabe mit CliOutput
+    let tables = Tables::new(Some(100));
+    let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
+    output.color_enabled = true;
+    output.table_width = 80;
+    output.line_numbering = true;
+    output.one_table = true;
+    
+    let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
+    let max_lines = table_rows.iter()
+        .map(|row| row.max_line_count())
+        .max()
+        .unwrap_or(1);
+    let rows_range = 0..max_lines;
+    
+    output.cli_out(&display_lines, &table_rows, rows_range);
 }
 
 // --- Zusätzliche Hilfsfunktion für einfache Tabellen ---
