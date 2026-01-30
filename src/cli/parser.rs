@@ -1,6 +1,9 @@
 use crate::ifIsZeilenAngabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
 use super::bereich::TextBereich;
 
+// Import für Kategorie-Funktionen (falls benötigt)
+// use crate::columnCategories_complete::{lade_kategorie_map, KategorieMap};
+
 // Neuer Datentyp für Spaltennamen-Konfiguration
 #[derive(Debug, Clone)]
 pub struct SpaltenNamen {
@@ -15,6 +18,40 @@ impl Default for SpaltenNamen {
             unterkategorie: "unterkategorie".to_string(),
         }
     }
+}
+
+// Funktion zum Suchen von Spaltennummern basierend auf Kategorienamen
+// Diese Funktion kann von main.rs aufgerufen werden
+pub fn finde_spaltennummern_fuer_kategorien(
+    oberkategorie: &str,
+    unterkategorie: &str,
+    kategorie_map: &crate::columnCategories_complete::KategorieMap
+) -> Vec<u32> {
+    println!("🔍 Suche Spaltennummern für: '{}' → '{}'", oberkategorie, unterkategorie);
+    
+    let mut gefundene_nummern = Vec::new();
+    
+    // Durchsuche alle Einträge
+    for eintrag in &kategorie_map.alle_eintraege {
+        if eintrag.oberkategorie.eq_ignore_ascii_case(oberkategorie) ||
+           eintrag.oberkategorie.replace("_", "").eq_ignore_ascii_case(oberkategorie) {
+            
+            if eintrag.unterkategorie.eq_ignore_ascii_case(unterkategorie) ||
+               eintrag.unterkategorie.replace("_", "").eq_ignore_ascii_case(unterkategorie) {
+                
+                gefundene_nummern.extend_from_slice(&eintrag.spaltennummern);
+                println!("✅ Gefunden: {} Spaltennummern", eintrag.spaltennummern.len());
+            }
+        }
+    }
+    
+    // Entferne Duplikate und sortiere
+    let mut unique: Vec<u32> = gefundene_nummern.into_iter().collect();
+    unique.sort();
+    unique.dedup();
+    
+    println!("📊 Insgesamt {} eindeutige Spaltennummern gefunden", unique.len());
+    unique
 }
 
 // Rückgabetyp erweitert um Spaltennamen
@@ -97,50 +134,6 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich,
                     }
                 }
             }
-            "--zeilevon" => {
-                if let Some((_, nachfolger)) = iter.next() {
-                    if let Ok(zahl) = nachfolger.parse::<usize>() {
-                        bereich.von_zeile = zahl;
-                        bereich.zeilen_bereiche.push((zahl, zahl));
-                        println!("📍 Zeile von gesetzt und als Bereich gespeichert: ({},{})", zahl, zahl);
-                    }
-                }
-            }
-            "--zeilebis" => {
-                if let Some((_, nachfolger)) = iter.next() {
-                    if let Ok(zahl) = nachfolger.parse::<usize>() {
-                        bereich.bis_zeile = zahl;
-                        if bereich.zeilen_bereiche.is_empty() {
-                            bereich.zeilen_bereiche.push((zahl, zahl));
-                        } else if let Some(last) = bereich.zeilen_bereiche.last_mut() {
-                            last.1 = zahl;
-                        }
-                        println!("📍 Zeile bis gesetzt auf: {}", zahl);
-                    }
-                }
-            }
-            "--spaltevon" => {
-                if let Some((_, nachfolger)) = iter.next() {
-                    if let Ok(zahl) = nachfolger.parse::<usize>() {
-                        bereich.von_spalte = zahl;
-                        bereich.spalten_bereiche.push((zahl, zahl));
-                        println!("📍 Spalte von gesetzt und als Bereich gespeichert: ({},{})", zahl, zahl);
-                    }
-                }
-            }
-            "--spaltebis" => {
-                if let Some((_, nachfolger)) = iter.next() {
-                    if let Ok(zahl) = nachfolger.parse::<usize>() {
-                        bereich.bis_spalte = zahl;
-                        if bereich.spalten_bereiche.is_empty() {
-                            bereich.spalten_bereiche.push((zahl, zahl));
-                        } else if let Some(last) = bereich.spalten_bereiche.last_mut() {
-                            last.1 = zahl;
-                        }
-                        println!("📍 Spalte bis gesetzt auf: {}", zahl);
-                    }
-                }
-            }
             // NEUE OPTION: Spaltennamen für SQL
             "--spaltenname" => {
                 if let Some((_, name1)) = iter.next() {
@@ -150,6 +143,14 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich,
                         spalten_namen.oberkategorie = name1.clone();
                         spalten_namen.unterkategorie = name2.clone();
                         println!("✅ Spaltennamen gespeichert: {:?}", spalten_namen);
+                        
+                        // JETZT: Spaltennummern automatisch suchen
+                        println!("\n🔍 Suche automatisch nach Spaltennummern für diese Kategorien...");
+                        
+                        // Hier können wir die Kategoriedaten laden und suchen
+                        // Das müsste aber in main.rs passieren, da wir hier 
+                        // keine KategorieMap haben
+                        
                     } else {
                         println!("❌ Fehler: --spaltenname benötigt zwei Namen");
                     }
@@ -157,26 +158,37 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich,
                     println!("❌ Fehler: --spaltenname benötigt zwei Namen");
                 }
             }
-            // Hilfe-Option
+            // Weitere Optionen...
+            "--zeilevon" => {
+                if let Some((_, nachfolger)) = iter.next() {
+                    if let Ok(zahl) = nachfolger.parse::<usize>() {
+                        bereich.von_zeile = zahl;
+                        bereich.zeilen_bereiche.push((zahl, zahl));
+                        println!("📍 Zeile von gesetzt und als Bereich gespeichert: ({},{})", zahl, zahl);
+                    }
+                }
+            }
+            // ... restliche Optionen
             "--help" | "-h" => {
                 println!("📖 Hilfe: Verfügbare Optionen:");
                 println!("  --vorhervonausschnitt ZEILEN    Zeilenbereiche auswählen");
                 println!("  --spalten SPALTEN               Spaltenbereiche auswählen");
+                println!("  --spaltenname OBER UNTER        Spaltennamen setzen + automatisch Spalten finden");
                 println!("  --zeilevon ZAHL                 Startzeile setzen");
                 println!("  --zeilebis ZAHL                 Endzeile setzen");
                 println!("  --spaltevon ZAHL                Startspalte setzen");
                 println!("  --spaltebis ZAHL                Endspalte setzen");
-                println!("  --spaltenname NAME1 NAME2       Spaltennamen für SQL setzen");
                 println!("  --help, -h                      Diese Hilfe anzeigen");
+                println!();
+                println!("📝 Beispiel für automatische Spaltensuche:");
+                println!("  mein-rpnn --spaltenname Menschliches Motive");
+                println!("  # Sucht automatisch alle Spaltennummern für 'Menschliches' → 'Motive'");
                 println!();
                 println!("📝 Beispiele für Zeilenangaben:");
                 println!("  5               Einzelzeile");
                 println!("  1-10            Bereich");
                 println!("  1,3,5,7         Einzelne Zeilen");
                 println!("  1-3,5,7-9       Kombination");
-                println!("  1..10           Generator-Notation");
-                println!("  1..=10          Inklusive Generator");
-                println!("  1..10:2         Generator mit Schrittweite");
             }
             _ => {
                 if dash_count == 0 {
@@ -200,17 +212,15 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich,
 
     (minuses, params, bereich, spalten_namen)
 }
-
 pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, usize)>> {
     println!("🔧 Parse zu Bereichen: '{}'", text);
     
     let mut bereiche = Vec::new();
     
-    // 1. Versuche Generator-Notation mit der besseren Funktion
+    // 1. Versuche Generator-Notation
     if let Some(zahlen) = str_as_generator_to_vec_i64(text) {
         println!("🎯 Generator-Notation erkannt: {:?}", zahlen);
         
-        // Konvertiere i64 zu usize (mit Überlauf-Prüfung)
         for &zahl in &zahlen {
             if zahl >= 0 {
                 let zahl_usize = zahl as usize;
@@ -222,20 +232,17 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
         
         if !bereiche.is_empty() {
             println!("📊 Aus Generator erstellte Bereiche: {:?}", bereiche);
-            // Sortiere aber fasse NICHT zusammen!
             bereiche.sort_by(|a, b| a.0.cmp(&b.0));
             return Some(bereiche);
         }
     }
     
     // 2. MANUELLE Parsing für Komma-getrennte Zahlen
-    // Teile zuerst nach Kommas auf
     let teile: Vec<&str> = text.split(',').collect();
     println!("🔪 Zerlegt nach Kommas in {} Teile: {:?}", teile.len(), teile);
     
-    // Wenn nur ein Teil vorhanden ist, versuche es mit der originalen Logik
+    // Wenn nur ein Teil vorhanden ist
     if teile.len() == 1 {
-        // Original-Logik für Bereichs-Notation (1-5) oder einzelne Zahl
         let teil = teile[0].trim();
         
         if teil.contains('-') {
@@ -262,7 +269,7 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
                 continue;
             }
             
-            // Prüfe ob es ein Bereich ist (kann in Komma-Liste vorkommen: "1-3,5")
+            // Prüfe ob es ein Bereich ist
             if teil_trimmed.contains('-') {
                 let bereichs_teile: Vec<&str> = teil_trimmed.split('-').collect();
                 if bereichs_teile.len() == 2 {
@@ -296,56 +303,4 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
         println!("❌ Keine gültigen Bereiche gefunden");
         None
     }
-}
-
-// Hilfsfunktion zur Ausgabe der SQL-SELECT Anweisungen
-pub fn generate_sql_select(spalten_namen: &SpaltenNamen) -> String {
-    let mut output = String::new();
-    
-    output.push_str(&format!("-- SQL SELECT Anweisungen mit Spaltennamen: '{}', '{}'\n", 
-                            spalten_namen.oberkategorie, spalten_namen.unterkategorie));
-    output.push_str("\n");
-    
-    // 1. Einfache SELECTs
-    output.push_str("-- 1. Alle Einträge mit Ober- und Unterkategorie\n");
-    output.push_str(&format!("SELECT {}, {}, spaltennummer\n", 
-                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
-    output.push_str(&format!("FROM kategorie_tabelle\n"));
-    output.push_str(&format!("WHERE {} IS NOT NULL AND {} IS NOT NULL\n", 
-                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
-    output.push_str("ORDER BY spaltennummer;\n\n");
-    
-    // 2. Einzigartige Kategorien
-    output.push_str("-- 2. Einzigartige Oberkategorien\n");
-    output.push_str(&format!("SELECT DISTINCT {}\n", spalten_namen.oberkategorie));
-    output.push_str(&format!("FROM kategorie_tabelle\n"));
-    output.push_str(&format!("ORDER BY {};\n\n", spalten_namen.oberkategorie));
-    
-    // 3. Unterkategorien für bestimmte Oberkategorie
-    output.push_str("-- 3. Unterkategorien für eine bestimmte Oberkategorie\n");
-    output.push_str(&format!("SELECT DISTINCT {}\n", spalten_namen.unterkategorie));
-    output.push_str(&format!("FROM kategorie_tabelle\n"));
-    output.push_str(&format!("WHERE {} = 'Menschliches'\n", spalten_namen.oberkategorie));
-    output.push_str(&format!("ORDER BY {};\n\n", spalten_namen.unterkategorie));
-    
-    // 4. Komplexe Abfrage mit JOIN
-    output.push_str("-- 4. Komplexe Abfrage mit JOIN auf Datentabelle\n");
-    output.push_str(&format!("SELECT k.{} as oberkategorie, k.{} as unterkategorie,\n", 
-                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
-    output.push_str("       k.spaltennummer, d.*\n");
-    output.push_str("FROM kategorie_tabelle k\n");
-    output.push_str("JOIN daten_tabelle d ON k.spaltennummer = d.id\n");
-    output.push_str(&format!("WHERE k.{} = 'Universum'\n", spalten_namen.oberkategorie));
-    output.push_str("ORDER BY k.spaltennummer;\n\n");
-    
-    // 5. CREATE TABLE Statement
-    output.push_str("-- 5. CREATE TABLE Statement\n");
-    output.push_str("CREATE TABLE kategorie_tabelle (\n");
-    output.push_str("  id INTEGER PRIMARY KEY AUTOINCREMENT,\n");
-    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", spalten_namen.oberkategorie));
-    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", spalten_namen.unterkategorie));
-    output.push_str("  spaltennummer INTEGER NOT NULL\n");
-    output.push_str(");\n");
-    
-    output
 }

@@ -7,6 +7,7 @@ use column_manager::get_column_names;
 use utils::print_recursive;
 use retaAusgabe::{Tables, CliOutput, OutputSyntax};
 use columnCategories_complete::lade_kategorie_map;  // Nur lade_kategorie_map importieren
+use cli::TextBereich;  // ODER: use cli::bereich::TextBereich;
 
 mod cli;
 mod data;
@@ -76,13 +77,66 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // ACHTUNG: parse_cli_args gibt jetzt 4 Werte zurück!
-    let (_dashes, _params, bereich, spalten_namen) = parse_cli_args(&args);
+    // In main(), NACH dem Parsen der CLI-Argumente:
 
-    // ... in main(), nachdem du 'bereich' hast:
-    println!("\n📂 Lade Kategorie-Daten...");
-    let kategorie_map = lade_kategorie_map();
+let (_dashes, _params, mut bereich, spalten_namen) = parse_cli_args(&args);
+// Kategoriedaten laden
+println!("\n📂 Lade Kategorie-Daten...");
+let kategorie_map = lade_kategorie_map();
 
+// NEU: Automatische Spaltensuche wenn --spaltenname ohne --spalten verwendet wird
+if !args.iter().any(|a| a == "--spalten") && 
+   (spalten_namen.oberkategorie != "oberkategorie" || 
+    spalten_namen.unterkategorie != "unterkategorie") {
+    
+    println!("\n🔍 Automatische Spaltensuche für: '{}' → '{}'", 
+             spalten_namen.oberkategorie, spalten_namen.unterkategorie);
+    
+    // Suche Spaltennummern
+    let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_kategorien(
+        &spalten_namen.oberkategorie,
+        &spalten_namen.unterkategorie
+    );
+    
+    if !gefundene_spalten.is_empty() {
+        println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
+        
+        // Konvertiere zu Bereichsformat für TextBereich
+        let mut bereich_fuer_spalten = TextBereich::default();
+        
+        // Sortiere und füge als einzelne Bereiche hinzu
+        let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
+        sorted.sort();
+        
+        for &num in &sorted {
+            bereich_fuer_spalten.spalten_bereiche.push((num, num));
+        }
+        
+        // Überschreibe bereich mit gefundenen Spalten
+        bereich.spalten_bereiche = bereich_fuer_spalten.spalten_bereiche;
+        
+        if !bereich.spalten_bereiche.is_empty() {
+            bereich.von_spalte = bereich.spalten_bereiche[0].0;
+            bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
+            
+            println!("📊 Automatisch erzeugte Spaltenbereiche: {:?}", bereich.spalten_bereiche);
+        }
+    } else {
+        println!("❌ Keine Spaltennummern gefunden für: '{}' → '{}'", 
+                 spalten_namen.oberkategorie, spalten_namen.unterkategorie);
+        
+        // Zeige verfügbare Kategorien
+        let mut oberkategorien = std::collections::HashSet::new();
+        for eintrag in &kategorie_map.alle_eintraege {
+            oberkategorien.insert(eintrag.oberkategorie.clone());
+        }
+        
+        println!("ℹ️  Verfügbare Oberkategorien (erste 10):");
+        for (i, kategorie) in oberkategorien.iter().take(10).enumerate() {
+            println!("  {}. {}", i + 1, kategorie);
+        }
+    }
+}
     // Filtere basierend auf CLI-Argumenten
     if !bereich.spalten_bereiche.is_empty() {
         let mut spalten_nummern = Vec::new();

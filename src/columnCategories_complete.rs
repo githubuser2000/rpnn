@@ -19,6 +19,8 @@ impl KategorieEintrag {
     }
 }
 
+
+
 pub struct KategorieMap {
     pub hauptkategorien: HashMap<String, HashMap<String, Vec<u32>>>,
     pub alle_eintraege: Vec<KategorieEintrag>,
@@ -33,7 +35,28 @@ impl KategorieMap {
         instanz.lade_kategorien();
         instanz
     }
+    // In columnCategories_complete.rs, im impl KategorieMap:
+pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
+    let mut gefundene = Vec::new();
     
+    for eintrag in &self.alle_eintraege {
+        // Fallunabhängiger Vergleich
+        if eintrag.oberkategorie.to_lowercase().contains(&ober.to_lowercase()) ||
+           eintrag.oberkategorie.replace("_", "").to_lowercase().contains(&ober.to_lowercase()) {
+            
+            if eintrag.unterkategorie.to_lowercase().contains(&unter.to_lowercase()) ||
+               eintrag.unterkategorie.replace("_", "").to_lowercase().contains(&unter.to_lowercase()) {
+                
+                gefundene.extend_from_slice(&eintrag.spaltennummern);
+            }
+        }
+    }
+    
+    // Entferne Duplikate und sortiere
+    gefundene.sort();
+    gefundene.dedup();
+    gefundene
+}
     fn lade_kategorien(&mut self) {
         let mut main_to_sub = HashMap::new();
         let mut alle_eintraege_temp = Vec::new();
