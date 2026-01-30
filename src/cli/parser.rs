@@ -1,12 +1,6 @@
-// src/cli/parser.rs
-use crate::ifIsZeilenAngabe::{
-    is_zeilen_angabe, 
-    str_as_generator_to_vec_i64, 
-    split_with_bracket_balance
-};
-
+use crate::ifIsZeilenAngabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
 use super::bereich::TextBereich;
-use super::utils::sortiere_und_fasse_zusammen;
+// sortiere_und_fasse_zusammen nicht mehr importieren, da wir sie nicht verwenden
 
 pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich) {
     let mut minuses = Vec::with_capacity(args.len());
@@ -176,58 +170,76 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
         
         if !bereiche.is_empty() {
             println!("📊 Aus Generator erstellte Bereiche: {:?}", bereiche);
+            // Sortiere aber fasse NICHT zusammen!
+            bereiche.sort_by(|a, b| a.0.cmp(&b.0));
             return Some(bereiche);
         }
     }
     
-    // 2. Zerlege in Komponenten
-    let teile: Vec<&str> = split_with_bracket_balance(text);
-    println!("🔪 Zerlegt in {} Teile: {:?}", teile.len(), teile);
+    // 2. MANUELLE Parsing für Komma-getrennte Zahlen
+    // Teile zuerst nach Kommas auf
+    let teile: Vec<&str> = text.split(',').collect();
+    println!("🔪 Zerlegt nach Kommas in {} Teile: {:?}", teile.len(), teile);
     
-    for teil in teile {
-        let teil_trimmed: &str = teil;
-        let teil_trimmed = teil_trimmed.trim();
+    // Wenn nur ein Teil vorhanden ist, versuche es mit der originalen Logik
+    if teile.len() == 1 {
+        // Original-Logik für Bereichs-Notation (1-5) oder einzelne Zahl
+        let teil = teile[0].trim();
         
-        if teil_trimmed.is_empty() {
-            continue;
-        }
-        
-        if teil_trimmed.contains('-') {
-            let bereichs_teile: Vec<&str> = teil_trimmed.split('-').collect();
+        if teil.contains('-') {
+            let bereichs_teile: Vec<&str> = teil.split('-').collect();
             if bereichs_teile.len() == 2 {
                 if let (Ok(von), Ok(bis)) = (
                     bereichs_teile[0].trim().parse::<usize>(),
                     bereichs_teile[1].trim().parse::<usize>()
                 ) {
-                    if von <= bis {
-                        bereiche.push((von, bis));
-                        println!("📈 Bereich {}-{} hinzugefügt", von, bis);
-                    } else {
-                        bereiche.push((bis, von));
-                        println!("🔄 Bereich {}-{} getauscht zu {}-{}", von, bis, bis, von);
-                    }
-                    continue;
+                    bereiche.push((von, bis));
+                    println!("📈 Bereich {}-{} hinzugefügt", von, bis);
                 }
             }
-        }
-        
-        let mut num_str = teil_trimmed;
-        if num_str.starts_with('v') {
-            num_str = &num_str[1..];
-        }
-        
-        if let Ok(num) = num_str.parse::<usize>() {
+        } else if let Ok(num) = teil.parse::<usize>() {
             bereiche.push((num, num));
-            println!("➕ Einzelzahl {} als Bereich ({},{}) hinzugefügt", num, num, num);
-        } else {
-            println!("⚠  Konnte '{}' nicht als Zahl parsen", teil_trimmed);
+            println!("➕ Einzelzahl {} hinzugefügt", num);
+        }
+    } else {
+        // Mehrere Teile = Komma-getrennte Zahlen
+        for teil in teile {
+            let teil_trimmed = teil.trim();
+            
+            if teil_trimmed.is_empty() {
+                continue;
+            }
+            
+            // Prüfe ob es ein Bereich ist (kann in Komma-Liste vorkommen: "1-3,5")
+            if teil_trimmed.contains('-') {
+                let bereichs_teile: Vec<&str> = teil_trimmed.split('-').collect();
+                if bereichs_teile.len() == 2 {
+                    if let (Ok(von), Ok(bis)) = (
+                        bereichs_teile[0].trim().parse::<usize>(),
+                        bereichs_teile[1].trim().parse::<usize>()
+                    ) {
+                        bereiche.push((von, bis));
+                        println!("📈 Bereich {}-{} hinzugefügt", von, bis);
+                        continue;
+                    }
+                }
+            }
+            
+            // Einzelne Zahl
+            if let Ok(num) = teil_trimmed.parse::<usize>() {
+                bereiche.push((num, num));
+                println!("➕ Einzelzahl {} hinzugefügt", num);
+            } else {
+                println!("⚠  Konnte '{}' nicht als Zahl parsen", teil_trimmed);
+            }
         }
     }
     
     if !bereiche.is_empty() {
-        let bereiche_geordnet = sortiere_und_fasse_zusammen(bereiche);
-        println!("✅ Insgesamt {} Bereichspaare: {:?}", bereiche_geordnet.len(), bereiche_geordnet);
-        Some(bereiche_geordnet)
+        // WICHTIG: Nur sortieren, NICHT zusammenfassen für einzelne Zahlen!
+        bereiche.sort_by(|a, b| a.0.cmp(&b.0));
+        println!("✅ Insgesamt {} Bereichspaare (sortiert): {:?}", bereiche.len(), bereiche);
+        Some(bereiche)
     } else {
         println!("❌ Keine gültigen Bereiche gefunden");
         None

@@ -1,33 +1,4 @@
 // src/cli/utils.rs
-pub(crate) fn sortiere_und_fasse_zusammen(mut bereiche: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
-    if bereiche.is_empty() {
-        return Vec::new();
-    }
-    
-    // Sortiere nach Startwert
-    bereiche.sort_by(|a, b| a.0.cmp(&b.0));
-    
-    let mut result = Vec::new();
-    let mut aktuell = bereiche[0];
-    
-    for &(von, bis) in &bereiche[1..] {
-        // Prüfe auf Überlappung oder direkte Nachbarschaft
-        if von <= aktuell.1 + 1 {
-            // Zusammenfassen: erweitere aktuellen Bereich
-            if bis > aktuell.1 {
-                aktuell.1 = bis;
-            }
-        } else {
-            // Neuer Bereich beginnt
-            result.push(aktuell);
-            aktuell = (von, bis);
-        }
-    }
-    
-    result.push(aktuell);
-    result
-}
-
 // Optional: Weitere Hilfsfunktionen
 pub(crate) fn parse_einfache_zahl(text: &str) -> Option<usize> {
     text.trim().parse::<usize>().ok()
