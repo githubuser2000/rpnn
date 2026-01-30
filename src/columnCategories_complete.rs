@@ -34,28 +34,179 @@ impl KategorieMap {
         instanz
     }
     // In columnCategories_complete.rs, im impl KategorieMap:
+    // In columnCategories_complete.rs, ersetze die finde_spaltennummern_fuer_kategorien-Funktion:
+
+// In columnCategories_complete.rs:
+
+// UND eine Version, die speziell für die Haupt-Datenstruktur optimiert ist:
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
+    println!("🔍 Suche nach: '{}' → '{}'", ober, unter);
+    
     let mut gefundene = Vec::new();
     
-    for eintrag in &self.alle_eintraege {
-        // Fallunabhängiger Vergleich
-        if eintrag.oberkategorie.to_lowercase().contains(&ober.to_lowercase()) ||
-           eintrag.oberkategorie.replace("_", "").to_lowercase().contains(&ober.to_lowercase()) {
-            
-            if eintrag.unterkategorie.to_lowercase().contains(&unter.to_lowercase()) ||
-               eintrag.unterkategorie.replace("_", "").to_lowercase().contains(&unter.to_lowercase()) {
+    // Suche in der Hauptkategorien-Struktur
+    for (haupt_name, unter_map) in &self.hauptkategorien {
+        let haupt_normalized = haupt_name.to_lowercase().replace("_", "");
+        let ober_normalized = ober.to_lowercase().replace("_", "");
+        
+        if haupt_normalized == ober_normalized {
+            for (unter_name, spaltennummern) in unter_map {
+                let unter_normalized = unter_name.to_lowercase().replace("_", "");
+                let such_unter_normalized = unter.to_lowercase().replace("_", "");
                 
+                if unter_normalized == such_unter_normalized {
+                    println!("✅ Gefunden: {} → {} : {:?}", haupt_name, unter_name, spaltennummern);
+                    gefundene.extend_from_slice(spaltennummern);
+                }
+            }
+        }
+    }
+    
+    // Wenn nichts gefunden, durchsuche alle Einträge
+    if gefundene.is_empty() {
+        println!("⚠️  Suche in flachen Daten...");
+        for eintrag in &self.alle_eintraege {
+            let ober_normalized = eintrag.oberkategorie.to_lowercase().replace("_", "");
+            let unter_normalized = eintrag.unterkategorie.to_lowercase().replace("_", "");
+            
+            if ober_normalized.contains(&ober.to_lowercase().replace("_", "")) &&
+               unter_normalized.contains(&unter.to_lowercase().replace("_", "")) {
+                println!("✅ Gefunden (erweitert): {} → {} : {:?}", 
+                        eintrag.oberkategorie, eintrag.unterkategorie, eintrag.spaltennummern);
                 gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
+        }
+    }
+    
+    gefundene.sort();
+    gefundene.dedup();
+    
+    if !gefundene.is_empty() {
+        println!("📊 {} Spaltennummern gefunden: {:?}", gefundene.len(), gefundene);
+    } else {
+        println!("❌ Keine Spaltennummern gefunden");
+    }
+    
+    gefundene
+}
+
+// NEUE Funktion für bessere Suche mit Synonymen
+pub fn finde_spaltennummern_fuer_kategorien_genau(&self, ober: &str, unter: &str) -> Vec<u32> {
+    println!("🔍 GENAU Suche nach: Ober='{}', Unter='{}'", ober, unter);
+    
+    // Durchsuche den gesamten Datensatz
+    let data = vec![
+        (vec!["Wichtigstes_zum_verstehen", "wichtigsteverstehen"], vec!["Wichtigste", "wichtigste"], vec![10, 5, 4, 8]),
+        (vec!["Menschliches", "menschliches"], vec!["Mensch-zu-Tier", "menschtier", "tiermensch"], vec![314]),
+        // ... dein gesamter Datensatz hier
+        (vec!["Menschliches", "menschliches"], vec!["Motive", "motivation", "motiv", "absicht", "absichten"], vec![10, 18, 42, 167, 168, 149, 229, 230]),
+        (vec!["Menschliches", "menschliches"], vec!["Liebe", "liebe", "ethik"], vec![8, 9, 28, 208, 330]),
+        (vec!["Religionen", "religionen", "religion"], vec!["Messias", "messias", "heptagramm", "hund", "messiase", "messiasse"], vec![7, 503]),
+        // ... restlicher Datensatz
+    ];
+    
+    let ober_normalized = ober.to_lowercase().replace("_", "");
+    let unter_normalized = unter.to_lowercase().replace("_", "");
+    
+    let mut gefundene = Vec::new();
+    
+    for (main_categories, sub_categories, spaltennummern) in data {
+        // Prüfe Oberkategorie
+        let mut ober_gefunden = false;
+        for &main_cat in &main_categories {
+            let main_normalized = main_cat.to_lowercase().replace("_", "");
+            if main_normalized == ober_normalized {
+                ober_gefunden = true;
+                break;
+            }
+        }
+        
+        if !ober_gefunden {
+            continue;
+        }
+        
+        // Prüfe Unterkategorie
+        let mut unter_gefunden = false;
+        for &sub_cat in &sub_categories {
+            let sub_normalized = sub_cat.to_lowercase().replace("_", "");
+            if sub_normalized == unter_normalized {
+                unter_gefunden = true;
+                break;
+            }
+        }
+        
+        if unter_gefunden {
+            println!("✅ GENAU gefunden in Datensatz: {:?} -> {:?} : {:?}", 
+                     main_categories, sub_categories, spaltennummern);
+            gefundene.extend_from_slice(&spaltennummern);
         }
     }
     
     // Entferne Duplikate und sortiere
     gefundene.sort();
     gefundene.dedup();
+    
+    println!("📊 GENAU Ergebnis: {} Spaltennummern", gefundene.len());
     gefundene
 }
+
+// Alternative: Nutze die bestehende Hauptkategorien-Struktur
+pub fn finde_spaltennummern_fuer_kategorien_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
+    println!("🔍 EXAKT Suche in Hauptkategorien-Struktur");
+    
+    let ober_normalized = ober.to_lowercase().replace("_", "");
+    let unter_normalized = unter.to_lowercase().replace("_", "");
+    
+    let mut gefundene = Vec::new();
+    
+    // Durchsuche die Hauptkategorien
+    for (haupt_name, unter_map) in &self.hauptkategorien {
+        let haupt_normalized = haupt_name.to_lowercase().replace("_", "");
+        
+        // Exakter Match für Oberkategorie
+        if haupt_normalized == ober_normalized {
+            println!("✅ Oberkategorie gefunden: {}", haupt_name);
+            
+            // Durchsuche Unterkategorien
+            for (unter_name, spaltennummern) in unter_map {
+                let unter_name_normalized = unter_name.to_lowercase().replace("_", "");
+                
+                if unter_name_normalized == unter_normalized {
+                    println!("✅ Unterkategorie gefunden: {} -> Spalten: {:?}", unter_name, spaltennummern);
+                    gefundene.extend_from_slice(spaltennummern);
+                } else {
+                    // Prüfe auf Teilübereinstimmung
+                    if unter_name_normalized.contains(&unter_normalized) || 
+                       unter_normalized.contains(&unter_name_normalized) {
+                        println!("⚠️  Teilübereinstimmung: '{}' ähnlich '{}'", unter_name, unter);
+                    }
+                }
+            }
+        }
+    }
+    
+    if gefundene.is_empty() {
+        println!("❌ Keine exakte Übereinstimmung in Hauptkategorien-Struktur");
+        
+        // Fallback auf die alte Methode
+        println!("🔄 Fallback auf flache Suche...");
+        return self.finde_spaltennummern_fuer_kategorien(ober, unter);
+    }
+    
+    // Entferne Duplikate und sortiere
+    gefundene.sort();
+    gefundene.dedup();
+    
+    println!("📊 EXAKT Ergebnis: {} Spaltennummern: {:?}", gefundene.len(), gefundene);
+    gefundene
+}
+
     fn lade_kategorien(&mut self) {
+        // In columnCategories_complete.rs - in der lade_kategorien Funktion:
+
+    
+   
+    // ... Rest des Codes ...
         let mut main_to_sub = HashMap::new();
         let mut alle_eintraege_temp = Vec::new();
         let data = vec![
@@ -439,27 +590,37 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         (vec!["Kontinuum", "kontinuum"], vec!["C", "c", "Drei"], vec![448]),
         (vec!["Kontinuum", "kontinuum"], vec!["D", "d", "Vier"], vec![449]),
     ];
- 
-        // DEIN KOMPLETTER DATENSATZ HIER - ich zeige nur ein Beispiel
-        for (main_categories, sub_categories, ids) in data {
-            for &main_cat in &main_categories {
-                for &sub_cat in &sub_categories {
-                    Self::insert_entry(&mut main_to_sub, main_cat, sub_cat, ids.clone());
-                    
-                    // Auch in die flache Liste aufnehmen
-                    alle_eintraege_temp.push(KategorieEintrag::new(
-                        main_cat,
-                        sub_cat,
-                        ids.clone()
-                    ));
+
+    // Jetzt verwenden wir data
+    for (main_categories, sub_categories, ids) in data {
+        // KORREKTUR: Von 1-basiert zu 0-basiert konvertieren
+        let korrigierte_ids: Vec<u32> = ids.iter()
+            .map(|&id| {
+                if id > 0 {
+                    id - 1  // Von 1-basiert zu 0-basiert
+                } else {
+                    id  // Falls 0, behalte es (sollte nicht vorkommen)
                 }
+            })
+            .collect();
+        
+        for &main_cat in &main_categories {
+            for &sub_cat in &sub_categories {
+                Self::insert_entry(&mut main_to_sub, main_cat, sub_cat, korrigierte_ids.clone());
+                
+                // Auch in die flache Liste aufnehmen
+                alle_eintraege_temp.push(KategorieEintrag::new(
+                    main_cat,
+                    sub_cat,
+                    korrigierte_ids.clone()
+                ));
             }
         }
-
-        self.hauptkategorien = main_to_sub;
-        self.alle_eintraege = alle_eintraege_temp;
     }
 
+    self.hauptkategorien = main_to_sub;
+    self.alle_eintraege = alle_eintraege_temp;
+} 
     fn insert_entry(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
         main_category: &str,

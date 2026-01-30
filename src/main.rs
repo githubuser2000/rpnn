@@ -62,7 +62,6 @@ pub fn test_simple_table() {
     print_table(&headers, data, &max_lengths, 1); // Mit start_row = 1
 }
 
-// main.rs - geänderte Stelle
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== START TABELLEN-TEST ===");
