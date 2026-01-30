@@ -1,12 +1,29 @@
 use crate::ifIsZeilenAngabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
 use super::bereich::TextBereich;
-// sortiere_und_fasse_zusammen nicht mehr importieren, da wir sie nicht verwenden
 
-pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich) {
+// Neuer Datentyp für Spaltennamen-Konfiguration
+#[derive(Debug, Clone)]
+pub struct SpaltenNamen {
+    pub oberkategorie: String,
+    pub unterkategorie: String,
+}
+
+impl Default for SpaltenNamen {
+    fn default() -> Self {
+        Self {
+            oberkategorie: "oberkategorie".to_string(),
+            unterkategorie: "unterkategorie".to_string(),
+        }
+    }
+}
+
+// Rückgabetyp erweitert um Spaltennamen
+pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
     let mut bereich = TextBereich::default();
+    let mut spalten_namen = SpaltenNamen::default();
 
     let mut iter = args.iter().enumerate();
     while let Some((i, arg)) = iter.next() {
@@ -124,6 +141,43 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
                     }
                 }
             }
+            // NEUE OPTION: Spaltennamen für SQL
+            "--spaltenname" => {
+                if let Some((_, name1)) = iter.next() {
+                    if let Some((_, name2)) = iter.next() {
+                        println!("📝 Setze Spaltennamen: Oberkategorie='{}', Unterkategorie='{}'", 
+                                 name1, name2);
+                        spalten_namen.oberkategorie = name1.clone();
+                        spalten_namen.unterkategorie = name2.clone();
+                        println!("✅ Spaltennamen gespeichert: {:?}", spalten_namen);
+                    } else {
+                        println!("❌ Fehler: --spaltenname benötigt zwei Namen");
+                    }
+                } else {
+                    println!("❌ Fehler: --spaltenname benötigt zwei Namen");
+                }
+            }
+            // Hilfe-Option
+            "--help" | "-h" => {
+                println!("📖 Hilfe: Verfügbare Optionen:");
+                println!("  --vorhervonausschnitt ZEILEN    Zeilenbereiche auswählen");
+                println!("  --spalten SPALTEN               Spaltenbereiche auswählen");
+                println!("  --zeilevon ZAHL                 Startzeile setzen");
+                println!("  --zeilebis ZAHL                 Endzeile setzen");
+                println!("  --spaltevon ZAHL                Startspalte setzen");
+                println!("  --spaltebis ZAHL                Endspalte setzen");
+                println!("  --spaltenname NAME1 NAME2       Spaltennamen für SQL setzen");
+                println!("  --help, -h                      Diese Hilfe anzeigen");
+                println!();
+                println!("📝 Beispiele für Zeilenangaben:");
+                println!("  5               Einzelzeile");
+                println!("  1-10            Bereich");
+                println!("  1,3,5,7         Einzelne Zeilen");
+                println!("  1-3,5,7-9       Kombination");
+                println!("  1..10           Generator-Notation");
+                println!("  1..=10          Inklusive Generator");
+                println!("  1..10:2         Generator mit Schrittweite");
+            }
             _ => {
                 if dash_count == 0 {
                     println!("📦 Parameter: {}", arg);
@@ -144,7 +198,7 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
         params.push(param);
     }
 
-    (minuses, params, bereich)
+    (minuses, params, bereich, spalten_namen)
 }
 
 pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, usize)>> {
@@ -242,4 +296,56 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
         println!("❌ Keine gültigen Bereiche gefunden");
         None
     }
+}
+
+// Hilfsfunktion zur Ausgabe der SQL-SELECT Anweisungen
+pub fn generate_sql_select(spalten_namen: &SpaltenNamen) -> String {
+    let mut output = String::new();
+    
+    output.push_str(&format!("-- SQL SELECT Anweisungen mit Spaltennamen: '{}', '{}'\n", 
+                            spalten_namen.oberkategorie, spalten_namen.unterkategorie));
+    output.push_str("\n");
+    
+    // 1. Einfache SELECTs
+    output.push_str("-- 1. Alle Einträge mit Ober- und Unterkategorie\n");
+    output.push_str(&format!("SELECT {}, {}, spaltennummer\n", 
+                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
+    output.push_str(&format!("FROM kategorie_tabelle\n"));
+    output.push_str(&format!("WHERE {} IS NOT NULL AND {} IS NOT NULL\n", 
+                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
+    output.push_str("ORDER BY spaltennummer;\n\n");
+    
+    // 2. Einzigartige Kategorien
+    output.push_str("-- 2. Einzigartige Oberkategorien\n");
+    output.push_str(&format!("SELECT DISTINCT {}\n", spalten_namen.oberkategorie));
+    output.push_str(&format!("FROM kategorie_tabelle\n"));
+    output.push_str(&format!("ORDER BY {};\n\n", spalten_namen.oberkategorie));
+    
+    // 3. Unterkategorien für bestimmte Oberkategorie
+    output.push_str("-- 3. Unterkategorien für eine bestimmte Oberkategorie\n");
+    output.push_str(&format!("SELECT DISTINCT {}\n", spalten_namen.unterkategorie));
+    output.push_str(&format!("FROM kategorie_tabelle\n"));
+    output.push_str(&format!("WHERE {} = 'Menschliches'\n", spalten_namen.oberkategorie));
+    output.push_str(&format!("ORDER BY {};\n\n", spalten_namen.unterkategorie));
+    
+    // 4. Komplexe Abfrage mit JOIN
+    output.push_str("-- 4. Komplexe Abfrage mit JOIN auf Datentabelle\n");
+    output.push_str(&format!("SELECT k.{} as oberkategorie, k.{} as unterkategorie,\n", 
+                           spalten_namen.oberkategorie, spalten_namen.unterkategorie));
+    output.push_str("       k.spaltennummer, d.*\n");
+    output.push_str("FROM kategorie_tabelle k\n");
+    output.push_str("JOIN daten_tabelle d ON k.spaltennummer = d.id\n");
+    output.push_str(&format!("WHERE k.{} = 'Universum'\n", spalten_namen.oberkategorie));
+    output.push_str("ORDER BY k.spaltennummer;\n\n");
+    
+    // 5. CREATE TABLE Statement
+    output.push_str("-- 5. CREATE TABLE Statement\n");
+    output.push_str("CREATE TABLE kategorie_tabelle (\n");
+    output.push_str("  id INTEGER PRIMARY KEY AUTOINCREMENT,\n");
+    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", spalten_namen.oberkategorie));
+    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", spalten_namen.unterkategorie));
+    output.push_str("  spaltennummer INTEGER NOT NULL\n");
+    output.push_str(");\n");
+    
+    output
 }

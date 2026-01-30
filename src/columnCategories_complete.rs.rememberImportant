@@ -1,43 +1,9 @@
-// file: columnCategories_complete.rs
 use std::collections::{HashMap, HashSet};
 
-// Öffentliche Struktur für Kategorien
-#[derive(Debug, Clone)]
-pub struct KategorieEintrag {
-    pub oberkategorie: String,
-    pub unterkategorie: String,
-    pub spaltennummern: Vec<u32>,
-}
+pub fn create_category_map() -> HashMap<&'static str, HashMap<&'static str, Vec<u32>>> {
+    let mut main_to_sub = HashMap::new();
 
-impl KategorieEintrag {
-    pub fn new(ober: &str, unter: &str, nummern: Vec<u32>) -> Self {
-        Self {
-            oberkategorie: ober.to_string(),
-            unterkategorie: unter.to_string(),
-            spaltennummern: nummern,
-        }
-    }
-}
-
-pub struct KategorieMap {
-    pub hauptkategorien: HashMap<String, HashMap<String, Vec<u32>>>,
-    pub alle_eintraege: Vec<KategorieEintrag>,
-}
-
-impl KategorieMap {
-    pub fn new() -> Self {
-        let mut instanz = Self {
-            hauptkategorien: HashMap::new(),
-            alle_eintraege: Vec::new(),
-        };
-        instanz.lade_kategorien();
-        instanz
-    }
-    
-    fn lade_kategorien(&mut self) {
-        let mut main_to_sub = HashMap::new();
-        let mut alle_eintraege_temp = Vec::new();
-        let data = vec![
+    let data = vec![
         (vec!["Wichtigstes_zum_verstehen", "wichtigsteverstehen"], vec!["Wichtigste", "wichtigste"], vec![10, 5, 4, 8]),
         (vec!["Menschliches", "menschliches"], vec!["Mensch-zu-Tier", "menschtier", "tiermensch"], vec![314]),
         (vec!["Religionen", "religionen", "religion"], vec!["Superkräfte", "Superkraefte"], vec![444, 494, 496, 503]),
@@ -418,138 +384,295 @@ impl KategorieMap {
         (vec!["Kontinuum", "kontinuum"], vec!["C", "c", "Drei"], vec![448]),
         (vec!["Kontinuum", "kontinuum"], vec!["D", "d", "Vier"], vec![449]),
     ];
- 
-        // DEIN KOMPLETTER DATENSATZ HIER - ich zeige nur ein Beispiel
-        for (main_categories, sub_categories, ids) in data {
-            for &main_cat in &main_categories {
-                for &sub_cat in &sub_categories {
-                    Self::insert_entry(&mut main_to_sub, main_cat, sub_cat, ids.clone());
-                    
-                    // Auch in die flache Liste aufnehmen
-                    alle_eintraege_temp.push(KategorieEintrag::new(
-                        main_cat,
-                        sub_cat,
-                        ids.clone()
-                    ));
-                }
+    // Total: 379 data entries
+
+    for (main_categories, sub_categories, ids) in data {
+        for &main_cat in &main_categories {
+            for &sub_cat in &sub_categories {
+                insert_entry(&mut main_to_sub, main_cat, sub_cat, ids.clone());
             }
         }
-
-        self.hauptkategorien = main_to_sub;
-        self.alle_eintraege = alle_eintraege_temp;
     }
 
-    fn insert_entry(
-        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
-        main_category: &str,
-        sub_category: &str,
-        new_ids: Vec<u32>
-    ) {
-        let main_entry = main_to_sub
-            .entry(main_category.to_string())
-            .or_insert_with(HashMap::new);
-
-        let existing_ids = main_entry
-            .entry(sub_category.to_string())
-            .or_insert_with(Vec::new);
-
-        let mut all_ids: HashSet<u32> = existing_ids.iter().cloned().collect();
-        for &id in &new_ids {
-            all_ids.insert(id);
-        }
-
-        let mut sorted_ids: Vec<u32> = all_ids.into_iter().collect();
-        sorted_ids.sort();
-        *existing_ids = sorted_ids;
-    }
-    
-    // Methode um Kategorien nach Spaltennummer zu filtern
-    pub fn filtere_nach_spaltennummern(&self, nummern: &[usize]) -> Vec<&KategorieEintrag> {
-        let nummern_set: HashSet<u32> = nummern.iter().map(|&n| n as u32).collect();
-        
-        self.alle_eintraege
-            .iter()
-            .filter(|eintrag| {
-                eintrag.spaltennummern.iter().any(|num| nummern_set.contains(num))
-            })
-            .collect()
-    }
-    
-    // Methode um SQL-SELECTs zu generieren
-    pub fn generiere_sql_selects(&self, 
-                                 oberkategorie_name: &str, 
-                                 unterkategorie_name: &str,
-                                 spalten_filter: Option<&[usize]>) -> String {
-        let mut output = String::new();
-        
-        output.push_str(&format!("-- SQL SELECTS für Kategorie-Datenbank\n"));
-        output.push_str(&format!("-- Spaltennamen: {}, {}\n\n", 
-                               oberkategorie_name, unterkategorie_name));
-        
-        // CREATE TABLE
-        output.push_str("CREATE TABLE kategorien (\n");
-        output.push_str("  id INTEGER PRIMARY KEY AUTOINCREMENT,\n");
-        output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", oberkategorie_name));
-        output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", unterkategorie_name));
-        output.push_str("  spaltennummer INTEGER NOT NULL\n");
-        output.push_str(");\n\n");
-        
-        // INSERT Statements
-        output.push_str("INSERT INTO kategorien (");
-        output.push_str(oberkategorie_name);
-        output.push_str(", ");
-        output.push_str(unterkategorie_name);
-        output.push_str(", spaltennummer) VALUES\n");
-        
-        let mut first = true;
-        for eintrag in &self.alle_eintraege {
-            // Filtern nach Spaltennummern falls gewünscht
-            if let Some(filter) = spalten_filter {
-                let filter_set: HashSet<u32> = filter.iter().map(|&n| n as u32).collect();
-                let hat_treffer = eintrag.spaltennummern.iter().any(|num| filter_set.contains(num));
-                if !hat_treffer {
-                    continue;
-                }
-            }
-            
-            for &spaltennummer in &eintrag.spaltennummern {
-                if !first {
-                    output.push_str(",\n");
-                }
-                output.push_str(&format!("  ('{}', '{}', {})", 
-                                       eintrag.oberkategorie, 
-                                       eintrag.unterkategorie, 
-                                       spaltennummer));
-                first = false;
-            }
-        }
-        
-        if !first {
-            output.push_str(";\n\n");
-        }
-        
-        // SELECT Examples
-        output.push_str("-- Beispiele für SELECT-Abfragen:\n\n");
-        output.push_str(&format!("-- 1. Alle eindeutigen {}s:\n", oberkategorie_name));
-        output.push_str(&format!("SELECT DISTINCT {} FROM kategorien ORDER BY {};\n\n", 
-                               oberkategorie_name, oberkategorie_name));
-        
-        output.push_str(&format!("-- 2. {}s für eine bestimmte {}:\n", 
-                               unterkategorie_name, oberkategorie_name));
-        output.push_str(&format!("SELECT DISTINCT {} FROM kategorien ", unterkategorie_name));
-        output.push_str(&format!("WHERE {} = 'Menschliches' ", oberkategorie_name));
-        output.push_str(&format!("ORDER BY {};\n\n", unterkategorie_name));
-        
-        output.push_str("-- 3. Spaltennummern für eine Kategorie-Kombination:\n");
-        output.push_str(&format!("SELECT spaltennummer FROM kategorien "));
-        output.push_str(&format!("WHERE {} = 'Universum' ", oberkategorie_name));
-        output.push_str(&format!("AND {} = 'Transzendentalien';\n", unterkategorie_name));
-        
-        output
-    }
+    main_to_sub
 }
 
-// Öffentliche Funktion um die Kategorie-Map zu erhalten
-pub fn lade_kategorie_map() -> KategorieMap {
-    KategorieMap::new()
+fn insert_entry(
+    main_to_sub: &mut HashMap<&'static str, HashMap<&'static str, Vec<u32>>>,
+    main_category: &'static str,
+    sub_category: &'static str,
+    new_ids: Vec<u32>
+) {
+    let main_entry = main_to_sub
+        .entry(main_category)
+        .or_insert_with(HashMap::new);
+
+    let existing_ids = main_entry
+        .entry(sub_category)
+        .or_insert_with(Vec::new);
+
+    let mut all_ids: HashSet<u32> = existing_ids.iter().cloned().collect();
+    for &id in &new_ids {
+        all_ids.insert(id);
+    }
+
+    let mut sorted_ids: Vec<u32> = all_ids.into_iter().collect();
+    sorted_ids.sort();
+    *existing_ids = sorted_ids;
+}
+
+
+// (Die create_category_map() und insert_entry() Funktionen bleiben gleich wie vorher)
+
+fn main() {
+    let category_map = create_category_map();
+    
+    println!("=== UM FANGREICHERE KATEGORIE-ANALYSE ===\n");
+    
+    // 1. Grundstatistik
+    println!("1. GRUNDSTATISTIK:");
+    println!("   Eindeutige Hauptkategorien: {}", category_map.len());
+    
+    let mut total_sub_entries = 0;
+    let mut total_id_references = 0;
+    let mut all_unique_ids = HashSet::new();
+    
+    for (main_cat, sub_map) in &category_map {
+        total_sub_entries += sub_map.len();
+        for ids in sub_map.values() {
+            total_id_references += ids.len();
+            for &id in ids {
+                all_unique_ids.insert(id);
+            }
+        }
+    }
+    
+    println!("   Haupt→Unter Einträge: {}", total_sub_entries);
+    println!("   ID-Referenzen gesamt: {}", total_id_references);
+    println!("   Eindeutige IDs: {}\n", all_unique_ids.len());
+    
+    // 2. Top Hauptkategorien nach Anzahl Unterkategorien
+    println!("2. TOP 10 HAUPTKATEGORIEN (nach Unterkategorien):");
+    let mut main_cats_sorted: Vec<(&str, usize)> = category_map
+        .iter()
+        .map(|(k, v)| (*k, v.len()))
+        .collect();
+    
+    main_cats_sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    for (i, (main_cat, count)) in main_cats_sorted.iter().take(10).enumerate() {
+        // Zähle auch die IDs für diese Hauptkategorie
+        let mut id_count = 0;
+        if let Some(sub_map) = category_map.get(main_cat) {
+            for ids in sub_map.values() {
+                id_count += ids.len();
+            }
+        }
+        println!("   {}. {:30} {} Unterkategorien, {} ID-Refs", 
+                 i + 1, main_cat, count, id_count);
+    }
+    
+    // 3. Spezifische Kategorie-Analysen
+    println!("\n3. SPEZIFISCHE KATEGORIE-ANALYSEN:");
+    
+    let test_categories = vec![
+        "Menschliches",
+        "menschliches",  // Alias
+        "Universum",
+        "universum",     // Alias  
+        "Galaxie",
+        "galaxie",       // Alias
+        "Religionen",
+        "religionen",    // Alias
+        "Grundstrukturen",
+        "Multiversum",
+        "Wichtigstes_zum_verstehen",
+    ];
+    
+    for main_cat in test_categories {
+        if let Some(sub_map) = category_map.get(main_cat) {
+            println!("\n   --- {} ({} Unterkategorien) ---", 
+                     main_cat, sub_map.len());
+            
+            // Top 3 Unterkategorien mit meisten IDs
+            let mut sub_cats: Vec<(&str, &Vec<u32>)> = sub_map
+                .iter()
+                .map(|(k, v)| (*k, v))
+                .collect();
+            
+            sub_cats.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+            
+            for (i, (sub_cat, ids)) in sub_cats.iter().take(3).enumerate() {
+                println!("      {}. {:40} {} IDs", i + 1, sub_cat, ids.len());
+                if !ids.is_empty() && ids.len() <= 5 {
+                    println!("          IDs: {:?}", ids);
+                }
+            }
+        } else {
+            println!("\n   --- {}: NICHT GEFUNDEN ---", main_cat);
+        }
+    }
+    
+    // 4. Interessante Unterkategorien über alle Hauptkategorien
+    println!("\n4. INTERESSANTE UNTERKATEGORIEN (über alle Hauptkategorien):");
+    
+    let interesting_subs = vec![
+        "Superkräfte",
+        "Superkraefte",
+        "Evolution_vs_Design_intelligent",
+        "Satan_Teufel",
+        "Teilchen_anderes_Universum",
+        "Biologischer_Baum(15)",
+        "Geist(15)",
+        "Transzendentalien",
+        "Meta-Systeme(12)",
+    ];
+    
+    for sub_cat in interesting_subs {
+        println!("\n   --- '{}' wird referenziert von: ---", sub_cat);
+        
+        let mut found_in = Vec::new();
+        
+        for (main_cat, sub_map) in &category_map {
+            if let Some(ids) = sub_map.get(sub_cat) {
+                found_in.push((*main_cat, ids.len()));
+            }
+        }
+        
+        if found_in.is_empty() {
+            println!("      (nicht gefunden)");
+        } else {
+            found_in.sort_by(|a, b| b.1.cmp(&a.1));
+            for (main_cat, id_count) in found_in {
+                println!("      {:30} {} IDs", main_cat, id_count);
+            }
+        }
+    }
+    
+    // 5. ID-Analyse
+    println!("\n5. ID-ANALYSE:");
+    
+    // Finde die am häufigsten referenzierte ID
+    let mut id_counts: HashMap<u32, usize> = HashMap::new();
+    
+    for (_, sub_map) in &category_map {
+        for ids in sub_map.values() {
+            for &id in ids {
+                *id_counts.entry(id).or_insert(0) += 1;
+            }
+        }
+    }
+    
+    let mut sorted_ids: Vec<(u32, usize)> = id_counts.into_iter().collect();
+    sorted_ids.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    println!("   Top 10 am häufigsten referenzierte IDs:");
+    for (i, (id, count)) in sorted_ids.iter().take(10).enumerate() {
+        println!("      {}. ID {} wird {} mal referenziert", i + 1, id, count);
+    }
+    
+    // 6. Alias-Analyse (gleiche IDs für verschiedene Schreibweisen)
+    println!("\n6. ALIAS-ANALYSE (Beispiele):");
+    
+    let alias_pairs = vec![
+        ("Menschliches", "menschliches"),
+        ("Universum", "universum"),
+        ("Galaxie", "galaxie"),
+        ("Religionen", "religionen"),
+        ("Superkräfte", "Superkraefte"),
+    ];
+    
+    for (alias1, alias2) in alias_pairs {
+        println!("\n   Vergleich {} vs {}:", alias1, alias2);
+        
+        let map1 = category_map.get(alias1);
+        let map2 = category_map.get(alias2);
+        
+        match (map1, map2) {
+            (Some(m1), Some(m2)) => {
+                // Zähle gemeinsame Unterkategorien
+                let common_subs: Vec<&str> = m1.keys()
+                    .filter(|k| m2.contains_key(*k))
+                    .cloned()
+                    .collect();
+                
+                println!("      Beide existieren mit {} bzw {} Unterkategorien", 
+                         m1.len(), m2.len());
+                println!("      {} gemeinsame Unterkategorien", common_subs.len());
+                
+                if !common_subs.is_empty() && common_subs.len() <= 3 {
+                    println!("      Gemeinsame: {:?}", common_subs);
+                }
+            }
+            (Some(_), None) => println!("      {} existiert, {} nicht", alias1, alias2),
+            (None, Some(_)) => println!("      {} nicht, {} existiert", alias1, alias2),
+            (None, None) => println!("      Beide nicht gefunden"),
+        }
+    }
+    
+    // 7. Beispiel-Zugriffe
+    println!("\n7. KONKRETE BEISPIEL-ZUGRIFFE:");
+    
+    let example_queries = vec![
+        ("Menschliches", "menschliches"),
+        ("Universum", "universum"),
+        ("Religionen", "religionen"),
+        ("Grundstrukturen", "Reziprokes"),
+        ("Galaxie", "Kugeln_Kreise"),
+    ];
+    
+    for (main_cat, sub_cat) in example_queries {
+        if let Some(sub_map) = category_map.get(main_cat) {
+            if let Some(ids) = sub_map.get(sub_cat) {
+                println!("   {} → {}: {} IDs", main_cat, sub_cat, ids.len());
+                
+                if !ids.is_empty() {
+                    // Zeige erste 5 und letzte 5 IDs wenn viele
+                    if ids.len() <= 10 {
+                        println!("      Alle IDs: {:?}", ids);
+                    } else {
+                        println!("      Erste 5: {:?}", &ids[..5]);
+                        println!("      ... und {} weitere", ids.len() - 5);
+                        println!("      Letzte 5: {:?}", &ids[ids.len()-5..]);
+                    }
+                    
+                    // ID-Bereich
+                    if let (Some(min), Some(max)) = (ids.iter().min(), ids.iter().max()) {
+                        println!("      Bereich: {} - {}", min, max);
+                    }
+                }
+            } else {
+                println!("   {} → {}: Unterkategorie nicht gefunden", main_cat, sub_cat);
+            }
+        } else {
+            println!("   {} → {}: Hauptkategorie nicht gefunden", main_cat, sub_cat);
+        }
+    }
+    
+    // 8. Statistik über leere ID-Listen
+    println!("\n8. LEERE ID-LISTEN:");
+    
+    let mut empty_count = 0;
+    let mut total_entries = 0;
+    
+    for (main_cat, sub_map) in &category_map {
+        for (sub_cat, ids) in sub_map {
+            total_entries += 1;
+            if ids.is_empty() {
+                empty_count += 1;
+            }
+        }
+    }
+    
+    println!("   Einträge mit leeren IDs: {} von {} ({:.1}%)", 
+             empty_count, total_entries, 
+             (empty_count as f32 / total_entries as f32) * 100.0);
+    
+    // 9. Export-Vorschlag
+    println!("\n9. EXPORT-VORSCHLAG:");
+    println!("   Du könntest die Map in verschiedene Formate exportieren:");
+    println!("   - JSON für Web-Anwendungen");
+    println!("   - SQL für Datenbanken");
+    println!("   - Graphviz-DOT für Visualisierungen");
+    println!("   - CSV für Tabellenkalkulation");
 }

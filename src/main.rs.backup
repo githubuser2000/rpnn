@@ -6,7 +6,6 @@ use table_printer::{query_column_by_index, print_table};
 use column_manager::get_column_names;
 use utils::print_recursive;
 use retaAusgabe::{Tables, CliOutput, OutputSyntax};
-use columnCategories_complete::lade_kategorie_map;  // Nur lade_kategorie_map importieren
 
 mod cli;
 mod data;
@@ -17,14 +16,13 @@ mod data_fetcher;
 mod table_printer;
 mod retaAusgabe;
 mod ifIsZeilenAngabe;
-mod columnCategories_complete;
 
 pub fn test_simple_table() {
     // Direkt in main.rs testen
     let tables = Tables::new(Some(100));
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.cliout2("TEST: Dies sollte ausgegeben werden");
-
+    
     println!("\n=== wurde oben TEST ausgegeben? EINFACHER TABELLEN-TEST ===");
 
     // Erstelle einfache Testdaten
@@ -52,22 +50,22 @@ pub fn test_simple_table() {
             }
         }
     }
-    
+
     println!("Headers: {:?}", headers);
     println!("Max lengths: {:?}", max_lengths);
     println!("Data rows: {}", data.len());
-    
-    // Direkter Aufruf - nur EINEN Aufruf!
-    print_table(&headers, data, &max_lengths, 1); // Mit start_row = 1
+
+    // Direkter Aufruf
+print_table(&headers, data, &max_lengths, 1); // NEU (Startzeile 1 für Test)    print_table(&headers, data, &max_lengths);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== START TABELLEN-TEST ===");
     test_simple_table();
-
+    
     // ... restlicher Code
     let args: Vec<String> = env::args().collect();
-
+    
     // Wenn nur der Programmname vorhanden ist (Länge = 1)
     if args.len() == 1 {
         println!("Benutzung: mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
@@ -75,56 +73,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Benutzung: mein-rpnn --vorhervonausschnitt 7-9 --spaltevon 2 --spaltebis 5");
         return Ok(());
     }
-
-    // ACHTUNG: parse_cli_args gibt jetzt 4 Werte zurück!
-    let (_dashes, _params, bereich, spalten_namen) = parse_cli_args(&args);
-
-    // ... in main(), nachdem du 'bereich' hast:
-    println!("\n📂 Lade Kategorie-Daten...");
-    let kategorie_map = lade_kategorie_map();
-
-    // Filtere basierend auf CLI-Argumenten
-    if !bereich.spalten_bereiche.is_empty() {
-        let mut spalten_nummern = Vec::new();
-        for (von, bis) in &bereich.spalten_bereiche {
-            for nummer in *von..=*bis {
-                spalten_nummern.push(nummer);
-            }
-        }
-
-        let gefilterte = kategorie_map.filtere_nach_spaltennummern(&spalten_nummern);
-        println!("📈 Gefundene Kategorie-Einträge für Spalten {:?}: {}",
-                 bereich.spalten_bereiche, gefilterte.len());
-
-        // SQL generieren (optional) - verwende die CLI-Spaltennamen!
-        let sql = kategorie_map.generiere_sql_selects(
-            &spalten_namen.oberkategorie,  // Jetzt aus CLI!
-            &spalten_namen.unterkategorie, // Jetzt aus CLI!
-            Some(&spalten_nummern)
-        );
-
-        println!("\n{}", sql);
-    }
-
+    
+    let (_dashes, _params, bereich) = parse_cli_args(&args); // NEU (oder nur `bereich` verwenden)
     // Beispiel-Struktur erstellen
     let meine_liste = data::create_example_structure();
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
-
+    
     // CSV in SQLite importieren
-    let projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR")); // NEU (mut entfernen)
     let pfad1 = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
     let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
     let dateien = [
         pfad1,
         pfad2,
     ];
-
+    
     let conn = import_csvs_to_sqlite(&dateien)?;
     query_column_by_index(&conn, bereich)?; // Fragt die 1. Spalte ab
-
+    
     let column_names = get_column_names(&conn)?;
     println!("Die Tabelle hat {} Spalten.", column_names.len());
-
+    
     Ok(())
 }
