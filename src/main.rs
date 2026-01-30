@@ -5,10 +5,11 @@ use csv_importer::import_csvs_to_sqlite;
 use table_printer::{query_column_by_index, print_table};
 use column_manager::get_column_names;
 use utils::print_recursive;
-use retaAusgabe::{Tables, CliOutput, OutputSyntax};
 use columnCategories_complete::lade_kategorie_map;  // Nur lade_kategorie_map importieren
 use cli::TextBereich;  // ODER: use cli::bereich::TextBereich;
-
+use retaAusgabe::{Tables, CliOutput, OutputSyntax};
+use std::collections::BTreeSet;
+mod retaAusgabe;
 mod cli;
 mod data;
 mod utils;
@@ -16,7 +17,6 @@ mod csv_importer;
 mod column_manager;
 mod data_fetcher;
 mod table_printer;
-mod retaAusgabe;
 mod ifIsZeilenAngabe;
 mod columnCategories_complete;
 
