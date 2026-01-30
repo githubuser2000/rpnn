@@ -233,39 +233,126 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: 
     }
 }
 
-pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
-    let column_names = get_column_names(conn)?;
-    let (query, headers) = build_column_query(&column_names, bereich.clone())?;
-    
-    // Berechne Header-Längen mit Unicode-Unterstützung
-    let header_lengths: Vec<usize> = headers.iter()
-        .map(|h| UnicodeWidthStr::width(h.as_str()))
-        .collect();
-    
-    let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    // NEUE LOGIK: Prüfe ob es sich um einzelne Zeilen handelt
-    let is_einzelne_zeilen = bereich.zeilen_bereiche.iter().all(|(start, end)| start == end);
+// In table_printer.rs - query_column_by_index Funktion anpassen:
+
+pub fn query_column_by_index(
+    conn: &Connection,
+    bereich: crate::cli::TextBereich,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔍 Table Printer mit Bereich: {:?}", bereich);
     
-    if is_einzelne_zeilen && bereich.zeilen_bereiche.len() > 1 {
-        // Fall: Einzelne Zeilen wie 7,10
-        // Wir müssen die tatsächlichen Zeilennummern in den Daten setzen
-        println!("🔍 Einzelne Zeilen erkannt: {:?}", bereich.zeilen_bereiche);
+    // Hole Spaltennamen
+    let column_names = crate::column_manager::get_column_names(conn)?;
+    println!("📊 Tabelle hat {} Spalten", column_names.len());
+    
+    // Wenn diskrete Spaltenbereiche vorhanden sind, verwende spezielle Funktion
+    let (query, selected_names) = if !bereich.spalten_bereiche.is_empty() {
+        println!("📊 Verwende diskrete Spaltenbereiche: {:?}", bereich.spalten_bereiche);
         
-        // Erstelle eine spezielle Tabelle mit den korrekten Zeilennummern
-        print_table_with_exact_rows(&headers, &data, &bereich.zeilen_bereiche);
+        // Spaltennummern aus den Bereichen extrahieren
+        let mut spalten_nummern = Vec::new();
+        for &(von, bis) in &bereich.spalten_bereiche {
+            for i in von..=bis {
+                spalten_nummern.push(i);
+            }
+        }
+        
+        // Sortieren und Duplikate entfernen
+        spalten_nummern.sort();
+        spalten_nummern.dedup();
+        
+        println!("📈 Zu verarbeitende Spaltennummern: {:?}", spalten_nummern);
+        
+        crate::column_manager::build_column_query_with_specific_columns(
+            &column_names,
+            &spalten_nummern,
+            &bereich.zeilen_bereiche
+        )?
     } else {
-        // Fall: Kontinuierlicher Bereich oder nur eine einzelne Zeile
-        let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
-            bereich.zeilen_bereiche[0].0
-        } else {
-            bereich.von_zeile
-        };
+        // Normale Verarbeitung
+        crate::column_manager::build_column_query(&column_names, bereich)?
+    };
+    
+    println!("📋 Anzahl ausgewählter Spalten: {}", selected_names.len());
+    
+    // Rest der Funktion bleibt gleich...
+    let mut stmt = conn.prepare(&query)?;
+    
+    // Spaltennamen für die Ausgabe
+    println!("\n📊 ERGEBNIS für '{}' -> '{}':", 
+             "Oberkategorie", "Unterkategorie"); // Hier könntest du die tatsächlichen Namen einfügen
+    
+    // Tabellenkopf drucken
+    print!("┌");
+    for (i, name) in selected_names.iter().enumerate() {
+        let clean_name = name.trim_matches('"');
+        let width = clean_name.len().max(15);
+        for _ in 0..width + 2 {
+            print!("─");
+        }
+        if i < selected_names.len() - 1 {
+            print!("┬");
+        }
+    }
+    println!("┐");
+    
+    // Spaltennamen
+    print!("│");
+    for (i, name) in selected_names.iter().enumerate() {
+        let clean_name = name.trim_matches('"');
+        let width = clean_name.len().max(15);
+        print!(" {:width$} │", clean_name, width = width);
+    }
+    println!();
+    
+    // Trennlinie
+    print!("├");
+    for (i, name) in selected_names.iter().enumerate() {
+        let clean_name = name.trim_matches('"');
+        let width = clean_name.len().max(15);
+        for _ in 0..width + 2 {
+            print!("─");
+        }
+        if i < selected_names.len() - 1 {
+            print!("┼");
+        }
+    }
+    println!("┤");
+    
+    // Daten ausgeben
+    let mut rows = stmt.query([])?;
+    let mut row_count = 0;
+    
+    while let Some(row) = rows.next()? {
+        row_count += 1;
+        print!("│");
         
-        print_table_chunked(&headers, &data, start_row_num);
+        for i in 0..selected_names.len() {
+            let value: String = row.get(i)?;
+            let clean_name = selected_names[i].trim_matches('"');
+            let width = clean_name.len().max(15);
+            print!(" {:width$} │", value, width = width);
+        }
+        println!();
     }
     
-    println!();
+    // Fußzeile
+    print!("└");
+    for (i, name) in selected_names.iter().enumerate() {
+        let clean_name = name.trim_matches('"');
+        let width = clean_name.len().max(15);
+        for _ in 0..width + 2 {
+            print!("─");
+        }
+        if i < selected_names.len() - 1 {
+            print!("┴");
+        }
+    }
+    println!("┘");
+    
+    println!("📈 Insgesamt {} Zeilen angezeigt", row_count);
+    
     Ok(())
 }
 

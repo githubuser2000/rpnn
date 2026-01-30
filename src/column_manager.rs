@@ -1,3 +1,4 @@
+// file: column_manager.rs
 use rusqlite::Connection;
 use crate::cli::TextBereich;
 
@@ -13,36 +14,92 @@ pub fn build_column_query(
     column_names: &[String],
     bereich: TextBereich,
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
+    println!("🔍 Build query mit Bereich: {:?}", bereich);
+    println!("  Spaltenbereiche: {:?}", bereich.spalten_bereiche);
+    println!("  von_spalte: {}, bis_spalte: {}", bereich.von_spalte, bereich.bis_spalte);
+    
     let mut selected_names = Vec::new();
+    let mut spalten_nummern = Vec::new();
 
-    // Validate column indices
-    if bereich.von_spalte == 0 || bereich.bis_spalte == 0 {
-        return Err("Column indices must start from 1".into());
-    }
+    // Fall 1: Diskret definierte Spaltenbereiche (z.B. [(10,10), (18,18), (42,42)])
+    if !bereich.spalten_bereiche.is_empty() {
+        println!("📊 Verwende diskrete Spaltenbereiche");
+        
+        for &(von, bis) in &bereich.spalten_bereiche {
+            for i in von..=bis {
+                spalten_nummern.push(i);
+            }
+        }
+        
+        // Sortieren und Duplikate entfernen
+        spalten_nummern.sort();
+        spalten_nummern.dedup();
+        
+        println!("📈 Eindeutige Spaltennummern: {:?}", spalten_nummern);
+        
+        // Überprüfen ob Spaltennummern existieren
+        for &nummer in &spalten_nummern {
+            if nummer == 0 || nummer > column_names.len() {
+                return Err(format!("Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
+                                   nummer, column_names.len()).into());
+            }
+            
+            if let Some(name) = column_names.get(nummer.saturating_sub(1)) {
+                selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
+            } else {
+                return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());
+            }
+        }
+    } 
+    // Fall 2: Kontinuierlicher Spaltenbereich (Legacy)
+    else if bereich.von_spalte > 0 && bereich.bis_spalte > 0 {
+        println!("📊 Verwende kontinuierlichen Spaltenbereich");
+        
+        // Validate column indices
+        if bereich.von_spalte == 0 || bereich.bis_spalte == 0 {
+            return Err("Spaltenindizes müssen bei 1 beginnen".into());
+        }
 
-    if bereich.von_spalte > bereich.bis_spalte {
-        return Err("Start column must be less than or equal to end column".into());
-    }
+        if bereich.von_spalte > bereich.bis_spalte {
+            return Err("Startspalte muss kleiner oder gleich Endspalte sein".into());
+        }
 
-    // Collect selected column names
-    for i in bereich.von_spalte..=bereich.bis_spalte {
-        if let Some(name) = column_names.get(i.saturating_sub(1)) {
-            selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
-        } else {
-            return Err(format!("Column number {} not found", i).into());
+        // Collect selected column names
+        for i in bereich.von_spalte..=bereich.bis_spalte {
+            spalten_nummern.push(i);
+            
+            if let Some(name) = column_names.get(i.saturating_sub(1)) {
+                selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
+            } else {
+                return Err(format!("Spaltennummer {} nicht gefunden", i).into());
+            }
         }
     }
-
+    // Fall 3: Keine Spalten angegeben - Standard auf Spalte 1
+    else {
+        println!("⚠️  Keine Spalten angegeben - verwende Spalte 1 als Standard");
+        spalten_nummern.push(1);
+        
+        if let Some(name) = column_names.get(0) {
+            selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
+        } else {
+            return Err("Tabelle hat keine Spalten".into());
+        }
+    }
+    
     let columns_clause = selected_names.join(", ");
+    println!("✅ Ausgewählte Spalten: {}", columns_clause);
+    println!("📋 Anzahl ausgewählter Spalten: {}", selected_names.len());
 
     // Determine which rows to select
     let query = if !bereich.zeilen_bereiche.is_empty() {
         // PRIORITÄT: Use zeilen_bereiche if it has entries (individual rows/ranges)
-        println!("🔍 Verwende zeilen_bereiche für Zeilenauswahl");
+        println!("🔍 Verwende zeilen_bereiche für Zeilenauswahl: {:?}", bereich.zeilen_bereiche);
         build_query_with_row_ranges_enhanced(&columns_clause, &bereich.zeilen_bereiche)
     } else {
         // FALLBACK: Use continuous row range (von_zeile/bis_zeile)
-        println!("📊 Verwende kontinuierlichen Bereich von_zeile/bis_zeile");
+        println!("📊 Verwende kontinuierlichen Zeilenbereich: {} bis {}", 
+                 bereich.von_zeile, bereich.bis_zeile);
         build_query_with_continuous_range(
             &columns_clause, 
             bereich.von_zeile, 
@@ -62,18 +119,18 @@ fn build_query_with_continuous_range(
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Validate row indices
     if von_zeile == 0 {
-        return Err("Row indices must start from 1".into());
+        return Err("Zeilenindizes müssen bei 1 beginnen".into());
     }
 
     if bis_zeile < von_zeile {
-        return Err("End row must be greater than or equal to start row".into());
+        return Err("Endzeile muss größer oder gleich Startzeile sein".into());
     }
 
     // Calculate number of rows (inclusive range)
     let anzahl = bis_zeile - von_zeile + 1;
 
     if anzahl == 0 {
-        return Err("Invalid row range".into());
+        return Err("Ungültiger Zeilenbereich".into());
     }
 
     // Build query for continuous range
@@ -91,7 +148,7 @@ fn build_query_with_row_ranges_enhanced(
     zeilen_bereiche: &[(usize, usize)],
 ) -> Result<String, Box<dyn std::error::Error>> {
     if zeilen_bereiche.is_empty() {
-        return Err("Row ranges cannot be empty".into());
+        return Err("Zeilenbereiche dürfen nicht leer sein".into());
     }
 
     println!("📈 Verarbeite {} Zeilenbereiche", zeilen_bereiche.len());
@@ -153,7 +210,7 @@ fn build_query_with_row_ranges_enhanced(
     println!("📋 Insgesamt {} eindeutige Zeilen", all_row_numbers.len());
     
     if all_row_numbers.is_empty() {
-        return Err("No valid rows selected".into());
+        return Err("Keine gültigen Zeilen ausgewählt".into());
     }
     
     // Standard-Query
@@ -175,53 +232,43 @@ fn build_query_with_row_ranges_enhanced(
 
     Ok(query)
 }
-// Behalte die alte Funktion für Kompatibilität, aber rufe die erweiterte auf
-fn build_query_with_row_ranges(
-    columns_clause: &str,
-    zeilen_bereiche: &[(usize, usize)],
-) -> Result<String, Box<dyn std::error::Error>> {
-    // Rufe einfach die erweiterte Version auf
-    build_query_with_row_ranges_enhanced(columns_clause, zeilen_bereiche)
-}
 
-// Alternative simpler version if you prefer a single function with pattern matching:
-pub fn build_column_query_alternative(
+// Neue Funktion, die direkt mit Spaltennummern arbeitet
+pub fn build_column_query_with_specific_columns(
     column_names: &[String],
-    bereich: TextBereich,
+    spalten_nummern: &[usize],
+    zeilen_bereiche: &[(usize, usize)],
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
+    println!("🔍 Baue Query mit spezifischen Spaltennummern: {:?}", spalten_nummern);
+    
     let mut selected_names = Vec::new();
-
-    // Collect selected column names (same as before)
-    for i in bereich.von_spalte..=bereich.bis_spalte {
-        if let Some(name) = column_names.get(i.saturating_sub(1)) {
+    
+    // Überprüfen ob Spaltennummern existieren
+    for &nummer in spalten_nummern {
+        if nummer == 0 || nummer > column_names.len() {
+            return Err(format!("Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
+                               nummer, column_names.len()).into());
+        }
+        
+        if let Some(name) = column_names.get(nummer.saturating_sub(1)) {
             selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
         } else {
-            return Err(format!("Column number {} not found", i).into());
+            return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());
         }
     }
-
-    let columns_clause = selected_names.join(", ");
-    let query = match (bereich.zeilen_bereiche.is_empty(), bereich.spalten_bereiche.is_empty()) {
-        (false, _) => {
-            // Use zeilen_bereiche for rows
-            build_query_with_row_ranges_enhanced(&columns_clause, &bereich.zeilen_bereiche)?
-        }
-        (true, false) => {
-            // Use spalten_bereiche for columns (if you want to support this too)
-            // You would need to modify the column selection logic
-            return Err("Column ranges not yet implemented".into());
-        }
-        (true, true) => {
-            // Use continuous ranges for both
-            build_query_with_continuous_range(
-                &columns_clause,
-                bereich.von_zeile,
-                bereich.bis_zeile
-            )?
-        }
-    };
     
-    println!("Generated query: {}", query);
+    let columns_clause = selected_names.join(", ");
+    println!("✅ Ausgewählte Spalten: {}", columns_clause);
+
+    // Zeilenauswahl bestimmen
+    let query = if !zeilen_bereiche.is_empty() {
+        build_query_with_row_ranges_enhanced(&columns_clause, zeilen_bereiche)
+    } else {
+        // Standardmäßig alle Zeilen
+        Ok(format!("SELECT {} FROM csv_data", columns_clause))
+    }?;
+
+    println!("✅ Generierte Query: {}", query);
 
     Ok((query, selected_names))
 }
