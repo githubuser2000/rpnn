@@ -1,5 +1,11 @@
 // src/cli.rs
-use crate::ifIsZeilenAngabe::{is_zeilen_angabe, str_as_generator_to_list_of_num_strs, split_with_bracket_balance};
+// Ändere den Import:
+use crate::ifIsZeilenAngabe::{
+    is_zeilen_angabe, 
+    str_as_generator_to_list_of_num_strs, 
+    str_as_generator_to_vec_i64,  // NEU hinzufügen
+    split_with_bracket_balance
+};
 
 #[derive(Debug, Clone)]
 pub struct TextBereich {
@@ -170,24 +176,27 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
 
     (minuses, params, bereich)
 }
-
+// In cli.rs, ersetze den Generator-Parsing Teil:
 fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, usize)>> {
     println!("🔧 Parse zu Bereichen: '{}'", text);
     
     let mut bereiche = Vec::new();
     
-    // 1. Versuche Generator-Notation
-    if let Some(strings) = str_as_generator_to_list_of_num_strs(text) {
-        println!("🎯 Generator-Notation erkannt: {:?}", strings);
+    // 1. Versuche Generator-Notation mit der besseren Funktion
+    if let Some(zahlen) = str_as_generator_to_vec_i64(text) {
+        println!("🎯 Generator-Notation erkannt: {:?}", zahlen);
         
-        let zahlen: Result<Vec<usize>, _> = strings.iter()
-            .map(|s: &String| s.parse::<usize>())
-            .collect();
-        
-        if let Ok(zahlen_vec) = zahlen {
-            for zahl in zahlen_vec {
-                bereiche.push((zahl, zahl));
+        // Konvertiere i64 zu usize (mit Überlauf-Prüfung)
+        for &zahl in &zahlen {
+            if zahl >= 0 {
+                let zahl_usize = zahl as usize;
+                bereiche.push((zahl_usize, zahl_usize));
+            } else {
+                println!("⚠  Negative Zahl {} in Generator ignoriert", zahl);
             }
+        }
+        
+        if !bereiche.is_empty() {
             println!("📊 Aus Generator erstellte Bereiche: {:?}", bereiche);
             return Some(bereiche);
         }
