@@ -62,6 +62,8 @@ pub fn test_simple_table() {
     print_table(&headers, data, &max_lengths, 1); // Mit start_row = 1
 }
 
+// main.rs - geänderte Stelle
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== START TABELLEN-TEST ===");
     test_simple_table();
@@ -69,21 +71,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() == 1 {
-        println!("Benutzung: mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
-        println!("Benutzung: mein-rpnn --vorhervonausschnitt 7,9 --spaltevon 2 --spaltebis 5");
-        println!("Benutzung: mein-rpnn --vorhervonausschnitt 7-9 --spaltevon 2 --spaltebis 5");
+        println!("Benutzung: mein-rpnn --spalten OBERKATEGORIE UNTERKATEGORIE");
+        println!("Beispiel:  mein-rpnn --spalten Menschliches Motive");
+        println!("Beispiel:  mein-rpnn --spalten Universum Transzendentalien");
+        println!("\nAlternative mit manuellen Bereichen:");
+        println!("  mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
+        println!("  mein-rpnn --vorhervonausschnitt 7,9 --spaltevon 2 --spaltebis 5");
         return Ok(());
     }
 
-    let (_dashes, _params, mut bereich, spalten_namen) = parse_cli_args(&args);
-
+    // LADE ZUERST die KategorieMap
     println!("\n📂 Lade Kategorie-Daten...");
     let kategorie_map = lade_kategorie_map();
+    
+    // ÜBERGEBE die KategorieMap an den Parser
+    let (_dashes, _params, mut bereich, spalten_namen) = parse_cli_args(&args, Some(&kategorie_map));
 
+    // Rest bleibt gleich...
     println!("🔍 CLI Argumente: {:?}", args);
-    println!("📊 Bereich vor Verarbeitung: {:?}", bereich);
+    println!("📊 Bereich nach Parser: {:?}", bereich);
     println!("📝 Spaltennamen: {:?}", spalten_namen);
-
+    
+    // ... Rest der main-Funktion
     let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
 
     if !hat_manuelle_spalten && 
