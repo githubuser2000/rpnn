@@ -19,8 +19,6 @@ impl KategorieEintrag {
     }
 }
 
-
-
 pub struct KategorieMap {
     pub hauptkategorien: HashMap<String, HashMap<String, Vec<u32>>>,
     pub alle_eintraege: Vec<KategorieEintrag>,

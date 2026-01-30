@@ -66,10 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== START TABELLEN-TEST ===");
     test_simple_table();
 
-    // ... restlicher Code
     let args: Vec<String> = env::args().collect();
 
-    // Wenn nur der Programmname vorhanden ist (Länge = 1)
     if args.len() == 1 {
         println!("Benutzung: mein-rpnn --zeilevon 2 --zeilebis 4 --spaltevon 2 --spaltebis 5");
         println!("Benutzung: mein-rpnn --vorhervonausschnitt 7,9 --spaltevon 2 --spaltebis 5");
@@ -77,67 +75,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // In main(), NACH dem Parsen der CLI-Argumente:
+    let (_dashes, _params, mut bereich, spalten_namen) = parse_cli_args(&args);
 
-let (_dashes, _params, mut bereich, spalten_namen) = parse_cli_args(&args);
-// Kategoriedaten laden
-println!("\n📂 Lade Kategorie-Daten...");
-let kategorie_map = lade_kategorie_map();
+    println!("\n📂 Lade Kategorie-Daten...");
+    let kategorie_map = lade_kategorie_map();
 
-// NEU: Automatische Spaltensuche wenn --spaltenname ohne --spalten verwendet wird
-if !args.iter().any(|a| a == "--spalten") && 
-   (spalten_namen.oberkategorie != "oberkategorie" || 
-    spalten_namen.unterkategorie != "unterkategorie") {
-    
-    println!("\n🔍 Automatische Spaltensuche für: '{}' → '{}'", 
-             spalten_namen.oberkategorie, spalten_namen.unterkategorie);
-    
-    // Suche Spaltennummern
-    let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_kategorien(
-        &spalten_namen.oberkategorie,
-        &spalten_namen.unterkategorie
-    );
-    
-    if !gefundene_spalten.is_empty() {
-        println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
+    println!("🔍 CLI Argumente: {:?}", args);
+    println!("📊 Bereich vor Verarbeitung: {:?}", bereich);
+    println!("📝 Spaltennamen: {:?}", spalten_namen);
+
+    let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
+
+    if !hat_manuelle_spalten && 
+       (spalten_namen.oberkategorie != "oberkategorie" || 
+        spalten_namen.unterkategorie != "unterkategorie") {
         
-        // Konvertiere zu Bereichsformat für TextBereich
-        let mut bereich_fuer_spalten = TextBereich::default();
-        
-        // Sortiere und füge als einzelne Bereiche hinzu
-        let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
-        sorted.sort();
-        
-        for &num in &sorted {
-            bereich_fuer_spalten.spalten_bereiche.push((num, num));
-        }
-        
-        // Überschreibe bereich mit gefundenen Spalten
-        bereich.spalten_bereiche = bereich_fuer_spalten.spalten_bereiche;
-        
-        if !bereich.spalten_bereiche.is_empty() {
-            bereich.von_spalte = bereich.spalten_bereiche[0].0;
-            bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
-            
-            println!("📊 Automatisch erzeugte Spaltenbereiche: {:?}", bereich.spalten_bereiche);
-        }
-    } else {
-        println!("❌ Keine Spaltennummern gefunden für: '{}' → '{}'", 
+        println!("\n🔍 Automatische Spaltensuche für: '{}' → '{}'", 
                  spalten_namen.oberkategorie, spalten_namen.unterkategorie);
         
-        // Zeige verfügbare Kategorien
-        let mut oberkategorien = std::collections::HashSet::new();
-        for eintrag in &kategorie_map.alle_eintraege {
-            oberkategorien.insert(eintrag.oberkategorie.clone());
-        }
+        let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_kategorien(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie
+        );
         
-        println!("ℹ️  Verfügbare Oberkategorien (erste 10):");
-        for (i, kategorie) in oberkategorien.iter().take(10).enumerate() {
-            println!("  {}. {}", i + 1, kategorie);
+        if !gefundene_spalten.is_empty() {
+            println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
+            
+            let mut bereich_fuer_spalten = TextBereich::default();
+            let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
+            sorted.sort();
+            
+            for &num in &sorted {
+                bereich_fuer_spalten.spalten_bereiche.push((num, num));
+            }
+            
+            bereich.spalten_bereiche = bereich_fuer_spalten.spalten_bereiche;
+            
+            if !bereich.spalten_bereiche.is_empty() {
+                bereich.von_spalte = bereich.spalten_bereiche[0].0;
+                bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
+                println!("📊 Automatisch erzeugte Spaltenbereiche: {:?}", bereich.spalten_bereiche);
+            }
+        } else {
+            println!("❌ Keine Spaltennummern gefunden für: '{}' → '{}'", 
+                     spalten_namen.oberkategorie, spalten_namen.unterkategorie);
+            println!("ℹ️  Versuche es mit diesen Kombinationen:");
+            println!("  --spaltenname 'Menschliches' 'Motive'");
+            println!("  --spaltenname 'Universum' 'Transzendentalien'");
+            println!("  --spaltenname 'Religionen' 'Superkräfte'");
+            
+            println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
+            bereich.spalten_bereiche.push((1, 1));
+            bereich.von_spalte = 1;
+            bereich.bis_spalte = 1;
         }
     }
-}
-    // Filtere basierend auf CLI-Argumenten
+
     if !bereich.spalten_bereiche.is_empty() {
         let mut spalten_nummern = Vec::new();
         for (von, bis) in &bereich.spalten_bereiche {
@@ -150,22 +143,33 @@ if !args.iter().any(|a| a == "--spalten") &&
         println!("📈 Gefundene Kategorie-Einträge für Spalten {:?}: {}",
                  bereich.spalten_bereiche, gefilterte.len());
 
-        // SQL generieren (optional) - verwende die CLI-Spaltennamen!
-        let sql = kategorie_map.generiere_sql_selects(
-            &spalten_namen.oberkategorie,  // Jetzt aus CLI!
-            &spalten_namen.unterkategorie, // Jetzt aus CLI!
-            Some(&spalten_nummern)
-        );
-
-        println!("\n{}", sql);
+        if !gefilterte.is_empty() {
+            let sql = kategorie_map.generiere_sql_selects(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+                Some(&spalten_nummern)
+            );
+            println!("\n{}", sql);
+        }
+    } else {
+        println!("⚠️  Keine Spaltennummern verfügbar - überspringe Kategorie-Verarbeitung");
     }
 
-    // Beispiel-Struktur erstellen
+    // Zeige verfügbare Kategorien (optional)
+    let mut oberkategorien = std::collections::HashSet::new();
+    for eintrag in &kategorie_map.alle_eintraege {
+        oberkategorien.insert(eintrag.oberkategorie.clone());
+    }
+    
+    println!("ℹ️  Verfügbare Oberkategorien (erste 10):");
+    for (i, kategorie) in oberkategorien.iter().take(10).enumerate() {
+        println!("  {}. {}", i + 1, kategorie);
+    }
+
     let meine_liste = data::create_example_structure();
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
 
-    // CSV in SQLite importieren
     let projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let pfad1 = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
     let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
@@ -175,7 +179,7 @@ if !args.iter().any(|a| a == "--spalten") &&
     ];
 
     let conn = import_csvs_to_sqlite(&dateien)?;
-    query_column_by_index(&conn, bereich)?; // Fragt die 1. Spalte ab
+    query_column_by_index(&conn, bereich)?;
 
     let column_names = get_column_names(&conn)?;
     println!("Die Tabelle hat {} Spalten.", column_names.len());
