@@ -498,66 +498,6 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
    
     // In columnCategories_complete.rs, innerhalb des impl KategorieMap:
 
-pub fn generiere_sql_inserts_nur(&self, 
-                                 oberkategorie_name: &str, 
-                                 unterkategorie_name: &str,
-                                 spalten_filter: Option<&[usize]>) -> String {
-    let mut output = String::new();
-    
-    // CREATE TABLE
-    output.push_str("CREATE TABLE kategorien (\n");
-    output.push_str("  id INTEGER PRIMARY KEY AUTOINCREMENT,\n");
-    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", oberkategorie_name));
-    output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", unterkategorie_name));
-    output.push_str("  spaltennummer INTEGER NOT NULL\n");
-    output.push_str(");\n\n");
-    
-    // INSERT Statements
-    output.push_str("INSERT INTO kategorien (");
-    output.push_str(oberkategorie_name);
-    output.push_str(", ");
-    output.push_str(unterkategorie_name);
-    output.push_str(", spaltennummer) VALUES\n");
-    
-    let mut first = true;
-    let mut has_data = false;
-    
-    for eintrag in &self.alle_eintraege {
-        // Filtern nach Spaltennummern falls gewünscht
-        if let Some(filter) = spalten_filter {
-            let filter_set: HashSet<u32> = filter.iter().map(|&n| n as u32).collect();
-            let hat_treffer = eintrag.spaltennummern.iter().any(|num| filter_set.contains(num));
-            if !hat_treffer {
-                continue;
-            }
-        }
-        
-        for &spaltennummer in &eintrag.spaltennummern {
-            if !first {
-                output.push_str(",\n");
-            }
-            output.push_str(&format!("  ('{}', '{}', {})", 
-                                   eintrag.oberkategorie, 
-                                   eintrag.unterkategorie, 
-                                   spaltennummer));
-            first = false;
-            has_data = true;
-        }
-    }
-    
-    if has_data {
-        output.push_str(";\n");
-    } else {
-        // Falls keine Daten vorhanden sind, leeren INSERT vermeiden
-        output = output.lines()
-            .filter(|line| !line.contains("INSERT INTO"))
-            .collect::<Vec<_>>()
-            .join("\n");
-    }
-    
-    output
-}
-
     // Methode um SQL-SELECTs zu generieren
     pub fn generiere_sql_selects(&self, 
                                  oberkategorie_name: &str, 

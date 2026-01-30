@@ -144,12 +144,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                  bereich.spalten_bereiche, gefilterte.len());
 
         if !gefilterte.is_empty() {
-            let sql = kategorie_map.generiere_sql_inserts_nur(
+            let sql = kategorie_map.generiere_sql_selects(
                 &spalten_namen.oberkategorie,
                 &spalten_namen.unterkategorie,
                 Some(&spalten_nummern)
             );
-            println!("\n{}", sql);
+            //println!("\n{}", sql);
         }
     } else {
         println!("⚠️  Keine Spaltennummern verfügbar - überspringe Kategorie-Verarbeitung");
