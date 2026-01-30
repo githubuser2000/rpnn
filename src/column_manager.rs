@@ -175,7 +175,6 @@ fn build_query_with_row_ranges_enhanced(
 
     Ok(query)
 }
-
 // Behalte die alte Funktion für Kompatibilität, aber rufe die erweiterte auf
 fn build_query_with_row_ranges(
     columns_clause: &str,

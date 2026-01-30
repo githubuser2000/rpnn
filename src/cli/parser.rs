@@ -5,7 +5,6 @@ use super::bereich::TextBereich;
 pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
-    let mut dash_count_before = 0;
 
     let mut bereich = TextBereich::default();
 
@@ -143,7 +142,6 @@ pub fn parse_cli_args(args: &[String]) -> (Vec<usize>, Vec<String>, TextBereich)
 
         minuses.push(dash_count);
         params.push(param);
-        dash_count_before = dash_count;
     }
 
     (minuses, params, bereich)

@@ -86,7 +86,8 @@ fn compute_columns_per_table(term_width: usize, headers: &[String], max_lengths:
 fn convert_to_table_rows(
     headers: &[String], 
     data: &[Vec<String>], 
-    column_widths: &[usize]
+    column_widths: &[usize],
+    start_row_num: usize, // NEU: Startzeilennummer für die Ausgabe
 ) -> Vec<TableRow> {
     let mut table_rows = Vec::new();
     
@@ -101,6 +102,8 @@ fn convert_to_table_rows(
     
     // Datenzeilen erstellen
     for (row_idx, row_data) in data.iter().enumerate() {
+        // WICHTIG: Berechne die tatsächliche Zeilennummer
+        let actual_line_num = start_row_num + row_idx;
         let mut cells = Vec::new();
         for (i, cell_content) in row_data.iter().enumerate() {
             let width = if i < column_widths.len() { column_widths[i] } else { MAX_COLUMN_WIDTH };
@@ -116,14 +119,15 @@ fn convert_to_table_rows(
             };
             cells.push(TableCell::new("".to_string(), width));
         }
-        table_rows.push(TableRow::new(cells, (row_idx + 1) as i32, (row_idx + 1) as i32));
+        // Hier die tatsächliche Zeilennummer setzen!
+        table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
     }
     
     table_rows
 }
 
 // --- Print one table chunk (mit retaAusgabe) ---
-pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize]) {
+pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], start_row: usize) {
     let tables = Tables::new(Some(100));
     
     // Bestimme Terminalbreite für die Ausgabe
@@ -143,15 +147,15 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
         column_widths.push(capped_width);
     }
     
-    // Konvertiere Daten in TableRow-Strukturen
-    let table_rows = convert_to_table_rows(headers, &data, &column_widths);
+    // Konvertiere Daten in TableRow-Strukturen mit korrekter Startzeilennummer
+    let table_rows = convert_to_table_rows(headers, &data, &column_widths, start_row);
     
     // Erstelle CliOutput für Plain-Text mit Farben
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;
     output.table_width = term_width;
     output.column_widths = column_widths.clone();
-    output.line_numbering = true; // Keine Zeilennummern für Datenbanktabellen
+    output.line_numbering = true; // Zeilennummern aktivieren
     output.one_table = true; // Eine zusammenhängende Tabelle
     
     // Erstelle Display-Lines Set
@@ -169,7 +173,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
 }
 
 // --- Print table in automatic chunks (angepasst für retaAusgabe) ---
-pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
+pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: usize) {
     let term_width = terminal_size().map(|(TermWidth(w), _)| w as usize).unwrap_or(100);
 
     // max_lengths automatisch berechnen mit Unicode-Unterstützung
@@ -221,7 +225,8 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
             println!("{}", "─".repeat(term_width));
         }
         
-        print_table(chunk_headers, chunk_data, chunk_max_lengths);
+        // Beachte: start_row wird hier verwendet
+        print_table(chunk_headers, chunk_data, chunk_max_lengths, start_row);
         
         start = end;
         chunk_num += 1;
@@ -231,7 +236,7 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>]) {
 // --- Query-Funktion ---
 pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-    let (query, headers) = build_column_query(&column_names, bereich)?;
+    let (query, headers) = build_column_query(&column_names, bereich.clone())?; // NEU
     
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
@@ -240,7 +245,16 @@ pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<
     
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    print_table_chunked(&headers, &data);
+    // Bestimme die Startzeilennummer für die Ausgabe
+    let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
+        // Erster Wert aus zeilen_bereiche
+        bereich.zeilen_bereiche[0].0
+    } else {
+        // von_zeile
+        bereich.von_zeile
+    };
+
+    print_table_chunked(&headers, &data, start_row_num);
     println!();
     Ok(())
 }
@@ -265,5 +279,6 @@ pub fn print_simple_table(headers: &[&str], data: &[Vec<&str>]) {
         }
     }
     
-    print_table(&headers_strings, data_strings, &max_lengths);
+    // Startzeilennummer für einfache Tabellen ist 1
+    print_table(&headers_strings, data_strings, &max_lengths, 1);
 }

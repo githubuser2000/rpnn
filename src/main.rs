@@ -56,7 +56,7 @@ pub fn test_simple_table() {
     println!("Data rows: {}", data.len());
 
     // Direkter Aufruf
-    print_table(&headers, data, &max_lengths);
+print_table(&headers, data, &max_lengths, 1); // NEU (Startzeile 1 für Test)    print_table(&headers, data, &max_lengths);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,15 +72,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     
-    let (dashes, params, bereich) = parse_cli_args(&args);
-    
+    let (_dashes, _params, bereich) = parse_cli_args(&args); // NEU (oder nur `bereich` verwenden)
     // Beispiel-Struktur erstellen
     let meine_liste = data::create_example_structure();
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
     print_recursive(&meine_liste, 0);
     
     // CSV in SQLite importieren
-    let mut projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR")); // NEU (mut entfernen)
     let pfad1 = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
     let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
     let dateien = [
