@@ -233,182 +233,30 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: 
     }
 }
 
-
-// In table_printer.rs - query_column_by_index Funktion anpassen:
-
-pub fn query_column_by_index(
-    conn: &Connection,
-    bereich: crate::cli::TextBereich,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔍 Table Printer mit Bereich: {:?}", bereich);
+// --- Query-Funktion ---
+pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
+    let column_names = get_column_names(conn)?;
+    let (query, headers) = build_column_query(&column_names, bereich.clone())?; // NEU
     
-    // Hole Spaltennamen
-    let column_names = crate::column_manager::get_column_names(conn)?;
-    println!("📊 Tabelle hat {} Spalten", column_names.len());
-    
-    // Wenn diskrete Spaltenbereiche vorhanden sind, verwende spezielle Funktion
-    let (query, selected_names) = if !bereich.spalten_bereiche.is_empty() {
-        println!("📊 Verwende diskrete Spaltenbereiche: {:?}", bereich.spalten_bereiche);
-        
-        // Spaltennummern aus den Bereichen extrahieren
-        let mut spalten_nummern = Vec::new();
-        for &(von, bis) in &bereich.spalten_bereiche {
-            for i in von..=bis {
-                spalten_nummern.push(i);
-            }
-        }
-        
-        // Sortieren und Duplikate entfernen
-        spalten_nummern.sort();
-        spalten_nummern.dedup();
-        
-        println!("📈 Zu verarbeitende Spaltennummern: {:?}", spalten_nummern);
-        
-        crate::column_manager::build_column_query_with_specific_columns(
-            &column_names,
-            &spalten_nummern,
-            &bereich.zeilen_bereiche
-        )?
-    } else {
-        // Normale Verarbeitung
-        crate::column_manager::build_column_query(&column_names, bereich)?
-    };
-    
-    println!("📋 Anzahl ausgewählter Spalten: {}", selected_names.len());
-    
-    // Rest der Funktion bleibt gleich...
-    let mut stmt = conn.prepare(&query)?;
-    
-    // Spaltennamen für die Ausgabe
-    println!("\n📊 ERGEBNIS für '{}' -> '{}':", 
-             "Oberkategorie", "Unterkategorie"); // Hier könntest du die tatsächlichen Namen einfügen
-    
-    // Tabellenkopf drucken
-    print!("┌");
-    for (i, name) in selected_names.iter().enumerate() {
-        let clean_name = name.trim_matches('"');
-        let width = clean_name.len().max(15);
-        for _ in 0..width + 2 {
-            print!("─");
-        }
-        if i < selected_names.len() - 1 {
-            print!("┬");
-        }
-    }
-    println!("┐");
-    
-    // Spaltennamen
-    print!("│");
-    for (i, name) in selected_names.iter().enumerate() {
-        let clean_name = name.trim_matches('"');
-        let width = clean_name.len().max(15);
-        print!(" {:width$} │", clean_name, width = width);
-    }
-    println!();
-    
-    // Trennlinie
-    print!("├");
-    for (i, name) in selected_names.iter().enumerate() {
-        let clean_name = name.trim_matches('"');
-        let width = clean_name.len().max(15);
-        for _ in 0..width + 2 {
-            print!("─");
-        }
-        if i < selected_names.len() - 1 {
-            print!("┼");
-        }
-    }
-    println!("┤");
-    
-    // Daten ausgeben
-    let mut rows = stmt.query([])?;
-    let mut row_count = 0;
-    
-    while let Some(row) = rows.next()? {
-        row_count += 1;
-        print!("│");
-        
-        for i in 0..selected_names.len() {
-            let value: String = row.get(i)?;
-            let clean_name = selected_names[i].trim_matches('"');
-            let width = clean_name.len().max(15);
-            print!(" {:width$} │", value, width = width);
-        }
-        println!();
-    }
-    
-    // Fußzeile
-    print!("└");
-    for (i, name) in selected_names.iter().enumerate() {
-        let clean_name = name.trim_matches('"');
-        let width = clean_name.len().max(15);
-        for _ in 0..width + 2 {
-            print!("─");
-        }
-        if i < selected_names.len() - 1 {
-            print!("┴");
-        }
-    }
-    println!("┘");
-    
-    println!("📈 Insgesamt {} Zeilen angezeigt", row_count);
-    
-    Ok(())
-}
-
-// Neue Funktion für einzelne Zeilen
-fn print_table_with_exact_rows(
-    headers: &[String], 
-    data: &[Vec<String>], 
-    zeilen_bereiche: &[(usize, usize)]
-) {
-    // Extrahiere die tatsächlichen Zeilennummern
-    let zeilennummern: Vec<usize> = zeilen_bereiche.iter()
-        .map(|(start, _)| *start)
+    // Berechne Header-Längen mit Unicode-Unterstützung
+    let header_lengths: Vec<usize> = headers.iter()
+        .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
     
-    println!("📋 Zeige Zeilen mit exakten Nummern: {:?}", zeilennummern);
-    
-    // Erstelle Tabellenzeilen mit den exakten Zeilennummern
-    let mut table_rows = Vec::new();
-    
-    // Header-Zeile (Zeile 0)
-    let mut header_cells = Vec::new();
-    for header in headers {
-        let cell = TableCell::new(header.clone(), 20); // Beispielbreite
-        header_cells.push(cell);
-    }
-    table_rows.push(TableRow::new(header_cells, 0, 0));
-    
-    // Datenzeilen mit exakten Zeilennummern
-    for (i, row_data) in data.iter().enumerate() {
-        if i < zeilennummern.len() {
-            let actual_line_num = zeilennummern[i];
-            let mut cells = Vec::new();
-            for cell_content in row_data {
-                let cell = TableCell::new(cell_content.clone(), 20);
-                cells.push(cell);
-            }
-            table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
-        }
-    }
-    
-    // Ausgabe mit CliOutput
-    let tables = Tables::new(Some(100));
-    let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
-    output.color_enabled = true;
-    output.table_width = 80;
-    output.line_numbering = true;
-    output.one_table = true;
-    
-    let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
-    let max_lines = table_rows.iter()
-        .map(|row| row.max_line_count())
-        .max()
-        .unwrap_or(1);
-    let rows_range = 0..max_lines;
-    
-    output.cli_out(&display_lines, &table_rows, rows_range);
+    let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
+
+    // Bestimme die Startzeilennummer für die Ausgabe
+    let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
+        // Erster Wert aus zeilen_bereiche
+        bereich.zeilen_bereiche[0].0
+    } else {
+        // von_zeile
+        bereich.von_zeile
+    };
+
+    print_table_chunked(&headers, &data, start_row_num);
+    println!();
+    Ok(())
 }
 
 // --- Zusätzliche Hilfsfunktion für einfache Tabellen ---
