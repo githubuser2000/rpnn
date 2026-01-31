@@ -21,9 +21,9 @@ pub fn build_column_query(
     let mut selected_names = Vec::new();
     let mut spalten_nummern = Vec::new();
 
-    // Fall 1: Diskret definierte Spaltenbereiche (z.B. [(10,10), (18,18), (42,42)])
+    // KONSISTENTE LOGIK: PRIORITÄT für diskrete Spaltenbereiche
     if !bereich.spalten_bereiche.is_empty() {
-        println!("📊 Verwende diskrete Spaltenbereiche");
+        println!("📊 Verwende diskrete Spaltenbereiche: {:?}", bereich.spalten_bereiche);
         
         for &(von, bis) in &bereich.spalten_bereiche {
             for i in von..=bis {
@@ -36,24 +36,11 @@ pub fn build_column_query(
         spalten_nummern.dedup();
         
         println!("📈 Eindeutige Spaltennummern: {:?}", spalten_nummern);
-        
-        // Überprüfen ob Spaltennummern existieren
-        for &nummer in &spalten_nummern {
-            if nummer == 0 || nummer > column_names.len() {
-                return Err(format!("Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
-                                   nummer, column_names.len()).into());
-            }
-            
-            if let Some(name) = column_names.get(nummer.saturating_sub(1)) {
-                selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
-            } else {
-                return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());
-            }
-        }
     } 
-    // Fall 2: Kontinuierlicher Spaltenbereich (Legacy)
+    // FALLBACK: Kontinuierlicher Spaltenbereich (nur wenn keine diskreten Bereiche)
     else if bereich.von_spalte > 0 && bereich.bis_spalte > 0 {
-        println!("📊 Verwende kontinuierlichen Spaltenbereich");
+        println!("📊 Keine diskreten Spaltenbereiche - verwende kontinuierlichen Bereich: {} bis {}", 
+                 bereich.von_spalte, bereich.bis_spalte);
         
         // Validate column indices
         if bereich.von_spalte == 0 || bereich.bis_spalte == 0 {
@@ -64,26 +51,28 @@ pub fn build_column_query(
             return Err("Startspalte muss kleiner oder gleich Endspalte sein".into());
         }
 
-        // Collect selected column names
+        // Collect column numbers for continuous range
         for i in bereich.von_spalte..=bereich.bis_spalte {
             spalten_nummern.push(i);
-            
-            if let Some(name) = column_names.get(i.saturating_sub(1)) {
-                selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
-            } else {
-                return Err(format!("Spaltennummer {} nicht gefunden", i).into());
-            }
         }
     }
     // Fall 3: Keine Spalten angegeben - Standard auf Spalte 1
     else {
         println!("⚠️  Keine Spalten angegeben - verwende Spalte 1 als Standard");
         spalten_nummern.push(1);
+    }
+    
+    // Jetzt: Überprüfen ob alle Spaltennummern existieren und Namen holen
+    for &nummer in &spalten_nummern {
+        if nummer == 0 || nummer > column_names.len() {
+            return Err(format!("Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
+                               nummer, column_names.len()).into());
+        }
         
-        if let Some(name) = column_names.get(0) {
+        if let Some(name) = column_names.get(nummer.saturating_sub(1)) {
             selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
         } else {
-            return Err("Tabelle hat keine Spalten".into());
+            return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());
         }
     }
     
@@ -91,16 +80,20 @@ pub fn build_column_query(
     println!("✅ Ausgewählte Spalten: {}", columns_clause);
     println!("📋 Anzahl ausgewählter Spalten: {}", selected_names.len());
 
-    // Determine which rows to select
+    // KONSISTENTE LOGIK für Zeilen: PRIORITÄT für diskrete Zeilenbereiche
     let query = if !bereich.zeilen_bereiche.is_empty() {
         // PRIORITÄT: Use zeilen_bereiche if it has entries (individual rows/ranges)
         println!("🔍 Verwende zeilen_bereiche für Zeilenauswahl: {:?}", bereich.zeilen_bereiche);
         build_query_with_row_ranges_enhanced(&columns_clause, &bereich.zeilen_bereiche)
-    } else {
-        // FALLBACK: Use continuous row range (von_zeile/bis_zeile)
-        println!("📊 Verwende kontinuierlichen Zeilenbereich: {} bis {}", 
+    } else if bereich.von_zeile > 0 && bereich.bis_zeile > 0 {
+        // FALLBACK: Use continuous row range (nur wenn keine diskreten Bereiche)
+        println!("📊 Keine diskreten Zeilenbereiche - verwende kontinuierlichen Bereich: {} bis {}", 
                  bereich.von_zeile, bereich.bis_zeile);
         build_query_with_continuous_range(&columns_clause, &bereich)
+    } else {
+        // STANDARD: Alle Zeilen
+        println!("📊 Keine Zeileneinschränkung - verwende alle Zeilen");
+        Ok(format!("SELECT {} FROM csv_data", columns_clause))
     }?;
 
     println!("✅ Generierte Query: {}", query);
