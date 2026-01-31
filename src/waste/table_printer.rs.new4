@@ -1,0 +1,231 @@
+use terminal_size::{terminal_size, Width as TermWidth};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use crate::cli::TextBereich;
+use crate::column_manager::{get_column_names, build_column_query};
+use crate::data_fetcher::fetch_data_with_stats;
+use rusqlite::Connection;
+
+const MIN_COLUMN_WIDTH: usize = 10;
+const MAX_COLUMN_WIDTH: usize = 34;
+const MAX_COLUMNS_CAP: usize = 6;
+const COLUMN_OVERHEAD: usize = 3; // 1 space left, 1 space right, 1 │
+
+#[derive(Copy, Clone)]
+enum ColumnKind {
+    Id,
+    Number,
+    ShortText,
+    LongText,
+}
+
+pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
+    let column_names = get_column_names(conn)?;
+    let (query, headers) = build_column_query(&column_names, bereich)?;
+    
+    let (data, _max_lengths) = fetch_data_with_stats(
+        conn,
+        &query,
+        headers.len(),
+        &headers.iter().map(|h| UnicodeWidthStr::width(h.as_str())).collect::<Vec<_>>()
+    )?;
+
+    // Jetzt unsere neue Table-Druck-Funktion verwenden:
+    print_table_chunked_full(&headers, &data);
+
+    println!();
+    Ok(())
+}
+
+fn infer_column_kind(header: &str) -> ColumnKind {
+    let h = header.to_lowercase();
+    if h == "id" || h.ends_with("_id") {
+        ColumnKind::Id
+    } else if h.contains("count") || h.contains("num") {
+        ColumnKind::Number
+    } else if h.contains("name") || h.contains("title") {
+        ColumnKind::ShortText
+    } else {
+        ColumnKind::LongText
+    }
+}
+
+fn min_width_for_kind(kind: ColumnKind) -> usize {
+    match kind {
+        ColumnKind::Id => 6,
+        ColumnKind::Number => 8,
+        ColumnKind::ShortText => 14,
+        ColumnKind::LongText => 20,
+    }
+}
+
+// UTF-8 truncate
+fn truncate_cell(content: &str, max_width: usize) -> String {
+    let mut width = 0;
+    let mut truncated = String::new();
+    for ch in content.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + ch_width > max_width {
+            truncated.push('…');
+            break;
+        }
+        truncated.push(ch);
+        width += ch_width;
+    }
+    truncated
+}
+
+// Berechnet, wie viele Spalten in die Bildschirmbreite passen
+fn compute_columns_per_table(term_width: usize, headers: &[String], max_lengths: &[usize]) -> usize {
+    let mut used_width = 0;
+    let mut cols = 0;
+    for (h, &w) in headers.iter().zip(max_lengths) {
+        let kind = infer_column_kind(h);
+        let min = min_width_for_kind(kind).max(MIN_COLUMN_WIDTH);
+        let col_width = w.max(min).min(MAX_COLUMN_WIDTH) + COLUMN_OVERHEAD;
+
+        if cols >= 2 && used_width + col_width > term_width {
+            break;
+        }
+        used_width += col_width;
+        cols += 1;
+        if cols >= MAX_COLUMNS_CAP {
+            break;
+        }
+    }
+    if headers.len() < 2 {
+        headers.len()
+    } else {
+        cols.clamp(2, MAX_COLUMNS_CAP)
+    }
+}
+
+// --- Druckt eine Tabelle (ein Chunk) ---
+fn print_table_chunk(headers: &[String], data: &[Vec<String>]) {
+    // Spaltenbreiten berechnen
+    let col_widths: Vec<usize> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            let max_cell = data
+                .iter()
+                .map(|row: &Vec<String>| row.get(i).map(|s| s.as_str()).unwrap_or(""))
+                .chain(std::iter::once(h.as_str()))
+                .map(|c| UnicodeWidthStr::width(c))
+                .max()
+                .unwrap_or(0);
+            max_cell.min(MAX_COLUMN_WIDTH)
+        })
+        .collect();
+
+    // Zellen in Zeilen aufsplitten (multi-line)
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    for row in data.iter() {
+        // Bestimme für jede Zelle, wie viele Zeilen nötig
+        let mut cell_lines: Vec<Vec<String>> = Vec::new();
+        let mut max_lines = 1;
+        for (i, cell) in row.iter().enumerate() {
+            let w = col_widths[i];
+            let mut lines = Vec::new();
+            let mut current = String::new();
+            let mut width = 0;
+            for ch in cell.chars() {
+                let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+                if width + ch_width > w {
+                    lines.push(current.clone());
+                    current.clear();
+                    width = 0;
+                }
+                current.push(ch);
+                width += ch_width;
+            }
+            if !current.is_empty() {
+                lines.push(current);
+            }
+            max_lines = max_lines.max(lines.len());
+            cell_lines.push(lines);
+        }
+
+        // Erzeuge Zeilen für diesen Datensatz
+        for line_idx in 0..max_lines {
+            let mut line: Vec<String> = Vec::new();
+            for (i, lines) in cell_lines.iter().enumerate() {
+                let content = lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
+                line.push(format!("{:width$}", content, width = col_widths[i]));
+            }
+            table_rows.push(line);
+        }
+    }
+
+    // Header
+    let header_line: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| format!("{:width$}", h, width = col_widths[i]))
+        .collect();
+
+    // Linien
+    let sep_top = col_widths
+        .iter()
+        .map(|w| "─".repeat(*w + 2))
+        .collect::<Vec<String>>()
+        .join("┬");
+    let sep_mid = col_widths
+        .iter()
+        .map(|w| "─".repeat(*w + 2))
+        .collect::<Vec<String>>()
+        .join("┼");
+    let sep_bottom = col_widths
+        .iter()
+        .map(|w| "─".repeat(*w + 2))
+        .collect::<Vec<String>>()
+        .join("┴");
+
+    println!("┌{}┐", sep_top);
+    println!("│ {} │", header_line.join(" │ "));
+    println!("├{}┤", sep_mid);
+    for row in table_rows {
+        println!("│ {} │", row.join(" │ "));
+    }
+    println!("└{}┘", sep_bottom);
+}
+
+// --- Druckt Tabelle in Chunks ---
+pub fn print_table_chunked_full(headers: &[String], data: &[Vec<String>]) {
+    let term_width = terminal_size().map(|(TermWidth(w), _)| w as usize).unwrap_or(100);
+
+    // max_lengths automatisch berechnen
+    let max_lengths: Vec<usize> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            data.iter()
+                .map(|row: &Vec<String>| row.get(i).map(|s| s.as_str()).unwrap_or(""))
+                .chain(std::iter::once(h.as_str()))
+                .map(|c| UnicodeWidthStr::width(c))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+
+    let mut start = 0;
+    while start < headers.len() {
+        let remaining_headers = &headers[start..];
+        let remaining_lengths = &max_lengths[start..];
+        let cols_per_table = compute_columns_per_table(term_width, remaining_headers, remaining_lengths);
+        let end = (start + cols_per_table).min(headers.len());
+
+        let chunk_headers = &headers[start..end];
+        let chunk_data: Vec<Vec<String>> = data
+            .iter()
+            .map(|row| {
+                let mut r = row[start..end].to_vec();
+                r.resize(end - start, "".to_string());
+                r
+            })
+            .collect();
+
+        print_table_chunk(chunk_headers, &chunk_data);
+
+        start = end;
+    }
+}

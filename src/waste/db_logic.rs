@@ -1,6 +1,4 @@
 use rusqlite::{Connection, Result};
-use crate::cli::TextBereich; // Angenommen, TextBereich ist in main oder lib definiert
-
 pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut stmt = conn.prepare("PRAGMA table_info(csv_data)")?;
     let names = stmt.query_map([], |row| row.get(1))?
@@ -14,6 +12,8 @@ pub fn fetch_data(conn: &Connection, names: &[String], bereich: &TextBereich) ->
         bereich.bis_zeile - bereich.von_zeile
     } else { 0 };
 
+    println!( "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
+        targets_sql, anzahl, bereich.von_zeile);
     let query = format!(
         "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
         targets_sql, anzahl, bereich.von_zeile

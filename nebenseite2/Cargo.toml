@@ -1,0 +1,11 @@
+[package]
+name = "functions_8_to_23"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+term_size = "1.0.0-beta1"
+unicode-width = "0.1"
+
+[features]
+rich = []  # Optional für cliout_rich
