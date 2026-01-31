@@ -73,7 +73,7 @@ pub fn parse_cli_args(
                 if let Some((_, ober)) = iter.next() {
                     if let Some((_, unter)) = iter.next() {
                         println!("🔍 Parameter --spalten: '{}' '{}'", ober, unter);
-                        
+                        bereich.spalten_gesucht = true; 
                         gesuchte_oberkategorie = ober.clone();
                         gesuchte_unterkategorie = unter.clone();
                         automatische_spalten_suche = true;
@@ -91,6 +91,7 @@ pub fn parse_cli_args(
                     if let Some((_, name2)) = iter.next() {
                         spalten_namen.oberkategorie = name1.clone();
                         spalten_namen.unterkategorie = name2.clone();
+                        bereich.spalten_gesucht = true; 
                     }
                 }
             }
@@ -124,6 +125,7 @@ pub fn parse_cli_args(
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
                         bereich.von_spalte = zahl;
                         bereich.spalten_bereiche.push((zahl, zahl));
+                        bereich.spalten_gesucht = true; 
                     }
                 }
             }
@@ -134,6 +136,7 @@ pub fn parse_cli_args(
                         bereich.bis_spalte = zahl;
                         if let Some(last) = bereich.spalten_bereiche.last_mut() {
                             last.1 = zahl;
+                            bereich.spalten_gesucht = true; 
                         }
                     }
                 }
