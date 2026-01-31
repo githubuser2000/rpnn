@@ -13,7 +13,7 @@ pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::e
 
 pub fn build_column_query(
     column_names: &[String],
-    mut bereich: TextBereich,
+    bereich: &mut TextBereich, // mutable reference
     wurde_spalten_gesucht: bool,  // NEU: Wurde --spalten angegeben?
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
     if !bereich.spalten_gesucht {
@@ -55,6 +55,7 @@ pub fn build_column_query(
     
     // KONSISTENTE LOGIK: PRIORITÄT für diskrete Spaltenbereiche
     if !bereich.spalten_bereiche.is_empty() {
+        bereich.spalten_gefunden = true;
         println!("📊 MODUS: Diskrete Spaltenbereiche (explizit gefunden)");
         println!("  Eingabe-Bereiche: {:?}", bereich.spalten_bereiche);
         println!("  Anzahl Bereiche: {}", bereich.spalten_bereiche.len());
