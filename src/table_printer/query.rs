@@ -13,15 +13,13 @@ pub fn query_column_by_index(
     mut bereich: TextBereich, // mutable copy
     wurde_spalten_gesucht: bool,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> { // <-- TextBereich zurückgeben
-    if !bereich.spalten_gefunden {
-        println!("❌ FEHLER: Spalten wurden nicht gefunden!");
-        println!("Unbekannt ob gesucht: --...spalten... aber keine Spalten in TextBereich gefunden");
-        //return Err("Spalten wurden gesucht aber nicht gefunden".into());
-        process::exit(1);
-    }
     let column_names = get_column_names(conn)?;
     
     let (query, headers) = build_column_query(&column_names, &mut bereich, wurde_spalten_gesucht)?;
+    if !bereich.spalten_gefunden {
+        println!("❌ FEHLER: Spalten wurden nicht gefunden!");
+        process::exit(1);
+    }
     
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
@@ -33,6 +31,6 @@ pub fn query_column_by_index(
 
     // KORREKTUR: Übergabe von zeilen_bereiche statt start_row_num
     print_table_chunked(&headers, &data, &bereich.zeilen_bereiche);
-    println!();
+    println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
     Ok(bereich)
 }
