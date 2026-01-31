@@ -1,0 +1,262 @@
+#+TITLE: Gesamter Kontrollfluss des Programms (nach Umstellung auf zeilen_bereiche)
+#+AUTHOR: Analyse
+#+OPTIONS: toc:t num:t
+
+* Überblick
+
+Diese Datei beschreibt den *vollständigen Kontroll- und Datenfluss*
+des Programms – vom Programmstart bis zur Ausgabe –
+nach der Umstellung auf:
+
+#+BEGIN_SRC rust
+zeilen_bereiche: Vec<(usize, usize)>
+#+END_SRC
+
+Es existieren *keine* Felder ~von_zeile~ oder ~bis_zeile~ mehr.
+
+---
+
+* 0. Konzeptionelles Gesamtbild
+
+Das Programm folgt immer demselben Ablauf:
+
+1. CLI-Argumente einlesen
+2. Argumente parsen
+3. Zeilen- und Spaltenangaben erkennen
+4. Zeilenbereiche in ~TextBereich~ *akkumulieren*
+5. Fachlogik ausführen (Query / Table / Print)
+6. Ausgabe rendern
+
+Der frühere Fehler entstand durch *zwei konkurrierende Repräsentationen*
+für Zeilenbereiche.  
+Jetzt existiert *genau eine*.
+
+---
+
+* 1. Programmstart (main.rs)
+
+#+BEGIN_SRC rust
+fn main() {
+    let args = std::env::args().collect::<Vec<_>>();
+    cli::run(args);
+}
+#+END_SRC
+
+** Kontrollfluss
+
+- Einstiegspunkt des Programms
+- Liest CLI-Argumente
+- Übergibt sie an die CLI-Schicht
+- Hat *keinerlei Wissen* über Zeilen oder Spalten
+
+---
+
+* 2. CLI-Dispatcher (cli/mod.rs)
+
+#+BEGIN_SRC rust
+let bereich = parse_args(&args)?;
+#+END_SRC
+
+** Kontrollfluss
+
+- Bestimmt den Modus (table, query, print, …)
+- Ruft den Argument-Parser auf
+- Erhält ein vollständig initialisiertes ~TextBereich~
+- Ab hier ist ~TextBereich~ die *einzige Wahrheit*
+
+---
+
+* 3. Argument-Parsing (cli/parser.rs)
+
+** 3.1 Initialisierung
+
+#+BEGIN_SRC rust
+let mut bereich = TextBereich {
+    zeilen_bereiche: Vec::new(),
+    spalten_bereiche: Vec::new(),
+};
+#+END_SRC
+
+- Keine Default-Ranges
+- Leer bedeutet: *keine Einschränkung*
+
+---
+
+** 3.2 Iteration über CLI-Argumente
+
+#+BEGIN_SRC rust
+for arg in args {
+#+END_SRC
+
+Jedes Argument wird unabhängig verarbeitet.
+
+---
+
+** 3.3 Erkennung von Zeilenangaben
+
+#+BEGIN_SRC rust
+if is_zeilen_angabe(&arg) {
+#+END_SRC
+
+- Kontrollfluss verzweigt
+- Andere Argumente werden ignoriert oder separat behandelt
+
+---
+
+** 3.4 Parsing der Zeilenangabe
+
+Beispiele:
+
+| CLI-Argument | Ergebnis                     |
+|-------------+------------------------------|
+| "3"         | (3,3)                        |
+| "5-10"      | (5,10)                       |
+| "1,4,7-9"   | ((1,1),(4,4),(7,9))          |
+
+#+BEGIN_SRC rust
+let ranges = parse_zeilen(arg);
+#+END_SRC
+
+---
+
+** 3.5 Akkumulation der Zeilenbereiche (zentraler Punkt)
+
+#+BEGIN_SRC rust
+for (von, bis) in ranges {
+    bereich.zeilen_bereiche.push((von, bis));
+}
+#+END_SRC
+
+- Keine Ersetzung
+- Kein Überschreiben
+- Jede Angabe ist additiv
+- Mehrfachangaben funktionieren automatisch
+
+---
+
+* 4. Zustand nach dem Parsing
+
+Beispiel:
+
+#+BEGIN_EXAMPLE
+--zeilen 1-3 7 10-12
+#+END_EXAMPLE
+
+Interner Zustand:
+
+#+BEGIN_SRC rust
+TextBereich {
+    zeilen_bereiche: vec![(1,3), (7,7), (10,12)],
+    spalten_bereiche: [...]
+}
+#+END_SRC
+
+- Kein alternativer Zustand
+- Keine implizite Priorität
+- Keine Sonderlogik
+
+---
+
+* 5. Übergabe an Fachlogik
+
+~TextBereich~ wird weitergereicht an:
+
+- column_manager
+- table_printer
+- query_engine
+
+** Wichtig
+
+- Diese Module interpretieren keine Eingaben
+- Sie *konsumieren* ausschließlich die vorhandenen Bereiche
+
+---
+
+* 6. Einheitliche Nutzung der Zeilenbereiche
+
+Dieses Muster gilt *überall* im Projekt:
+
+#+BEGIN_SRC rust
+for (von, bis) in &bereich.zeilen_bereiche {
+    for zeile in *von..=*bis {
+        // Fachlogik
+    }
+}
+#+END_SRC
+
+- Keine If-Verzweigungen
+- Keine Prioritätslogik
+- Keine impliziten Annahmen
+
+---
+
+* 7. Ausgabe / Rendering
+
+Beispiel aus dem Table-Printer:
+
+#+BEGIN_SRC rust
+for (von, bis) in &bereich.zeilen_bereiche {
+    for zeile in *von..=*bis {
+        render_row(zeile);
+    }
+}
+#+END_SRC
+
+- Deterministische Reihenfolge
+- Vollständig erklärbarer Ablauf
+
+---
+
+* 8. Warum der alte Bug unmöglich ist
+
+** Früher
+
+- Zwei konkurrierende Repräsentationen:
+  - ~von_zeile / bis_zeile~
+  - ~zeilen_bereiche~
+- Default-Werte wie ~0..0~ hatten Bedeutung
+- Implizite Prioritätsentscheidungen
+
+** Jetzt
+
+- Genau *eine* Repräsentation
+- Keine Default-Ranges mit Semantik
+- Kein Kontrollfluss, der wählen muss
+
+#+BEGIN_QUOTE
+Der fehlerhafte Zustand existiert nicht mehr im Typensystem.
+#+END_QUOTE
+
+---
+
+* 9. Mentales Modell
+
+Nicht mehr denken:
+
+#+BEGIN_QUOTE
+"Habe ich eine Range oder mehrere?"
+#+END_QUOTE
+
+Sondern:
+
+#+BEGIN_QUOTE
+Ich habe *immer* eine Liste von Ranges.
+#+END_QUOTE
+
+Ein einzelner Bereich ist nur:
+
+#+BEGIN_SRC rust
+vec![(von, bis)]
+#+END_SRC
+
+---
+
+* 10. Gesamtablauf in einem Satz
+
+#+BEGIN_QUOTE
+CLI → Parser → akkumulierte Zeilenbereiche → lineare Iteration → Ausgabe
+#+END_QUOTE
+
+Ohne Sonderfälle.  
+Ohne Prioritäten.  
+Ohne implizite Defaults.
