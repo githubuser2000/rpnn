@@ -13,18 +13,13 @@ pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<
     
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
-        .map(|h| UnicodeWidthStr::width(h.as_str()))
+        .map(|h| h.chars().count())  // Einfacher für Test
         .collect();
     
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    let start_row_num = if !bereich.zeilen_bereiche.is_empty() {
-        bereich.zeilen_bereiche[0].0
-    } else {
-        bereich.von_zeile
-    };
-
-    print_table_chunked(&headers, &data, start_row_num);
+    // ÄNDERUNG: zeilen_bereiche direkt übergeben
+    print_table_chunked(&headers, &data, &bereich.zeilen_bereiche);
     println!();
     Ok(())
 }

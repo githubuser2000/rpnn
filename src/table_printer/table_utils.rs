@@ -49,41 +49,79 @@ pub fn convert_to_table_rows(
     headers: &[String], 
     data: &[Vec<String>], 
     column_widths: &[usize],
-    start_row_num: usize,
+    zeilen_bereiche: &[(usize, usize)],  // ÄNDERUNG: Parameter hinzugefügt
 ) -> Vec<TableRow> {
     let mut table_rows = Vec::new();
     
     // Header-Zeile erstellen
     let mut header_cells = Vec::new();
     for (i, header) in headers.iter().enumerate() {
-        let width = if i < column_widths.len() { column_widths[i] } else { MAX_COLUMN_WIDTH };
+        let width = if i < column_widths.len() { column_widths[i] } else { 30 };
         let cell = TableCell::new(header.clone(), width);
         header_cells.push(cell);
     }
     table_rows.push(TableRow::new(header_cells, 0, 0));
     
-    // Datenzeilen erstellen
-    for (row_idx, row_data) in data.iter().enumerate() {
-        let actual_line_num = start_row_num + row_idx;
-        let mut cells = Vec::new();
-        for (i, cell_content) in row_data.iter().enumerate() {
-            let width = if i < column_widths.len() { column_widths[i] } else { MAX_COLUMN_WIDTH };
-            let cell = TableCell::new(cell_content.clone(), width);
-            cells.push(cell);
+    // Datenzeilen erstellen MIT KORREKTEN ZEILENNUMMERN
+    if zeilen_bereiche.is_empty() {
+        // Fall 1: Kontinuierliche Zeilen
+        for (row_idx, row_data) in data.iter().enumerate() {
+            let actual_line_num = 1 + row_idx;  // 1-basiert
+            let mut cells = Vec::new();
+            for (i, cell_content) in row_data.iter().enumerate() {
+                let width = if i < column_widths.len() { column_widths[i] } else { 30 };
+                let cell = TableCell::new(cell_content.clone(), width);
+                cells.push(cell);
+            }
+            while cells.len() < headers.len() {
+                let width = if cells.len() < column_widths.len() { 
+                    column_widths[cells.len()] 
+                } else { 
+                    30 
+                };
+                cells.push(TableCell::new("".to_string(), width));
+            }
+            table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
         }
-        while cells.len() < headers.len() {
-            let width = if cells.len() < column_widths.len() { 
-                column_widths[cells.len()] 
-            } else { 
-                MAX_COLUMN_WIDTH 
-            };
-            cells.push(TableCell::new("".to_string(), width));
+    } else {
+        // Fall 2: Diskontinuierliche Zeilen (RICHTIG!)
+        let mut all_row_numbers = Vec::new();
+        
+        // Alle Zeilennummern sammeln
+        for (von, bis) in zeilen_bereiche {
+            for zeile in *von..=*bis {
+                all_row_numbers.push(zeile);
+            }
         }
-        table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
+        
+        // Jeder Datenzeile ihre echte Zeilennummer zuweisen
+        for (row_idx, row_data) in data.iter().enumerate() {
+            if row_idx < all_row_numbers.len() {
+                let actual_line_num = all_row_numbers[row_idx];
+                
+                let mut cells = Vec::new();
+                for (i, cell_content) in row_data.iter().enumerate() {
+                    let width = if i < column_widths.len() { column_widths[i] } else { 30 };
+                    let cell = TableCell::new(cell_content.clone(), width);
+                    cells.push(cell);
+                }
+                while cells.len() < headers.len() {
+                    let width = if cells.len() < column_widths.len() { 
+                        column_widths[cells.len()] 
+                    } else { 
+                        30 
+                    };
+                    cells.push(TableCell::new("".to_string(), width));
+                }
+                
+                table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
+            }
+        }
     }
     
     table_rows
 }
+
 
 // --- Get terminal width ---
 pub fn get_terminal_width() -> usize {

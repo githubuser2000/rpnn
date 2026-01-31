@@ -8,7 +8,6 @@ use utils::print_recursive;
 use columnCategories_complete::lade_kategorie_map;  // Nur lade_kategorie_map importieren
 use cli::TextBereich;  // ODER: use cli::bereich::TextBereich;
 use retaAusgabe::{Tables, CliOutput, OutputSyntax};
-use std::collections::BTreeSet;
 mod retaAusgabe;
 mod cli;
 mod data;
@@ -21,12 +20,14 @@ mod ifIsZeilenAngabe;
 mod columnCategories_complete;
 
 pub fn test_simple_table() {
+
     // Direkt in main.rs testen
     let tables = Tables::new(Some(100));
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.cliout2("TEST: Dies sollte ausgegeben werden");
 
     println!("\n=== wurde oben TEST ausgegeben? EINFACHER TABELLEN-TEST ===");
+    
 
     // Erstelle einfache Testdaten
     let headers = vec![
@@ -59,7 +60,8 @@ pub fn test_simple_table() {
     println!("Data rows: {}", data.len());
     
     // Direkter Aufruf - nur EINEN Aufruf!
-    print_table(&headers, data, &max_lengths, 1); // Mit start_row = 1
+    let zeilen_bereiche: Vec<(usize, usize)> = vec![(1, 3)];  // Zeilen 1-3
+    print_table(&headers, data, &max_lengths, &zeilen_bereiche);
 }
 
 

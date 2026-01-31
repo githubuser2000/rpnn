@@ -9,12 +9,12 @@ use crate::table_printer::table_utils::{
 use crate::retaAusgabe::{CliOutput, Tables, OutputSyntax, TableRow};  // TableRow importiert
 
 // --- Print one table chunk (mit retaAusgabe) ---
-pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], start_row: usize) {
+pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], zeilen_bereiche: &[(usize, usize)]) {  // ÄNDERUNG
     let tables = Tables::new(Some(100));
     let term_width = get_terminal_width();
     
     let column_widths = compute_column_widths(headers, max_lengths, term_width);
-    let table_rows = convert_to_table_rows(headers, &data, &column_widths, start_row);
+    let table_rows = convert_to_table_rows(headers, &data, &column_widths, zeilen_bereiche);  // ÄNDERUNG
     
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;
@@ -25,7 +25,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
     
     let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
     let max_lines_in_cells = table_rows.iter()
-        .map(|row: &TableRow| row.max_line_count())  // Jetzt sollte TableRow bekannt sein
+        .map(|row: &TableRow| row.max_line_count())
         .max()
         .unwrap_or(1);
     let rows_range = 0..max_lines_in_cells;
@@ -33,8 +33,8 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
     output.cli_out(&display_lines, &table_rows, rows_range);
 }
 
-// --- Print table in automatic chunks (angepasst für retaAusgabe) ---
-pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: usize) {
+// ÄNDERUNG auch hier:
+pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bereiche: &[(usize, usize)]) {  // Parameter geändert
     let term_width = get_terminal_width();
     let max_lengths = compute_max_lengths(headers, data);
 
@@ -71,9 +71,12 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], start_row: 
             println!("{}", "─".repeat(term_width));
         }
         
-        print_table(chunk_headers, chunk_data, chunk_max_lengths, start_row);
+        // ÄNDERUNG: zeilen_bereiche übergeben
+        print_table(chunk_headers, chunk_data, chunk_max_lengths, zeilen_bereiche);
         
         start = end;
         chunk_num += 1;
     }
 }
+
+
