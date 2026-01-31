@@ -1,6 +1,7 @@
 // file: column_manager.rs
 use rusqlite::Connection;
 use crate::cli::TextBereich;
+use std::process;
 
 pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut stmt = conn.prepare("PRAGMA table_info(csv_data)")?;
@@ -15,6 +16,10 @@ pub fn build_column_query(
     bereich: TextBereich,
     wurde_spalten_gesucht: bool,  // NEU: Wurde --spalten angegeben?
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
+    if !bereich.spalten_gesucht {
+        println!("Es wurde kein Spalten-Input angegeben.");
+        process::exit(1);
+    }
     println!("=== 🔍 START Build Query ===");
     println!("📊 Eingabe-Daten:");
     println!("  - Verfügbare Spalten insgesamt: {}", column_names.len());
