@@ -179,7 +179,8 @@ pub fn parse_cli_args(
                 &gesuchte_unterkategorie
             );
             
-            if gefundene_spalten.is_empty() {
+            if !gefundene_spalten.is_empty() {
+                /*
                 println!("❌ Keine Spaltennummern gefunden für '{}' → '{}'", 
                          gesuchte_oberkategorie, gesuchte_unterkategorie);
                 
@@ -207,7 +208,9 @@ pub fn parse_cli_args(
                 bereich.spalten_bereiche.push((1, 1));
                 bereich.von_spalte = 1;
                 bereich.bis_spalte = 1;
-            } else {
+                panic!("Keine Spalten gefunden für: '{}' → '{}'",
+           gesuchte_oberkategorie, gesuchte_unterkategorie);
+            } else {*/
                 println!("✅ {} Spaltennummern gefunden", gefundene_spalten.len());
                 
                 // Spaltenbereiche setzen

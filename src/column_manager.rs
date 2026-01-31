@@ -13,6 +13,7 @@ pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::e
 pub fn build_column_query(
     column_names: &[String],
     bereich: TextBereich,
+    wurde_spalten_gesucht: bool,  // NEU: Wurde --spalten angegeben?
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
     println!("=== 🔍 START Build Query ===");
     println!("📊 Eingabe-Daten:");
@@ -22,6 +23,7 @@ pub fn build_column_query(
     println!("  - von_spalte: {}, bis_spalte: {}", bereich.von_spalte, bereich.bis_spalte);
     println!("  - Zeilenbereiche: {:?}", bereich.zeilen_bereiche);
     println!("  - von_zeile: {}, bis_zeile: {}", bereich.von_zeile, bereich.bis_zeile);
+    println!("  - Wurde --spalten angegeben: {}", wurde_spalten_gesucht);
     
     // Debug: Zeige erste 10 verfügbare Spaltennamen
     println!("\n📋 Verfügbare Spaltennamen (erste 15):");
@@ -36,10 +38,21 @@ pub fn build_column_query(
     let mut spalten_nummern = Vec::new();
 
     println!("\n=== 🔧 SPALTENAUSWAHL ===");
+    
+    // KRITISCHE PRÜFUNG 1: Wurde --spalten angegeben aber nichts gefunden?
+    if wurde_spalten_gesucht && bereich.spalten_bereiche.is_empty() {
+        println!("❌ FATALER FEHLER:");
+        println!("  --spalten wurde in CLI angegeben, aber keine Spalten gefunden!");
+        println!("  Bitte überprüfen Sie die Kategorie-Namen.");
+        println!("  Beispiel: mein-rpnn --spalten Menschliches Motive");
+        return Err("Keine Spalten für angegebene Kategorie gefunden".into());
+    }
+    
     // KONSISTENTE LOGIK: PRIORITÄT für diskrete Spaltenbereiche
     if !bereich.spalten_bereiche.is_empty() {
-        println!("📊 MODUS: Diskrete Spaltenbereiche");
+        println!("📊 MODUS: Diskrete Spaltenbereiche (explizit gefunden)");
         println!("  Eingabe-Bereiche: {:?}", bereich.spalten_bereiche);
+        println!("  Anzahl Bereiche: {}", bereich.spalten_bereiche.len());
         
         for &(von, bis) in &bereich.spalten_bereiche {
             println!("  Verarbeite Bereich {} bis {}", von, bis);
@@ -65,17 +78,19 @@ pub fn build_column_query(
     } 
     // FALLBACK: Kontinuierlicher Spaltenbereich (nur wenn keine diskreten Bereiche)
     else if bereich.von_spalte > 0 && bereich.bis_spalte > 0 {
-        println!("📊 MODUS: Kontinuierlicher Spaltenbereich (Fallback)");
+        println!("📊 MODUS: Kontinuierlicher Spaltenbereich (manuell angegeben)");
         println!("  Keine diskreten Spaltenbereiche gefunden");
         println!("  Verwende kontinuierlichen Bereich: {} bis {}", 
                  bereich.von_spalte, bereich.bis_spalte);
         
         // Validate column indices
         if bereich.von_spalte == 0 || bereich.bis_spalte == 0 {
+            println!("    ❌ FEHLER: Spaltenindizes müssen bei 1 beginnen");
             return Err("Spaltenindizes müssen bei 1 beginnen".into());
         }
 
         if bereich.von_spalte > bereich.bis_spalte {
+            println!("    ❌ FEHLER: Startspalte muss kleiner oder gleich Endspalte sein");
             return Err("Startspalte muss kleiner oder gleich Endspalte sein".into());
         }
 
@@ -86,12 +101,24 @@ pub fn build_column_query(
             println!("    → Spalte {}", i);
         }
     }
-    // Fall 3: Keine Spalten angegeben - Standard auf Spalte 1
+    // Fall 3: Keine Spalten angegeben - NUR wenn --spalten nicht verwendet wurde
     else {
+        // KRITISCHE PRÜFUNG 2: Wenn hierher, darf --spalten NICHT verwendet worden sein
+        if wurde_spalten_gesucht {
+            println!("❌ INTERNER FEHLER: --spalten wurde angegeben, aber keine Spalten verarbeitet");
+            return Err("Interner Fehler: Spalten wurden gesucht aber nicht verarbeitet".into());
+        }
+        
         println!("📊 MODUS: Standard-Spalte (Fallback)");
-        println!("⚠️  Keine Spalten angegeben - verwende Spalte 1 als Standard");
+        println!("ℹ️  Keine Spalten angegeben - verwende Spalte 1 als Standard");
         spalten_nummern.push(1);
         println!("  → Hinzugefügt Spalte 1");
+    }
+    
+    // KRITISCHE PRÜFUNG 3: Sind überhaupt Spaltennummern vorhanden?
+    if spalten_nummern.is_empty() {
+        println!("❌ FEHLER: Keine Spaltennummern ausgewählt");
+        return Err("Keine Spaltennummern ausgewählt".into());
     }
     
     println!("\n=== 🔎 SPALTENNAMEN ZUORDNUNG ===");
@@ -255,7 +282,7 @@ fn build_query_with_row_ranges_enhanced(
         
         let row_numbers_str = einzelne_zeilen
             .iter()
-            .map(|n| (n - 1).to_string())
+            .map(|n| (n - 1).to_string())  // 0-basiert für SQL
             .collect::<Vec<_>>()
             .join(", ");
             
@@ -345,11 +372,19 @@ pub fn build_column_query_with_specific_columns(
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
     println!("🔍 Baue Query mit spezifischen Spaltennummern: {:?}", spalten_nummern);
     
+    // PRÜFUNG: Sind Spaltennummern vorhanden?
+    if spalten_nummern.is_empty() {
+        println!("❌ FEHLER: Keine Spaltennummern angegeben");
+        return Err("Keine Spaltennummern angegeben".into());
+    }
+    
     let mut selected_names = Vec::new();
     
     // Überprüfen ob Spaltennummern existieren
     for &nummer in spalten_nummern {
         if nummer == 0 || nummer > column_names.len() {
+            println!("❌ FEHLER: Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
+                     nummer, column_names.len());
             return Err(format!("Spaltennummer {} existiert nicht (Tabelle hat {} Spalten)", 
                                nummer, column_names.len()).into());
         }
@@ -357,6 +392,7 @@ pub fn build_column_query_with_specific_columns(
         if let Some(name) = column_names.get(nummer.saturating_sub(1)) {
             selected_names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
         } else {
+            println!("❌ FEHLER: Spaltennummer {} nicht gefunden", nummer);
             return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());
         }
     }

@@ -19,17 +19,14 @@ mod table_printer;
 mod ifIsZeilenAngabe;
 mod columnCategories_complete;
 
+// In test_simple_table() in main.rs:
 pub fn test_simple_table() {
-
-    // Direkt in main.rs testen
     let tables = Tables::new(Some(100));
     let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
-    output.cliout2("TEST: Dies sollte ausgegeben werden");
+    output.cliout2("TEST: Dies sollte ausgegeben werden\n");
 
-    println!("\n=== wurde oben TEST ausgegeben? EINFACHER TABELLEN-TEST ===");
-    
+    println!("\n=== EINFACHER TABELLEN-TEST ===");
 
-    // Erstelle einfache Testdaten
     let headers = vec![
         "Name".to_string(),
         "Alter".to_string(),
@@ -42,7 +39,6 @@ pub fn test_simple_table() {
         vec!["Peter".to_string(), "22".to_string(), "Hamburg".to_string()],
     ];
 
-    // Berechne max_lengths
     let mut max_lengths = vec![0, 0, 0];
     for (i, header) in headers.iter().enumerate() {
         max_lengths[i] = max_lengths[i].max(header.len());
@@ -55,14 +51,12 @@ pub fn test_simple_table() {
         }
     }
     
-    println!("Headers: {:?}", headers);
-    println!("Max lengths: {:?}", max_lengths);
-    println!("Data rows: {}", data.len());
+    // Leere zeilen_bereiche für den Test (alle Zeilen)
+    let zeilen_bereiche: Vec<(usize, usize)> = Vec::new();
     
-    // Direkter Aufruf - nur EINEN Aufruf!
-    let zeilen_bereiche: Vec<(usize, usize)> = vec![(1, 3)];  // Zeilen 1-3
     print_table(&headers, data, &max_lengths, &zeilen_bereiche);
 }
+
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -189,7 +183,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let conn = import_csvs_to_sqlite(&dateien)?;
-    query_column_by_index(&conn, bereich)?;
+    let wurde_spalten_gesucht = args.iter().any(|arg| arg == "--spalten");
+    println!("🔍 Wurde --spalten angegeben: {}", wurde_spalten_gesucht);
+    query_column_by_index(&conn, bereich, wurde_spalten_gesucht)?;
 
     let column_names = get_column_names(&conn)?;
     println!("Die Tabelle hat {} Spalten.", column_names.len());

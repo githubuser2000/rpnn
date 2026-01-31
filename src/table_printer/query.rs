@@ -4,21 +4,26 @@ use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
 use crate::data_fetcher::fetch_data_with_stats;
 use crate::table_printer::printer::print_table_chunked;
-use unicode_width::UnicodeWidthStr;  // Import hinzugefügt
+use unicode_width::UnicodeWidthStr;
 
 // --- Query-Funktion ---
-pub fn query_column_by_index(conn: &Connection, bereich: TextBereich) -> Result<(), Box<dyn std::error::Error>> {
+pub fn query_column_by_index(
+    conn: &Connection, 
+    bereich: TextBereich,
+    wurde_spalten_gesucht: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-    let (query, headers) = build_column_query(&column_names, bereich.clone())?;
+    
+    let (query, headers) = build_column_query(&column_names, bereich.clone(), wurde_spalten_gesucht)?;
     
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
-        .map(|h| h.chars().count())  // Einfacher für Test
+        .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
     
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    // ÄNDERUNG: zeilen_bereiche direkt übergeben
+    // KORREKTUR: Übergabe von zeilen_bereiche statt start_row_num
     print_table_chunked(&headers, &data, &bereich.zeilen_bereiche);
     println!();
     Ok(())

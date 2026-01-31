@@ -9,14 +9,13 @@ use crate::table_printer::table_utils::{
 use crate::retaAusgabe::{CliOutput, Tables, OutputSyntax, TableRow};  // TableRow importiert
 
 // --- Print one table chunk (mit retaAusgabe) ---
-pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], zeilen_bereiche: &[(usize, usize)]) {  // ÄNDERUNG
+pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], zeilen_bereiche: &[(usize, usize)]) {
     let tables = Tables::new(Some(100));
     let term_width = get_terminal_width();
     
     let column_widths = compute_column_widths(headers, max_lengths, term_width);
-    let table_rows = convert_to_table_rows(headers, &data, &column_widths, zeilen_bereiche);  // ÄNDERUNG
-    
-    let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
+    let table_rows = convert_to_table_rows(headers, &data, &column_widths, zeilen_bereiche); // zeilen_bereiche übergeben!
+   let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;
     output.table_width = term_width;
     output.column_widths = column_widths.clone();

@@ -7,6 +7,7 @@ pub struct TextBereich {
     pub bis_spalte: usize,
     pub zeilen_bereiche: Vec<(usize, usize)>,
     pub spalten_bereiche: Vec<(usize, usize)>,
+    pub spalten_explizit_gefunden: bool,  // NEU: Wurden Spalten explizit gefunden?
 }
 
 impl Default for TextBereich {
@@ -18,9 +19,11 @@ impl Default for TextBereich {
             bis_spalte: 0,
             zeilen_bereiche: Vec::new(),
             spalten_bereiche: Vec::new(),
+            spalten_explizit_gefunden: false,  // Standard: nicht gefunden
         }
     }
 }
+
 
 // Optional: Hilfsmethoden für TextBereich
 impl TextBereich {
