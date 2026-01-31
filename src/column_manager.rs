@@ -13,7 +13,7 @@ pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::e
 
 pub fn build_column_query(
     column_names: &[String],
-    bereich: TextBereich,
+    mut bereich: TextBereich,
     wurde_spalten_gesucht: bool,  // NEU: Wurde --spalten angegeben?
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
     if !bereich.spalten_gesucht {
@@ -149,6 +149,7 @@ pub fn build_column_query(
             let quoted_name = format!("\"{}\"", name.replace("\"", "\"\""));
             selected_names.push(quoted_name.clone());
             println!("    ✅ OK: Spalte {} = '{}' → SQL: {}", nummer, name, quoted_name);
+
         } else {
             println!("    ❌ FEHLER: Spaltennummer {} nicht gefunden", nummer);
             return Err(format!("Spaltennummer {} nicht gefunden", nummer).into());

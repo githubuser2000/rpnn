@@ -177,11 +177,12 @@ pub fn parse_cli_args(
     if automatische_spalten_suche {
         if let Some(kategorie_map) = kategorie_map {
             // SUCHFUNKTION AUFRUFEN - KORREKTE SYNTAX
-            let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_kategorien(
+            // ERSETZEN durch exakte Suche:
+            let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
                 &gesuchte_oberkategorie,
                 &gesuchte_unterkategorie
             );
-            
+                       
             if !gefundene_spalten.is_empty() {
                 /*
                 println!("❌ Keine Spaltennummern gefunden für '{}' → '{}'", 
