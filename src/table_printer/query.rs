@@ -16,6 +16,7 @@ pub fn query_column_by_index(
     let column_names = get_column_names(conn)?;
     
     let (query, headers) = build_column_query(&column_names, &mut bereich, wurde_spalten_gesucht)?;
+    println!("Headerslänge {}", headers.len());
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);

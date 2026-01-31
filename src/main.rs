@@ -183,9 +183,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let conn = import_csvs_to_sqlite(&dateien)?;
-    let wurde_spalten_gesucht = args.iter().any(|arg| arg == "--spalten");
-    println!("🔍 Wurde --spalten angegeben: {}", wurde_spalten_gesucht);
-    query_column_by_index(&conn, bereich, wurde_spalten_gesucht)?;
+    //let wurde_spalten_gesucht = args.iter().any(|arg| arg == "--spalten");
+    //println!("🔍 Wurde --spalten angegeben: {}", wurde_spalten_gesucht);
+    let wurde_spalten_gesucht2 = bereich.spalten_gesucht2;
+
+    query_column_by_index(&conn, bereich, wurde_spalten_gesucht2)?;
 
     let column_names = get_column_names(&conn)?;
     println!("Die Tabelle hat {} Spalten.", column_names.len());
