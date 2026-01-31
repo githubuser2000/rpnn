@@ -100,11 +100,7 @@ pub fn build_column_query(
         // FALLBACK: Use continuous row range (von_zeile/bis_zeile)
         println!("📊 Verwende kontinuierlichen Zeilenbereich: {} bis {}", 
                  bereich.von_zeile, bereich.bis_zeile);
-        build_query_with_continuous_range(
-            &columns_clause, 
-            bereich.von_zeile, 
-            bereich.bis_zeile
-        )
+        build_query_with_continuous_range(&columns_clause, &bereich)
     }?;
 
     println!("✅ Generierte Query: {}", query);
@@ -114,20 +110,19 @@ pub fn build_column_query(
 
 fn build_query_with_continuous_range(
     columns_clause: &str,
-    von_zeile: usize,
-    bis_zeile: usize,
+    bereich: &TextBereich,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Validate row indices
-    if von_zeile == 0 {
+    if bereich.von_zeile == 0 {
         return Err("Zeilenindizes müssen bei 1 beginnen".into());
     }
 
-    if bis_zeile < von_zeile {
+    if bereich.bis_zeile < bereich.von_zeile {
         return Err("Endzeile muss größer oder gleich Startzeile sein".into());
     }
 
     // Calculate number of rows (inclusive range)
-    let anzahl = bis_zeile - von_zeile + 1;
+    let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
 
     if anzahl == 0 {
         return Err("Ungültiger Zeilenbereich".into());
@@ -138,7 +133,7 @@ fn build_query_with_continuous_range(
         "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
         columns_clause,
         anzahl,
-        von_zeile.saturating_sub(1)  // OFFSET is 0-based
+        bereich.von_zeile.saturating_sub(1)  // OFFSET is 0-based
     ))
 }
 
