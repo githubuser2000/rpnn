@@ -19,3 +19,5 @@ Makefile
 nebenseite/target/
 nebenseite/target
 target/
+**/debug/
+**/target/
