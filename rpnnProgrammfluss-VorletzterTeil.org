@@ -1,0 +1,265 @@
+#+TITLE: Kontrollfluss – 8. Automatische Spaltensuche (detailliert, mit table_printer)
+#+OPTIONS: toc:t num:t
+
+* Kontext: Wo wir uns im Gesamtablauf befinden
+
+Wir sind **nach**:
+
+- CLI-Parsing
+- Setzen von `--spalten`
+- Aufbau von `TextBereich`
+- Laden der Tabelle / Datenstruktur
+
+und **vor**:
+
+- Ausgabe
+- Query-Ausführung
+- expliziter Iteration über Zeilen
+
+Der relevante Zustand ist jetzt:
+
+#+BEGIN_SRC rust
+automatische_spalten_suche == true
+bereich.zeilen_bereiche.is_empty() == true
+gesuchte_oberkategorie == "…"
+gesuchte_unterkategorie == "…"
+#+END_SRC
+
+➡️ Das bedeutet:
+
+#+BEGIN_QUOTE
+Der Benutzer hat KEINE Zeilen angegeben,
+sondern erwartet, dass sie aus den Spalten abgeleitet werden.
+#+END_QUOTE
+
+---
+
+* 8. Automatische Spaltensuche – Zweck
+
+Die automatische Spaltensuche beantwortet exakt **eine** Frage:
+
+#+BEGIN_QUOTE
+Welche Zeilen sind relevant, weil sie Daten
+in bestimmten Spalten (Ober-/Unterkategorie) enthalten?
+#+END_QUOTE
+
+Sie ist also **keine Ausgabe-Logik**, sondern **Vorbereitungslogik**.
+
+---
+
+* 8.1 Einstiegspunkt: table_printer (neu)
+
+Neu bei dir:  
+Die automatische Spaltensuche wird **implizit über den table_printer ausgelöst**.
+
+Strukturell:
+
+#+BEGIN_EXAMPLE
+cli
+ → TextBereich (noch ohne Zeilen)
+ → table_printer::run / print / query
+   → interne Spaltensuche
+   → Ableitung der Zeilen
+#+END_EXAMPLE
+
+Das ist wichtig:
+- Die CLI weiß *nicht*, wie Spalten intern aussehen
+- Der table_printer weiß es
+
+---
+
+* 8.2 Datenbasis der Spaltensuche
+
+Im table_printer liegen vor:
+
+- Tabellenstruktur
+- Spaltenmetadaten
+- Zuordnung:
+  - Spalte → Werte
+  - Wert → Zeile
+
+Typisch (konzeptionell):
+
+#+BEGIN_SRC rust
+struct Spalte {
+    oberkategorie: String,
+    unterkategorie: String,
+    werte: Vec<Cell>,
+}
+#+END_SRC
+
+Der table_printer kann also fragen:
+
+#+BEGIN_QUOTE
+Gibt es eine Spalte mit diesen Kategorien?
+Und wenn ja: in welchen Zeilen kommt sie vor?
+#+END_QUOTE
+
+---
+
+* 8.3 Filterphase: Finden der passenden Spalten
+
+Erster Teil der automatischen Suche:
+
+#+BEGIN_SRC rust
+for spalte in alle_spalten {
+    if spalte.oberkategorie == gesuchte_oberkategorie
+       && spalte.unterkategorie == gesuchte_unterkategorie {
+        passende_spalten.push(spalte);
+    }
+}
+#+END_SRC
+
+**Semantik**
+
+- Hier werden *nur Spalten* gefunden
+- Noch keine Zeilen
+- Ergebnis kann sein:
+  - 0 Spalten
+  - 1 Spalte
+  - n Spalten
+
+⚠️ Noch **kein Abbruch**, weil:
+> Spalten gefunden ≠ Zeilen gefunden
+
+---
+
+* 8.4 Ableitung der Zeilen aus den Spalten (KERN)
+
+Jetzt kommt der **entscheidende Schritt**.
+
+Für jede passende Spalte:
+
+#+BEGIN_SRC rust
+for spalte in passende_spalten {
+    for (zeilen_index, zellenwert) in spalte.werte.iter().enumerate() {
+        if zellenwert.is_relevant() {
+            gefundene_zeilen.insert(zeilen_index);
+        }
+    }
+}
+#+END_SRC
+
+**Wichtig**
+
+- Die Zeilennummern entstehen *hier*
+- Nicht im CLI
+- Nicht beim Spaltenfinden
+- Sondern beim Durchlaufen der Zellwerte
+
+Ergebnis:
+
+#+BEGIN_SRC rust
+gefundene_zeilen: Set<usize>  // oder Vec<usize>
+#+END_SRC
+
+---
+
+* 8.5 Überführung in TextBereich
+
+Jetzt – und **erst jetzt** – wird `TextBereich` befüllt:
+
+#+BEGIN_SRC rust
+for z in gefundene_zeilen {
+    bereich.zeilen_bereiche.push((z, z));
+}
+#+END_SRC
+
+Damit gilt:
+
+#+BEGIN_QUOTE
+Die automatische Spaltensuche ist abgeschlossen.
+#+END_QUOTE
+
+---
+
+* 8.6 Der entscheidende Validierungspunkt (hart)
+
+Genau hier MUSS geprüft werden:
+
+#+BEGIN_SRC rust
+if automatische_spalten_suche && bereich.zeilen_bereiche.is_empty() {
+    eprintln!(
+        "❌ Fehler: Für die Spalten '{}' → '{}' wurden keine Zeilen gefunden.",
+        gesuchte_oberkategorie,
+        gesuchte_unterkategorie
+    );
+    std::process::exit(1);
+}
+#+END_SRC
+
+**Warum exakt hier?**
+
+- Die Suche ist beendet
+- Das Ergebnis ist final
+- Ein Weiterlaufen wäre semantisch falsch
+
+Alles davor wäre:
+- zu früh
+- spekulativ
+- logisch inkorrekt
+
+---
+
+* 8.7 Übergang zur normalen Verarbeitung
+
+Nach erfolgreicher automatischer Spaltensuche:
+
+#+BEGIN_SRC rust
+assert!(!bereich.zeilen_bereiche.is_empty());
+#+END_SRC
+
+Jetzt ist der Zustand identisch zu:
+
+#+BEGIN_QUOTE
+Der Benutzer hat explizit Zeilen angegeben.
+#+END_QUOTE
+
+Ab hier:
+
+- table_printer
+- query
+- printer
+
+arbeiten **blind** mit:
+
+#+BEGIN_SRC rust
+bereich.zeilen_bereiche
+#+END_SRC
+
+---
+
+* 8.8 Warum table_printer der richtige Ort ist
+
+Die automatische Spaltensuche gehört **nicht**:
+
+- in die CLI
+- in den Parser
+- in `TextBereich`
+
+Sondern genau hierhin, weil:
+
+- nur table_printer die Tabellenstruktur kennt
+- nur dort Spalten → Zeilen korrekt abgebildet werden können
+- CLI nur *Intent*, nicht *Datenwissen* hat
+
+---
+
+* 8.9 Mentales Modell (Merksatz)
+
+#+BEGIN_QUOTE
+--spalten setzt eine Erwartung.
+table_printer erfüllt sie – oder bricht hart ab.
+#+END_QUOTE
+
+---
+
+* 8.10 Zusammenfassung in einem Satz
+
+#+BEGIN_QUOTE
+Die automatische Spaltensuche filtert zuerst Spalten,
+leitet daraus konkrete Zeilennummern ab,
+schreibt sie in TextBereich
+und erzwingt danach die Invariante:
+„Es gibt mindestens eine Zeile – oder das Programm endet.“
+#+END_QUOTE
