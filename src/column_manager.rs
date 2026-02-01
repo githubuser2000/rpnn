@@ -20,6 +20,15 @@ pub fn build_column_query(
         println!("Es wurde kein Spalten-Input angegeben.");
         process::exit(1);
     }
+    /*
+    if bereich.von_spalte == -1 && bereich.spalten_gesucht {
+        println!("--spaltevon wurde nicht angegeben oder nicht gefunden --spaltenname.");
+        process::exit(1);
+    }
+    if bereich.von_spalte == -1 && bereich.spalten_gesucht {
+        println!("--spaltebis wurde nicht angegeben oder nicht gefunden --spaltenname.");
+        process::exit(1);
+    }*/
     println!("=== 🔍 START Build Query ===");
     println!("📊 Eingabe-Daten:");
     println!("  - Verfügbare Spalten insgesamt: {}", column_names.len());

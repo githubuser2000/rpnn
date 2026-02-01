@@ -17,8 +17,8 @@ impl Default for TextBereich {
         Self {
             von_zeile: 0,
             bis_zeile: 0,
-            von_spalte: 0,
-            bis_spalte: 0,
+            von_spalte: usize::MAX,
+            bis_spalte: usize::MAX,
             zeilen_bereiche: Vec::new(),
             spalten_bereiche: Vec::new(),
             spalten_gefunden: false,  // Standard: nicht gefunden
