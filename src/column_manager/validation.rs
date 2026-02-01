@@ -10,7 +10,7 @@ pub fn validate_spalten_input(
     }
 
     if wurde_spalten_gesucht && bereich.spalten_bereiche.is_empty() {
-        return Err("--spalten wurde angegeben, aber keine Spalten gefunden".into());
+        return Err("--spaltenname wurde angegeben, aber keine Spalten gefunden".into());
     }
 
     Ok(())

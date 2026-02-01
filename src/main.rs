@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  --spaltenname 'Religionen' 'Superkräfte'");
             
             println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
-            bereich.spalten_bereiche.push((1, 1));
+            //bereich.spalten_bereiche.push((1, 1));
             bereich.von_spalte = 1;
             bereich.bis_spalte = 1;
         }
