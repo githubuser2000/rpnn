@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use crate::multiplesTeiler::faktor_finder::{multiples, find_all_divisors};
-use crate::multiplesTeiler::bereichs_verarbeitung::simulate_bereich_to_numbers2;
+use crate::multiples_teiler::faktor_finder::{multiples, find_all_divisors};
+use crate::multiples_teiler::bereichs_verarbeitung::simulate_bereich_to_numbers2;
 
 // 21: teiler - Findet alle Teiler einer oder mehrerer Zahlen
 pub fn teiler(zahlen_bereichs_angabe: &str) -> (Vec<String>, HashSet<i64>) {

@@ -1,5 +1,5 @@
 use crate::cli::{TextBereich, parser::SpaltenNamen};
-use crate::columnCategories_complete::KategorieMap;
+use crate::column_categories_complete::KategorieMap;
 
 // 4. Funktion: Verarbeitung der Kategorie-Map
 pub fn verarbeite_kategorien(

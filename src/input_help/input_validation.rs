@@ -1,7 +1,7 @@
-use crate::inputHelp::pattern_definitions::*;
-use crate::inputHelp::generator_parser::str_as_generator_to_list_of_num_strs_alt;
-use crate::inputHelp::bruch_validator::is_zeilen_bruch_angabe_between_kommas;
-use crate::inputHelp::zeilen_angabe_validator::is_zeilen_angabe_between_kommas;
+use crate::input_help::pattern_definitions::*;
+use crate::input_help::generator_parser::str_as_generator_to_list_of_num_strs_alt;
+use crate::input_help::bruch_validator::is_zeilen_bruch_angabe_between_kommas;
+use crate::input_help::zeilen_angabe_validator::is_zeilen_angabe_between_kommas;
 
 // 1. isZeilenBruchOrGanzZahlAngabe
 pub fn is_zeilen_bruch_or_ganz_zahl_angabe(text: &str) -> bool {

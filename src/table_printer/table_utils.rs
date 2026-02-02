@@ -2,7 +2,7 @@
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use terminal_size::{terminal_size, Width as TermWidth};
 use crate::table_printer::config::{ColumnKind, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH, COLUMN_OVERHEAD, MAX_COLUMNS_CAP};
-use crate::retaAusgabe::{TableRow, TableCell};
+use crate::reta_ausgabe::{TableRow, TableCell};
 
 // --- UTF8 Truncation ---
 pub fn truncate_cell(content: &str, max_width: usize) -> String {

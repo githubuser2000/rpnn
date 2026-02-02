@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::env;
-use crate::columnCategories_complete::lade_kategorie_map;
+use crate::column_categories_complete::lade_kategorie_map;
 use crate::csv_importer::import_csvs_to_sqlite;
 use crate::table_printer::query_column_by_index;
 use crate::column_manager::get_column_names;

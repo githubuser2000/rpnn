@@ -1,5 +1,5 @@
-use crate::inputHelp::pattern_definitions::ZEILEN_PATTERN;
-use crate::inputHelp::generator_parser::str_as_generator_to_list_of_num_strs;
+use crate::input_help::pattern_definitions::ZEILEN_PATTERN;
+use crate::input_help::generator_parser::str_as_generator_to_list_of_num_strs;
 
 // 5. isZeilenAngabe_betweenKommas
 pub fn is_zeilen_angabe_between_kommas(g: &str) -> bool {

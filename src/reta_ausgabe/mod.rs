@@ -1,4 +1,4 @@
-// src/retaAusgabe/mod.rs
+// src/reta_ausgabe/mod.rs
 pub mod output_syntax;
 pub mod utils;
 pub mod table_cell;

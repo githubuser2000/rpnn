@@ -1,5 +1,5 @@
 // parser.rs - korrigierte Version
-use crate::ifIsZeilenAngabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
+use crate::if_is_zeilen_angabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
 use super::bereich::TextBereich;
 
 // Neuer Datentyp für Spaltennamen-Konfiguration
@@ -21,7 +21,7 @@ impl Default for SpaltenNamen {
 // Rückgabetyp erweitert um Spaltennamen
 pub fn parse_cli_args(
     args: &[String], 
-    kategorie_map: Option<&crate::columnCategories_complete::KategorieMap>
+    kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
 ) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());

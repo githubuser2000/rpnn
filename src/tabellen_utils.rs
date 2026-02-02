@@ -1,4 +1,4 @@
-use crate::retaAusgabe::{Tables, CliOutput, OutputSyntax};
+use crate::reta_ausgabe::{Tables, CliOutput, OutputSyntax};
 use crate::table_printer::print_table;
 
 // 1. Funktion: Tabellentest

@@ -1,6 +1,6 @@
-// retaAusgabe-table_cell.rs
-// src/retaAusgabe/table_cell.rs
-use crate::retaAusgabe::utils::word_wrap;  // oder use super::utils::word_wrap;
+// reta_ausgabe-table_cell.rs
+// src/reta_ausgabe/table_cell.rs
+use crate::reta_ausgabe::utils::word_wrap;  // oder use super::utils::word_wrap;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone)]

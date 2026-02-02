@@ -1,12 +1,12 @@
-// src/retaAusgabe/cli_output.rs
+// src/reta_ausgabe/cli_output.rs
 use std::collections::{BTreeSet, HashMap};
 use colored::*;
 use unicode_width::UnicodeWidthStr;
 
-use crate::retaAusgabe::output_syntax::OutputSyntax;
-use crate::retaAusgabe::table_cell::{TableCell, TableRow};
-use crate::retaAusgabe::tables::Tables;
-use crate::retaAusgabe::utils::unicode_pad;
+use crate::reta_ausgabe::output_syntax::OutputSyntax;
+use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
+use crate::reta_ausgabe::tables::Tables;
+use crate::reta_ausgabe::utils::unicode_pad;
 
 #[derive(Debug)]
 pub struct CliOutput<'a> {

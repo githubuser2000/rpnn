@@ -1,4 +1,4 @@
-// ifIsZeilenAngabe/validation.rs
+// if_is_zeilen_angabe/validation.rs
 use super::split::*;
 
 // Test der Lookahead-Implementierung

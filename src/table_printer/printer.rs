@@ -5,9 +5,9 @@ use crate::table_printer::table_utils::{
     compute_columns_per_table, convert_to_table_rows, get_terminal_width,
     compute_max_lengths, compute_column_widths
 };
-use crate::retaAusgabe::{CliOutput, Tables, OutputSyntax, TableRow};  // TableRow importiert
+use crate::reta_ausgabe::{CliOutput, Tables, OutputSyntax, TableRow};  // TableRow importiert
 
-// --- Print one table chunk (mit retaAusgabe) ---
+// --- Print one table chunk (mit reta_ausgabe) ---
 pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[usize], zeilen_bereiche: &[(usize, usize)]) {
     let tables = Tables::new(Some(100));
     let term_width = get_terminal_width();

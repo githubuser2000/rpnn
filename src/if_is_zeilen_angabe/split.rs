@@ -1,4 +1,4 @@
-// ifIsZeilenAngabe/split.rs
+// if_is_zeilen_angabe/split.rs
 
 // Implementierung von Lookahead: r",(?![^\[\]\{\}\(\)]*[\]\}\)])"
 // Diese Regex sucht Kommas, die NICHT gefolgt werden von einem schließenden Bracket/Klammer ohne vorher ein öffnendes gesehen zu haben

@@ -1,7 +1,7 @@
-// ifIsZeilenAngabe/functions.rs
+// if_is_zeilen_angabe/functions.rs
 use regex::Regex;
 use lazy_static::lazy_static;
-use crate::ifIsZeilenAngabe::split;  // Füge diesen Import hinzu
+use crate::if_is_zeilen_angabe::split;  // Füge diesen Import hinzu
 
 // Für die i18n Simulation
 pub mod i18n {

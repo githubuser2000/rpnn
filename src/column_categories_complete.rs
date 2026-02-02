@@ -1,4 +1,4 @@
-// file: columnCategories_complete.rs
+// file: column_categories_complete.rs
 use std::collections::{HashMap, HashSet};
 
 // Öffentliche Struktur für Kategorien
@@ -39,10 +39,10 @@ impl KategorieMap {
         instanz.lade_kategorien();
         instanz
     }
-    // In columnCategories_complete.rs, im impl KategorieMap:
-    // In columnCategories_complete.rs, ersetze die finde_spaltennummern_fuer_kategorien-Funktion:
+    // In column_categories_complete.rs, im impl KategorieMap:
+    // In column_categories_complete.rs, ersetze die finde_spaltennummern_fuer_kategorien-Funktion:
 
-// In columnCategories_complete.rs:
+// In column_categories_complete.rs:
 // NEUE Funktion für exakte Suche - innerhalb des impl Blocks!
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     println!("🔍 EXAKTE Suche nach: '{}' → '{}'", ober, unter);
@@ -158,7 +158,7 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
 
 
     fn lade_kategorien(&mut self) {
-        // In columnCategories_complete.rs - in der lade_kategorien Funktion:
+        // In column_categories_complete.rs - in der lade_kategorien Funktion:
 
     
    
@@ -609,7 +609,7 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
             .collect()
     }
    
-    // In columnCategories_complete.rs, innerhalb des impl KategorieMap:
+    // In column_categories_complete.rs, innerhalb des impl KategorieMap:
 
     // Methode um SQL-SELECTs zu generieren
     pub fn generiere_sql_selects(&self, 

@@ -1,6 +1,6 @@
 use crate::cli::{TextBereich, parse_cli_args};
 use crate::cli::parser::SpaltenNamen;
-use crate::columnCategories_complete::KategorieMap;
+use crate::column_categories_complete::KategorieMap;
 
 // 3. Funktion: Verarbeitung der Spaltennamen und Kategorien
 pub fn verarbeite_spaltennamen(

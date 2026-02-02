@@ -1,4 +1,4 @@
-// retaAusgabe-output_syntax.rs
+// reta_ausgabe-output_syntax.rs
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy)]
