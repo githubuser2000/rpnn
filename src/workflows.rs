@@ -39,9 +39,9 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     print_recursive(&meine_liste, 0);
 
     // 5. CSV-Daten importieren
-    let projPath = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let pfad1 = projPath.to_string_lossy().into_owned() + "/csv/religion.csv";
-    let pfad2 = projPath.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
+    let proj_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let pfad1 = proj_path.to_string_lossy().into_owned() + "/csv/religion.csv";
+    let pfad2 = proj_path.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
     let dateien = [pfad1, pfad2];
 
     let conn = import_csvs_to_sqlite(&dateien)?;

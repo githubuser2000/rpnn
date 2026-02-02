@@ -4,22 +4,6 @@ use terminal_size::{terminal_size, Width as TermWidth};
 use crate::table_printer::config::{ColumnKind, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH, COLUMN_OVERHEAD, MAX_COLUMNS_CAP};
 use crate::reta_ausgabe::{TableRow, TableCell};
 
-// --- UTF8 Truncation ---
-pub fn truncate_cell(content: &str, max_width: usize) -> String {
-    let mut width = 0;
-    let mut truncated = String::new();
-
-    for ch in content.chars() {
-        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
-        if width + ch_width > max_width {
-            truncated.push('…');
-            break;
-        }
-        truncated.push(ch);
-        width += ch_width;
-    }
-    truncated
-}
 
 // --- Compute how many columns fit ---
 pub fn compute_columns_per_table(term_width: usize, headers: &[String], max_lengths: &[usize]) -> usize {

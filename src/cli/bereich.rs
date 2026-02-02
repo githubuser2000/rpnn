@@ -29,31 +29,3 @@ impl Default for TextBereich {
 }
 
 
-// Optional: Hilfsmethoden für TextBereich
-impl TextBereich {
-    pub fn ist_leer(&self) -> bool {
-        self.zeilen_bereiche.is_empty() && self.spalten_bereiche.is_empty()
-    }
-    
-    pub fn gesamt_zeilen(&self) -> usize {
-        self.zeilen_bereiche.iter()
-            .map(|(von, bis)| bis - von + 1)
-            .sum()
-    }
-    
-    pub fn gesamt_spalten(&self) -> usize {
-        self.spalten_bereiche.iter()
-            .map(|(von, bis)| bis - von + 1)
-            .sum()
-    }
-    
-    pub fn enthaelt_zeile(&self, zeile: usize) -> bool {
-        self.zeilen_bereiche.iter()
-            .any(|(von, bis)| zeile >= *von && zeile <= *bis)
-    }
-    
-    pub fn enthaelt_spalte(&self, spalte: usize) -> bool {
-        self.spalten_bereiche.iter()
-            .any(|(von, bis)| spalte >= *von && spalte <= *bis)
-    }
-}

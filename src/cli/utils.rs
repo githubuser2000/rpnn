@@ -1,16 +1,4 @@
 // src/cli/utils.rs
-// Optional: Weitere Hilfsfunktionen
-pub(crate) fn parse_einfache_zahl(text: &str) -> Option<usize> {
-    text.trim().parse::<usize>().ok()
-}
-
-pub(crate) fn extrahiere_zahlen_aus_string(text: &str) -> Vec<usize> {
-    text.split(|c: char| !c.is_numeric())
-        .filter(|s| !s.is_empty())
-        .filter_map(|s| s.parse::<usize>().ok())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
