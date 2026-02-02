@@ -13,10 +13,10 @@ pub fn list(elements: Vec<Element>) -> Element {
 }
 
 pub fn create_example_structure() -> Element {
-    let hauptParameter = vec!["zeilen1", "zeilen2", "spalten","ausgabe"];
-    let zeilenParameter  = vec!["von", "bis", "ohnevon", "ohnebis"];
-    let spaltenParameter = vec!["spaltennummer", "universum", "cluster", "galaxie", "kontinuum"];
-    let ausgabeParameter = vec!["nichtsleeres", "unfarbig"];
+    let _hauptParameter = vec!["zeilen1", "zeilen2", "spalten","ausgabe"];
+    let _zeilenParameter  = vec!["von", "bis", "ohnevon", "ohnebis"];
+    let _spaltenParameter = vec!["spaltennummer", "universum", "cluster", "galaxie", "kontinuum"];
+    let _ausgabeParameter = vec!["nichtsleeres", "unfarbig"];
 
     list(vec![
         list(vec![

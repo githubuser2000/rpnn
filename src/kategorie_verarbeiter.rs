@@ -20,7 +20,7 @@ pub fn verarbeite_kategorien(
                 bereich.spalten_bereiche, gefilterte.len());
         
         if !gefilterte.is_empty() {
-            let sql = kategorie_map.generiere_sql_selects(
+            let _sql = kategorie_map.generiere_sql_selects(
                 &spalten_namen.oberkategorie,
                 &spalten_namen.unterkategorie,
                 Some(&spalten_nummern)

@@ -32,7 +32,7 @@ pub fn import_csvs_to_sqlite<P: AsRef<Path>>(pfade: &[P]) -> Result<Connection, 
             let record = result?;
 // Falsch: .or_insert_with(Vec::new()); 
 // Richtig:
-let row = data_map.entry(current_row).or_insert_with(|| Vec::new());
+let _row = data_map.entry(current_row).or_insert_with(|| Vec::new());
 
 // ODER noch kürzer:
 let row = data_map.entry(current_row).or_insert_with(Vec::new);

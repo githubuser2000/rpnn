@@ -1,5 +1,4 @@
 // table_printer/printer.rs
-use unicode_width::UnicodeWidthStr;
 use std::collections::BTreeSet;
 use crate::table_printer::config::MAX_COLUMN_WIDTH;
 use crate::table_printer::table_utils::{

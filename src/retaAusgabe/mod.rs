@@ -10,4 +10,3 @@ pub use output_syntax::OutputSyntax;
 pub use table_cell::{TableCell, TableRow};
 pub use tables::Tables;
 pub use cli_output::CliOutput;
-pub use utils::{word_wrap, unicode_pad};

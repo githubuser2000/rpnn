@@ -29,12 +29,12 @@ pub fn parse_cli_args(
     let mut bereich = TextBereich::default();
     let mut spalten_namen = SpaltenNamen::default();
     
-    let mut automatische_spalten_suche = false;
-    let mut gesuchte_oberkategorie = String::new();
-    let mut gesuchte_unterkategorie = String::new();
+    let automatische_spalten_suche = false;
+    let gesuchte_oberkategorie = String::new();
+    let gesuchte_unterkategorie = String::new();
 
     let mut iter = args.iter().enumerate();
-    while let Some((i, arg)) = iter.next() {
+    while let Some((_i, arg)) = iter.next() {
         let mut dash_count = 0;
         
         for c in arg.chars() {

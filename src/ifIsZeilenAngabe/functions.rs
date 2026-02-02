@@ -63,7 +63,7 @@ pub fn str_as_generator_to_vec_i64(text: &str) -> Option<Vec<i64>> {
     }
 
     // erlaubte Klammern
-    let (open, close) = match trimmed.chars().next()? {
+    let (_open, close) = match trimmed.chars().next()? {
         '(' => ('(', ')'),
         '[' => ('[', ']'),
         '{' => ('{', '}'),

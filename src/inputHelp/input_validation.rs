@@ -1,5 +1,3 @@
-use regex::Regex;
-use lazy_static::lazy_static;
 use crate::inputHelp::pattern_definitions::*;
 use crate::inputHelp::generator_parser::str_as_generator_to_list_of_num_strs_alt;
 use crate::inputHelp::bruch_validator::is_zeilen_bruch_angabe_between_kommas;

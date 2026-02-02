@@ -1,6 +1,5 @@
 // ifIsZeilenAngabe/validation.rs
 use super::split::*;
-use super::functions::*;
 
 // Test der Lookahead-Implementierung
 pub fn test_lookahead_implementation() {

@@ -1,14 +1,3 @@
-use std::path::PathBuf;
-use std::env;
-use cli::parse_cli_args;
-use csv_importer::import_csvs_to_sqlite;
-use table_printer::{query_column_by_index, print_table};
-use column_manager::get_column_names;
-use utils::print_recursive;
-use columnCategories_complete::lade_kategorie_map;
-use cli::TextBereich;
-use cli::parser::SpaltenNamen;
-use retaAusgabe::{Tables, CliOutput, OutputSyntax};
 
 mod retaAusgabe;
 mod cli;

@@ -53,7 +53,7 @@ pub fn build_column_query_with_specific_columns(
     let columns_clause = selected_names.join(", ");
     println!("✅ Ausgewählte Spalten: {}", columns_clause);
 
-    use super::row_query_builder::{build_query_with_row_ranges_enhanced, build_row_query};
+    use super::row_query_builder::build_row_query;
     
     let bereich = TextBereich {
         zeilen_bereiche: zeilen_bereiche.to_vec(),
