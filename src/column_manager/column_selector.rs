@@ -12,7 +12,6 @@ pub fn get_column_names(conn: &Connection) -> Result<Vec<String>, Box<dyn std::e
 
 pub fn collect_spalten_nummern(
     bereich: &mut TextBereich,
-    wurde_spalten_gesucht: bool,
 ) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
     let mut nums = Vec::new();
 
@@ -33,7 +32,7 @@ pub fn collect_spalten_nummern(
             nums.push(i);
         }
     } else {
-        if wurde_spalten_gesucht {
+        if bereich.spalten_gesucht2 {
             return Err("Spalten wurden gesucht, aber keine verarbeitet".into());
         }
         nums.push(1);

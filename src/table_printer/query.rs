@@ -11,11 +11,10 @@ use std::process;
 pub fn query_column_by_index(
     conn: &Connection,
     mut bereich: TextBereich, // mutable copy
-    wurde_spalten_gesucht: bool,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> { // <-- TextBereich zurückgeben
     let column_names = get_column_names(conn)?;
     
-    let (query, headers) = build_column_query(&column_names, &mut bereich, wurde_spalten_gesucht)?;
+    let (query, headers) = build_column_query(&column_names, &mut bereich)?;
     println!("Headerslänge {}", headers.len());
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");

@@ -7,11 +7,10 @@ use super::validation::validate_spalten_input;
 pub fn build_column_query(
     column_names: &[String],
     bereich: &mut TextBereich,
-    wurde_spalten_gesucht: bool,
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
-    validate_spalten_input(bereich, wurde_spalten_gesucht)?;
+    validate_spalten_input(bereich)?;
 
-    let spalten_nummern = collect_spalten_nummern(bereich, wurde_spalten_gesucht)?;
+    let spalten_nummern = collect_spalten_nummern(bereich)?;
     let selected_names = resolve_spaltennamen(column_names, &spalten_nummern)?;
     let columns_clause = selected_names.join(", ");
 

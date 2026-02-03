@@ -47,8 +47,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let conn = import_csvs_to_sqlite(&dateien)?;
 
     // 6. Spalten abfragen
-    let wurde_spalten_gesucht2 = bereich.spalten_gesucht2;
-    query_column_by_index(&conn, bereich, wurde_spalten_gesucht2)?;
+    query_column_by_index(&conn, bereich)?;
 
     // 7. Spaltennamen abrufen
     let column_names = get_column_names(&conn)?;
