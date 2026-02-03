@@ -1,5 +1,5 @@
 use crate::data::Element;
-
+/*
 pub fn print_recursive(el: &Element, tiefe: usize) {
     let einrückung = "  ".repeat(tiefe);
     match el {
@@ -14,3 +14,4 @@ pub fn print_recursive(el: &Element, tiefe: usize) {
         }
     }
 }
+*/

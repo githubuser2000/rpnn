@@ -11,7 +11,7 @@ pub fn text(s: &str) -> Element {
 pub fn list(elements: Vec<Element>) -> Element {
     Element::Liste(elements)
 }
-
+/*
 pub fn create_example_structure() -> Element {
 
     list(vec![
@@ -28,4 +28,4 @@ pub fn create_example_structure() -> Element {
             ]),
         ]),
     ])
-}
+}*/

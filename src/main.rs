@@ -1,7 +1,7 @@
 
 mod cli;
 mod data;
-mod utils;
+//mod utils;
 mod csv_importer;
 mod column_manager;
 mod data_fetcher;

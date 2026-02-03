@@ -4,8 +4,7 @@ use crate::column_categories_complete::lade_kategorie_map;
 use crate::csv_importer::import_csvs_to_sqlite;
 use crate::table_printer::query_column_by_index;
 use crate::column_manager::get_column_names;
-use crate::utils::print_recursive;
-use crate::data::create_example_structure;
+//use crate::utils::print_recursive;
 
 use crate::tabellen_utils::{test_simple_table, show_usage};
 use crate::argument_verarbeiter::verarbeite_spaltennamen;
@@ -34,9 +33,10 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     verarbeite_kategorien(&kategorie_map, &bereich, &spalten_namen)?;
     
     // 4. Datenstruktur erstellen und ausgeben
-    let meine_liste = create_example_structure();
+    /*let meine_liste = create_example_structure();
+    println!("Struktur wurde erstellt: {:?}", meine_liste);
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
-    print_recursive(&meine_liste, 0);
+    print_recursive(&meine_liste, 0);*/
 
     // 5. CSV-Daten importieren
     let proj_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
