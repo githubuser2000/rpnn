@@ -12,9 +12,9 @@ pub fn build_column_query(
 
     let spalten_nummern = collect_spalten_nummern(bereich)?;
     let selected_names = resolve_spaltennamen(column_names, &spalten_nummern)?;
-    let columns_clause = selected_names.join(", ");
+    let columns_clause_satz_string = selected_names.join(", ");
 
-    let query = build_row_query(&columns_clause, bereich)?;
+    let query = build_row_query(&columns_clause_satz_string, bereich)?;
 
     Ok((query, selected_names))
 }

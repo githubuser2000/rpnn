@@ -126,6 +126,7 @@ pub fn str_as_generator_to_list_of_num_strs(text: &str) -> Option<Vec<String>> {
 }
 
 // Optimierte Version für isZeilenAngabe_betweenKommas
+/*
 pub fn is_zeilen_angabe_between_kommas_optimized(g: &str) -> bool {
     // Prüfe zuerst das reguläre Muster
     if OPTIMIZED_PATTERN.is_match(g) {
@@ -148,3 +149,4 @@ pub fn is_zeilen_angabe_between_kommas_optimized(g: &str) -> bool {
     
     false
 }
+*/

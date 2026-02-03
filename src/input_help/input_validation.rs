@@ -30,6 +30,7 @@ pub fn is_zeilen_angabe(text: &str) -> bool {
 }
 
 // Optimierte Version für isZeilenAngabe_betweenKommas
+/*
 pub fn is_zeilen_angabe_between_kommas_optimized(g: &str) -> bool {
     // Prüfe zuerst das reguläre Muster
     if OPTIMIZED_PATTERN.is_match(g) {
@@ -52,3 +53,4 @@ pub fn is_zeilen_angabe_between_kommas_optimized(g: &str) -> bool {
     
     false
 }
+*/
