@@ -7,7 +7,7 @@ use crate::column_manager::get_column_names;
 //use crate::utils::print_recursive;
 
 use crate::tabellen_utils::{test_simple_table, show_usage};
-use crate::argument_verarbeiter::verarbeite_spaltennamen;
+use crate::argument_verarbeiter::SpaltenVerarbeiter;
 use crate::kategorie_verarbeiter::verarbeite_kategorien;
 
 // 5. Funktion: Haupt-Workflow
@@ -27,7 +27,8 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let kategorie_map = lade_kategorie_map();
 
     // 2. Verarbeite CLI-Argumente und Spaltennamen
-    let (bereich, spalten_namen) = verarbeite_spaltennamen(&args, &kategorie_map)?;
+    let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
+    let (bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
 
     // 3. Verarbeite Kategorien
     verarbeite_kategorien(&kategorie_map, &bereich, &spalten_namen)?;
