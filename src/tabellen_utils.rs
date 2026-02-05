@@ -39,10 +39,10 @@ pub fn test_simple_table() {
 
 // 2. Funktion: Anzeige der Nutzungshinweise
 pub fn show_usage() {
-    println!("Benutzung: mein-rpnn --spalten OBERKATEGORIE UNTERKATEGORIE");
-    println!("Beispiel:  mein-rpnn --spalten Menschliches Motive");
-    println!("Beispiel:  mein-rpnn --spalten Universum Transzendentalien");
+    println!("Benutzung: mein-rpnn --spaltenname OBERKATEGORIE UNTERKATEGORIE");
     println!("\nAlternative mit manuellen Bereichen:");
     println!("mein-rpnn --vorhervonausschnitt 7-12 --spaltenname Menschliches Motive");
-    println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive");
+    println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive --spaltenname Menschliches Liebe");
+    println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive --spaltenname Menschliches Liebe");
+    println!("mein-rpnn --vorhervonausschnitt 7-12 --spaltevon 2 --spaltebis 4 --spaltenreihenfolgeundnurdiese 3,2");
 }
