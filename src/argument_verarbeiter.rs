@@ -62,33 +62,51 @@ impl<'a> SpaltenVerarbeiter<'a> {
             println!("\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
                      spalten_namen.oberkategorie, spalten_namen.unterkategorie);
             
-            self.suche_und_setze_spalten(bereich, spalten_namen, spalten_namen_liste)?;
+            self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         }
         
         Ok(())
     }
     
-    // Methode für die Suche nach Spaltennummern
-    fn suche_und_setze_spalten(
-        &self,
-        bereich: &mut TextBereich,
-        spalten_namen: &SpaltenNamen,
-        spalten_namen_liste: &SpaltenNamenListe
-    ) -> Result<(), Box<dyn Error>> {
-        let gefundene_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+fn suche_und_setze_spalten(
+    &self,
+    bereich: &mut TextBereich,
+    spalten_namen_liste: &SpaltenNamenListe
+) -> Result<(), Box<dyn Error>> {
+    // Alle gefundenen Spalten sammeln
+    let mut alle_gefundene_spalten: Vec<u32> = Vec::new();
+    
+    // Durch alle SpaltenNamen in der Liste iterieren
+    // Der Compiler-Hinweis sagt, es gibt möglicherweise ein Feld "eintraege"
+    for spalten_namen in &spalten_namen_liste.eintraege {
+        let gefundene_spalten: Vec<u32> = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie
         );
         
-        if !gefundene_spalten.is_empty() {
-            self.setze_gefundene_spalten(bereich, gefundene_spalten)?;
-        } else {
-            self.fallback_zu_standards(bereich, spalten_namen)?;
-        }
-        
-        Ok(())
+        // Gefundene Spalten zur Gesamtliste hinzufügen
+        alle_gefundene_spalten.extend(gefundene_spalten);
     }
     
+    // Nach der Schleife prüfen, ob wir Spalten gefunden haben
+    if !alle_gefundene_spalten.is_empty() {
+        // Optional: Duplikate entfernen und/oder sortieren
+        alle_gefundene_spalten.sort_unstable();
+        alle_gefundene_spalten.dedup();
+        
+        self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
+    } else {
+        // Fallback für den letzten SpaltenNamen
+        if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
+            self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
+        } else {
+            return Err("SpaltenNamenListe ist leer".into());
+        }
+    }
+    
+    Ok(())
+}
+
     // Methode zum Setzen gefundener Spalten
     fn setze_gefundene_spalten(
         &self,
