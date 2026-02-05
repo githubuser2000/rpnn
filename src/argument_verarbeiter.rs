@@ -32,7 +32,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         println!("🔍 CLI Argumente: {:?}", self.args);
         
         // Parse CLI-Argumente
-        let (_dashes, _params, mut bereich, spalten_namen) = 
+        let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste) = 
             parse_cli_args(self.args, Some(self.kategorie_map));
         
         println!("📊 Bereich nach Parser: {:?}", bereich);

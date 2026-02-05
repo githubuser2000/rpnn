@@ -27,7 +27,7 @@ impl Default for SpaltenNamen {
 pub fn parse_cli_args(
     args: &[String], 
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
-) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen) {
+) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
@@ -250,7 +250,7 @@ pub fn parse_cli_args(
         }
     }
 
-    (minuses, params, bereich, spalten_namen)
+    (minuses, params, bereich, spalten_namen, spalten_namen_liste)
 }
 
 // Hilfsfunktion zum Parsen von Zeilenangaben (bereinigt)
