@@ -32,18 +32,13 @@ impl<'a> SpaltenVerarbeiter<'a> {
         println!("🔍 CLI Argumente: {:?}", self.args);
         
         // Parse CLI-Argumente
-        let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste, spaltenreihenfolgeundnurdiese) = 
+        let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste) = 
             parse_cli_args(self.args, Some(self.kategorie_map));
         
         println!("📊 Bereich nach Parser: {:?}", bereich);
         println!("📝 Spaltennamen: {:?}", spalten_namen);
         
         self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
-        /*
-        if !spaltenreihenfolgeundnurdiese.is_empty() {
-            bereich.spalten_bereiche = sort_by_indices(&bereich.spalten_bereiche, &spaltenreihenfolgeundnurdiese).unwrap();
-        }
-        */
         Ok(VerarbeitungsErgebnis {
             bereich,
             spalten_namen,
@@ -167,38 +162,4 @@ fn suche_und_setze_spalten(
         println!("   --spaltenname 'Universum' 'Transzendentalien --spaltenname 'Menschliches' 'Liebe'");
         println!("  --spaltenname 'Religionen' 'Superkräfte'");
     }
-}
-
-fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T>, String> {
-    // Wenn der Index-Vektor leer ist, gibt einen leeren Vektor zurück
-    if indices.is_empty() {
-        return Ok(Vec::new());
-    }
-    
-    // Finde den maximalen Index
-    let max_index = indices.iter().max().copied().unwrap_or(0);
-    
-    // Überprüfe, ob alle Indizes gültig sind
-    if max_index >= values.len() {
-        return Err(format!(
-            "Index {} ist außerhalb der Grenzen (0..{})",
-            max_index,
-            values.len() - 1
-        ));
-    }
-    
-    // Erstelle den sortierten Vektor basierend auf den Indizes
-    let result = indices
-        .iter()
-        .map(|&i| {
-            // Diese Prüfung haben wir bereits oben durchgeführt, 
-            // aber zur Sicherheit behalten wir sie bei
-            if i >= values.len() {
-                panic!("Unerwarteter Fehler: Index {} außerhalb der Grenzen", i);
-            }
-            values[i].clone()
-        })
-        .collect();
-    
-    Ok(result)
 }

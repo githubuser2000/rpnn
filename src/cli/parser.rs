@@ -27,7 +27,7 @@ impl Default for SpaltenNamen {
 pub fn parse_cli_args(
     args: &[String], 
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
-) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe, Vec<usize>) {
+) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
@@ -37,7 +37,6 @@ pub fn parse_cli_args(
     let automatische_spalten_suche = false;
     let gesuchte_oberkategorie = String::new();
     let gesuchte_unterkategorie = String::new();
-    let mut spaltenreihenfolgeundnurdiese = Vec::<usize>::new();
 
     let mut iter = args.iter().enumerate();
     let mut spalten_namen_liste = SpaltenNamenListe::default();
@@ -125,7 +124,7 @@ pub fn parse_cli_args(
 	                panic!("--spaltenreihenfolgeundnurdiese darf nicht leer sein");
 	            }
 	            // hier speichern / weiterreichen
-	            spaltenreihenfolgeundnurdiese = spalten;
+	            bereich.spaltenreihenfolgeundnurdiese = spalten;
 	        } else {
 	            panic!("--spaltenreihenfolgeundnurdiese erwartet eine kommagetrennte Zahlenliste");
 	        }
@@ -275,7 +274,7 @@ pub fn parse_cli_args(
         }
     }
 
-    (minuses, params, bereich, spalten_namen, spalten_namen_liste, spaltenreihenfolgeundnurdiese)
+    (minuses, params, bereich, spalten_namen, spalten_namen_liste)
 }
 
 // Hilfsfunktion zum Parsen von Zeilenangaben (bereinigt)
