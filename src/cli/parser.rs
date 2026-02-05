@@ -9,11 +9,16 @@ pub struct SpaltenNamen {
     pub unterkategorie: String,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SpaltenNamenListe {
+    pub eintraege: Vec<SpaltenNamen>,
+}
+
 impl Default for SpaltenNamen {
     fn default() -> Self {
         Self {
-            oberkategorie: "oberkategorie".to_string(),
-            unterkategorie: "unterkategorie".to_string(),
+            oberkategorie: String::new(),
+            unterkategorie: String::new(),
         }
     }
 }
@@ -34,6 +39,7 @@ pub fn parse_cli_args(
     let gesuchte_unterkategorie = String::new();
 
     let mut iter = args.iter().enumerate();
+    let mut spalten_namen_liste = SpaltenNamenListe::default();
     while let Some((_i, arg)) = iter.next() {
         let mut dash_count = 0;
         
@@ -92,6 +98,8 @@ pub fn parse_cli_args(
                     if let Some((_, name2)) = iter.next() {
                         spalten_namen.oberkategorie = name1.clone();
                         spalten_namen.unterkategorie = name2.clone();
+                        spalten_namen_liste.eintraege.push(SpaltenNamen {
+                            oberkategorie: name1.clone(),                                               unterkategorie: name2.clone(),                                          });
                         bereich.spalten_gesucht =   true; 
                         bereich.spalten_gesucht2 =   true; 
                     }
