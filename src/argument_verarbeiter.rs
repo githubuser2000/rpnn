@@ -62,7 +62,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
             println!("\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
                      spalten_namen.oberkategorie, spalten_namen.unterkategorie);
             
-            self.suche_und_setze_spalten(bereich, spalten_namen)?;
+            self.suche_und_setze_spalten(bereich, spalten_namen, spalten_namen_liste)?;
         }
         
         Ok(())
@@ -72,7 +72,8 @@ impl<'a> SpaltenVerarbeiter<'a> {
     fn suche_und_setze_spalten(
         &self,
         bereich: &mut TextBereich,
-        spalten_namen: &SpaltenNamen
+        spalten_namen: &SpaltenNamen,
+        spalten_namen_liste: &SpaltenNamenListe
     ) -> Result<(), Box<dyn Error>> {
         let gefundene_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
             &spalten_namen.oberkategorie,
