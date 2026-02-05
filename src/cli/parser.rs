@@ -27,7 +27,7 @@ impl Default for SpaltenNamen {
 pub fn parse_cli_args(
     args: &[String], 
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
-) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe, Vec<i32>) {
+) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe, Vec<usize>) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
@@ -37,7 +37,7 @@ pub fn parse_cli_args(
     let automatische_spalten_suche = false;
     let gesuchte_oberkategorie = String::new();
     let gesuchte_unterkategorie = String::new();
-    let mut spaltenreihenfolgeundnurdiese = Vec::<i32>::new();
+    let mut spaltenreihenfolgeundnurdiese = Vec::<usize>::new();
 
     let mut iter = args.iter().enumerate();
     let mut spalten_namen_liste = SpaltenNamenListe::default();
@@ -106,6 +106,30 @@ pub fn parse_cli_args(
                     }
                 }
             }
+            "--spaltenreihenfolgeundnurdiese" => {
+	        if let Some((_, nachfolger)) = iter.next() {
+	    
+	            let spalten: Vec<usize> = nachfolger
+	                .split(',')
+	                .map(|s| {
+	                    s.parse::<usize>().unwrap_or_else(|_| {
+	                        panic!(
+	                            "Ungültige Spaltenliste '{}': '{}' ist keine Zahl",
+	                            nachfolger, s
+	                        )
+	                    })
+	                })
+	                .collect();
+	    
+	            if spalten.is_empty() {
+	                panic!("--spaltenreihenfolgeundnurdiese darf nicht leer sein");
+	            }
+	            // hier speichern / weiterreichen
+	            spaltenreihenfolgeundnurdiese = spalten;
+	        } else {
+	            panic!("--spaltenreihenfolgeundnurdiese erwartet eine kommagetrennte Zahlenliste");
+	        }
+	    }
             
             "--zeilevon" => {
                 if let Some((_, nachfolger)) = iter.next() {
