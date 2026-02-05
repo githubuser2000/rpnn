@@ -27,7 +27,7 @@ impl Default for SpaltenNamen {
 pub fn parse_cli_args(
     args: &[String], 
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
-) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe) {
+) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe, Vec<i32>) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
@@ -37,6 +37,7 @@ pub fn parse_cli_args(
     let automatische_spalten_suche = false;
     let gesuchte_oberkategorie = String::new();
     let gesuchte_unterkategorie = String::new();
+    let mut spaltenreihenfolgeundnurdiese = Vec::<i32>::new();
 
     let mut iter = args.iter().enumerate();
     let mut spalten_namen_liste = SpaltenNamenListe::default();
@@ -250,7 +251,7 @@ pub fn parse_cli_args(
         }
     }
 
-    (minuses, params, bereich, spalten_namen, spalten_namen_liste)
+    (minuses, params, bereich, spalten_namen, spalten_namen_liste, spaltenreihenfolgeundnurdiese)
 }
 
 // Hilfsfunktion zum Parsen von Zeilenangaben (bereinigt)
