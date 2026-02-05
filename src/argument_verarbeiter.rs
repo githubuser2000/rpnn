@@ -1,5 +1,5 @@
 use crate::cli::{TextBereich, parse_cli_args};
-use crate::cli::parser::SpaltenNamen;
+use crate::cli::parser::{SpaltenNamen, SpaltenNamenListe};
 use crate::column_categories_complete::KategorieMap;
 use std::error::Error;
 
@@ -38,7 +38,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         println!("📊 Bereich nach Parser: {:?}", bereich);
         println!("📝 Spaltennamen: {:?}", spalten_namen);
         
-        self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen)?;
+        self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
         
         Ok(VerarbeitungsErgebnis {
             bereich,
@@ -50,7 +50,8 @@ impl<'a> SpaltenVerarbeiter<'a> {
     fn verarbeite_automatische_spalten(
         &self,
         bereich: &mut TextBereich,
-        spalten_namen: &SpaltenNamen
+        spalten_namen: &SpaltenNamen,
+        spalten_namen_liste: &SpaltenNamenListe
     ) -> Result<(), Box<dyn Error>> {
         let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
         
