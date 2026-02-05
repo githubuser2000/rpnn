@@ -160,13 +160,41 @@ fn suche_und_setze_spalten(
     fn zeige_alternative_kombinationen(&self) {
         println!("ℹ️  Versuche es mit diesen Kombinationen:");
         println!("  --spaltenname 'Menschliches' 'Motive'");
-        println!("  --spaltenname 'Universum' 'Transzendentalien'");
+        println!("   --spaltenname 'Universum' 'Transzendentalien --spaltenname 'Menschliches' 'Liebe'");
         println!("  --spaltenname 'Religionen' 'Superkräfte'");
     }
 }
 
-// Beispiel für die Verwendung:
-// let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
-// let ergebnis = verarbeiter.verarbeite()?;
-// let bereich = ergebnis.bereich;
-// let spalten_namen = ergebnis.spalten_namen;
+fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T>, String> {
+    // Wenn der Index-Vektor leer ist, gibt einen leeren Vektor zurück
+    if indices.is_empty() {
+        return Ok(Vec::new());
+    }
+    
+    // Finde den maximalen Index
+    let max_index = indices.iter().max().copied().unwrap_or(0);
+    
+    // Überprüfe, ob alle Indizes gültig sind
+    if max_index >= values.len() {
+        return Err(format!(
+            "Index {} ist außerhalb der Grenzen (0..{})",
+            max_index,
+            values.len() - 1
+        ));
+    }
+    
+    // Erstelle den sortierten Vektor basierend auf den Indizes
+    let result = indices
+        .iter()
+        .map(|&i| {
+            // Diese Prüfung haben wir bereits oben durchgeführt, 
+            // aber zur Sicherheit behalten wir sie bei
+            if i >= values.len() {
+                panic!("Unerwarteter Fehler: Index {} außerhalb der Grenzen", i);
+            }
+            values[i].clone()
+        })
+        .collect();
+    
+    Ok(result)
+}
