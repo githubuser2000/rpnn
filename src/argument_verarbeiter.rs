@@ -39,10 +39,11 @@ impl<'a> SpaltenVerarbeiter<'a> {
         println!("📝 Spaltennamen: {:?}", spalten_namen);
         
         self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
+        /*
         if !spaltenreihenfolgeundnurdiese.is_empty() {
             bereich.spalten_bereiche = sort_by_indices(&bereich.spalten_bereiche, &spaltenreihenfolgeundnurdiese).unwrap();
         }
-        
+        */
         Ok(VerarbeitungsErgebnis {
             bereich,
             spalten_namen,
