@@ -105,6 +105,28 @@ pub fn parse_cli_args(
                     }
                 }
             }
+            "--breiten" => {
+	        if let Some((_, nachfolger)) = iter.next() {
+                    let breiten: Vec<usize> = nachfolger
+	                .split(',')
+	                .map(|s| {
+	                    s.parse::<usize>().unwrap_or_else(|_| {
+	                        panic!(
+	                            "Ungültige Spaltenliste '{}': '{}' ist keine Zahl",
+	                            nachfolger, s
+	                        )
+	                    })
+	                })
+	                .collect();
+	    
+	            if breiten.is_empty() {
+	                panic!("--breiten darf nicht leer sein");
+	            }
+	            // hier speichern / weiterreichen
+	            bereich.breiten = breiten;
+
+                }
+            }
             "--spaltenreihenfolgeundnurdiese" => {
 	        if let Some((_, nachfolger)) = iter.next() {
 	    

@@ -8,6 +8,7 @@ pub struct TextBereich {
     pub zeilen_bereiche: Vec<(usize, usize)>,
     pub spalten_bereiche: Vec<(usize, usize)>,
     pub spaltenreihenfolgeundnurdiese: Vec<usize>,
+    pub breiten: Vec<usize>,
     pub spalten_gefunden: bool,  // NEU: Wurden Spalten explizit gefunden?
     pub spalten_gesucht: bool,  // NEU: Wurden Spalten explizit gefunden?
     pub spalten_gesucht2: bool,  // NEU: Wurden Spalten explizit gefunden?
@@ -23,6 +24,7 @@ impl Default for TextBereich {
             zeilen_bereiche: Vec::new(),
             spalten_bereiche: Vec::new(),
             spaltenreihenfolgeundnurdiese: Vec::new(),
+            breiten: Vec::new(),
             spalten_gefunden: false,  // Standard: nicht gefunden
             spalten_gesucht: false,  // Standard: nicht gefunden
             spalten_gesucht2: false,  // Standard: nicht gefunden

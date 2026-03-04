@@ -13,6 +13,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
     let term_width = get_terminal_width();
     
     let column_widths = compute_column_widths(headers, max_lengths, term_width);
+    println!("ALX column_width: {:?}", column_widths);
     let table_rows = convert_to_table_rows(headers, &data, &column_widths, zeilen_bereiche); // zeilen_bereiche übergeben!
    let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
     output.color_enabled = true;

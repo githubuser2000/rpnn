@@ -13,7 +13,7 @@ use crate::kategorie_verarbeiter::verarbeite_kategorien;
 // 5. Funktion: Haupt-Workflow
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== START TABELLEN-TEST ===");
-    test_simple_table();
+    //test_simple_table();
 
     let args: Vec<String> = env::args().collect();
 
