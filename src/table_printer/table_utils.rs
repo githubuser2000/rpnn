@@ -82,9 +82,9 @@ pub fn convert_to_table_rows(
             }
         }
         
-        println!("📊 DEBUG: {} tatsächliche Zeilennummern: {:?}", 
+        /*println!("📊 DEBUG: {} tatsächliche Zeilennummern: {:?}", 
                  all_row_numbers.len(), all_row_numbers);
-        println!("📊 DEBUG: {} Datenzeilen vorhanden", data.len());
+        println!("📊 DEBUG: {} Datenzeilen vorhanden", data.len());*/
         
         // Sicherstellen, dass wir genug Daten für alle angeforderten Zeilen haben
         if all_row_numbers.len() != data.len() {
@@ -122,15 +122,15 @@ pub fn convert_to_table_rows(
                 cells.push(TableCell::new("".to_string(), width));
             }
             
-            println!("📊 DEBUG: Zeile {} bekommt Original-Nummer {}", 
-                     row_idx, actual_line_num);
+            /*println!("📊 DEBUG: Zeile {} bekommt Original-Nummer {}", 
+                     row_idx, actual_line_num);*/
             
             table_rows.push(TableRow::new(cells, actual_line_num as i32, actual_line_num as i32));
         }
     }
     
-    println!("📊 DEBUG: {} TableRows erstellt (davon {} Header, {} Daten)", 
-             table_rows.len(), 1, table_rows.len() - 1);
+    /*println!("📊 DEBUG: {} TableRows erstellt (davon {} Header, {} Daten)", 
+             table_rows.len(), 1, table_rows.len() - 1);*/
     
     table_rows
 }

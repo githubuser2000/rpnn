@@ -6,10 +6,10 @@ pub fn fetch_data_with_stats(
     column_count: usize,
     header_lengths: &[usize],
 ) -> Result<(Vec<Vec<String>>, Vec<usize>), Box<dyn std::error::Error>> {
-    println!("=== 📊 START Datenabfrage ===");
+    /*println!("=== 📊 START Datenabfrage ===");
     println!("🔍 Query: {}", query);
     println!("📋 Erwartete Spaltenanzahl: {}", column_count);
-    println!("📏 Header-Längen: {:?}", header_lengths);
+    println!("📏 Header-Längen: {:?}", header_lengths);*/
     
     let mut stmt = conn.prepare(query)?;
     let mut rows = stmt.query([])?;
@@ -19,11 +19,11 @@ pub fn fetch_data_with_stats(
     let mut row_counter = 0;
     let mut zeilennummer = 1; // 1-basierte Zählung für Ausgabe
 
-    println!("📈 Lese Datenbankzeilen...");
+    //println!("📈 Lese Datenbankzeilen...");
     
     while let Some(row) = rows.next()? {
         row_counter += 1;
-        println!("\n📄 Zeile {} (DB-Row {}):", zeilennummer, row_counter);
+        //println!("\n📄 Zeile {} (DB-Row {}):", zeilennummer, row_counter);
         
         let mut values = Vec::new();
         for i in 0..column_count {
@@ -32,7 +32,7 @@ pub fn fetch_data_with_stats(
             // Debug-Info für diese Zelle
             let len = val.chars().count();
             let old_max = max_lengths[i];
-            
+            /*
             if len > old_max {
                 max_lengths[i] = len;
                 println!("  Spalte {}: '{}' (Länge: {} → {}!)", 
@@ -44,7 +44,7 @@ pub fn fetch_data_with_stats(
                          i + 1, 
                          val.chars().take(30).collect::<String>() + if val.len() > 30 { "..." } else { "" }, 
                          len);
-            }
+            }*/
             
             values.push(val);
         }
@@ -53,11 +53,11 @@ pub fn fetch_data_with_stats(
         zeilennummer += 1;
     }
 
-    println!("\n=== ✅ DATENABFRAGE ERFOLGREICH ===");
+    /*println!("\n=== ✅ DATENABFRAGE ERFOLGREICH ===");
     println!("📊 Statistiken:");
     println!("  - Gelesene Zeilen: {}", row_counter);
     println!("  - Gespeicherte Zeilen: {}", all_data.len());
-    println!("  - Finale Spaltenbreiten: {:?}", max_lengths);
+    println!("  - Finale Spaltenbreiten: {:?}", max_lengths);*/
     
     if row_counter == 0 {
         println!("⚠️  WARNUNG: Keine Daten gefunden!");

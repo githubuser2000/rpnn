@@ -15,7 +15,7 @@ pub fn query_column_by_index(
     let column_names = get_column_names(conn)?;
     
     let (query, headers) = build_column_query(&column_names, &mut bereich)?;
-    println!("Headerslänge vor Sortierung: {}", headers.len());
+    //println!("Headerslänge vor Sortierung: {}", headers.len());
     
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
@@ -30,15 +30,15 @@ pub fn query_column_by_index(
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
     // DEBUG: Zeige aktuelle Status
-    println!("=== 🔍 STATUS VOR SORTIERUNG ===");
+    /*println!("=== 🔍 STATUS VOR SORTIERUNG ===");
     println!("Spaltenreihenfolge: {:?}", bereich.spaltenreihenfolgeundnurdiese);
     println!("Headers vor Sortierung: {} Stück", headers.len());
-    println!("Daten vor Sortierung: {} Zeilen", data.len());
+    println!("Daten vor Sortierung: {} Zeilen", data.len());*/
     
     // SORTIERUNG DER SPALTEN: NUR wenn spaltenreihenfolgeundnurdiese befüllt ist
     let (final_headers, final_data) = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-        println!("=== 🔄 STARTE SPALTENSORTIERUNG ===");
-        println!("Sortierindizes (1-basiert): {:?}", bereich.spaltenreihenfolgeundnurdiese);
+        /*println!("=== 🔄 STARTE SPALTENSORTIERUNG ===");
+        println!("Sortierindizes (1-basiert): {:?}", bereich.spaltenreihenfolgeundnurdiese);*/
         
         // WICHTIG: Konvertiere 1-basierte Indizes zu 0-basierten
         let null_basierte_indizes: Vec<usize> = bereich.spaltenreihenfolgeundnurdiese
@@ -53,32 +53,32 @@ pub fn query_column_by_index(
             })
             .collect();
         
-        println!("Sortierindizes (0-basiert): {:?}", null_basierte_indizes);
+        //println!("Sortierindizes (0-basiert): {:?}", null_basierte_indizes);
         
         // 1. Headers (Spaltenüberschriften) sortieren
-        println!("➡️  Sortiere Headers...");
+        //println!("➡️  Sortiere Headers...");
         let sorted_headers = match sort_by_indices(&headers, &null_basierte_indizes) {
             Ok(h) => {
-                println!("✅ Headers sortiert: {} → {} Spalten", headers.len(), h.len());
+                //println!("✅ Headers sortiert: {} → {} Spalten", headers.len(), h.len());
                 h
             },
             Err(e) => {
-                println!("⚠️  Fehler beim Sortieren der Headers: {}", e);
-                println!("⚠️  Verwende unsortierte Headers");
+                /*println!("⚠️  Fehler beim Sortieren der Headers: {}", e);
+                println!("⚠️  Verwende unsortierte Headers");*/
                 headers.clone()
             }
         };
         
         // 2. Daten sortieren: JEDE ZEILE muss ihre SPALTEN in der gleichen Reihenfolge haben
-        println!("➡️  Sortiere Datenzeilen...");
+        //println!("➡️  Sortiere Datenzeilen...");
         let sorted_data: Vec<Vec<String>> = data.iter()
             .enumerate()
             .map(|(row_idx, row)| {
                 match sort_by_indices(row, &null_basierte_indizes) {
                     Ok(sorted_row) => {
                         if row_idx == 0 {
-                            println!("✅ Erste Zeile sortiert: {} → {} Spalten", 
-                                     row.len(), sorted_row.len());
+                            /*println!("✅ Erste Zeile sortiert: {} → {} Spalten", 
+                                     row.len(), sorted_row.len());*/
                         }
                         sorted_row
                     },
@@ -91,33 +91,34 @@ pub fn query_column_by_index(
             })
             .collect();
         
-        println!("=== ✅ SORTIERUNG ABGESCHLOSSEN ===");
+        /*println!("=== ✅ SORTIERUNG ABGESCHLOSSEN ===");
         println!("Sortierte Headers: {} Spalten", sorted_headers.len());
-        println!("Sortierte Daten: {} Zeilen", sorted_data.len());
+        println!("Sortierte Daten: {} Zeilen", sorted_data.len());*/
         
         (sorted_headers, sorted_data)
     } else {
         // KEINE SORTIERUNG: Verwende Originaldaten
-        println!("=== ℹ️  KEINE SORTIERUNG ===");
-        println!("spaltenreihenfolgeundnurdiese ist leer oder nicht vorhanden");
+        /*println!("=== ℹ️  KEINE SORTIERUNG ===");
+        println!("spaltenreihenfolgeundnurdiese ist leer oder nicht vorhanden");*/
         (headers.clone(), data.clone())
     };
     
     // Kontroll-Ausgabe
-    println!("=== 📊 FINALE DATEN ===");
-    println!("Finale Headers: {} Spalten", final_headers.len());
+    //println!("=== 📊 FINALE DATEN ===");
+    //println!("Finale Headers: {} Spalten", final_headers.len());
+    /*
     for (i, header) in final_headers.iter().enumerate() {
         let original_index = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() && i < bereich.spaltenreihenfolgeundnurdiese.len() {
             format!("(ursprünglich Spalte {})", bereich.spaltenreihenfolgeundnurdiese[i])
         } else {
             "".to_string()
         };
-        println!("  Ausgabe-Spalte {} {}: '{}'", i + 1, original_index, header);
-    }
-    
-    println!("Finale Daten: {} Zeilen", final_data.len());
+        //println!("  Ausgabe-Spalte {} {}: '{}'", i + 1, original_index, header);
+    }*/
+    /*
+    //println!("Finale Daten: {} Zeilen", final_data.len());
     if !final_data.is_empty() {
-        println!("Erste Zeile hat {} Spalten", final_data[0].len());
+        //println!("Erste Zeile hat {} Spalten", final_data[0].len());
         for (i, value) in final_data[0].iter().enumerate() {
             let spalten_nr = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() && i < bereich.spaltenreihenfolgeundnurdiese.len() {
                 format!("(Spalte {})", bereich.spaltenreihenfolgeundnurdiese[i])
@@ -126,10 +127,10 @@ pub fn query_column_by_index(
             };
             println!("  Wert {} {}: '{}'", i + 1, spalten_nr, value);
         }
-    }
+    }*/
     
     print_table_chunked(&final_headers, &final_data, &bereich.zeilen_bereiche);
-    println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
+    //println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
     Ok(bereich)
 }
 
