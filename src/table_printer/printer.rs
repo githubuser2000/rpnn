@@ -33,7 +33,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
 }
 
 // ÄNDERUNG auch hier:
-pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bereiche: &[(usize, usize)]) {  // Parameter geändert
+pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bereiche: &[(usize, usize)], breiten: &[usize]) {  // Parameter geändert
     let term_width = get_terminal_width();
     let max_lengths = compute_max_lengths(headers, data);
 
