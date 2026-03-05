@@ -35,6 +35,7 @@ pub fn print_table(headers: &[String], data: Vec<Vec<String>>, max_lengths: &[us
 // ÄNDERUNG auch hier:
 pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bereiche: &[(usize, usize)], breiten: &[usize]) {  // Parameter geändert
     let term_width = get_terminal_width();
+    println!("Terminal Width {}", term_width);
     let max_lengths = compute_max_lengths(headers, data);
 
     let mut start = 0;
@@ -47,8 +48,12 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bere
         let capped_lengths: Vec<usize> = remaining_lengths.iter()
             .map(|&w| w.min(MAX_COLUMN_WIDTH))
             .collect();
-        
-        let cols_per_table = compute_columns_per_table(term_width, remaining_headers, &capped_lengths);
+        let cols_per_table;
+        if !breiten.is_empty() {
+            println!("breiten not empty");
+            
+        } 
+        cols_per_table = compute_columns_per_table(term_width, remaining_headers, &capped_lengths);
         let end = (start + cols_per_table).min(headers.len());
 
         let chunk_headers = &headers[start..end];
@@ -64,11 +69,11 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bere
             })
             .collect();
 
-        if chunk_num > 0 {
+        /*if chunk_num > 0 {
             println!("\n{}", "─".repeat(term_width));
             println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
             println!("{}", "─".repeat(term_width));
-        }
+        }*/
         
         // ÄNDERUNG: zeilen_bereiche übergeben
         print_table(chunk_headers, chunk_data, chunk_max_lengths, zeilen_bereiche);
@@ -78,4 +83,28 @@ pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], zeilen_bere
     }
 }
 
+fn gruppiere_nach_limit(zahlen: &[usize], limit: usize) -> Vec<Vec<usize>> {
+    let mut ergebnis = Vec::new();
+    let mut aktuelle_gruppe = Vec::new();
+    let mut laufende_summe = 0;
 
+    for &zahl in zahlen {
+        laufende_summe += zahl;
+        aktuelle_gruppe.push(zahl);
+
+        // Sobald das Limit erreicht oder überschritten ist
+        if laufende_summe >= limit {
+            ergebnis.push(aktuelle_gruppe);
+            // Reset für die nächste Gruppe
+            aktuelle_gruppe = Vec::new();
+            laufende_summe = 0;
+        }
+    }
+
+    // Falls am Ende noch Zahlen übrig sind, die das Limit nicht mehr erreicht haben
+    if !aktuelle_gruppe.is_empty() {
+        ergebnis.push(aktuelle_gruppe);
+    }
+
+    ergebnis
+}
