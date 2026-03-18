@@ -63,16 +63,25 @@ pub fn print_table_chunked(
     headers: &[String],
     data: &[Vec<String>],
     row_ranges: &[RowRange],
+    explizite_breiten: &[usize],
 ) {
     let term_width = get_terminal_width();
-    // 3 Zeichen Puffer für den rechten Rand (Scrollbar/Terminal-Varianz)
-    let available_total = term_width.saturating_sub(3); 
+    let available_total = term_width.saturating_sub(3);
 
-    // Wir berechnen das Budget so, dass pro Spalte Platz für den Content + Trenner ist
-    let overhead_per_col = COLUMN_OVERHEAD + 1; 
+    let overhead_per_col = COLUMN_OVERHEAD + 1;
     let full_budget = available_total.saturating_sub(headers.len() * overhead_per_col);
-    
-    let global_widths = compute_column_widths_from_global_mass(headers, data, full_budget);
+
+    let mut global_widths =
+        compute_column_widths_from_global_mass(headers, data, full_budget);
+
+    if !explizite_breiten.is_empty() {
+        for (i, &breite) in explizite_breiten.iter().enumerate() {
+            if i >= global_widths.len() {
+                break;
+            }
+            global_widths[i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+        }
+    }
 
     let mut start = 0usize;
     while start < headers.len() {
@@ -81,48 +90,48 @@ pub fn print_table_chunked(
 
         while end < headers.len() {
             let col_width = global_widths[end];
-            // Wir rechnen: VERDOPPELTE Spaltenbreite + Overhead + 1 Sicherheitszeichen
             let needed = (col_width * 2) + COLUMN_OVERHEAD + 1;
 
-            // Wenn die nächste Spalte (die jetzt sehr breit sein kann) nicht mehr passt:
             if used + needed > available_total {
-                // Wenn noch gar keine Spalte im Chunk ist, müssen wir diese eine nehmen,
-                // auch wenn sie breiter als das Terminal ist (wird dann abgeschnitten/umgebrochen).
                 if end == start {
                     end += 1;
                 }
-                break; 
+                break;
             }
 
             used += needed;
             end += 1;
         }
 
-        if end == start { end = start + 1; }
+        if end == start {
+            end = start + 1;
+        }
 
         let chunk_headers = &headers[start..end];
-        // Auch hier die Breiten verdoppeln
         let chunk_widths: Vec<usize> = global_widths[start..end]
             .iter()
             .map(|&w| (w * 2).min(MAX_COLUMN_WIDTH))
             .collect();
-        
+
         let chunk_data: Vec<Vec<String>> = data.iter()
             .map(|row| {
                 let mut partial = if start < row.len() {
                     row[start..end.min(row.len())].to_vec()
-                } else { Vec::new() };
+                } else {
+                    Vec::new()
+                };
                 partial.resize(end - start, String::new());
                 partial
-            }).collect();
+            })
+            .collect();
 
-        // Anzeige-Logik
         if start > 0 {
             println!("\n{}", "─".repeat(available_total));
             println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
         }
 
-        let table_rows = convert_to_table_rows(chunk_headers, &chunk_data, &chunk_widths, row_ranges);
+        let table_rows =
+            convert_to_table_rows(chunk_headers, &chunk_data, &chunk_widths, row_ranges);
         render_rows(term_width, chunk_widths, &table_rows);
 
         start = end;

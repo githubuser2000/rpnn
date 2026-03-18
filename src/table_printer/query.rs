@@ -128,7 +128,7 @@ pub fn query_column_by_index(
         }
     }
     
-    print_table_chunked(&final_headers, &final_data, &bereich.zeilen_bereiche);
+    print_table_chunked(&final_headers, &final_data, &bereich.zeilen_bereiche, &bereich.breiten);
     println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
     Ok(bereich)
 }

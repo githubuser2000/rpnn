@@ -92,7 +92,30 @@ pub fn parse_cli_args(
                     }
                 }
             }*/
-            
+            "--breiten" => {
+    if let Some((_, nachfolger)) = iter.next() {
+        let breiten: Vec<usize> = nachfolger
+            .split(',')
+            .map(|s| {
+                let trimmed = s.trim();
+                trimmed.parse::<usize>().unwrap_or_else(|_| {
+                    panic!(
+                        "Ungültige Breitenliste '{}': '{}' ist keine Zahl",
+                        nachfolger, trimmed
+                    )
+                })
+            })
+            .collect();
+
+        if breiten.is_empty() {
+            panic!("--breiten darf nicht leer sein");
+        }
+
+        bereich.breiten = breiten;
+    } else {
+        panic!("--breiten erwartet eine kommagetrennte Zahlenliste");
+    }
+}
             "--spaltenname" => {
                 if let Some((_, name1)) = iter.next() {
                     if let Some((_, name2)) = iter.next() {
