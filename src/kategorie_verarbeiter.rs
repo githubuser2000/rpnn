@@ -13,17 +13,8 @@ fn is_primzahlkreuz_pro_contra_request(ober: &str, unter: &str) -> bool {
     let ober = normalize_category_key(ober);
     let unter = normalize_category_key(unter);
 
-    let ober_ok = matches!(
-        ober.as_str(),
-        "bedeutung" | "procontra" | "universum"
-    );
-
-    let unter_ok = matches!(
-        unter.as_str(),
-        "primzahlkreuzprocontra" | "primzahlkreuz"
-    );
-
-    ober_ok && unter_ok
+    matches!(ober.as_str(), "bedeutung" | "procontra" | "universum")
+        && matches!(unter.as_str(), "primzahlkreuzprocontra" | "primzahlkreuz")
 }
 
 // 4. Funktion: Verarbeitung der Kategorie-Map

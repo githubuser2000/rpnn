@@ -9,6 +9,16 @@ use crate::table_printer::printer::print_table_chunked;
 use unicode_width::UnicodeWidthStr;
 use crate::generated_columns::{apply_generated_columns, ParametersMain};
 // --- Query-Funktion ---
+fn build_full_table_row_query(column_names: &[String]) -> String {
+    let columns = column_names
+        .iter()
+        .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("SELECT {} FROM csv_data", columns)
+}
+
 
 pub fn query_column_by_index(
     conn: &Connection,
@@ -17,10 +27,17 @@ pub fn query_column_by_index(
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
    let column_names = get_column_names(conn)?;
-    
-    let (query, headers) = build_column_query(&column_names, &mut bereich)?;
-    println!("Headerslänge vor Sortierung: {}", headers.len());
-    
+
+let (query, headers): (String, Vec<String>) =
+    if generated_befehle.contains("primzahlkreuzprocontra") {
+        println!("ℹ️ Primzahlkreuz-Sonderpfad: lade Volltabelle für Generator");
+        bereich.spalten_gefunden = true;
+        (build_full_table_row_query(&column_names), column_names.clone())
+    } else {
+        build_column_query(&column_names, &mut bereich)?
+    };
+
+println!("Headerslänge vor Sortierung: {}", headers.len());
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
@@ -97,6 +114,13 @@ pub fn query_column_by_index(
         }
     }
     
+    apply_generated_columns(
+    &mut final_headers,
+    &mut final_data,
+    &bereich,
+    generated_befehle,
+    parameters_main,
+)?;
     print_table_chunked(&final_headers, &final_data, &bereich.zeilen_bereiche, &bereich.breiten);
     //println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
     Ok(bereich)
