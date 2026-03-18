@@ -1,11 +1,15 @@
 use std::collections::BTreeSet;
 
 use crate::reta_ausgabe::{CliOutput, OutputSyntax, TableRow, Tables};
-use crate::table_printer::config::MAX_COLUMN_WIDTH;
+use crate::table_printer::config::{COLUMN_OVERHEAD, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH};
 use crate::table_printer::table_utils::{
-    build_table_layout, chunk_bounds, compute_column_widths, compute_column_widths_optimized,
-    compute_columns_per_table, compute_columns_per_table_optimized, compute_max_lengths,
-    convert_to_table_rows, get_terminal_width, RowRange,
+    build_table_layout,
+    compute_column_stats,
+    compute_column_widths_from_global_mass,
+    convert_to_table_rows,
+    get_terminal_width,
+    shrink_widths_to_fit_budget,
+    RowRange,
 };
 
 fn build_output<'a>(
@@ -27,6 +31,7 @@ fn render_rows(term_width: usize, column_widths: Vec<usize>, table_rows: &[Table
     let mut output = build_output(&tables, term_width, column_widths);
 
     let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
+
     let max_lines_in_cells = table_rows
         .iter()
         .map(TableRow::max_line_count)
@@ -37,135 +42,98 @@ fn render_rows(term_width: usize, column_widths: Vec<usize>, table_rows: &[Table
     output.cli_out(&display_lines, table_rows, rows_range);
 }
 
-// Alte kompatible Signatur
 pub fn print_table(
     headers: &[String],
-    data: Vec<Vec<String>>,
-    max_lengths: &[usize],
-    row_ranges: &[RowRange],
-) {
-    let term_width = get_terminal_width();
-    let column_widths = compute_column_widths(headers, max_lengths, term_width);
-    let table_rows = convert_to_table_rows(headers, &data, &column_widths, row_ranges);
-
-    render_rows(term_width, column_widths, &table_rows);
-}
-
-// Neue empfohlene Variante
-pub fn print_table_optimized(
-    headers: &[String],
     data: &[Vec<String>],
     row_ranges: &[RowRange],
 ) {
     let term_width = get_terminal_width();
-    let column_widths = compute_column_widths_optimized(headers, data, term_width);
+    let available_budget = term_width
+        .saturating_sub(1)
+        .saturating_sub(headers.len() * COLUMN_OVERHEAD);
+
+    let column_widths =
+        compute_column_widths_from_global_mass(headers, data, available_budget);
+
     let table_rows = convert_to_table_rows(headers, data, &column_widths, row_ranges);
-
     render_rows(term_width, column_widths, &table_rows);
 }
 
-// Alte kompatible Chunk-Variante
-pub fn print_table_chunked(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
-    let term_width = get_terminal_width();
-    let max_lengths = compute_max_lengths(headers, data);
-
-    let capped_lengths: Vec<usize> = max_lengths
-        .iter()
-        .map(|&w| w.min(MAX_COLUMN_WIDTH))
-        .collect();
-
-    let chunk_size = compute_columns_per_table(term_width, headers, &capped_lengths);
-    let bounds = chunk_bounds(headers.len(), chunk_size);
-
-    for (chunk_index, (start, end)) in bounds.iter().copied().enumerate() {
-        let chunk_headers = &headers[start..end];
-        let chunk_max_lengths = &capped_lengths[start..end];
-
-        let chunk_data: Vec<Vec<String>> = data
-            .iter()
-            .map(|row| {
-                let slice_end = end.min(row.len());
-                let mut partial = if start < row.len() {
-                    row[start..slice_end].to_vec()
-                } else {
-                    Vec::new()
-                };
-                partial.resize(end - start, String::new());
-                partial
-            })
-            .collect();
-
-        if chunk_index > 0 {
-            println!();
-            println!("{}", "─".repeat(term_width));
-            println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
-            println!("{}", "─".repeat(term_width));
-        }
-
-        print_table(chunk_headers, chunk_data, chunk_max_lengths, row_ranges);
-    }
-}
-
-// Optimierte Chunk-Variante mit kompakteren Standardbreiten
-pub fn print_table_chunked_optimized(
+pub fn print_table_chunked(
     headers: &[String],
     data: &[Vec<String>],
     row_ranges: &[RowRange],
 ) {
     let term_width = get_terminal_width();
+    // 3 Zeichen Puffer für den rechten Rand (Scrollbar/Terminal-Varianz)
+    let available_total = term_width.saturating_sub(3); 
+
+    // Wir berechnen das Budget so, dass pro Spalte Platz für den Content + Trenner ist
+    let overhead_per_col = COLUMN_OVERHEAD + 1; 
+    let full_budget = available_total.saturating_sub(headers.len() * overhead_per_col);
+    
+    let global_widths = compute_column_widths_from_global_mass(headers, data, full_budget);
 
     let mut start = 0usize;
-    let mut chunk_index = 0usize;
-
     while start < headers.len() {
-        let remaining_headers = &headers[start..];
+        let mut used = 0usize;
+        let mut end = start;
 
-        let remaining_data: Vec<Vec<String>> = data
-            .iter()
-            .map(|row| {
-                if start < row.len() {
-                    row[start..].to_vec()
-                } else {
-                    Vec::new()
+        while end < headers.len() {
+            let col_width = global_widths[end];
+            // Wir rechnen: VERDOPPELTE Spaltenbreite + Overhead + 1 Sicherheitszeichen
+            let needed = (col_width * 2) + COLUMN_OVERHEAD + 1;
+
+            // Wenn die nächste Spalte (die jetzt sehr breit sein kann) nicht mehr passt:
+            if used + needed > available_total {
+                // Wenn noch gar keine Spalte im Chunk ist, müssen wir diese eine nehmen,
+                // auch wenn sie breiter als das Terminal ist (wird dann abgeschnitten/umgebrochen).
+                if end == start {
+                    end += 1;
                 }
-            })
-            .collect();
+                break; 
+            }
 
-        let cols_in_chunk =
-            compute_columns_per_table_optimized(term_width, remaining_headers, &remaining_data);
-
-        let end = (start + cols_in_chunk).min(headers.len());
-        let chunk_headers = &headers[start..end];
-
-        let chunk_data: Vec<Vec<String>> = data
-            .iter()
-            .map(|row| {
-                let slice_end = end.min(row.len());
-                let mut partial = if start < row.len() {
-                    row[start..slice_end].to_vec()
-                } else {
-                    Vec::new()
-                };
-                partial.resize(end - start, String::new());
-                partial
-            })
-            .collect();
-
-        if chunk_index > 0 {
-            println!();
-            println!("{}", "─".repeat(term_width.saturating_sub(1)));
-            println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
-            println!("{}", "─".repeat(term_width.saturating_sub(1)));
+            used += needed;
+            end += 1;
         }
 
-        print_table_optimized(chunk_headers, &chunk_data, row_ranges);
+        if end == start { end = start + 1; }
+
+        let chunk_headers = &headers[start..end];
+        // Auch hier die Breiten verdoppeln
+        let chunk_widths: Vec<usize> = global_widths[start..end]
+            .iter()
+            .map(|&w| (w * 2).min(MAX_COLUMN_WIDTH))
+            .collect();
+        
+        let chunk_data: Vec<Vec<String>> = data.iter()
+            .map(|row| {
+                let mut partial = if start < row.len() {
+                    row[start..end.min(row.len())].to_vec()
+                } else { Vec::new() };
+                partial.resize(end - start, String::new());
+                partial
+            }).collect();
+
+        // Anzeige-Logik
+        if start > 0 {
+            println!("\n{}", "─".repeat(available_total));
+            println!("Fortsetzung (Spalten {}-{}):", start + 1, end);
+        }
+
+        let table_rows = convert_to_table_rows(chunk_headers, &chunk_data, &chunk_widths, row_ranges);
+        render_rows(term_width, chunk_widths, &table_rows);
 
         start = end;
-        chunk_index += 1;
     }
 }
 
-pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
+pub fn print_table_auto(
+    headers: &[String],
+    data: &[Vec<String>],
+    row_ranges: &[RowRange],
+) {
     let layout = build_table_layout(headers, data);
     let table_rows = convert_to_table_rows(headers, data, &layout.column_widths, row_ranges);
 

@@ -1,9 +1,9 @@
 // table_printer/config.rs
 
-pub const MIN_COLUMN_WIDTH: usize = 2;
+pub const MIN_COLUMN_WIDTH: usize = 3;
 pub const MAX_COLUMNS_CAP: usize = 12;
-pub const MAX_COLUMN_WIDTH: usize = 48;
-pub const COLUMN_OVERHEAD: usize = 4;
+pub const MAX_COLUMN_WIDTH: usize = 38;
+pub const COLUMN_OVERHEAD: usize = 1;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ColumnKind {

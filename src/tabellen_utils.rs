@@ -21,20 +21,22 @@ pub fn test_simple_table() {
         vec!["Peter".to_string(), "22".to_string(), "Hamburg".to_string()],
     ];
 
-    let mut max_lengths = vec![0, 0, 0];
+    //
+    /*let mut max_lengths = vec![0, 0, 0];
     for (i, header) in headers.iter().enumerate() {
         max_lengths[i] = max_lengths[i].max(header.len());
     }
-    for row in &data {
+    formatr row in &data {
         for (i, cell) in row.iter().enumerate() {
             if i < max_lengths.len() {
                 max_lengths[i] = max_lengths[i].max(cell.len());
             }
         }
-    }
+    }*/
 
     let zeilen_bereiche: Vec<(usize, usize)> = Vec::new();
-    print_table(&headers, data, &max_lengths, &zeilen_bereiche);
+    //print_table(&headers, data, &max_lengths, &zeilen_bereiche);
+    print_table(&headers, &data, &zeilen_bereiche);
 }
 
 // 2. Funktion: Anzeige der Nutzungshinweise

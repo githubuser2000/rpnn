@@ -1,37 +1,33 @@
-// reta_ausgabe-table_cell.rs
 // src/reta_ausgabe/table_cell.rs
-use crate::reta_ausgabe::utils::word_wrap;  // oder use super::utils::word_wrap;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone)]
 pub struct TableCell {
-    pub lines: Vec<String>,
     pub original_content: String,
 }
 
 impl TableCell {
-    pub fn new(content: String, width: usize) -> Self {
-        // Wende Wortumbruch an
-        let lines = word_wrap(&content, width);
-        
-        TableCell { 
-            lines,
+    pub fn new(content: String, _width: usize) -> Self {
+        TableCell {
             original_content: content,
         }
     }
-    
+
     pub fn get_line(&self, line_num: usize) -> Option<&str> {
-        self.lines.get(line_num).map(|s| s.as_str())
+        if line_num == 0 {
+            Some(self.original_content.as_str())
+        } else {
+            None
+        }
     }
-    
+
     pub fn line_count(&self) -> usize {
-        self.lines.len()
+        1
     }
-    
-    // Neue Methode für Unicode-Breite einer Zeile
+
     pub fn get_line_width(&self, line_num: usize) -> usize {
         self.get_line(line_num)
-            .map(|line| UnicodeWidthStr::width(line))
+            .map(UnicodeWidthStr::width)
             .unwrap_or(0)
     }
 }
@@ -51,9 +47,10 @@ impl TableRow {
             display_line_num,
         }
     }
-    
+
     pub fn max_line_count(&self) -> usize {
-        self.cells.iter()
+        self.cells
+            .iter()
             .map(|cell| cell.line_count())
             .max()
             .unwrap_or(0)
