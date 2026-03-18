@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::env;
 use crate::column_categories_complete::lade_kategorie_map;
@@ -9,11 +10,12 @@ use crate::column_manager::get_column_names;
 use crate::tabellen_utils::{test_simple_table, show_usage};
 use crate::argument_verarbeiter::SpaltenVerarbeiter;
 use crate::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::generated_columns::ParametersMain;
 
 // 5. Funktion: Haupt-Workflow
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== START TABELLEN-TEST ===");
-    test_simple_table();
+    //println!("=== START TABELLEN-TEST ===");
+    //test_simple_table();
 
     let args: Vec<String> = env::args().collect();
 
@@ -23,17 +25,21 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 1. Lade Kategorie-Daten
-    println!("\n📂 Lade Kategorie-Daten...");
+    //println!("\n📂 Lade Kategorie-Daten...");
     let kategorie_map = lade_kategorie_map();
 
     // 2. Verarbeite CLI-Argumente und Spaltennamen
     let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
-    let (bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
+    let (mut bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
 
     // 3. Verarbeite Kategorien
-    verarbeite_kategorien(&kategorie_map, &bereich, &spalten_namen)?;
+    //verarbeite_kategorien(&kategorie_map, &bereich, &spalten_namen)?;
     
-    // 4. Datenstruktur erstellen und ausgeben
+let generated_befehle: BTreeSet<String> =
+    verarbeite_kategorien(&kategorie_map, &mut bereich, &spalten_namen)?;
+
+let parameters_main = ParametersMain::default();
+   // 4. Datenstruktur erstellen und ausgeben
     /*let meine_liste = create_example_structure();
     println!("Struktur wurde erstellt: {:?}", meine_liste);
     println!("Struktur wurde erstellt. Hier ist die rekursive Ausgabe:");
@@ -48,7 +54,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let conn = import_csvs_to_sqlite(&dateien)?;
 
     // 6. Spalten abfragen
-    query_column_by_index(&conn, bereich)?;
+    query_column_by_index(&conn, bereich, &generated_befehle, &parameters_main)?;
 
     // 7. Spaltennamen abrufen
     let column_names = get_column_names(&conn)?;

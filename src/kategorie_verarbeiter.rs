@@ -1,46 +1,78 @@
+use std::collections::BTreeSet;
 use crate::cli::{TextBereich, parser::SpaltenNamen};
 use crate::column_categories_complete::KategorieMap;
+
+fn normalize_category_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+}
+
+fn is_primzahlkreuz_pro_contra_request(ober: &str, unter: &str) -> bool {
+    let ober = normalize_category_key(ober);
+    let unter = normalize_category_key(unter);
+
+    let ober_ok = matches!(
+        ober.as_str(),
+        "bedeutung" | "procontra" | "universum"
+    );
+
+    let unter_ok = matches!(
+        unter.as_str(),
+        "primzahlkreuzprocontra" | "primzahlkreuz"
+    );
+
+    ober_ok && unter_ok
+}
 
 // 4. Funktion: Verarbeitung der Kategorie-Map
 pub fn verarbeite_kategorien(
     kategorie_map: &KategorieMap,
-    bereich: &TextBereich,
-    spalten_namen: &SpaltenNamen
-) -> Result<(), Box<dyn std::error::Error>> {
-    if !bereich.spalten_bereiche.is_empty() {
-        let mut spalten_nummern = Vec::new();
-        for (von, bis) in &bereich.spalten_bereiche {
-            for nummer in *von..=*bis {
-                spalten_nummern.push(nummer);
-            }
-        }
+    bereich: &mut TextBereich,
+    spalten_namen: &SpaltenNamen,
+) -> Result<BTreeSet<String>, Box<dyn std::error::Error>> {
+    let mut generated_befehle = BTreeSet::new();
+
+    if is_primzahlkreuz_pro_contra_request(
+        &spalten_namen.oberkategorie,
+        &spalten_namen.unterkategorie,
+    ) {
+        generated_befehle.insert("primzahlkreuzprocontra".to_string());
         
-        let gefilterte = kategorie_map.filtere_nach_spaltennummern(&spalten_nummern);
-        println!("📈 Gefundene Kategorie-Einträge für Spalten {:?}: {}", 
-                bereich.spalten_bereiche, gefilterte.len());
-        
-        if !gefilterte.is_empty() {
-            let _sql = kategorie_map.generiere_sql_selects(
-                &spalten_namen.oberkategorie,
-                &spalten_namen.unterkategorie,
-                Some(&spalten_nummern)
-            );
-            // println!("\n{}", sql); // Optional: SQL ausgeben
-        }
+        // ganz wichtig: sonst läuft später der "keine Spalten gefunden"-Fehler an
+        bereich.spalten_gefunden = true;
+        bereich.spalten_gesucht = false;
+        bereich.spalten_gesucht2 = false;
+        return Ok(generated_befehle);
+    }
+
+    let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
+        &spalten_namen.oberkategorie,
+        &spalten_namen.unterkategorie,
+    );
+
+    if !gefundene_spalten.is_empty() {
+        bereich.spalten_gefunden = true;
+        bereich.spaltenreihenfolgeundnurdiese = gefundene_spalten
+            .iter()
+            .map(|&x| x as usize)
+            .collect();
+        println!(
+            "✅ Kategorie gefunden: {} → {} : {:?}",
+            spalten_namen.oberkategorie,
+            spalten_namen.unterkategorie,
+            gefundene_spalten
+        );
     } else {
-        println!("⚠️  Keine Spaltennummern verfügbar - überspringe Kategorie-Verarbeitung");
+        println!(
+            "⚠️ Keine Kategorie-Spalten gefunden für: {} → {}",
+            spalten_namen.oberkategorie,
+            spalten_namen.unterkategorie
+        );
     }
-    
-    // Zeige verfügbare Kategorien (optional)
-    let mut oberkategorien = std::collections::HashSet::new();
-    for eintrag in &kategorie_map.alle_eintraege {
-        oberkategorien.insert(eintrag.oberkategorie.clone());
-    }
-    
-    println!("ℹ️  Verfügbare Oberkategorien (erste 10):");
-    for (i, kategorie) in oberkategorien.iter().take(10).enumerate() {
-        println!("  {}. {}", i + 1, kategorie);
-    }
-    
-    Ok(())
+
+    let _ = bereich;
+
+    Ok(generated_befehle)
 }

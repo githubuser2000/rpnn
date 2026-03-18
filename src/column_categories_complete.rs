@@ -166,6 +166,9 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         let mut main_to_sub = HashMap::new();
         let mut alle_eintraege_temp = Vec::new();
         let data = vec![
+(vec!["Pro_Contra", "procontra", "dagegendafuer"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
+(vec!["Bedeutung", "bedeutung"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
+(vec!["Universum", "universum"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
         (vec!["Wichtigstes_zum_verstehen", "wichtigsteverstehen"], vec!["Wichtigste", "wichtigste"], vec![10, 5, 4, 8]),
         (vec!["Menschliches", "menschliches"], vec!["Mensch-zu-Tier", "menschtier", "tiermensch"], vec![314]),
         (vec!["Religionen", "religionen", "religion"], vec!["Superkräfte", "Superkraefte"], vec![444, 494, 496, 503]),
