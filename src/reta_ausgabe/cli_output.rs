@@ -34,31 +34,88 @@ impl<'a> CliOutput<'a> {
             tables_ref: tables,
         }
     }
+fn is_perfect_power(n: i32) -> bool {
+    if n < 4 {
+        return false;
+    }
 
-    pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
-        if !self.color_enabled {
-            return text.to_string();
+    let n64 = n as i64;
+    let max_exp = 31 - (n as u32).leading_zeros();
+
+    for exp in 2..=max_exp {
+        let base = (n as f64).powf(1.0 / exp as f64).round() as i64;
+        if base > 1 && base.pow(exp) == n64 {
+            return true;
         }
+    }
 
-        match self.out_type {
-            OutputSyntax::Plain => {
-                if line_num == 0 {
-                    text.red().on_white().bold().to_string()
-                } else if is_empty {
-                    if line_num % 2 == 0 {
-                        text.black().on_white().to_string()
-                    } else {
-                        text.white().on_black().to_string()
-                    }
-                } else if line_num % 2 == 0 {
+    false
+}
+fn is_prime(n: i32) -> bool {
+    if n <= 1 {
+        return false;
+    }
+    if n == 2 {
+        return true;
+    }
+    if n % 2 == 0 {
+        return false;
+    }
+
+    let mut d = 3;
+    while d * d <= n {
+        if n % d == 0 {
+            return false;
+        }
+        d += 2;
+    }
+
+    true
+}
+    pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
+    if !self.color_enabled {
+        return text.to_string();
+    }
+
+    match self.out_type {
+        OutputSyntax::Plain => {
+            if line_num == 0 {
+                return text.red().on_white().bold().to_string();
+            }
+
+            if is_empty {
+                return if line_num % 2 == 0 {
                     text.black().on_white().to_string()
                 } else {
                     text.white().on_black().to_string()
-                }
+                };
             }
-            _ => text.to_string(),
+
+            if Self::is_perfect_power(line_num) {
+                return if line_num % 2 == 0 {
+                    text.black().on_cyan().to_string()
+                } else {
+                    text.black().on_bright_cyan().to_string()
+                };
+            }
+
+            if Self::is_prime(line_num) {
+                return if line_num % 2 == 0 {
+                    text.black().on_yellow().bold().to_string()
+                } else {
+                    text.black().on_bright_yellow().to_string()
+                };
+            }
+
+            if line_num % 2 == 0 {
+                text.black().on_white().to_string()
+            } else {
+                text.white().on_bright_black().to_string()
+            }
         }
+        _ => text.to_string(),
     }
+}
 
     pub fn cliout2(&mut self, text: &str) {
         self.resulting_output.push(text.to_string());
