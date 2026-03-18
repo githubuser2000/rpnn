@@ -1,37 +1,50 @@
 // table_printer/config.rs
-pub const MIN_COLUMN_WIDTH: usize = 10;
-pub const MAX_COLUMNS_CAP: usize = 6;
-pub const MAX_COLUMN_WIDTH: usize = 34;
-pub const COLUMN_OVERHEAD: usize = 5;
 
-#[derive(Copy, Clone)]
+pub const MIN_COLUMN_WIDTH: usize = 2;
+pub const MAX_COLUMNS_CAP: usize = 12;
+pub const MAX_COLUMN_WIDTH: usize = 48;
+pub const COLUMN_OVERHEAD: usize = 4;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ColumnKind {
-    Id,
-    Number,
-    ShortText,
-    LongText,
+    Compact,
+    Normal,
+    Wide,
 }
 
 impl ColumnKind {
-    pub fn infer_from_header(header: &str) -> ColumnKind {
-        let h = header.to_lowercase();
-        if h == "id" || h.ends_with("_id") {
-            ColumnKind::Id
-        } else if h.contains("count") || h.contains("num") {
-            ColumnKind::Number
-        } else if h.contains("name") || h.contains("title") {
-            ColumnKind::ShortText
-        } else {
-            ColumnKind::LongText
-        }
+    /// Keine Wortsuche mehr im Header.
+    /// Der Header allein ist zu unzuverlässig für semantische Typisierung.
+    /// Die eigentliche Breitenlogik soll aus den Inhalten kommen.
+    pub fn infer_from_header(_header: &str) -> ColumnKind {
+        ColumnKind::Normal
     }
 
     pub fn min_width(&self) -> usize {
         match self {
-            ColumnKind::Id => 6,
-            ColumnKind::Number => 8,
-            ColumnKind::ShortText => 14,
-            ColumnKind::LongText => 20,
+            ColumnKind::Compact => 2,
+            ColumnKind::Normal => 4,
+            ColumnKind::Wide => 8,
         }
+    }
+
+    pub fn soft_width(&self) -> usize {
+        match self {
+            ColumnKind::Compact => 6,
+            ColumnKind::Normal => 12,
+            ColumnKind::Wide => 24,
+        }
+    }
+
+    pub fn growth_weight(&self) -> usize {
+        match self {
+            ColumnKind::Compact => 1,
+            ColumnKind::Normal => 2,
+            ColumnKind::Wide => 4,
+        }
+    }
+
+    pub fn prefers_compact_layout(&self) -> bool {
+        matches!(self, ColumnKind::Compact | ColumnKind::Normal)
     }
 }
