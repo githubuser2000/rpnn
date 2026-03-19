@@ -48,6 +48,33 @@ pub fn compute_max_lengths(headers: &[String], data: &[Vec<String>]) -> Vec<usiz
     max_lengths
 }
 
+/// ------------------------------------------------------------
+/// Funktion: compute_column_stats
+///
+/// Beschreibung:
+/// Berechnet statistische Kennzahlen für jede Spalte einer Tabelle.
+/// Diese Statistiken werden später verwendet, um Spaltenbreiten
+/// intelligent (inhaltlich gewichtet) zu bestimmen.
+///
+/// Parameter:
+/// - headers: &[String]
+///     Liste der Spaltenüberschriften
+///
+/// - data: &[Vec<String>]
+///     Tabelleninhalt, jede innere Vec ist eine Zeile
+///
+/// Rückgabe:
+/// - Vec<ColumnStats>
+///     Für jede Spalte ein Statistikobjekt mit:
+///       - header_width: Breite des Headers
+///       - max_width: maximale Zellbreite
+///       - total_width: Summe aller Zellbreiten
+///       - avg_width: Durchschnittliche Breite
+///       - non_empty_ratio: Anteil nicht-leerer Zellen
+///       - text_mass: gewichtete Gesamttextmenge
+///
+/// Zweck:
+/// Grundlage für dynamische Spaltenbreiten (wichtiger Kern deiner Engine)
 pub fn compute_column_stats(headers: &[String], data: &[Vec<String>]) -> Vec<ColumnStats> {
     let mut stats = Vec::with_capacity(headers.len());
 
@@ -176,6 +203,26 @@ pub fn compute_column_widths_linear_natural(
         .collect()
 }
 
+/// Kürzt Spaltenbreiten lokal so weit ein,
+/// bis sie in das verfügbare Budget des aktuellen Chunks passen.
+///
+/// Was die Funktion macht:
+/// - Summiert alle Breiten des Chunks
+/// - Wenn die Summe zu groß ist, werden Spalten schrittweise verkleinert
+/// - Keine Spalte wird unter `MIN_COLUMN_WIDTH` reduziert
+///
+/// Warum das nötig ist:
+/// - Explizite Breiten oder aggressive Statistik können ein Chunk-Budget sprengen
+/// - Dann muss lokal nachkorrigiert werden
+///
+/// Parameter:
+/// - `widths`:
+///   Spaltenbreiten des aktuellen Chunks
+/// - `budget`:
+///   Maximale Gesamtbreite für den aktuellen Chunk
+///
+/// Rückgabe:
+/// - Keine; `widths` wird direkt verändert
 pub fn shrink_widths_to_fit_budget(widths: &mut [usize], budget: usize) {
     let mut current: usize = widths.iter().sum();
 
