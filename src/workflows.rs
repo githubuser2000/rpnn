@@ -10,7 +10,7 @@ use crate::column_manager::get_column_names;
 use crate::tabellen_utils::{test_simple_table, show_usage};
 use crate::argument_verarbeiter::SpaltenVerarbeiter;
 use crate::kategorie_verarbeiter::verarbeite_kategorien;
-use crate::generated_columns::ParametersMain;
+use crate::generated_columns_words_registry::ParametersMain;
 
 // 5. Funktion: Haupt-Workflow
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
