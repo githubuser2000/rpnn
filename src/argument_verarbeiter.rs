@@ -68,7 +68,43 @@ fn verarbeite_automatische_spalten(
     spalten_namen: &SpaltenNamen,
     spalten_namen_liste: &SpaltenNamenListe
 ) -> Result<(), Box<dyn Error>> {
-    let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
+let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+    &spalten_namen.oberkategorie,
+    &spalten_namen.unterkategorie,
+);
+
+if !direkte_spalten.is_empty() {
+    println!("✅ Direkte Spalten gefunden");
+    self.setze_gefundene_spalten(bereich, direkte_spalten)?;
+    bereich.spalten_gefunden = true;
+    bereich.spalten_gesucht = true;
+    bereich.spalten_gesucht2 = false;
+    return Ok(());
+}
+
+if let Some(inference) = self.kategorie_map.infer_generated_pair(
+    &spalten_namen.oberkategorie,
+    &spalten_namen.unterkategorie,
+) {
+    if !inference.required_columns.is_empty() || !inference.generated_befehle.is_empty() {
+        println!(
+            "ℹ️ Generator-Inferenz: {:?} mit Basisspalten {:?}",
+            inference.generated_befehle,
+            inference.required_columns
+        );
+
+        if !inference.required_columns.is_empty() {
+            self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
+        }
+
+        bereich.spalten_gefunden = true;
+        bereich.spalten_gesucht = true;
+        bereich.spalten_gesucht2 = false;
+
+        return Ok(());
+    }
+}
+/*    let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
 
     if !hat_manuelle_spalten &&
        (spalten_namen.oberkategorie != "oberkategorie" ||
@@ -118,7 +154,7 @@ if !alle_gefundene_spalten.is_empty() {
 
     return Ok(());
 }
-}
+}*/
 // 🔥 ERST JETZT: Generator prüfen
 let mut generated_befehle = BTreeSet::new();
 let mut required_columns = BTreeSet::new();

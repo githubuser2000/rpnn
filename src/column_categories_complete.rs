@@ -30,6 +30,20 @@ pub struct KategorieMap {
     pub alle_eintraege: Vec<KategorieEintrag>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GeneratedInference {
+    pub generated_befehle: Vec<String>,
+    pub required_columns: Vec<u32>,
+    pub direct_columns: Vec<u32>,
+}
+
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+}
+
 impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
@@ -38,6 +52,78 @@ impl KategorieMap {
         };
         instanz.lade_kategorien();
         instanz
+    }
+    pub fn infer_generated_pair(
+        &self,
+        ober: &str,
+        unter: &str,
+    ) -> Option<GeneratedInference> {
+        let ober_n = normalize_key(ober);
+        let unter_n = normalize_key(unter);
+
+        let mut direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
+        direct_columns.sort();
+        direct_columns.dedup();
+
+        let has = |n: u32| direct_columns.contains(&n);
+
+        let mut generated_befehle = Vec::<String>::new();
+        let mut required_columns = Vec::<u32>::new();
+
+        // reiner Generatorfall aus words.py / column_categories_complete:
+        // procontra|bedeutung + primzahlkreuz -> leere direkte Spaltenliste
+        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
+            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
+        {
+            generated_befehle.push("primzahlkreuzprocontra".to_string());
+        }
+
+        // ab hier nur noch additive Inferenz aus Basis-Spalten
+        if has(9) {
+            generated_befehle.push("lovepolygon".to_string());
+            required_columns.push(9);
+        }
+
+        if has(132) {
+            generated_befehle.push("gleichheitfreiheit".to_string());
+            required_columns.push(132);
+        }
+
+        if has(242) {
+            generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+            required_columns.push(242);
+        }
+
+        if has(64) {
+            generated_befehle.push("primcreativitytype".to_string());
+            generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+            required_columns.push(64);
+        }
+
+        if has(19) || has(90) {
+            generated_befehle.push("vervielfachezeile".to_string());
+            if has(19) {
+                required_columns.push(19);
+            }
+            if has(90) {
+                required_columns.push(90);
+            }
+        }
+
+        generated_befehle.sort();
+        generated_befehle.dedup();
+        required_columns.sort();
+        required_columns.dedup();
+
+        if generated_befehle.is_empty() && direct_columns.is_empty() {
+            None
+        } else {
+            Some(GeneratedInference {
+                generated_befehle,
+                required_columns,
+                direct_columns,
+            })
+        }
     }
     // In column_categories_complete.rs, im impl KategorieMap:
     // In column_categories_complete.rs, ersetze die finde_spaltennummern_fuer_kategorien-Funktion:

@@ -41,6 +41,45 @@ pub fn apply_generated_columns(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if generated_befehle.contains("primzahlkreuzprocontra") {
         concat1_primzahlkreuz_pro_contra_into_headers_and_data(
+            headers, data, bereich, generated_befehle, parameters_main
+        )?;
+    }
+
+    if generated_befehle.contains("lovepolygon") {
+        concat_love_polygon_into_headers_and_data(headers, data)?;
+    }
+
+    if generated_befehle.contains("gleichheitfreiheit") {
+        concat_gleichheit_freiheit_dominieren_into_headers_and_data(headers, data)?;
+    }
+
+    if generated_befehle.contains("geistemotionenergiematerietopologie") {
+        concat_geist_emotion_energie_materie_topologie_into_headers_and_data(headers, data)?;
+    }
+
+    if generated_befehle.contains("primcreativitytype") {
+        concat_prim_creativity_type_into_headers_and_data(headers, data)?;
+    }
+
+    if generated_befehle.contains("mondexponzierenlogarithmustyp") {
+        concat_mond_exponzieren_logarithmus_typ_into_headers_and_data(headers, data)?;
+    }
+
+    if generated_befehle.contains("vervielfachezeile") {
+        concat_vervielfache_zeile_into_headers_and_data(headers, data)?;
+    }
+
+    Ok(())
+}
+/*pub fn apply_generated_columns(
+    headers: &mut Vec<String>,
+    data: &mut Vec<Vec<String>>,
+    bereich: &TextBereich,
+    generated_befehle: &BTreeSet<String>,
+    parameters_main: &ParametersMain,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if generated_befehle.contains("primzahlkreuzprocontra") {
+        concat1_primzahlkreuz_pro_contra_into_headers_and_data(
             headers,
             data,
             bereich,
@@ -51,7 +90,7 @@ pub fn apply_generated_columns(
 
     Ok(())
 }
-
+*/
 fn concat1_primzahlkreuz_pro_contra_into_headers_and_data(
     headers: &mut Vec<String>,
     data: &mut Vec<Vec<String>>,
