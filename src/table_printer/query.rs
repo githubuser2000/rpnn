@@ -1,13 +1,13 @@
 // table_printer/query.rs
-use std::collections::BTreeSet;
-use std::process;
-use rusqlite::Connection;
 use crate::cli::TextBereich;
-use crate::column_manager::{get_column_names, build_column_query};
+use crate::column_manager::{build_column_query, get_column_names};
 use crate::data_fetcher::fetch_data_with_stats;
-use unicode_width::UnicodeWidthStr;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
+use rusqlite::Connection;
+use std::collections::BTreeSet;
+use std::process;
+use unicode_width::UnicodeWidthStr;
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -51,10 +51,16 @@ fn normalize_token(s: &str) -> String {
 }
 
 fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
-    aliases.iter().any(|alias| tokens.contains(&normalize_token(alias)))
+    aliases
+        .iter()
+        .any(|alias| tokens.contains(&normalize_token(alias)))
 }
 
-fn selected_by_pair(tokens: &BTreeSet<String>, first_aliases: &[&str], second_aliases: &[&str]) -> bool {
+fn selected_by_pair(
+    tokens: &BTreeSet<String>,
+    first_aliases: &[&str],
+    second_aliases: &[&str],
+) -> bool {
     contains_any_alias(tokens, first_aliases) && contains_any_alias(tokens, second_aliases)
 }
 
@@ -62,21 +68,49 @@ fn should_use_full_table_for_generated(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> bool {
-    let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
-    if !parameters_main.bedeutung0.is_empty() { tokens.insert(normalize_token(&parameters_main.bedeutung0)); }
-    if !parameters_main.procontra0.is_empty() { tokens.insert(normalize_token(&parameters_main.procontra0)); }
-    if !parameters_main.grundstrukturen0.is_empty() { tokens.insert(normalize_token(&parameters_main.grundstrukturen0)); }
-    if !parameters_main.unter0.is_empty() { tokens.insert(normalize_token(&parameters_main.unter0)); }
+    let mut tokens: BTreeSet<String> = generated_befehle
+        .iter()
+        .map(|s| normalize_token(s))
+        .collect();
+    if !parameters_main.bedeutung0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.bedeutung0));
+    }
+    if !parameters_main.procontra0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.procontra0));
+    }
+    if !parameters_main.grundstrukturen0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.grundstrukturen0));
+    }
+    if !parameters_main.unter0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.unter0));
+    }
 
     const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
     const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
     const GRUNDSTRUKTUREN: &[&str] = &["Grundstrukturen", "grundstrukturen"];
     const MENSCHLICHES: &[&str] = &["Menschliches", "menschliches"];
-    const UNIVERSUM: &[&str] = &["Universum", "universum", "transzendentalien", "strukturalien", "kugel", "kugeln", "ball", "baelle", "bälle"];
+    const UNIVERSUM: &[&str] = &[
+        "Universum",
+        "universum",
+        "transzendentalien",
+        "strukturalien",
+        "kugel",
+        "kugeln",
+        "ball",
+        "baelle",
+        "bälle",
+    ];
     const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
     const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
     const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
-    const GALAXIE: &[&str] = &["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"];
+    const GALAXIE: &[&str] = &[
+        "Galaxie",
+        "galaxie",
+        "alteschriften",
+        "kreis",
+        "galaxien",
+        "kreise",
+    ];
 
     const PK_PROCONTRA_ALIASES: &[&str] = &[
         "Primzahlkreuz pro contra",
@@ -99,12 +133,7 @@ fn should_use_full_table_for_generated(
         "ordnenundfiltern",
         "filtern",
     ];
-    const GEIST_ALIASES: &[&str] = &[
-        "Geist__(15)",
-        "Geist_(15)",
-        "geist",
-        "bewusstsein",
-    ];
+    const GEIST_ALIASES: &[&str] = &["Geist__(15)", "Geist_(15)", "geist", "bewusstsein"];
     const MOND64_ALIASES: &[&str] = &[
         "Drittwichtigste",
         "drittwichtigste",
@@ -186,7 +215,10 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
     if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
         let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
         let offset = bereich.von_zeile.saturating_sub(1);
-        return format!("SELECT {} FROM csv_data LIMIT {} OFFSET {}", columns, anzahl, offset);
+        return format!(
+            "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
+            columns, anzahl, offset
+        );
     }
 
     format!("SELECT {} FROM csv_data", columns)
@@ -203,7 +235,10 @@ pub fn query_column_by_index(
     let (query, headers): (String, Vec<String>) =
         if should_use_full_table_for_generated(generated_befehle, parameters_main) {
             bereich.spalten_gefunden = true;
-            (build_full_table_row_query(&column_names, &bereich), column_names.clone())
+            (
+                build_full_table_row_query(&column_names, &bereich),
+                column_names.clone(),
+            )
         } else {
             build_column_query(&column_names, &mut bereich)?
         };
@@ -213,36 +248,36 @@ pub fn query_column_by_index(
         process::exit(1);
     }
 
-    let header_lengths: Vec<usize> = headers.iter()
+    let header_lengths: Vec<usize> = headers
+        .iter()
         .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
 
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    let (mut final_headers, mut final_data) =
-    if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+    let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
+
+    let (mut final_headers, mut final_data) = if is_generated_mode {
+        (headers.clone(), data.clone())
+    } else if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
         let null_basierte_indizes: Vec<usize> = bereich
             .spaltenreihenfolgeundnurdiese
             .iter()
             .map(|&i| if i == 0 { 0 } else { i - 1 })
             .collect();
 
-        let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
-            .unwrap_or_else(|_| headers.clone());
+        let sorted_headers =
+            sort_by_indices(&headers, &null_basierte_indizes).unwrap_or_else(|_| headers.clone());
 
         let sorted_data: Vec<Vec<String>> = data
             .iter()
-            .map(|row| {
-                sort_by_indices(row, &null_basierte_indizes)
-                    .unwrap_or_else(|_| row.clone())
-            })
+            .map(|row| sort_by_indices(row, &null_basierte_indizes).unwrap_or_else(|_| row.clone()))
             .collect();
 
         (sorted_headers, sorted_data)
     } else {
         (headers.clone(), data.clone())
     };
-
     apply_generated_columns(
         &mut final_headers,
         &mut final_data,
@@ -268,7 +303,11 @@ fn sort_by_indices<T: Clone>(items: &[T], indices: &[usize]) -> Result<Vec<T>, S
     let mut result = Vec::new();
     for &idx in indices {
         if idx >= items.len() {
-            return Err(format!("Index {} außerhalb des Bereichs (0..{})", idx, items.len()));
+            return Err(format!(
+                "Index {} außerhalb des Bereichs (0..{})",
+                idx,
+                items.len()
+            ));
         }
         result.push(items[idx].clone());
     }
