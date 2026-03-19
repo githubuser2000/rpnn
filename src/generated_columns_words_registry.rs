@@ -494,13 +494,13 @@ pub fn gleichheit_freiheit_vergleich(zahl: usize) -> String {
         out.push("Einschränkung der Freiheit".to_string());
     }
     if zahl % 4 == 2 {
-        if (zahl - 2) % 8 == 0 {
+        if zahl >= 2 && (zahl - 2) % 8 == 0 {
             out.push("Gleichheit".to_string());
         }
-        if (zahl - 6) % 16 == 0 {
+        if zahl >= 6 && (zahl - 6) % 16 == 0 {
             out.push("den anderen überbieten wollen".to_string());
         }
-        if (zahl - 14) % 16 == 0 {
+        if zahl >= 14 && (zahl - 14) % 16 == 0 {
             out.push("den anderen unterbieten wollen".to_string());
         }
     }
