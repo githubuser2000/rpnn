@@ -1,6 +1,6 @@
-// parser.rs - korrigierte Version
 use crate::if_is_zeilen_angabe::{is_zeilen_angabe, str_as_generator_to_vec_i64};
 use super::bereich::TextBereich;
+use std::collections::BTreeSet;
 
 // Neuer Datentyp für Spaltennamen-Konfiguration
 #[derive(Debug, Clone)]
@@ -23,9 +23,65 @@ impl Default for SpaltenNamen {
     }
 }
 
+fn is_flag(s: &str) -> bool {
+    s.starts_with('-')
+}
+
+fn print_all_oberkategorien(
+    kategorie_map: Option<&crate::column_categories_complete::KategorieMap>,
+) {
+    if let Some(kategorie_map) = kategorie_map {
+        let mut set = BTreeSet::new();
+
+        for eintrag in &kategorie_map.alle_eintraege {
+            let ok = eintrag.oberkategorie.trim();
+            if !ok.is_empty() {
+                set.insert(ok.to_string());
+            }
+        }
+
+        println!("Mögliche erste Wörter nach --spaltenname:");
+        for item in set {
+            println!("{item}");
+        }
+    } else {
+        println!("Keine Kategoriedaten verfügbar.");
+    }
+}
+
+fn print_passende_unterkategorien(
+    kategorie_map: Option<&crate::column_categories_complete::KategorieMap>,
+    oberkategorie: &str,
+) {
+    if let Some(kategorie_map) = kategorie_map {
+        let mut set = BTreeSet::new();
+        let needle = oberkategorie.to_lowercase();
+
+        for eintrag in &kategorie_map.alle_eintraege {
+            if eintrag.oberkategorie.to_lowercase() == needle {
+                let uk = eintrag.unterkategorie.trim();
+                if !uk.is_empty() {
+                    set.insert(uk.to_string());
+                }
+            }
+        }
+
+        if set.is_empty() {
+            println!("Keine passenden zweiten Wörter für '{oberkategorie}' gefunden.");
+        } else {
+            println!("Mögliche zweite Wörter für '{oberkategorie}':");
+            for item in set {
+                println!("{item}");
+            }
+        }
+    } else {
+        println!("Keine Kategoriedaten verfügbar.");
+    }
+}
+
 // Rückgabetyp erweitert um Spaltennamen
 pub fn parse_cli_args(
-    args: &[String], 
+    args: &[String],
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>
 ) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe) {
     let mut minuses = Vec::with_capacity(args.len());
@@ -33,16 +89,17 @@ pub fn parse_cli_args(
 
     let mut bereich = TextBereich::default();
     let mut spalten_namen = SpaltenNamen::default();
-    
+
     let automatische_spalten_suche = false;
     let gesuchte_oberkategorie = String::new();
     let gesuchte_unterkategorie = String::new();
 
-    let mut iter = args.iter().enumerate();
+    let mut iter = args.iter().enumerate().peekable();
     let mut spalten_namen_liste = SpaltenNamenListe::default();
+
     while let Some((_i, arg)) = iter.next() {
         let mut dash_count = 0;
-        
+
         for c in arg.chars() {
             if c == '-' {
                 dash_count += 1;
@@ -55,13 +112,13 @@ pub fn parse_cli_args(
             "--vorhervonausschnitt" => {
                 if let Some((_, nachfolger)) = iter.next() {
                     println!("📋 Verarbeite --vorhervonausschnitt: {}", nachfolger);
-                    
+
                     if is_zeilen_angabe(nachfolger) {
                         if let Some(bereichspaare) = parse_zeilenangabe_zu_bereichen(nachfolger) {
                             if !bereichspaare.is_empty() {
                                 bereich.zeilen_bereiche = bereichspaare.clone();
                                 bereich.von_zeile = bereichspaare[0].0;
-                                
+
                                 if let Some(last_bereich) = bereichspaare.last() {
                                     bereich.bis_zeile = last_bereich.1;
                                 }
@@ -74,88 +131,106 @@ pub fn parse_cli_args(
                     }
                 }
             }
+
             "--keineleereninhalte" => {
                 bereich.keineleereninhalte = true;
             }
-            /*
-            "--spalten" => {
-                if let Some((_, ober)) = iter.next() {
-                    if let Some((_, unter)) = iter.next() {
-                        println!("🔍 Parameter --spalten: '{}' '{}'", ober, unter);
-                        bereich.spalten_gesucht = true; 
-                        bereich.spalten_gesucht2 = true; 
-                        gesuchte_oberkategorie = ober.clone();
-                        gesuchte_unterkategorie = unter.clone();
-                        automatische_spalten_suche = true;
-                        
-                        spalten_namen.oberkategorie = ober.clone();
-                        spalten_namen.unterkategorie = unter.clone();
-                        
-                        println!("✅ Suche: '{}' → '{}'", ober, unter);
-                    }
-                }
-            }*/
+
             "--breiten" => {
-    if let Some((_, nachfolger)) = iter.next() {
-        let breiten: Vec<usize> = nachfolger
-            .split(',')
-            .map(|s| {
-                let trimmed = s.trim();
-                trimmed.parse::<usize>().unwrap_or_else(|_| {
-                    panic!(
-                        "Ungültige Breitenliste '{}': '{}' ist keine Zahl",
-                        nachfolger, trimmed
-                    )
-                })
-            })
-            .collect();
+                if let Some((_, nachfolger)) = iter.next() {
+                    let breiten: Vec<usize> = nachfolger
+                        .split(',')
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            trimmed.parse::<usize>().unwrap_or_else(|_| {
+                                panic!(
+                                    "Ungültige Breitenliste '{}': '{}' ist keine Zahl",
+                                    nachfolger, trimmed
+                                )
+                            })
+                        })
+                        .collect();
 
-        if breiten.is_empty() {
-            panic!("--breiten darf nicht leer sein");
-        }
-
-        bereich.breiten = breiten;
-    } else {
-        panic!("--breiten erwartet eine kommagetrennte Zahlenliste");
-    }
-}
-            "--spaltenname" => {
-                if let Some((_, name1)) = iter.next() {
-                    if let Some((_, name2)) = iter.next() {
-                        spalten_namen.oberkategorie = name1.clone();
-                        spalten_namen.unterkategorie = name2.clone();
-                        spalten_namen_liste.eintraege.push(SpaltenNamen {
-                            oberkategorie: name1.clone(),                                               unterkategorie: name2.clone(),                                          });
-                        bereich.spalten_gesucht =   true; 
-                        bereich.spalten_gesucht2 =   true; 
+                    if breiten.is_empty() {
+                        panic!("--breiten darf nicht leer sein");
                     }
+
+                    bereich.breiten = breiten;
+                } else {
+                    panic!("--breiten erwartet eine kommagetrennte Zahlenliste");
                 }
             }
+
+            "--spaltenname" => {
+                // Fall 1: gar nichts dahinter oder direkt nächster Flag
+                let first = match iter.peek() {
+                    None => {
+                        print_all_oberkategorien(kategorie_map);
+                        std::process::exit(0);
+                    }
+                    Some((_, next_arg)) if is_flag(next_arg) => {
+                        print_all_oberkategorien(kategorie_map);
+                        std::process::exit(0);
+                    }
+                    Some(_) => {
+                        let (_, v) = iter.next().unwrap();
+                        v.clone()
+                    }
+                };
+
+                // Fall 2: erstes Wort da, aber zweites fehlt oder nächster Wert ist schon ein Flag
+                let second = match iter.peek() {
+                    None => {
+                        print_passende_unterkategorien(kategorie_map, &first);
+                        std::process::exit(0);
+                    }
+                    Some((_, next_arg)) if is_flag(next_arg) => {
+                        print_passende_unterkategorien(kategorie_map, &first);
+                        std::process::exit(0);
+                    }
+                    Some(_) => {
+                        let (_, v) = iter.next().unwrap();
+                        v.clone()
+                    }
+                };
+
+                // Fall 3: beide da -> normal übernehmen
+                spalten_namen.oberkategorie = first.clone();
+                spalten_namen.unterkategorie = second.clone();
+
+                spalten_namen_liste.eintraege.push(SpaltenNamen {
+                    oberkategorie: first,
+                    unterkategorie: second,
+                });
+
+                bereich.spalten_gesucht = true;
+                bereich.spalten_gesucht2 = true;
+            }
+
             "--spaltenreihenfolgeundnurdiese" => {
-	        if let Some((_, nachfolger)) = iter.next() {
-	    
-	            let spalten: Vec<usize> = nachfolger
-	                .split(',')
-	                .map(|s| {
-	                    s.parse::<usize>().unwrap_or_else(|_| {
-	                        panic!(
-	                            "Ungültige Spaltenliste '{}': '{}' ist keine Zahl",
-	                            nachfolger, s
-	                        )
-	                    })
-	                })
-	                .collect();
-	    
-	            if spalten.is_empty() {
-	                panic!("--spaltenreihenfolgeundnurdiese darf nicht leer sein");
-	            }
-	            // hier speichern / weiterreichen
-	            bereich.spaltenreihenfolgeundnurdiese = spalten;
-	        } else {
-	            panic!("--spaltenreihenfolgeundnurdiese erwartet eine kommagetrennte Zahlenliste");
-	        }
-	    }
-            
+                if let Some((_, nachfolger)) = iter.next() {
+                    let spalten: Vec<usize> = nachfolger
+                        .split(',')
+                        .map(|s| {
+                            s.parse::<usize>().unwrap_or_else(|_| {
+                                panic!(
+                                    "Ungültige Spaltenliste '{}': '{}' ist keine Zahl",
+                                    nachfolger, s
+                                )
+                            })
+                        })
+                        .collect();
+
+                    if spalten.is_empty() {
+                        panic!("--spaltenreihenfolgeundnurdiese darf nicht leer sein");
+                    }
+
+                    bereich.spaltenreihenfolgeundnurdiese = spalten;
+                } else {
+                    panic!("--spaltenreihenfolgeundnurdiese erwartet eine kommagetrennte Zahlenliste");
+                }
+            }
+
             "--zeilevon" => {
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
@@ -168,7 +243,7 @@ pub fn parse_cli_args(
                     }
                 }
             }
-            
+
             "--zeilebis" => {
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
@@ -179,29 +254,29 @@ pub fn parse_cli_args(
                     }
                 }
             }
-            
+
             "--spaltevon" => {
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
                         bereich.von_spalte = zahl;
                         bereich.spalten_bereiche.push((zahl, zahl));
-                        bereich.spalten_gesucht = true; 
+                        bereich.spalten_gesucht = true;
                     }
                 }
             }
-            
+
             "--spaltebis" => {
                 if let Some((_, nachfolger)) = iter.next() {
                     if let Ok(zahl) = nachfolger.parse::<usize>() {
                         bereich.bis_spalte = zahl;
                         if let Some(last) = bereich.spalten_bereiche.last_mut() {
                             last.1 = zahl;
-                            bereich.spalten_gesucht = true; 
+                            bereich.spalten_gesucht = true;
                         }
                     }
                 }
             }
-            
+
             "--help" | "-h" => {
                 println!("📖 Hilfe:");
                 println!("  --spalten OBER UNTER      Suche Spaltennummern für Kategorien");
@@ -217,10 +292,8 @@ pub fn parse_cli_args(
                 println!("  mein-rpnn --spalten Menschliches Motive");
                 println!("  mein-rpnn --spalten Universum Transzendentalien --zeilevon 1 --zeilebis 10");
             }
-            
-            _ => {
-                // Keine Ausgabe für unbekannte Parameter
-            }
+
+            _ => {}
         }
 
         let param = if dash_count > 0 {
@@ -233,60 +306,26 @@ pub fn parse_cli_args(
         params.push(param);
     }
 
-    // Automatische Spaltensuche durchführen
     if automatische_spalten_suche {
         if let Some(kategorie_map) = kategorie_map {
-            // SUCHFUNKTION AUFRUFEN - KORREKTE SYNTAX
-            // ERSETZEN durch exakte Suche:
             let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
                 &gesuchte_oberkategorie,
                 &gesuchte_unterkategorie
             );
-                       
+
             if !gefundene_spalten.is_empty() {
-                /*
-                println!("❌ Keine Spaltennummern gefunden für '{}' → '{}'", 
-                         gesuchte_oberkategorie, gesuchte_unterkategorie);
-                
-                // Zeige Vorschläge
-                let mut vorschlaege = Vec::new();
-                
-                // Finde ähnliche Oberkategorien
-                for eintrag in &kategorie_map.alle_eintraege {
-                    if eintrag.oberkategorie.to_lowercase().contains(
-                        &gesuchte_oberkategorie.to_lowercase()
-                    ) {
-                        vorschlaege.push(eintrag.oberkategorie.clone());
-                    }
-                }
-                
-                if !vorschlaege.is_empty() {
-                    println!("ℹ️  Ähnliche Oberkategorien:");
-                    let unique: std::collections::HashSet<_> = vorschlaege.into_iter().collect();
-                    for kat in unique.iter().take(5) {
-                        println!("   - {}", kat);
-                    }
-                }
-                
-                println!("⚠️  Verwende Standard-Spalte 1");
-                bereich.spalten_bereiche.push((1, 1));
-                bereich.von_spalte = 1;
-                bereich.bis_spalte = 1;
-                panic!("Keine Spalten gefunden für: '{}' → '{}'",
-           gesuchte_oberkategorie, gesuchte_unterkategorie);
-            } else {*/
                 println!("✅ {} Spaltennummern gefunden", gefundene_spalten.len());
-                
-                // Spaltenbereiche setzen
-                let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
+
+                let mut sorted: Vec<usize> =
+                    gefundene_spalten.iter().map(|&n| n as usize).collect();
                 sorted.sort();
                 sorted.dedup();
-                
+
                 bereich.spalten_bereiche.clear();
                 for &num in &sorted {
                     bereich.spalten_bereiche.push((num, num));
                 }
-                
+
                 if !bereich.spalten_bereiche.is_empty() {
                     bereich.von_spalte = bereich.spalten_bereiche[0].0;
                     bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
@@ -306,27 +345,25 @@ pub fn parse_cli_args(
 // Hilfsfunktion zum Parsen von Zeilenangaben (bereinigt)
 pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, usize)>> {
     let mut bereiche = Vec::new();
-    
-    // 1. Versuche Generator-Notation
+
     if let Some(zahlen) = str_as_generator_to_vec_i64(text) {
         for &zahl in &zahlen {
             if zahl >= 0 {
                 bereiche.push((zahl as usize, zahl as usize));
             }
         }
-        
+
         if !bereiche.is_empty() {
             bereiche.sort_by(|a, b| a.0.cmp(&b.0));
             return Some(bereiche);
         }
     }
-    
-    // 2. Manuelles Parsing
+
     let teile: Vec<&str> = text.split(',').collect();
-    
+
     if teile.len() == 1 {
         let teil = teile[0].trim();
-        
+
         if teil.contains('-') {
             let bereichs_teile: Vec<&str> = teil.split('-').collect();
             if bereichs_teile.len() == 2 {
@@ -343,11 +380,11 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
     } else {
         for teil in teile {
             let teil_trimmed = teil.trim();
-            
+
             if teil_trimmed.is_empty() {
                 continue;
             }
-            
+
             if teil_trimmed.contains('-') {
                 let bereichs_teile: Vec<&str> = teil_trimmed.split('-').collect();
                 if bereichs_teile.len() == 2 {
@@ -360,13 +397,13 @@ pub(crate) fn parse_zeilenangabe_zu_bereichen(text: &str) -> Option<Vec<(usize, 
                     }
                 }
             }
-            
+
             if let Ok(num) = teil_trimmed.parse::<usize>() {
                 bereiche.push((num, num));
             }
         }
     }
-    
+
     if !bereiche.is_empty() {
         bereiche.sort_by(|a, b| a.0.cmp(&b.0));
         Some(bereiche)
