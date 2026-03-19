@@ -13,6 +13,14 @@ use crate::table_printer::table_utils::{
     RowRange,
 };
 
+
+fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize> {
+    match explizite_breiten.len() {
+        0 => None,
+        1 => Some(explizite_breiten[0]),
+        _ => explizite_breiten.get(index).copied(),
+    }
+}
 fn filter_small_lines_in_cell(cell: &str) -> String {
     cell.lines()
         .map(str::trim)
@@ -53,12 +61,11 @@ pub fn print_table_chunked_with_line_numbers(
         let mut used = 0usize;
 
         while end < headers.len() {
-            let guessed_width = if let Some(&breite) = explizite_breiten.get(end) {
+            let guessed_width = if let Some(breite) = get_explicit_width(explizite_breiten, end) {
                 breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
             } else {
                 estimate_natural_width_for_chunking(&headers[end], data, end)
             };
-
             let needed = guessed_width + COLUMN_OVERHEAD + 1;
 
             if used + needed > available_total {
@@ -96,11 +103,10 @@ pub fn print_table_chunked_with_line_numbers(
             compute_column_widths_from_global_mass(&chunk_headers, &chunk_data, chunk_budget);
 
         for (local_i, global_i) in (start..end).enumerate() {
-            if let Some(&breite) = explizite_breiten.get(global_i) {
+            if let Some(breite) = get_explicit_width(explizite_breiten, global_i) {
                 chunk_widths[local_i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
             }
         }
-
         let current_sum: usize = chunk_widths.iter().sum();
         if current_sum > chunk_budget {
             let mut shrinkable = chunk_widths.clone();

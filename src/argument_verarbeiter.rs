@@ -42,13 +42,13 @@ impl<'a> SpaltenVerarbeiter<'a> {
 
 
     pub fn verarbeite(&self) -> Result<VerarbeitungsErgebnis, Box<dyn Error>> {
-        println!("🔍 CLI Argumente: {:?}", self.args);
+        //println!("🔍 CLI Argumente: {:?}", self.args);
 
         let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste) =
             parse_cli_args(self.args, Some(self.kategorie_map));
 
-        println!("📊 Bereich nach Parser: {:?}", bereich);
-        println!("📝 Spaltennamen: {:?}", spalten_namen);
+        //println!("📊 Bereich nach Parser: {:?}", bereich);
+        //println!("📝 Spaltennamen: {:?}", spalten_namen);
 
         self.verarbeite_automatische_spalten(
             &mut bereich,
@@ -74,16 +74,16 @@ fn verarbeite_automatische_spalten(
        (spalten_namen.oberkategorie != "oberkategorie" ||
         spalten_namen.unterkategorie != "unterkategorie") {
 
-        println!(
+        /*println!(
             "\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
             spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );
+        );*/
 
         if is_primzahlkreuz_pro_contra_request(
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie,
         ) {
-            println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
+            //println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
 
             bereich.spalten_gefunden = true;
             bereich.spalten_gesucht = true;
@@ -106,7 +106,7 @@ for spalten_namen in &spalten_namen_liste.eintraege {
 }
 
 if !alle_gefundene_spalten.is_empty() {
-    println!("✅ Direkte Spalten gefunden → KEIN Generator nötig");
+    //println!("✅ Direkte Spalten gefunden → KEIN Generator nötig");
 
     alle_gefundene_spalten.sort_unstable();
     alle_gefundene_spalten.dedup();
@@ -129,10 +129,10 @@ if try_resolve_generated_pair(
     &mut generated_befehle,
     &mut required_columns,
 ) {
-    println!(
+    /*println!(
         "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
         generated_befehle, required_columns
-    );
+    );*/
 
     let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
     self.setze_gefundene_spalten(bereich, required)?;
@@ -181,10 +181,10 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
                     &mut generated_befehle,
                     &mut required_columns,
                 ) {
-                    println!(
+                    /*println!(
                         "ℹ️ Fallback auf generierte Spaltenauflösung: {:?} → Basisspalten {:?}",
                         generated_befehle, required_columns
-                    );
+                    );*/
 
                     let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
                     self.setze_gefundene_spalten(bereich, required)?;
@@ -207,7 +207,7 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         bereich: &mut TextBereich,
         gefundene_spalten: Vec<u32>,
     ) -> Result<(), Box<dyn Error>> {
-        println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
+        //println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
 
         let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
         sorted.sort();
@@ -222,10 +222,10 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         if !bereich.spalten_bereiche.is_empty() {
             bereich.von_spalte = bereich.spalten_bereiche[0].0;
             bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
-            println!(
+            /*println!(
                 "📊 Automatisch erzeugte Spaltenbereiche: {:?}",
                 bereich.spalten_bereiche
-            );
+            );*/
         }
 
         Ok(())
@@ -236,14 +236,14 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         bereich: &mut TextBereich,
         spalten_namen: &SpaltenNamen,
     ) -> Result<(), Box<dyn Error>> {
-        println!(
+        /*println!(
             "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
             spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );
+        );*/
 
-        self.zeige_alternative_kombinationen();
+        //self.zeige_alternative_kombinationen();
 
-        println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
+        //println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
         bereich.von_spalte = 1;
         bereich.bis_spalte = 1;
 

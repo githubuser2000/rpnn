@@ -46,5 +46,5 @@ pub fn show_usage() {
     println!("mein-rpnn --vorhervonausschnitt 7-12 --spaltenname Menschliches Motive");
     println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive --spaltenname Menschliches Liebe");
     println!("mein-rpnn --vorhervonausschnitt 7,9 --spaltenname Menschliches Motive --spaltenname Menschliches Liebe --breiten 10,20,30,10");
-    println!("mein-rpnn --vorhervonausschnitt 7-12 --spaltevon 2 --spaltebis 4 --spaltenreihenfolgeundnurdiese 3,2");
+    println!("mein-rpnn --vorhervonausschnitt 7-12,14,19-21 --spaltevon 2 --spaltebis 4 --spaltenreihenfolgeundnurdiese 3,2 --breite 18");
 }

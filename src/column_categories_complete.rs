@@ -45,7 +45,7 @@ impl KategorieMap {
 // In column_categories_complete.rs:
 // NEUE Funktion für exakte Suche - innerhalb des impl Blocks!
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-    println!("🔍 EXAKTE Suche nach: '{}' → '{}'", ober, unter);
+    //println!("🔍 EXAKTE Suche nach: '{}' → '{}'", ober, unter);
     
     let mut gefundene = Vec::new();
     
@@ -59,15 +59,15 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
         
         // EXAKTER Vergleich
         if haupt_normalized == ober_gesucht {
-            println!("✅ Exakte Oberkategorie gefunden: {}", haupt_name);
+            //println!("✅ Exakte Oberkategorie gefunden: {}", haupt_name);
             
             for (unter_name, spaltennummern) in unter_map {
                 let unter_normalized = unter_name.to_lowercase().replace("_", "");
                 
                 // EXAKTER Vergleich
                 if unter_normalized == unter_gesucht {
-                    println!("✅ Exakte Unterkategorie gefunden: {} → {} : {:?}", 
-                            haupt_name, unter_name, spaltennummern);
+                    /*println!("✅ Exakte Unterkategorie gefunden: {} → {} : {:?}", 
+                            haupt_name, unter_name, spaltennummern);*/
                     gefundene.extend_from_slice(spaltennummern);
                 }
             }
@@ -76,14 +76,14 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     
     // Fallback: Durchsuche alle Einträge
     if gefundene.is_empty() {
-        println!("⚠️  Exakte Suche in flachen Daten...");
+        //println!("⚠️  Exakte Suche in flachen Daten...");
         for eintrag in &self.alle_eintraege {
             let ober_normalized = eintrag.oberkategorie.to_lowercase().replace("_", "");
             let unter_normalized = eintrag.unterkategorie.to_lowercase().replace("_", "");
             
             if ober_normalized == ober_gesucht && unter_normalized == unter_gesucht {
-                println!("✅ Exakt in flachen Daten: {} → {} : {:?}", 
-                        eintrag.oberkategorie, eintrag.unterkategorie, eintrag.spaltennummern);
+                /*println!("✅ Exakt in flachen Daten: {} → {} : {:?}", 
+                        eintrag.oberkategorie, eintrag.unterkategorie, eintrag.spaltennummern);*/
                 gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
         }
@@ -92,18 +92,18 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     gefundene.sort();
     gefundene.dedup();
     
-    if !gefundene.is_empty() {
+    /*if !gefundene.is_empty() {
         println!("📊 {} exakte Spaltennummern gefunden: {:?}", gefundene.len(), gefundene);
     } else {
         println!("❌ Keine exakte Übereinstimmung");
-    }
+    }*/
     
     gefundene
 }
 // UND eine Version, die speziell für die Haupt-Datenstruktur optimiert ist:
 
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
-    println!("🔍 Suche nach: '{}' → '{}'", ober, unter);
+    //println!("🔍 Suche nach: '{}' → '{}'", ober, unter);
     
     let mut gefundene = Vec::new();
     
@@ -118,7 +118,7 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
                 let such_unter_normalized = unter.to_lowercase().replace("_", "");
                 
                 if unter_normalized == such_unter_normalized {
-                    println!("✅ Gefunden: {} → {} : {:?}", haupt_name, unter_name, spaltennummern);
+                    //println!("✅ Gefunden: {} → {} : {:?}", haupt_name, unter_name, spaltennummern);
                     gefundene.extend_from_slice(spaltennummern);
                 }
             }
@@ -127,15 +127,15 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     
     // Wenn nichts gefunden, durchsuche alle Einträge
     if gefundene.is_empty() {
-        println!("⚠️  Suche in flachen Daten...");
+        //println!("⚠️  Suche in flachen Daten...");
         for eintrag in &self.alle_eintraege {
             let ober_normalized = eintrag.oberkategorie.to_lowercase().replace("_", "");
             let unter_normalized = eintrag.unterkategorie.to_lowercase().replace("_", "");
             
             if ober_normalized.contains(&ober.to_lowercase().replace("_", "")) &&
                unter_normalized.contains(&unter.to_lowercase().replace("_", "")) {
-                println!("✅ Gefunden (erweitert): {} → {} : {:?}", 
-                        eintrag.oberkategorie, eintrag.unterkategorie, eintrag.spaltennummern);
+                /*println!("✅ Gefunden (erweitert): {} → {} : {:?}", 
+                        eintrag.oberkategorie, eintrag.unterkategorie, eintrag.spaltennummern);*/
                 gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
         }
@@ -144,11 +144,11 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     gefundene.sort();
     gefundene.dedup();
     
-    if !gefundene.is_empty() {
+    /*if !gefundene.is_empty() {
         println!("📊 {} Spaltennummern gefunden: {:?}", gefundene.len(), gefundene);
     } else {
         println!("❌ Keine Spaltennummern gefunden");
-    }
+    }*/
     
     gefundene
 }

@@ -26,9 +26,9 @@ pub fn build_query_with_continuous_range(
     columns_clause: &str,
     bereich: &TextBereich,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    println!("  📐 Berechne kontinuierlichen Zeilenbereich:");
-    println!("    - Startzeile: {}", bereich.von_zeile);
-    println!("    - Endzeile: {}", bereich.bis_zeile);
+    //println!("  📐 Berechne kontinuierlichen Zeilenbereich:");
+    //println!("    - Startzeile: {}", bereich.von_zeile);
+    //println!("    - Endzeile: {}", bereich.bis_zeile);
     
     if bereich.von_zeile == 0 {
         println!("    ❌ FEHLER: Zeilenindizes müssen bei 1 beginnen");
@@ -41,7 +41,7 @@ pub fn build_query_with_continuous_range(
     }
 
     let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
-    println!("    - Anzahl Zeilen (inklusive): {}", anzahl);
+    //println!("    - Anzahl Zeilen (inklusive): {}", anzahl);
 
     if anzahl == 0 {
         println!("    ❌ FEHLER: Ungültiger Zeilenbereich (Anzahl = 0)");
@@ -49,15 +49,15 @@ pub fn build_query_with_continuous_range(
     }
 
     let offset = bereich.von_zeile.saturating_sub(1);
-    println!("    - SQL OFFSET (0-basiert): {}", offset);
-    println!("    - SQL LIMIT: {}", anzahl);
+    //println!("    - SQL OFFSET (0-basiert): {}", offset);
+    //println!("    - SQL LIMIT: {}", anzahl);
 
     let query = format!(
         "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
         columns_clause, anzahl, offset
     );
     
-    println!("    ✅ Kontinuierliche Query generiert");
+    //println!("    ✅ Kontinuierliche Query generiert");
     Ok(query)
 }
 
@@ -65,15 +65,15 @@ pub fn build_query_with_row_ranges_enhanced(
     columns_clause: &str,
     zeilen_bereiche: &[(usize, usize)],
 ) -> Result<String, Box<dyn std::error::Error>> {
-    println!("  📐 Verarbeite diskrete Zeilenbereiche:");
+    //println!("  📐 Verarbeite diskrete Zeilenbereiche:");
     
     if zeilen_bereiche.is_empty() {
         println!("    ❌ FEHLER: Zeilenbereiche dürfen nicht leer sein");
         return Err("Zeilenbereiche dürfen nicht leer sein".into());
     }
 
-    println!("    - Eingabe: {} Zeilenbereiche", zeilen_bereiche.len());
-    println!("    - Bereiche: {:?}", zeilen_bereiche);
+    //println!("    - Eingabe: {} Zeilenbereiche", zeilen_bereiche.len());
+    //println!("    - Bereiche: {:?}", zeilen_bereiche);
     
     let mut einzelne_zeilen = Vec::new();
     let mut bereiche = Vec::new();
@@ -81,19 +81,19 @@ pub fn build_query_with_row_ranges_enhanced(
     for &(start, end) in zeilen_bereiche {
         if start == end {
             einzelne_zeilen.push(start);
-            println!("      → Einzelne Zeile: {}", start);
+            //println!("      → Einzelne Zeile: {}", start);
         } else {
             bereiche.push((start, end));
-            println!("      → Bereich: {} bis {} ({} Zeilen)", start, end, end - start + 1);
+            //println!("      → Bereich: {} bis {} ({} Zeilen)", start, end, end - start + 1);
         }
     }
     
-    println!("\n    📊 Analyse:");
-    println!("      - {} einzelne Zeilen", einzelne_zeilen.len());
-    println!("      - {} Bereiche", bereiche.len());
+    //println!("\n    📊 Analyse:");
+    //println!("      - {} einzelne Zeilen", einzelne_zeilen.len());
+    //println!("      - {} Bereiche", bereiche.len());
     
     if bereiche.is_empty() && !einzelne_zeilen.is_empty() {
-        println!("    ⚡ MODUS: Optimierte Query für einzelne Zeilen");
+        //println!("    ⚡ MODUS: Optimierte Query für einzelne Zeilen");
         
         let row_numbers_str = einzelne_zeilen
             .iter()
@@ -101,8 +101,8 @@ pub fn build_query_with_row_ranges_enhanced(
             .collect::<Vec<_>>()
             .join(", ");
             
-        println!("      - 0-basierte Zeilennummern: {}", row_numbers_str);
-        println!("      - Anzahl Zeilen: {}", einzelne_zeilen.len());
+        //println!("      - 0-basierte Zeilennummern: {}", row_numbers_str);
+        //println!("      - Anzahl Zeilen: {}", einzelne_zeilen.len());
         
         let query = format!(
             "SELECT {} FROM (
@@ -114,22 +114,22 @@ pub fn build_query_with_row_ranges_enhanced(
             columns_clause, row_numbers_str
         );
         
-        println!("      ✅ Optimierte Query generiert");
+        //println!("      ✅ Optimierte Query generiert");
         return Ok(query);
     }
     
-    println!("    📋 MODUS: Allgemeine Query für gemischte Bereiche");
+    //println!("    📋 MODUS: Allgemeine Query für gemischte Bereiche");
     
     let mut all_row_numbers = Vec::new();
     
     for &zeile in &einzelne_zeilen {
         all_row_numbers.push(zeile);
-        println!("      → Hinzugefügt einzelne Zeile: {}", zeile);
+        //println!("      → Hinzugefügt einzelne Zeile: {}", zeile);
     }
     
     for (start, end) in &bereiche {
         let anzahl_im_bereich = end - start + 1;
-        println!("      → Verarbeite Bereich {}..{} ({} Zeilen)", start, end, anzahl_im_bereich);
+        //println!("      → Verarbeite Bereich {}..{} ({} Zeilen)", start, end, anzahl_im_bereich);
         
         for row in *start..=*end {
             all_row_numbers.push(row);
@@ -137,14 +137,14 @@ pub fn build_query_with_row_ranges_enhanced(
     }
     
     let vor_dedup = all_row_numbers.len();
-    println!("    📈 Vor Dedup: {} Zeilennummern", vor_dedup);
+    //println!("    📈 Vor Dedup: {} Zeilennummern", vor_dedup);
     
     all_row_numbers.sort();
     all_row_numbers.dedup();
     
-    println!("    📊 Nach Dedup:");
-    println!("      - Eindeutige Zeilen: {}", all_row_numbers.len());
-    println!("      - Entfernte Duplikate: {}", vor_dedup - all_row_numbers.len());
+    //println!("    📊 Nach Dedup:");
+    //println!("      - Eindeutige Zeilen: {}", all_row_numbers.len());
+    //println!("      - Entfernte Duplikate: {}", vor_dedup - all_row_numbers.len());
     
     if all_row_numbers.is_empty() {
         println!("    ❌ FEHLER: Keine gültigen Zeilen ausgewählt");
@@ -157,8 +157,8 @@ pub fn build_query_with_row_ranges_enhanced(
         .collect::<Vec<_>>()
         .join(", ");
 
-    println!("    📝 0-basierte Zeilennummern für SQL: {}", row_numbers_str);
-    println!("    📋 Gesamt: {} eindeutige Zeilen", all_row_numbers.len());
+    //println!("    📝 0-basierte Zeilennummern für SQL: {}", row_numbers_str);
+    //println!("    📋 Gesamt: {} eindeutige Zeilen", all_row_numbers.len());
 
     let query = format!(
         "SELECT {} FROM (
@@ -170,6 +170,6 @@ pub fn build_query_with_row_ranges_enhanced(
         columns_clause, row_numbers_str
     );
 
-    println!("      ✅ Allgemeine Query generiert");
+    //println!("      ✅ Allgemeine Query generiert");
     Ok(query)
 }

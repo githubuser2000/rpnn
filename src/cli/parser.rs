@@ -131,7 +131,25 @@ pub fn parse_cli_args(
                     }
                 }
             }
+            "--breite" => {
+                if let Some((_, nachfolger)) = iter.next() {
+                    let breite = nachfolger.trim().parse::<usize>().unwrap_or_else(|_| {
+                        panic!(
+                            "Ungültige Breite '{}': keine Zahl",
+                            nachfolger
+                        )
+                    });
 
+                    if breite == 0 {
+                        panic!("--breite muss größer als 0 sein");
+                    }
+
+                    // Eine einzige Breite = globale Breite für alle Spalten
+                    bereich.breiten = vec![breite];
+                } else {
+                    panic!("--breite erwartet genau eine Zahl");
+                }
+            }
             "--keineleereninhalte" => {
                 bereich.keineleereninhalte = true;
             }
