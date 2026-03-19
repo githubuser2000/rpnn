@@ -1,3 +1,4 @@
+// file: column_manager/column_selector.rs
 use rusqlite::Connection;
 use crate::cli::TextBereich;
 

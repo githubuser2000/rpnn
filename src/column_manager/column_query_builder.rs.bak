@@ -1,15 +1,21 @@
+// file: column_manager/column_query_builder.rs
 use crate::cli::TextBereich;
 use super::column_selector::{collect_spalten_nummern, resolve_spaltennamen};
 use super::row_query_builder::build_row_query;
 use super::validation::validate_spalten_input_with_pair;
 
+
+
 pub fn build_column_query(
     column_names: &[String],
     bereich: &mut TextBereich,
 ) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
+
+    // 🔧 NEU: Paar extrahieren
     let ober = column_names.get(0).cloned().unwrap_or_default();
     let unter = column_names.get(1).cloned().unwrap_or_default();
 
+    // 🔧 NEU: richtige Validation
     validate_spalten_input_with_pair(
         bereich,
         &ober,
