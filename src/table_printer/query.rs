@@ -57,73 +57,64 @@ println!("Headerslänge vor Sortierung: {}", headers.len());
     println!("Daten vor Sortierung: {} Zeilen", data.len());
     */
     // SORTIERUNG DER SPALTEN: NUR wenn spaltenreihenfolgeundnurdiese befüllt ist
-   let (mut final_headers, mut final_data) =
-        if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-            let null_basierte_indizes: Vec<usize> = bereich
-                .spaltenreihenfolgeundnurdiese
-                .iter()
-                .map(|&i| if i == 0 { 0 } else { i - 1 })
-                .collect();
+    let (mut final_headers, mut final_data) =
+    if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+        let null_basierte_indizes: Vec<usize> = bereich
+            .spaltenreihenfolgeundnurdiese
+            .iter()
+            .map(|&i| if i == 0 { 0 } else { i - 1 })
+            .collect();
 
-            let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
-                .unwrap_or_else(|_| headers.clone());
+        let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
+            .unwrap_or_else(|_| headers.clone());
 
-            let sorted_data: Vec<Vec<String>> = data
-                .iter()
-                .map(|row| {
-                    sort_by_indices(row, &null_basierte_indizes)
-                        .unwrap_or_else(|_| row.clone())
-                })
-                .collect();
+        let sorted_data: Vec<Vec<String>> = data
+            .iter()
+            .map(|row| {
+                sort_by_indices(row, &null_basierte_indizes)
+                    .unwrap_or_else(|_| row.clone())
+            })
+            .collect();
 
-            (sorted_headers, sorted_data)
-        } else {
-            (headers.clone(), data.clone())
-        };
+        (sorted_headers, sorted_data)
+    } else {
+        (headers.clone(), data.clone())
+    };
 
-    apply_generated_columns(
-        &mut final_headers,
-        &mut final_data,
-        &bereich,
-        generated_befehle,
-        parameters_main,
-    )?;
- 
-   // Kontroll-Ausgabe
-    //println!("=== 📊 FINALE DATEN ===");
-    //println!("Finale Headers: {} Spalten", final_headers.len());
-    for (i, header) in final_headers.iter().enumerate() {
-        let original_index = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() && i < bereich.spaltenreihenfolgeundnurdiese.len() {
-            format!("(ursprünglich Spalte {})", bereich.spaltenreihenfolgeundnurdiese[i])
-        } else {
-            "".to_string()
-        };
-        println!("  Ausgabe-Spalte {} {}: '{}'", i + 1, original_index, header);
-    }
-    
-    println!("Finale Daten: {} Zeilen", final_data.len());
-    if !final_data.is_empty() {
-        println!("Erste Zeile hat {} Spalten", final_data[0].len());
-        for (i, value) in final_data[0].iter().enumerate() {
-            let spalten_nr = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() && i < bereich.spaltenreihenfolgeundnurdiese.len() {
-                format!("(Spalte {})", bereich.spaltenreihenfolgeundnurdiese[i])
-            } else {
-                "".to_string()
-            };
-            println!("  Wert {} {}: '{}'", i + 1, spalten_nr, value);
-        }
-    }
-    
-    apply_generated_columns(
+apply_generated_columns(
     &mut final_headers,
     &mut final_data,
     &bereich,
     generated_befehle,
     parameters_main,
 )?;
-    print_table_chunked(&final_headers, &final_data, &bereich.zeilen_bereiche, &bereich.breiten);
-    //println!("Spalten wurden gefunden: {}", bereich.spalten_gefunden);
-    Ok(bereich)
+
+// Für Primzahlkreuz nur die 2 neu generierten Spalten ausgeben
+if generated_befehle.contains("primzahlkreuzprocontra") {
+    if final_headers.len() >= 2 {
+        let keep_from = final_headers.len() - 2;
+        final_headers = final_headers[keep_from..].to_vec();
+
+        final_data = final_data
+            .into_iter()
+            .map(|row| {
+                if row.len() >= 2 {
+                    row[row.len() - 2..].to_vec()
+                } else {
+                    row
+                }
+            })
+            .collect();
+    }
+}
+
+print_table_chunked(
+    &final_headers,
+    &final_data,
+    &bereich.zeilen_bereiche,
+    &bereich.breiten,
+);
+      Ok(bereich)
 }
 
 fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T>, String> {
