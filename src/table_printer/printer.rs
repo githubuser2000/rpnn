@@ -7,11 +7,10 @@ use crate::table_printer::table_utils::{
     compute_column_stats,
     compute_column_widths_from_global_mass,
     convert_to_table_rows,
+    convert_to_table_rows_with_offset,
     get_terminal_width,
     RowRange,
 };
-
-
 
 
 /// Erstellt das Ausgabeobjekt für das eigentliche Tabellen-Rendering.
@@ -83,6 +82,15 @@ pub fn print_table(
     data: &[Vec<String>],
     row_ranges: &[RowRange],
 ) {
+    print_table_with_offset(headers, data, row_ranges, 1);
+}
+
+pub fn print_table_with_offset(
+    headers: &[String],
+    data: &[Vec<String>],
+    row_ranges: &[RowRange],
+    original_start_line: usize,
+) {
     let term_width = get_terminal_width();
     let available_budget = term_width
         .saturating_sub(1)
@@ -91,7 +99,14 @@ pub fn print_table(
     let column_widths =
         compute_column_widths_from_global_mass(headers, data, available_budget);
 
-    let table_rows = convert_to_table_rows(headers, data, &column_widths, row_ranges);
+    let table_rows = convert_to_table_rows_with_offset(
+        headers,
+        data,
+        &column_widths,
+        row_ranges,
+        original_start_line,
+    );
+
     render_rows(term_width, column_widths, &table_rows);
 }
 
@@ -187,28 +202,30 @@ pub fn print_table_chunked(
     row_ranges: &[RowRange],
     explizite_breiten: &[usize],
 ) {
-    // Bestimme die aktuelle Terminalbreite.
+    print_table_chunked_with_offset(
+        headers,
+        data,
+        row_ranges,
+        explizite_breiten,
+        1,
+    );
+}
+
+pub fn print_table_chunked_with_offset(
+    headers: &[String],
+    data: &[Vec<String>],
+    row_ranges: &[RowRange],
+    explizite_breiten: &[usize],
+    original_start_line: usize,
+) {
     let term_width = get_terminal_width();
-
-    // Sicherheitsabstand für Rahmen und Ausgabeformat.
     let available_total = term_width.saturating_sub(3);
-
-    // Startindex des nächsten Chunks in der Gesamttabelle.
     let mut start = 0usize;
 
-    // Solange noch Spalten übrig sind, werden weitere Chunks gebildet.
     while start < headers.len() {
         let mut end = start;
         let mut used = 0usize;
 
-        // ------------------------------------------------------------
-        // BLOCK 1:
-        // Chunk-Grenze bestimmen
-        //
-        // Hier wird nur grob geschätzt, wie viele Spalten in den
-        // nächsten Chunk passen. Das ist absichtlich noch NICHT
-        // die endgültige Breitenberechnung.
-        // ------------------------------------------------------------
         while end < headers.len() {
             let guessed_width = if let Some(&breite) = explizite_breiten.get(end) {
                 breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
@@ -216,12 +233,9 @@ pub fn print_table_chunked(
                 estimate_natural_width_for_chunking(&headers[end], data, end)
             };
 
-            // Benötigter Platz dieser Spalte inklusive Overhead.
             let needed = guessed_width + COLUMN_OVERHEAD + 1;
 
-            // Wenn die Spalte nicht mehr hineinpasst, endet der Chunk hier.
             if used + needed > available_total {
-                // Mindestens eine Spalte muss immer in den Chunk passen.
                 if end == start {
                     end += 1;
                 }
@@ -232,18 +246,10 @@ pub fn print_table_chunked(
             end += 1;
         }
 
-        // Zusätzlicher Schutz: Ein Chunk darf nie leer sein.
         if end <= start {
             end = (start + 1).min(headers.len());
         }
 
-        // ------------------------------------------------------------
-        // BLOCK 2:
-        // Lokalen Chunk aus der Gesamttabelle ausschneiden
-        //
-        // Ab jetzt arbeiten wir nur noch mit den Spalten des aktuellen
-        // Chunks und nicht mehr mit der Gesamttabelle.
-        // ------------------------------------------------------------
         let chunk_headers: Vec<String> = headers[start..end].to_vec();
 
         let chunk_data: Vec<Vec<String>> = data
@@ -255,84 +261,51 @@ pub fn print_table_chunked(
             })
             .collect();
 
-        // ------------------------------------------------------------
-        // BLOCK 3:
-        // Budget des aktuellen Chunks bestimmen
-        //
-        // Vom verfügbaren Platz wird der Spalten-Overhead abgezogen.
-        // Das verbleibende Budget darf auf die tatsächlichen
-        // Spaltenbreiten verteilt werden.
-        // ------------------------------------------------------------
         let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
         let chunk_budget = available_total.saturating_sub(chunk_overhead);
 
-        // ------------------------------------------------------------
-        // BLOCK 4:
-        // Finale Breiten für diesen Chunk lokal berechnen
-        //
-        // Das ist die eigentliche Korrektur:
-        // Nicht globale Breiten ausschneiden,
-        // sondern für den aktuellen Chunk echte Statistik berechnen.
-        // ------------------------------------------------------------
         let mut chunk_widths =
             compute_column_widths_from_global_mass(&chunk_headers, &chunk_data, chunk_budget);
 
-        // ------------------------------------------------------------
-        // BLOCK 5:
-        // Explizite Benutzerbreiten auf lokale Chunk-Indizes abbilden
-        //
-        // `explizite_breiten` ist global indiziert,
-        // `chunk_widths` ist lokal indiziert.
-        // Deshalb wird hier global -> lokal gemappt.
-        // ------------------------------------------------------------
         for (local_i, global_i) in (start..end).enumerate() {
             if let Some(&breite) = explizite_breiten.get(global_i) {
                 chunk_widths[local_i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
             }
         }
 
-        // ------------------------------------------------------------
-        // BLOCK 6:
-        // Falls der Chunk jetzt zu breit geworden ist,
-        // lokal wieder in das Budget einkürzen
-        // ------------------------------------------------------------
-let current_sum: usize = chunk_widths.iter().sum();
-if current_sum > chunk_budget {
-    let mut shrinkable = chunk_widths.clone();
-    let mut current_total: usize = shrinkable.iter().sum();
+        let current_sum: usize = chunk_widths.iter().sum();
+        if current_sum > chunk_budget {
+            let mut shrinkable = chunk_widths.clone();
+            let mut current_total: usize = shrinkable.iter().sum();
 
-    while current_total > chunk_budget {
-        let mut changed = false;
+            while current_total > chunk_budget {
+                let mut changed = false;
 
-        for w in shrinkable.iter_mut() {
-            if *w > MIN_COLUMN_WIDTH && current_total > chunk_budget {
-                *w -= 1;
-                current_total -= 1;
-                changed = true;
+                for w in shrinkable.iter_mut() {
+                    if *w > MIN_COLUMN_WIDTH && current_total > chunk_budget {
+                        *w -= 1;
+                        current_total -= 1;
+                        changed = true;
+                    }
+                }
+
+                if !changed {
+                    break;
+                }
             }
+
+            chunk_widths = shrinkable;
         }
 
-        if !changed {
-            break;
-        }
-    }
-
-    chunk_widths = shrinkable;
-}
-        // ------------------------------------------------------------
-        // BLOCK 7:
-        // Chunk in Render-Strukturen umwandeln und ausgeben
-        // ------------------------------------------------------------
-        let table_rows = convert_to_table_rows(
+        let table_rows = convert_to_table_rows_with_offset(
             &chunk_headers,
             &chunk_data,
             &chunk_widths,
             row_ranges,
+            original_start_line,
         );
 
         render_rows(term_width, chunk_widths, &table_rows);
-
-        // Nächster Chunk startet hinter dem aktuellen Endindex.
         start = end;
     }
 }

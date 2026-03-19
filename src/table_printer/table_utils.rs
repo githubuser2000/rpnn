@@ -397,12 +397,22 @@ pub fn convert_to_table_rows(
     column_widths: &[usize],
     row_ranges: &[RowRange],
 ) -> Vec<TableRow> {
+    convert_to_table_rows_with_offset(headers, data, column_widths, row_ranges, 1)
+}
+
+pub fn convert_to_table_rows_with_offset(
+    headers: &[String],
+    data: &[Vec<String>],
+    column_widths: &[usize],
+    row_ranges: &[RowRange],
+    original_start_line: usize,
+) -> Vec<TableRow> {
     let mut rows = Vec::new();
     rows.push(build_header_row(headers, column_widths));
 
     if row_ranges.is_empty() {
         for (idx, row_data) in data.iter().enumerate() {
-            let line_num = idx + 1;
+            let line_num = original_start_line + idx;
             rows.push(build_data_row(
                 row_data,
                 headers.len(),

@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
 use crate::data_fetcher::fetch_data_with_stats;
-use crate::table_printer::printer::print_table_chunked;
+use crate::table_printer::printer::print_table_chunked_with_offset;
 use unicode_width::UnicodeWidthStr;
 use crate::generated_columns::{apply_generated_columns, ParametersMain};
 // --- Query-Funktion ---
@@ -108,12 +108,28 @@ if generated_befehle.contains("primzahlkreuzprocontra") {
     }
 }
 
-print_table_chunked(
-    &final_headers,
-    &final_data,
-    &bereich.zeilen_bereiche,
-    &bereich.breiten,
-);
+let hat_kontinuierlichen_sql_bereich =
+    bereich.von_zeile > 0 && bereich.bis_zeile > 0;
+
+if hat_kontinuierlichen_sql_bereich {
+    let render_row_ranges: Vec<(usize, usize)> = Vec::new();
+
+    print_table_chunked_with_offset(
+        &final_headers,
+        &final_data,
+        &render_row_ranges,
+        &bereich.breiten,
+        bereich.von_zeile,
+    );
+} else {
+    print_table_chunked_with_offset(
+        &final_headers,
+        &final_data,
+        &bereich.zeilen_bereiche,
+        &bereich.breiten,
+        1,
+    );
+}
       Ok(bereich)
 }
 
