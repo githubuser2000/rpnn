@@ -10,8 +10,108 @@ use crate::table_printer::table_utils::{
     convert_to_table_rows_with_offset,
     get_terminal_width,
     RowRange,
+    convert_to_table_rows_with_line_numbers,
 };
 
+pub fn print_table_chunked_with_line_numbers(
+    headers: &[String],
+    data: &[Vec<String>],
+    explizite_breiten: &[usize],
+    original_line_numbers: &[usize],
+) {
+    let term_width = get_terminal_width();
+    let available_total = term_width.saturating_sub(3);
+    let mut start = 0usize;
+
+    while start < headers.len() {
+        let mut end = start;
+        let mut used = 0usize;
+
+        while end < headers.len() {
+            let guessed_width = if let Some(&breite) = explizite_breiten.get(end) {
+                breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
+            } else {
+                estimate_natural_width_for_chunking(&headers[end], data, end)
+            };
+
+            let needed = guessed_width + COLUMN_OVERHEAD + 1;
+
+            if used + needed > available_total {
+                if end == start {
+                    end += 1;
+                }
+                break;
+            }
+
+            used += needed;
+            end += 1;
+        }
+
+        if end <= start {
+            end = (start + 1).min(headers.len());
+        }
+
+        let chunk_headers: Vec<String> = headers[start..end].to_vec();
+
+        let chunk_data: Vec<Vec<String>> = data
+            .iter()
+            .map(|row| {
+                (start..end)
+                    .map(|i| row.get(i).cloned().unwrap_or_default())
+                    .collect()
+            })
+            .collect();
+
+        let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
+        let chunk_budget = available_total.saturating_sub(chunk_overhead);
+
+        let mut chunk_widths =
+            compute_column_widths_from_global_mass(&chunk_headers, &chunk_data, chunk_budget);
+
+        for (local_i, global_i) in (start..end).enumerate() {
+            if let Some(&breite) = explizite_breiten.get(global_i) {
+                chunk_widths[local_i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+            }
+        }
+
+        let current_sum: usize = chunk_widths.iter().sum();
+        if current_sum > chunk_budget {
+            let mut shrinkable = chunk_widths.clone();
+            let mut current_total: usize = shrinkable.iter().sum();
+
+            while current_total > chunk_budget {
+                let mut changed = false;
+
+                for w in shrinkable.iter_mut() {
+                    if *w > MIN_COLUMN_WIDTH && current_total > chunk_budget {
+                        *w -= 1;
+                        current_total -= 1;
+                        changed = true;
+                    }
+                }
+
+                if !changed {
+                    break;
+                }
+            }
+
+            chunk_widths = shrinkable;
+        }
+
+        let table_rows = convert_to_table_rows_with_line_numbers(
+            &chunk_headers,
+            &chunk_data,
+            &chunk_widths,
+            original_line_numbers,
+        );
+
+        render_rows(term_width, chunk_widths, &table_rows);
+        if end < headers.len() {
+    println!();
+}
+        start = end;
+    }
+}
 
 /// Erstellt das Ausgabeobjekt für das eigentliche Tabellen-Rendering.
 ///

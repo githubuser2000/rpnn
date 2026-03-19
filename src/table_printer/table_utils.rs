@@ -6,6 +6,32 @@ use crate::table_printer::config::{
     COLUMN_OVERHEAD, MAX_COLUMNS_CAP, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH,
 };
 
+pub fn convert_to_table_rows_with_line_numbers(
+    headers: &[String],
+    data: &[Vec<String>],
+    column_widths: &[usize],
+    original_line_numbers: &[usize],
+) -> Vec<TableRow> {
+    let mut rows = Vec::new();
+    rows.push(build_header_row(headers, column_widths));
+
+    for (idx, row_data) in data.iter().enumerate() {
+        let line_num = original_line_numbers
+            .get(idx)
+            .copied()
+            .unwrap_or(idx + 1);
+
+        rows.push(build_data_row(
+            row_data,
+            headers.len(),
+            column_widths,
+            line_num,
+        ));
+    }
+
+    rows
+}
+
 pub type RowRange = (usize, usize);
 
 #[derive(Debug, Clone)]

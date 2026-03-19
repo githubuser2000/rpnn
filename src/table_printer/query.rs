@@ -5,9 +5,47 @@ use rusqlite::Connection;
 use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
 use crate::data_fetcher::fetch_data_with_stats;
-use crate::table_printer::printer::print_table_chunked_with_offset;
 use unicode_width::UnicodeWidthStr;
 use crate::generated_columns::{apply_generated_columns, ParametersMain};
+use crate::table_printer::printer::print_table_chunked_with_line_numbers;
+
+fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
+    if !bereich.zeilen_bereiche.is_empty() {
+        let mut nums = Vec::new();
+
+        for &(from, to) in &bereich.zeilen_bereiche {
+            if from == 0 || to == 0 || from > to {
+                continue;
+            }
+
+            for n in from..=to {
+                nums.push(n);
+            }
+        }
+
+        nums.sort();
+        nums.dedup();
+
+        if nums.len() > data_len {
+            nums.truncate(data_len);
+        }
+
+        return nums;
+    }
+
+    if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
+        let mut nums: Vec<usize> = (bereich.von_zeile..=bereich.bis_zeile).collect();
+
+        if nums.len() > data_len {
+            nums.truncate(data_len);
+        }
+
+        return nums;
+    }
+
+    (1..=data_len).collect()
+}
+
 // --- Query-Funktion ---
 fn build_full_table_row_query(column_names: &[String]) -> String {
     let columns = column_names
@@ -108,28 +146,14 @@ if generated_befehle.contains("primzahlkreuzprocontra") {
     }
 }
 
-let hat_kontinuierlichen_sql_bereich =
-    bereich.von_zeile > 0 && bereich.bis_zeile > 0;
+let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
 
-if hat_kontinuierlichen_sql_bereich {
-    let render_row_ranges: Vec<(usize, usize)> = Vec::new();
-
-    print_table_chunked_with_offset(
-        &final_headers,
-        &final_data,
-        &render_row_ranges,
-        &bereich.breiten,
-        bereich.von_zeile,
-    );
-} else {
-    print_table_chunked_with_offset(
-        &final_headers,
-        &final_data,
-        &bereich.zeilen_bereiche,
-        &bereich.breiten,
-        1,
-    );
-}
+print_table_chunked_with_line_numbers(
+    &final_headers,
+    &final_data,
+    &bereich.breiten,
+    &original_line_numbers,
+);
       Ok(bereich)
 }
 
