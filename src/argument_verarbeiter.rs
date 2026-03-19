@@ -40,6 +40,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         Ok((ergebnis.bereich, ergebnis.spalten_namen))
     }
 
+
     pub fn verarbeite(&self) -> Result<VerarbeitungsErgebnis, Box<dyn Error>> {
         println!("🔍 CLI Argumente: {:?}", self.args);
 
@@ -91,32 +92,60 @@ fn verarbeite_automatische_spalten(
             return Ok(());
         }
 
-        let mut generated_befehle = BTreeSet::new();
-        let mut required_columns = BTreeSet::new();
+        // 🔥 ERST: normale direkte Spalten suchen
+let mut alle_gefundene_spalten: Vec<u32> = Vec::new();
 
-        if try_resolve_generated_pair(
+for spalten_namen in &spalten_namen_liste.eintraege {
+    let gefundene_spalten: Vec<u32> =
+        self.kategorie_map.finde_spaltennummern_fuer_kategorien(
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie,
-            &mut generated_befehle,
-            &mut required_columns,
-        ) {
-            println!(
-                "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
-                generated_befehle, required_columns
-            );
+        );
 
-            let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
-            self.setze_gefundene_spalten(bereich, required)?;
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
-            return Ok(());
-        }
+    alle_gefundene_spalten.extend(gefundene_spalten);
+}
 
-        self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
-    }
+if !alle_gefundene_spalten.is_empty() {
+    println!("✅ Direkte Spalten gefunden → KEIN Generator nötig");
 
-    Ok(())
+    alle_gefundene_spalten.sort_unstable();
+    alle_gefundene_spalten.dedup();
+
+    self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
+    bereich.spalten_gefunden = true;
+    bereich.spalten_gesucht = true;
+    bereich.spalten_gesucht2 = false;
+
+    return Ok(());
+}
+}
+// 🔥 ERST JETZT: Generator prüfen
+let mut generated_befehle = BTreeSet::new();
+let mut required_columns = BTreeSet::new();
+
+if try_resolve_generated_pair(
+    &spalten_namen.oberkategorie,
+    &spalten_namen.unterkategorie,
+    &mut generated_befehle,
+    &mut required_columns,
+) {
+    println!(
+        "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
+        generated_befehle, required_columns
+    );
+
+    let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
+    self.setze_gefundene_spalten(bereich, required)?;
+    bereich.spalten_gefunden = true;
+    bereich.spalten_gesucht = true;
+    bereich.spalten_gesucht2 = false;
+
+    return Ok(());
+}
+
+// 🔥 FALLBACK wie vorher
+self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
+            Ok(())
 }
 
     fn suche_und_setze_spalten(
