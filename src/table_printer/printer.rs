@@ -1,23 +1,48 @@
 use std::collections::BTreeSet;
 
 use crate::reta_ausgabe::{CliOutput, OutputSyntax, TableRow, Tables};
-use crate::table_printer::config::{COLUMN_OVERHEAD, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH};
+use crate::table_printer::config::{COLUMN_OVERHEAD, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH};
 use crate::table_printer::table_utils::{
     build_table_layout,
     compute_column_stats,
     compute_column_widths_from_global_mass,
     convert_to_table_rows,
+    convert_to_table_rows_with_line_numbers,
     convert_to_table_rows_with_offset,
     get_terminal_width,
     RowRange,
-    convert_to_table_rows_with_line_numbers,
 };
+
+fn filter_small_lines_in_cell(cell: &str) -> String {
+    cell.lines()
+        .map(str::trim)
+        .filter(|line| line.chars().count() > 2)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+fn sanitize_chunk_data(chunk_data: &[Vec<String>], keineleereninhalte: bool) -> Vec<Vec<String>> {
+    if !keineleereninhalte {
+        return chunk_data.to_vec();
+    }
+
+    chunk_data
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|cell| filter_small_lines_in_cell(cell))
+                .collect()
+        })
+        .collect()
+}
 
 pub fn print_table_chunked_with_line_numbers(
     headers: &[String],
     data: &[Vec<String>],
     explizite_breiten: &[usize],
     original_line_numbers: &[usize],
+    keineleereninhalte: bool,
 ) {
     let term_width = get_terminal_width();
     let available_total = term_width.saturating_sub(3);
@@ -53,7 +78,7 @@ pub fn print_table_chunked_with_line_numbers(
 
         let chunk_headers: Vec<String> = headers[start..end].to_vec();
 
-        let chunk_data: Vec<Vec<String>> = data
+        let raw_chunk_data: Vec<Vec<String>> = data
             .iter()
             .map(|row| {
                 (start..end)
@@ -61,6 +86,8 @@ pub fn print_table_chunked_with_line_numbers(
                     .collect()
             })
             .collect();
+
+        let chunk_data = sanitize_chunk_data(&raw_chunk_data, keineleereninhalte);
 
         let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
         let chunk_budget = available_total.saturating_sub(chunk_overhead);
@@ -106,30 +133,15 @@ pub fn print_table_chunked_with_line_numbers(
         );
 
         render_rows(term_width, chunk_widths, &table_rows);
+
         if end < headers.len() {
-    println!();
-}
+            println!();
+        }
+
         start = end;
     }
 }
 
-/// Erstellt das Ausgabeobjekt für das eigentliche Tabellen-Rendering.
-///
-/// Was die Funktion macht:
-/// - Baut ein `CliOutput`-Objekt auf
-/// - Schaltet Farbausgabe, Tabellenbreite, Spaltenbreiten und Zeilennummern ein
-/// - Konfiguriert die Ausgabe so, dass immer genau eine Tabelle gerendert wird
-///
-/// Parameter:
-/// - `tables`:
-///   Tabellen-Kontext aus deiner Ausgabelogik
-/// - `term_width`:
-///   Aktuelle Terminalbreite in Zeichen
-/// - `column_widths`:
-///   Finale Breiten der Spalten, die gerendert werden sollen
-///
-/// Rückgabe:
-/// - Ein fertig konfiguriertes `CliOutput`
 fn build_output<'a>(
     tables: &'a Tables,
     term_width: usize,
@@ -144,23 +156,6 @@ fn build_output<'a>(
     output
 }
 
-/// Rendert bereits vorbereitete `TableRow`-Strukturen auf das Terminal.
-///
-/// Was die Funktion macht:
-/// - Erzeugt intern die Ausgabe-Struktur
-/// - Bestimmt, wie viele Zeilen in den Zellen maximal nötig sind
-/// - Rendert dann alle sichtbaren Tabellenzeilen
-///
-/// Parameter:
-/// - `term_width`:
-///   Terminalbreite in Zeichen
-/// - `column_widths`:
-///   Spaltenbreiten für den aktuell zu rendernden Chunk
-/// - `table_rows`:
-///   Bereits umgewandelte Tabellenzeilen
-///
-/// Rückgabe:
-/// - Keine; die Funktion druckt direkt auf stdout
 fn render_rows(term_width: usize, column_widths: Vec<usize>, table_rows: &[TableRow]) {
     let tables = Tables::new(Some(100));
     let mut output = build_output(&tables, term_width, column_widths);
@@ -177,11 +172,7 @@ fn render_rows(term_width: usize, column_widths: Vec<usize>, table_rows: &[Table
     output.cli_out(&display_lines, table_rows, rows_range);
 }
 
-pub fn print_table(
-    headers: &[String],
-    data: &[Vec<String>],
-    row_ranges: &[RowRange],
-) {
+pub fn print_table(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
     print_table_with_offset(headers, data, row_ranges, 1);
 }
 
@@ -196,8 +187,7 @@ pub fn print_table_with_offset(
         .saturating_sub(1)
         .saturating_sub(headers.len() * COLUMN_OVERHEAD);
 
-    let column_widths =
-        compute_column_widths_from_global_mass(headers, data, available_budget);
+    let column_widths = compute_column_widths_from_global_mass(headers, data, available_budget);
 
     let table_rows = convert_to_table_rows_with_offset(
         headers,
@@ -210,45 +200,11 @@ pub fn print_table_with_offset(
     render_rows(term_width, column_widths, &table_rows);
 }
 
-
-/// Ermittelt eine grobe natürliche Breite einer einzelnen Spalte,
-/// ohne schon das gesamte Chunk-Budget hart zu verteilen.
-/// Diese Heuristik dient NUR dazu, zu entscheiden,
-/// wie viele Spalten ungefähr in einen Chunk passen.
-/// Schätzt eine grobe natürliche Breite einer einzelnen Spalte für die Chunk-Bildung.
-///
-/// Was die Funktion macht:
-/// - Betrachtet genau eine Spalte isoliert
-/// - Berechnet dafür lokale Spaltenstatistiken
-/// - Verwendet die durchschnittliche Zellbreite als Heuristik
-///
-/// Wofür diese Funktion da ist:
-/// - Nicht für das finale Rendern
-/// - Sondern nur dafür, grob abzuschätzen,
-///   wie viele Spalten in den nächsten Chunk passen
-///
-/// Warum das wichtig ist:
-/// - Die alte Logik hat globale Breiten genommen
-/// - Dadurch wurden spätere Chunks systematisch verzerrt
-/// - Diese Funktion trennt Chunk-Bildung von finaler Breitenberechnung
-///
-/// Parameter:
-/// - `header`:
-///   Header der betrachteten Spalte
-/// - `data`:
-///   Gesamte Tabellendaten
-/// - `col_idx`:
-///   Globaler Index der Spalte in der Gesamttabelle
-///
-/// Rückgabe:
-/// - Eine grob geschätzte Breite dieser Spalte
 fn estimate_natural_width_for_chunking(
     header: &String,
     data: &[Vec<String>],
     col_idx: usize,
 ) -> usize {
-    // Baue künstlich eine 1-Spalten-Tabelle,
-    // damit die bestehende Statistikfunktion wiederverwendet werden kann.
     let single_header = vec![header.clone()];
 
     let single_col_data: Vec<Vec<String>> = data
@@ -257,7 +213,6 @@ fn estimate_natural_width_for_chunking(
         .collect();
 
     let stats = compute_column_stats(&single_header, &single_col_data);
-    // Nutze den Durchschnitt als grobe natürliche Breite.
     let guessed = stats
         .first()
         .map(|s| s.avg_width.ceil() as usize)
@@ -266,41 +221,12 @@ fn estimate_natural_width_for_chunking(
     guessed.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
 }
 
-/// Gibt die Tabelle chunkweise aus.
-/// Jeder Chunk bekommt seine eigene Statistik und eigene Breitenberechnung.
-/// Dadurch werden spätere Chunks nicht mehr durch frühe Spalten "leerbudgetiert".
-/// Gibt die Tabelle chunkweise aus.
-///
-/// Was die Funktion macht:
-/// - Zerlegt eine breite Tabelle in mehrere untereinander ausgegebene Chunks
-/// - Berechnet für jeden Chunk eigene Spaltenbreiten
-/// - Beachtet optionale explizite Breiten pro globaler Spalte
-///
-/// Wichtige Designidee:
-/// - Chunk-Grenzen werden nur grob heuristisch bestimmt
-/// - Die echten Spaltenbreiten werden danach pro Chunk lokal berechnet
-///
-/// Dadurch werden zwei alte Fehler behoben:
-/// 1. Die Statistik wird nicht mehr nur einmal global am Anfang berechnet
-/// 2. Spätere Chunks werden nicht mehr durch frühe Spalten "dünn gerechnet"
-///
-/// Parameter:
-/// - `headers`:
-///   Alle Header der Gesamttabelle
-/// - `data`:
-///   Gesamte Tabellendaten
-/// - `row_ranges`:
-///   Angabe, welche Zeilenbereiche pro Zelle sichtbar sein sollen
-/// - `explizite_breiten`:
-///   Optional vom Benutzer vorgegebene Breiten pro globaler Spalte
-///
-/// Rückgabe:
-/// - Keine; die Funktion druckt direkt die Tabelle
 pub fn print_table_chunked(
     headers: &[String],
     data: &[Vec<String>],
     row_ranges: &[RowRange],
     explizite_breiten: &[usize],
+    keineleereninhalte: bool,
 ) {
     print_table_chunked_with_offset(
         headers,
@@ -308,6 +234,7 @@ pub fn print_table_chunked(
         row_ranges,
         explizite_breiten,
         1,
+        keineleereninhalte,
     );
 }
 
@@ -317,6 +244,7 @@ pub fn print_table_chunked_with_offset(
     row_ranges: &[RowRange],
     explizite_breiten: &[usize],
     original_start_line: usize,
+    keineleereninhalte: bool,
 ) {
     let term_width = get_terminal_width();
     let available_total = term_width.saturating_sub(3);
@@ -352,7 +280,7 @@ pub fn print_table_chunked_with_offset(
 
         let chunk_headers: Vec<String> = headers[start..end].to_vec();
 
-        let chunk_data: Vec<Vec<String>> = data
+        let raw_chunk_data: Vec<Vec<String>> = data
             .iter()
             .map(|row| {
                 (start..end)
@@ -360,6 +288,8 @@ pub fn print_table_chunked_with_offset(
                     .collect()
             })
             .collect();
+
+        let chunk_data = sanitize_chunk_data(&raw_chunk_data, keineleereninhalte);
 
         let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
         let chunk_budget = available_total.saturating_sub(chunk_overhead);
@@ -406,15 +336,16 @@ pub fn print_table_chunked_with_offset(
         );
 
         render_rows(term_width, chunk_widths, &table_rows);
+
+        if end < headers.len() {
+            println!();
+        }
+
         start = end;
     }
 }
 
-pub fn print_table_auto(
-    headers: &[String],
-    data: &[Vec<String>],
-    row_ranges: &[RowRange],
-) {
+pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
     let layout = build_table_layout(headers, data);
     let table_rows = convert_to_table_rows(headers, data, &layout.column_widths, row_ranges);
 

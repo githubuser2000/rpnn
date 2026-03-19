@@ -5,6 +5,7 @@ pub struct TextBereich {
     pub bis_zeile: usize,
     pub von_spalte: usize,
     pub bis_spalte: usize,
+    pub keineleereninhalte: bool,
     pub zeilen_bereiche: Vec<(usize, usize)>,
     pub spalten_bereiche: Vec<(usize, usize)>,
     pub spaltenreihenfolgeundnurdiese: Vec<usize>,
@@ -17,6 +18,7 @@ pub struct TextBereich {
 impl Default for TextBereich {
     fn default() -> Self {
         Self {
+            keineleereninhalte: false,
             von_zeile: 0,
             bis_zeile: 0,
             von_spalte: usize::MAX,

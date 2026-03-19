@@ -74,6 +74,9 @@ pub fn parse_cli_args(
                     }
                 }
             }
+            "--keineleereninhalte" => {
+                bereich.keineleereninhalte = true;
+            }
             /*
             "--spalten" => {
                 if let Some((_, ober)) = iter.next() {
