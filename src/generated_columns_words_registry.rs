@@ -26,12 +26,12 @@ pub struct Tables {
     pub hoechste_zeile_1024: usize,
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct ParametersMain {
     pub bedeutung0: String,
     pub procontra0: String,
     pub grundstrukturen0: String,
+    pub unter0: String,
 }
 
 fn normalize_token(s: &str) -> String {
@@ -64,6 +64,7 @@ pub fn apply_generated_columns(
     if !parameters_main.bedeutung0.is_empty() { tokens.insert(normalize_token(&parameters_main.bedeutung0)); }
     if !parameters_main.procontra0.is_empty() { tokens.insert(normalize_token(&parameters_main.procontra0)); }
     if !parameters_main.grundstrukturen0.is_empty() { tokens.insert(normalize_token(&parameters_main.grundstrukturen0)); }
+    if !parameters_main.unter0.is_empty() { tokens.insert(normalize_token(&parameters_main.unter0)); }
 
     const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
     const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
@@ -222,7 +223,6 @@ pub fn apply_generated_columns(
 
     Ok(())
 }
-
 #[derive(Debug, Clone, Default)]
 pub struct ConcatState {
     pub ones: BTreeSet<usize>,
@@ -452,6 +452,7 @@ fn tagset(tags: &[ST]) -> BTreeSet<ST> {
    1) gleichheitFreiheitVergleich
 ------------------------------ */
 
+
 pub fn gleichheit_freiheit_vergleich(zahl: usize) -> String {
     let mut out = Vec::new();
 
@@ -465,20 +466,19 @@ pub fn gleichheit_freiheit_vergleich(zahl: usize) -> String {
         out.push("Einschränkung der Freiheit".to_string());
     }
     if zahl % 4 == 2 {
-        if (zahl - 2) % 8 == 0 {
+        if zahl >= 2 && (zahl - 2) % 8 == 0 {
             out.push("Gleichheit".to_string());
         }
-        if (zahl - 6) % 16 == 0 {
+        if zahl >= 6 && (zahl - 6) % 16 == 0 {
             out.push("den anderen überbieten wollen".to_string());
         }
-        if (zahl - 14) % 16 == 0 {
+        if zahl >= 14 && (zahl - 14) % 16 == 0 {
             out.push("den anderen unterbieten wollen".to_string());
         }
     }
 
     out.join("; ")
 }
-
 /* -----------------------------
    2) geistEmotionEnergieMaterieTopologie
 ------------------------------ */

@@ -46,7 +46,6 @@ fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<us
     (1..=data_len).collect()
 }
 
-
 fn normalize_token(s: &str) -> String {
     s.trim().to_lowercase()
 }
@@ -67,6 +66,7 @@ fn should_use_full_table_for_generated(
     if !parameters_main.bedeutung0.is_empty() { tokens.insert(normalize_token(&parameters_main.bedeutung0)); }
     if !parameters_main.procontra0.is_empty() { tokens.insert(normalize_token(&parameters_main.procontra0)); }
     if !parameters_main.grundstrukturen0.is_empty() { tokens.insert(normalize_token(&parameters_main.grundstrukturen0)); }
+    if !parameters_main.unter0.is_empty() { tokens.insert(normalize_token(&parameters_main.unter0)); }
 
     const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
     const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
@@ -149,17 +149,48 @@ fn should_use_full_table_for_generated(
         || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
 }
 
-// --- Query-Funktion ---
-fn build_full_table_row_query(column_names: &[String]) -> String {
+fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) -> String {
     let columns = column_names
         .iter()
         .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
         .collect::<Vec<_>>()
         .join(", ");
 
+    if !bereich.zeilen_bereiche.is_empty() {
+        let mut all_row_numbers = Vec::new();
+        for &(start, end) in &bereich.zeilen_bereiche {
+            if start == 0 || end == 0 || start > end {
+                continue;
+            }
+            for row in start..=end {
+                all_row_numbers.push(row);
+            }
+        }
+        all_row_numbers.sort_unstable();
+        all_row_numbers.dedup();
+
+        if !all_row_numbers.is_empty() {
+            let row_numbers_str = all_row_numbers
+                .iter()
+                .map(|n| (n - 1).to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            return format!(
+                "SELECT {} FROM (\n                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n                    FROM csv_data\n                ) numbered_data\n                WHERE row_num IN ({})\n                ORDER BY row_num",
+                columns, row_numbers_str
+            );
+        }
+    }
+
+    if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
+        let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
+        let offset = bereich.von_zeile.saturating_sub(1);
+        return format!("SELECT {} FROM csv_data LIMIT {} OFFSET {}", columns, anzahl, offset);
+    }
+
     format!("SELECT {} FROM csv_data", columns)
 }
-
 
 pub fn query_column_by_index(
     conn: &Connection,
@@ -167,37 +198,27 @@ pub fn query_column_by_index(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
-   let column_names = get_column_names(conn)?;
+    let column_names = get_column_names(conn)?;
 
-let (query, headers): (String, Vec<String>) =
-    if should_use_full_table_for_generated(generated_befehle, parameters_main) {
-        println!("ℹ️ Generator-Sonderpfad: lade Volltabelle für generierte Spalten");
-        bereich.spalten_gefunden = true;
-        (build_full_table_row_query(&column_names), column_names.clone())
-    } else {
-        build_column_query(&column_names, &mut bereich)?
-    };
+    let (query, headers): (String, Vec<String>) =
+        if should_use_full_table_for_generated(generated_befehle, parameters_main) {
+            bereich.spalten_gefunden = true;
+            (build_full_table_row_query(&column_names, &bereich), column_names.clone())
+        } else {
+            build_column_query(&column_names, &mut bereich)?
+        };
 
-println!("Headerslänge vor Sortierung: {}", headers.len());
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
-    
-    // Berechne Header-Längen mit Unicode-Unterstützung
+
     let header_lengths: Vec<usize> = headers.iter()
         .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
-    
+
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    /* DEBUG: Zeige aktuelle Status
-    println!("=== 🔍 STATUS VOR SORTIERUNG ===");
-    println!("Spaltenreihenfolge: {:?}", bereich.spaltenreihenfolgeundnurdiese);
-    println!("Headers vor Sortierung: {} Stück", headers.len());
-    println!("Daten vor Sortierung: {} Zeilen", data.len());
-    */
-    // SORTIERUNG DER SPALTEN: NUR wenn spaltenreihenfolgeundnurdiese befüllt ist
     let (mut final_headers, mut final_data) =
     if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
         let null_basierte_indizes: Vec<usize> = bereich
@@ -222,56 +243,34 @@ println!("Headerslänge vor Sortierung: {}", headers.len());
         (headers.clone(), data.clone())
     };
 
-apply_generated_columns(
-    &mut final_headers,
-    &mut final_data,
-    &bereich,
-    generated_befehle,
-    parameters_main,
-)?;
+    apply_generated_columns(
+        &mut final_headers,
+        &mut final_data,
+        &bereich,
+        generated_befehle,
+        parameters_main,
+    )?;
 
-let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
+    let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
 
-print_table_chunked_with_line_numbers(
-    &final_headers,
-    &final_data,
-    &bereich.breiten,
-    &original_line_numbers,
-    false,
-);
-      Ok(bereich)
+    print_table_chunked_with_line_numbers(
+        &final_headers,
+        &final_data,
+        &bereich.breiten,
+        &original_line_numbers,
+        false,
+    );
+
+    Ok(bereich)
 }
 
-fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T>, String> {
-    // Wenn der Index-Vektor leer ist, gibt einen leeren Vektor zurück
-    if indices.is_empty() {
-        return Ok(Vec::new());
+fn sort_by_indices<T: Clone>(items: &[T], indices: &[usize]) -> Result<Vec<T>, String> {
+    let mut result = Vec::new();
+    for &idx in indices {
+        if idx >= items.len() {
+            return Err(format!("Index {} außerhalb des Bereichs (0..{})", idx, items.len()));
+        }
+        result.push(items[idx].clone());
     }
-    
-    // Finde den maximalen Index
-    let max_index = indices.iter().max().copied().unwrap_or(0);
-    
-    // Überprüfe, ob alle Indizes gültig sind
-    if max_index >= values.len() {
-        return Err(format!(
-            "Index {} ist außerhalb der Grenzen (0..{})",
-            max_index,
-            values.len() - 1
-        ));
-    }
-    
-    // Erstelle den sortierten Vektor basierend auf den Indizes
-    let result = indices
-        .iter()
-        .map(|&i| {
-            // Diese Prüfung haben wir bereits oben durchgeführt, 
-            // aber zur Sicherheit behalten wir sie bei
-            if i >= values.len() {
-                panic!("Unerwarteter Fehler: Index {} außerhalb der Grenzen", i);
-            }
-            values[i].clone()
-        })
-        .collect();
-    
     Ok(result)
 }
