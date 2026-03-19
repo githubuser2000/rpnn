@@ -26,6 +26,7 @@ pub struct Tables {
     pub hoechste_zeile_1024: usize,
 }
 
+
 #[derive(Debug, Clone, Default)]
 pub struct ParametersMain {
     pub bedeutung0: String,
@@ -49,7 +50,7 @@ fn selected_by_pair(tokens: &BTreeSet<String>, first_aliases: &[&str], second_al
 pub fn apply_generated_columns(
     headers: &mut Vec<String>,
     data: &mut Vec<Vec<String>>,
-    _bereich: &TextBereich,
+    bereich: &TextBereich,
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -126,6 +127,15 @@ pub fn apply_generated_columns(
         "bibel",
         "offenbarungjohannes",
     ];
+    const MODAL_ALIASES: &[&str] = &[
+        "modallogik",
+        "modal",
+        "modus",
+        "modi",
+        "sein",
+        "zustaende",
+        "zustände",
+    ];
 
     let want_primzahlkreuz = tokens.contains("primzahlkreuzprocontra")
         || selected_by_pair(&tokens, PROCONTRA, PK_PROCONTRA_ALIASES)
@@ -151,7 +161,9 @@ pub fn apply_generated_columns(
         || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES)
         || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"]);
 
-    if !(want_primzahlkreuz || want_love || want_gleichheit || want_geist || want_mond64 || want_vervielfache) {
+    let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
+
+    if !(want_primzahlkreuz || want_love || want_gleichheit || want_geist || want_mond64 || want_vervielfache || want_modal) {
         return Ok(());
     }
 
@@ -196,12 +208,28 @@ pub fn apply_generated_columns(
     if want_vervielfache {
         concat_vervielfache_zeile(&mut table, &rows_as_numbers, &tables);
     }
+    if want_modal {
+        let modal_concepts: BTreeSet<(usize, usize)> =
+            BTreeSet::from([(121usize, 122usize)]);
+        concat_modallogik(&mut table, &modal_concepts, &mut rows_as_numbers, &mut tables);
+    }
 
     if table.is_empty() {
         return Ok(());
     }
 
-    let mut keep_indices: Vec<usize> = (original_header_len..table[0].len()).collect();
+    let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+        bereich
+            .spaltenreihenfolgeundnurdiese
+            .iter()
+            .filter_map(|&i| i.checked_sub(1))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    keep_indices.extend(original_header_len..table[0].len());
+
     if want_vervielfache {
         for idx in [19usize, 90usize] {
             if idx < original_header_len && !keep_indices.contains(&idx) {
@@ -223,6 +251,7 @@ pub fn apply_generated_columns(
 
     Ok(())
 }
+
 #[derive(Debug, Clone, Default)]
 pub struct ConcatState {
     pub ones: BTreeSet<usize>,
@@ -452,7 +481,6 @@ fn tagset(tags: &[ST]) -> BTreeSet<ST> {
    1) gleichheitFreiheitVergleich
 ------------------------------ */
 
-
 pub fn gleichheit_freiheit_vergleich(zahl: usize) -> String {
     let mut out = Vec::new();
 
@@ -466,19 +494,20 @@ pub fn gleichheit_freiheit_vergleich(zahl: usize) -> String {
         out.push("Einschränkung der Freiheit".to_string());
     }
     if zahl % 4 == 2 {
-        if zahl >= 2 && (zahl - 2) % 8 == 0 {
+        if (zahl - 2) % 8 == 0 {
             out.push("Gleichheit".to_string());
         }
-        if zahl >= 6 && (zahl - 6) % 16 == 0 {
+        if (zahl - 6) % 16 == 0 {
             out.push("den anderen überbieten wollen".to_string());
         }
-        if zahl >= 14 && (zahl - 14) % 16 == 0 {
+        if (zahl - 14) % 16 == 0 {
             out.push("den anderen unterbieten wollen".to_string());
         }
     }
 
     out.join("; ")
 }
+
 /* -----------------------------
    2) geistEmotionEnergieMaterieTopologie
 ------------------------------ */

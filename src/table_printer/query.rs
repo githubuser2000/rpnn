@@ -1,13 +1,15 @@
 // table_printer/query.rs
+use std::collections::BTreeSet;
+use std::process;
+
+use rusqlite::Connection;
+use unicode_width::UnicodeWidthStr;
+
 use crate::cli::TextBereich;
 use crate::column_manager::{build_column_query, get_column_names};
 use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
-use rusqlite::Connection;
-use std::collections::BTreeSet;
-use std::process;
-use unicode_width::UnicodeWidthStr;
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -68,10 +70,7 @@ fn should_use_full_table_for_generated(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> bool {
-    let mut tokens: BTreeSet<String> = generated_befehle
-        .iter()
-        .map(|s| normalize_token(s))
-        .collect();
+    let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
     if !parameters_main.bedeutung0.is_empty() {
         tokens.insert(normalize_token(&parameters_main.bedeutung0));
     }
@@ -103,14 +102,7 @@ fn should_use_full_table_for_generated(
     const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
     const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
     const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
-    const GALAXIE: &[&str] = &[
-        "Galaxie",
-        "galaxie",
-        "alteschriften",
-        "kreis",
-        "galaxien",
-        "kreise",
-    ];
+    const GALAXIE: &[&str] = &["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"];
 
     const PK_PROCONTRA_ALIASES: &[&str] = &[
         "Primzahlkreuz pro contra",
@@ -206,7 +198,7 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
                 .join(", ");
 
             return format!(
-                "SELECT {} FROM (\n                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n                    FROM csv_data\n                ) numbered_data\n                WHERE row_num IN ({})\n                ORDER BY row_num",
+                "SELECT {} FROM (\n    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n    FROM csv_data\n) numbered_data\nWHERE row_num IN ({})\nORDER BY row_num",
                 columns, row_numbers_str
             );
         }
@@ -232,16 +224,14 @@ pub fn query_column_by_index(
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
 
-    let (query, headers): (String, Vec<String>) =
-        if should_use_full_table_for_generated(generated_befehle, parameters_main) {
-            bereich.spalten_gefunden = true;
-            (
-                build_full_table_row_query(&column_names, &bereich),
-                column_names.clone(),
-            )
-        } else {
-            build_column_query(&column_names, &mut bereich)?
-        };
+    let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
+
+    let (query, headers): (String, Vec<String>) = if is_generated_mode {
+        bereich.spalten_gefunden = true;
+        (build_full_table_row_query(&column_names, &bereich), column_names.clone())
+    } else {
+        build_column_query(&column_names, &mut bereich)?
+    };
 
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
@@ -255,8 +245,6 @@ pub fn query_column_by_index(
 
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
-
     let (mut final_headers, mut final_data) = if is_generated_mode {
         (headers.clone(), data.clone())
     } else if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
@@ -266,18 +254,21 @@ pub fn query_column_by_index(
             .map(|&i| if i == 0 { 0 } else { i - 1 })
             .collect();
 
-        let sorted_headers =
-            sort_by_indices(&headers, &null_basierte_indizes).unwrap_or_else(|_| headers.clone());
+        let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
+            .unwrap_or_else(|_| headers.clone());
 
         let sorted_data: Vec<Vec<String>> = data
             .iter()
-            .map(|row| sort_by_indices(row, &null_basierte_indizes).unwrap_or_else(|_| row.clone()))
+            .map(|row| {
+                sort_by_indices(row, &null_basierte_indizes).unwrap_or_else(|_| row.clone())
+            })
             .collect();
 
         (sorted_headers, sorted_data)
     } else {
         (headers.clone(), data.clone())
     };
+
     apply_generated_columns(
         &mut final_headers,
         &mut final_data,
@@ -299,17 +290,20 @@ pub fn query_column_by_index(
     Ok(bereich)
 }
 
-fn sort_by_indices<T: Clone>(items: &[T], indices: &[usize]) -> Result<Vec<T>, String> {
-    let mut result = Vec::new();
-    for &idx in indices {
-        if idx >= items.len() {
-            return Err(format!(
-                "Index {} außerhalb des Bereichs (0..{})",
-                idx,
-                items.len()
-            ));
-        }
-        result.push(items[idx].clone());
+fn sort_by_indices<T: Clone>(values: &[T], indices: &[usize]) -> Result<Vec<T>, String> {
+    if indices.is_empty() {
+        return Ok(Vec::new());
     }
+
+    let max_index = indices.iter().max().copied().unwrap_or(0);
+    if max_index >= values.len() {
+        return Err(format!(
+            "Index {} ist außerhalb der Grenzen (0..{})",
+            max_index,
+            values.len().saturating_sub(1)
+        ));
+    }
+
+    let result = indices.iter().map(|&i| values[i].clone()).collect();
     Ok(result)
 }
