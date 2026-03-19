@@ -1,0 +1,115 @@
+--- a/src/generated_columns_words_registry.rs
++++ b/src/generated_columns_words_registry.rs
+@@
+     const MODAL_ALIASES: &[&str] = &[
+         "modallogik",
+         "modal",
+         "modus",
+@@
+-    if want_modal {
+-        let modal_concepts: BTreeSet<(usize, usize)> =
+-            BTreeSet::from([(121usize, 122usize)]);
+-        concat_modallogik(&mut table, &modal_concepts, &mut rows_as_numbers, &mut tables);
++    if want_modal {
++        let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
++
++        // Nimm zuerst die tatsaechlich ausgewaehlten SQL-Spalten.
++        // Automatische Kategoriesuche fuellt meist spalten_bereiche, nicht
++        // spaltenreihenfolgeundnurdiese.
++        let selected_zero_based: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
++            bereich
++                .spaltenreihenfolgeundnurdiese
++                .iter()
++                .filter_map(|&i| i.checked_sub(1))
++                .collect()
++        } else if !bereich.spalten_bereiche.is_empty() {
++            let mut cols = Vec::new();
++            for &(from, to) in &bereich.spalten_bereiche {
++                if from == 0 || to == 0 || from > to {
++                    continue;
++                }
++                for c in from..=to {
++                    if let Some(zero) = c.checked_sub(1) {
++                        cols.push(zero);
++                    }
++                }
++            }
++            cols.sort_unstable();
++            cols.dedup();
++            cols
++        } else {
++            Vec::new()
++        };
++
++        if selected_zero_based.len() >= 2 {
++            for pair in selected_zero_based.chunks(2) {
++                if pair.len() == 2 {
++                    modal_concepts.insert((pair[0], pair[1]));
++                }
++            }
++        }
++
++        // Fallback nur fuer rein begriffliche Modal-Anfragen ohne direkte
++        // Spaltenwahl.
++        if modal_concepts.is_empty() {
++            modal_concepts.insert((121usize, 122usize));
++        }
++
++        concat_modallogik(&mut table, &modal_concepts, &mut rows_as_numbers, &mut tables);
+     }
+@@
+-    let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
++    let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+         bereich
+             .spaltenreihenfolgeundnurdiese
+             .iter()
+             .filter_map(|&i| i.checked_sub(1))
+             .collect()
++    } else if !bereich.spalten_bereiche.is_empty() {
++        let mut cols = Vec::new();
++        for &(from, to) in &bereich.spalten_bereiche {
++            if from == 0 || to == 0 || from > to {
++                continue;
++            }
++            for c in from..=to {
++                if let Some(zero) = c.checked_sub(1) {
++                    cols.push(zero);
++                }
++            }
++        }
++        cols.sort_unstable();
++        cols.dedup();
++        cols
+     } else {
+         Vec::new()
+     };
+--- a/src/table_printer/query.rs
++++ b/src/table_printer/query.rs
+@@
+ fn should_use_full_table_for_generated(
+     generated_befehle: &BTreeSet<String>,
+     parameters_main: &ParametersMain,
+ ) -> bool {
+@@
+     const VERVIELFACHE_ALIASES: &[&str] = &[
+         "Zweitwichtigste",
+         "zweitwichtigste",
+@@
+         "offenbarungjohannes",
+     ];
++    const MODAL_ALIASES: &[&str] = &[
++        "modallogik",
++        "modal",
++        "modus",
++        "modi",
++        "sein",
++        "zustaende",
++        "zustände",
++    ];
+@@
+         || selected_by_pair(&tokens, WICHTIGSTE, VERVIELFACHE_ALIASES)
+         || selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
+         || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES)
+         || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
++        || contains_any_alias(&tokens, MODAL_ALIASES)
+ }

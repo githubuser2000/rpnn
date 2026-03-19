@@ -1,5 +1,5 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::cli::TextBereich;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub type Table = Vec<Vec<String>>;
 pub type RowSet = BTreeSet<usize>;
@@ -26,7 +26,6 @@ pub struct Tables {
     pub hoechste_zeile_1024: usize,
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct ParametersMain {
     pub bedeutung0: String,
@@ -40,10 +39,16 @@ fn normalize_token(s: &str) -> String {
 }
 
 fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
-    aliases.iter().any(|alias| tokens.contains(&normalize_token(alias)))
+    aliases
+        .iter()
+        .any(|alias| tokens.contains(&normalize_token(alias)))
 }
 
-fn selected_by_pair(tokens: &BTreeSet<String>, first_aliases: &[&str], second_aliases: &[&str]) -> bool {
+fn selected_by_pair(
+    tokens: &BTreeSet<String>,
+    first_aliases: &[&str],
+    second_aliases: &[&str],
+) -> bool {
     contains_any_alias(tokens, first_aliases) && contains_any_alias(tokens, second_aliases)
 }
 
@@ -54,77 +59,85 @@ pub fn apply_generated_columns(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if headers.is_empty() {
-        return Ok(());
+    let original_headers = headers.clone();
+    let original_data = data.clone();
+
+    let mut table: Table = Vec::with_capacity(original_data.len() + 1);
+    table.push(original_headers.clone());
+    table.extend(original_data.clone());
+
+    let original_header_len = original_headers.len();
+
+    let mut tables = Tables::default();
+    let mut rows_as_numbers: BTreeSet<usize> = (0..original_header_len).collect();
+
+    let mut tokens: BTreeSet<String> = generated_befehle
+        .iter()
+        .map(|s| normalize_token(s))
+        .collect();
+
+    if !parameters_main.bedeutung0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.bedeutung0));
+    }
+    if !parameters_main.procontra0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.procontra0));
+    }
+    if !parameters_main.grundstrukturen0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.grundstrukturen0));
+    }
+    if !parameters_main.unter0.is_empty() {
+        tokens.insert(normalize_token(&parameters_main.unter0));
     }
 
-    let original_header_len = headers.len();
-    let original_headers = headers.clone();
+    const MENSCHLICHES: &[&str] = &["menschliches"];
+    const PLANET: &[&str] = &["planet"];
+    const UNIVERSUM: &[&str] = &["universum", "multiversum", "grundstrukturen"];
+    const BEDEUTUNG: &[&str] = &["bedeutung", "wichtigste"];
+    const GALAXIE: &[&str] = &["galaxie"];
 
-    let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
-    if !parameters_main.bedeutung0.is_empty() { tokens.insert(normalize_token(&parameters_main.bedeutung0)); }
-    if !parameters_main.procontra0.is_empty() { tokens.insert(normalize_token(&parameters_main.procontra0)); }
-    if !parameters_main.grundstrukturen0.is_empty() { tokens.insert(normalize_token(&parameters_main.grundstrukturen0)); }
-    if !parameters_main.unter0.is_empty() { tokens.insert(normalize_token(&parameters_main.unter0)); }
-
-    const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
-    const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
-    const GRUNDSTRUKTUREN: &[&str] = &["Grundstrukturen", "grundstrukturen"];
-    const MENSCHLICHES: &[&str] = &["Menschliches", "menschliches"];
-    const UNIVERSUM: &[&str] = &["Universum", "universum", "transzendentalien", "strukturalien", "kugel", "kugeln", "ball", "baelle", "bälle"];
-    const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
-    const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
-    const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
-    const GALAXIE: &[&str] = &["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"];
-
-    const PK_PROCONTRA_ALIASES: &[&str] = &[
-        "Primzahlkreuz pro contra",
-        "nachvollziehen emotional oder geistig durch Primzahl-Kreuz-Algorithmus",
-        "primzahlkreuz",
-        "nachvollziehen",
-        "primzahlkreuzprocontra",
-    ];
-    const LOVE_ALIASES: &[&str] = &["Liebe", "liebe", "ethik", "Liebe_(7)"];
+    const LOVE_ALIASES: &[&str] = &["liebe", "ethik"];
     const GLEICHHEIT_ALIASES: &[&str] = &[
-        "Gleichheit_Freiheit_Ordnung",
-        "Gleichheit_Freiheit",
-        "gleichheitfreiheit",
-        "ungleichheit",
-        "dominieren",
         "gleichheit",
         "freiheit",
-        "Ordnung_und_Filterung_12_und_1pro12",
+        "dominieren",
+        "ordnung",
         "ordnen",
-        "ordnenundfiltern",
-        "filtern",
+        "filterung",
+        "ungleichheit",
     ];
     const GEIST_ALIASES: &[&str] = &[
-        "Geist__(15)",
-        "Geist_(15)",
         "geist",
         "bewusstsein",
+        "emotion",
+        "emotionen",
+        "gefuehl",
+        "gefuehle",
+        "gefühl",
+        "gefühle",
+        "energie",
+        "materie",
+        "topologie",
     ];
     const MOND64_ALIASES: &[&str] = &[
-        "Drittwichtigste",
-        "drittwichtigste",
-        "Gestirn",
         "gestirn",
         "mond",
         "sonne",
         "planet",
+        "evolution",
+        "intelligenz",
+        "kreativ",
+        "kreativitaet",
+        "kreativität",
+        "lernen",
+        "erwerben",
     ];
     const VERVIELFACHE_ALIASES: &[&str] = &[
-        "Zweitwichtigste",
-        "zweitwichtigste",
-        "Primzahlen",
         "primzahlen",
         "vielfache",
         "vielfacher",
-        "Offenbarung_des_Johannes",
+        "multis",
+        "multiplikationen",
         "offenbarung",
-        "offenbarungdesjohannes",
-        "johannes",
-        "bibel",
         "offenbarungjohannes",
     ];
     const MODAL_ALIASES: &[&str] = &[
@@ -138,84 +151,105 @@ pub fn apply_generated_columns(
     ];
 
     let want_primzahlkreuz = tokens.contains("primzahlkreuzprocontra")
-        || selected_by_pair(&tokens, PROCONTRA, PK_PROCONTRA_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, PK_PROCONTRA_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, PK_PROCONTRA_ALIASES);
+        || (contains_any_alias(&tokens, BEDEUTUNG)
+            && contains_any_alias(&tokens, &["primzahlkreuz"]))
+        || (contains_any_alias(&tokens, &["procontra"])
+            && contains_any_alias(&tokens, &["primzahlkreuz"]));
 
-    let want_love = selected_by_pair(&tokens, MENSCHLICHES, LOVE_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, LOVE_ALIASES);
-
+    let want_love = selected_by_pair(&tokens, MENSCHLICHES, LOVE_ALIASES);
     let want_gleichheit = selected_by_pair(&tokens, PLANET, GLEICHHEIT_ALIASES)
-        || selected_by_pair(&tokens, MENSCHLICHES, GLEICHHEIT_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GLEICHHEIT_ALIASES);
-
-    let want_geist = selected_by_pair(&tokens, UNIVERSUM, GEIST_ALIASES)
-        || selected_by_pair(&tokens, MULTIVERSUM, GEIST_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GEIST_ALIASES);
-
-    let want_mond64 = selected_by_pair(&tokens, WICHTIGSTE, MOND64_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, MOND64_ALIASES);
-
-    let want_vervielfache = selected_by_pair(&tokens, WICHTIGSTE, VERVIELFACHE_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
-        || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES)
-        || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"]);
-
+        || selected_by_pair(
+            &tokens,
+            &["menschliches", "grundstrukturen"],
+            GLEICHHEIT_ALIASES,
+        );
+    let want_geist = selected_by_pair(&tokens, UNIVERSUM, GEIST_ALIASES);
+    let want_mond64 = selected_by_pair(&tokens, BEDEUTUNG, MOND64_ALIASES);
+    let want_vervielfache = selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
+        || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES);
     let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
 
-    if !(want_primzahlkreuz || want_love || want_gleichheit || want_geist || want_mond64 || want_vervielfache || want_modal) {
-        return Ok(());
-    }
-
-    let mut table: Table = Vec::with_capacity(data.len() + 1);
-    table.push(headers.clone());
-    table.extend(data.iter().cloned());
-
-    let mut rows_as_numbers: RowSet = (0..original_header_len).collect();
-    let mut tables = Tables {
-        generated_spalten_parameter_tags: HashMap::new(),
-        generated_spalten_parameter: BTreeMap::new(),
-        spalten_vanilla_amount: original_header_len,
-        last_line_number: table.len().saturating_sub(1),
-        data_dict: HashMap::new(),
-        html_output_yes: false,
-        bbcode_output_yes: false,
-        hoechste_zeile_1024: table.len().saturating_sub(1),
-    };
-
     if want_primzahlkreuz {
-        concat1_primzahlkreuz_pro_contra(
-            &mut table,
-            &mut rows_as_numbers,
-            &mut tables,
-            &tokens,
-            parameters_main,
-        );
-    }
+    concat1_primzahlkreuz_pro_contra(
+        &mut table,
+        &mut rows_as_numbers,
+        &mut tables,
+        generated_befehle,
+        parameters_main,
+    );
+}
+
     if want_love {
         concat_love_polygon(&mut table, &mut rows_as_numbers, &mut tables);
     }
+
     if want_gleichheit {
         concat_gleichheit_freiheit_dominieren(&mut table, &mut rows_as_numbers, &mut tables);
     }
+
     if want_geist {
-        concat_geist_emotion_energie_materie_topologie(&mut table, &mut rows_as_numbers, &mut tables);
+        concat_geist_emotion_energie_materie_topologie(
+            &mut table,
+            &mut rows_as_numbers,
+            &mut tables,
+        );
     }
+
     if want_mond64 {
         concat_prim_creativity_type(&mut table, &mut rows_as_numbers, &mut tables);
         concat_mond_exponzieren_logarithmus_typ(&mut table, &mut rows_as_numbers, &mut tables);
     }
+
     if want_vervielfache {
-        concat_vervielfache_zeile(&mut table, &rows_as_numbers, &tables);
-    }
-    if want_modal {
-        let modal_concepts: BTreeSet<(usize, usize)> =
-            BTreeSet::from([(121usize, 122usize)]);
-        concat_modallogik(&mut table, &modal_concepts, &mut rows_as_numbers, &mut tables);
+        concat_vervielfache_zeile(&mut table, &mut rows_as_numbers, &mut tables);
     }
 
-    if table.is_empty() {
-        return Ok(());
+    if want_modal {
+        let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
+
+        let selected_zero_based: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+            bereich
+                .spaltenreihenfolgeundnurdiese
+                .iter()
+                .filter_map(|&i| i.checked_sub(1))
+                .collect()
+        } else if !bereich.spalten_bereiche.is_empty() {
+            let mut cols = Vec::new();
+            for &(from, to) in &bereich.spalten_bereiche {
+                if from == 0 || to == 0 || from > to {
+                    continue;
+                }
+                for c in from..=to {
+                    if let Some(zero) = c.checked_sub(1) {
+                        cols.push(zero);
+                    }
+                }
+            }
+            cols.sort_unstable();
+            cols.dedup();
+            cols
+        } else {
+            Vec::new()
+        };
+
+        if selected_zero_based.len() >= 2 {
+            for pair in selected_zero_based.chunks(2) {
+                if pair.len() == 2 {
+                    modal_concepts.insert((pair[0], pair[1]));
+                }
+            }
+        }
+
+        if modal_concepts.is_empty() {
+            modal_concepts.insert((121usize, 122usize));
+        }
+
+        concat_modallogik(
+            &mut table,
+            &modal_concepts,
+            &mut rows_as_numbers,
+            &mut tables,
+        );
     }
 
     let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
@@ -224,30 +258,77 @@ pub fn apply_generated_columns(
             .iter()
             .filter_map(|&i| i.checked_sub(1))
             .collect()
+    } else if !bereich.spalten_bereiche.is_empty() {
+        let mut cols = Vec::new();
+        for &(from, to) in &bereich.spalten_bereiche {
+            if from == 0 || to == 0 || from > to {
+                continue;
+            }
+            for c in from..=to {
+                if let Some(zero) = c.checked_sub(1) {
+                    cols.push(zero);
+                }
+            }
+        }
+        cols.sort_unstable();
+        cols.dedup();
+        cols
     } else {
         Vec::new()
     };
 
-    keep_indices.extend(original_header_len..table[0].len());
+    for i in original_header_len..table[0].len() {
+        keep_indices.push(i);
+    }
 
     if want_vervielfache {
-        for idx in [19usize, 90usize] {
-            if idx < original_header_len && !keep_indices.contains(&idx) {
-                keep_indices.push(idx);
-            }
+        if original_header_len > 19 {
+            keep_indices.push(19);
+        }
+        if original_header_len > 90 {
+            keep_indices.push(90);
         }
     }
-    keep_indices.sort_unstable();
-    keep_indices.dedup();
+
+    let mut seen = BTreeSet::new();
+    keep_indices.retain(|i| seen.insert(*i));
 
     if keep_indices.is_empty() {
         return Ok(());
     }
 
-    *headers = keep_indices.iter().map(|&i| table[0].get(i).cloned().unwrap_or_else(|| original_headers.get(i).cloned().unwrap_or_default())).collect();
-    *data = table.into_iter().skip(1).map(|row| {
-        keep_indices.iter().map(|&i| row.get(i).cloned().unwrap_or_default()).collect::<Vec<_>>()
-    }).collect();
+    let header_row: Vec<String> = table
+        .first()
+        .cloned()
+        .unwrap_or_else(|| original_headers.clone());
+
+    *headers = keep_indices
+        .iter()
+        .map(|&i| {
+            let raw: String = header_row
+                .get(i)
+                .cloned()
+                .or_else(|| original_headers.get(i).cloned())
+                .unwrap_or_default();
+
+            if raw.trim().is_empty() {
+                format!("SQL-Spalte {}", i + 1)
+            } else {
+                raw
+            }
+        })
+        .collect();
+
+    *data = table
+        .into_iter()
+        .skip(1)
+        .map(|row| {
+            keep_indices
+                .iter()
+                .map(|&i| row.get(i).cloned().unwrap_or_default())
+                .collect::<Vec<_>>()
+        })
+        .collect();
 
     Ok(())
 }
@@ -270,7 +351,10 @@ fn append_generated_col(table: &mut Table, values: Vec<String>) {
 }
 
 fn current_new_col_index(table: &Table) -> usize {
-    table.first().map(|r| r.len().saturating_sub(1)).unwrap_or(0)
+    table
+        .first()
+        .map(|r| r.len().saturating_sub(1))
+        .unwrap_or(0)
 }
 
 fn register_generated_column(
@@ -282,7 +366,9 @@ fn register_generated_column(
 ) {
     let new_col = table.first().map(|r| r.len() - 1).unwrap_or(0);
     rows_as_numbers.insert(new_col);
-    tables.generated_spalten_parameter_tags.insert(new_col, tags);
+    tables
+        .generated_spalten_parameter_tags
+        .insert(new_col, tags);
 
     let key = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
     if tables.generated_spalten_parameter.contains_key(&key) {
@@ -292,14 +378,16 @@ fn register_generated_column(
 }
 
 fn get_cell(table: &Table, row: usize, col: usize) -> &str {
-    table.get(row)
+    table
+        .get(row)
         .and_then(|r| r.get(col))
         .map(|s| s.as_str())
         .unwrap_or("")
 }
 
 fn join_nonempty(parts: impl IntoIterator<Item = String>, sep: &str) -> String {
-    parts.into_iter()
+    parts
+        .into_iter()
         .filter(|s| !s.trim().is_empty())
         .collect::<Vec<_>>()
         .join(sep)
@@ -586,11 +674,7 @@ pub fn geist_emotion_energie_materie_topologie(zahl: usize) -> String {
    3) concatLovePolygon
 ------------------------------ */
 
-pub fn concat_love_polygon(
-    table: &mut Table,
-    rows_as_numbers: &mut RowSet,
-    tables: &mut Tables,
-) {
+pub fn concat_love_polygon(table: &mut Table, rows_as_numbers: &mut RowSet, tables: &mut Tables) {
     if !rows_as_numbers.contains(&9) {
         return;
     }
@@ -602,7 +686,9 @@ pub fn concat_love_polygon(
             if c8.is_empty() {
                 String::new()
             } else {
-                format!("{c8} der eigenen Strukturgröße ({c4}) auf dich bei gleichförmigen Polygonen")
+                format!(
+                    "{c8} der eigenen Strukturgröße ({c4}) auf dich bei gleichförmigen Polygonen"
+                )
             }
         })
         .collect();
@@ -614,7 +700,12 @@ pub fn concat_love_polygon(
         rows_as_numbers,
         table,
         tagset(&[ST::SternPolygon, ST::Galaxie, ST::GleichfoermigesPolygon]),
-        tables.data_dict.get(&0).and_then(|m| m.get(&9)).cloned().unwrap_or_default(),
+        tables
+            .data_dict
+            .get(&0)
+            .and_then(|m| m.get(&9))
+            .cloned()
+            .unwrap_or_default(),
     );
 }
 
@@ -648,7 +739,12 @@ pub fn concat_gleichheit_freiheit_dominieren(
         rows_as_numbers,
         table,
         tagset(&[ST::SternPolygon, ST::Universum]),
-        tables.data_dict.get(&0).and_then(|m| m.get(&132)).cloned().unwrap_or_default(),
+        tables
+            .data_dict
+            .get(&0)
+            .and_then(|m| m.get(&132))
+            .cloned()
+            .unwrap_or_default(),
     );
 }
 
@@ -668,7 +764,8 @@ pub fn concat_geist_emotion_energie_materie_topologie(
     let values: Vec<String> = (0..=tables.last_line_number.min(table.len().saturating_sub(1)))
         .map(|i| {
             if i == 0 {
-                "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string()
+                "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art"
+                    .to_string()
             } else {
                 geist_emotion_energie_materie_topologie(i)
             }
@@ -682,7 +779,12 @@ pub fn concat_geist_emotion_energie_materie_topologie(
         rows_as_numbers,
         table,
         tagset(&[ST::SternPolygon, ST::Universum]),
-        tables.data_dict.get(&0).and_then(|m| m.get(&242)).cloned().unwrap_or_default(),
+        tables
+            .data_dict
+            .get(&0)
+            .and_then(|m| m.get(&242))
+            .cloned()
+            .unwrap_or_default(),
     );
 }
 
@@ -722,7 +824,12 @@ pub fn concat_prim_creativity_type(
         rows_as_numbers,
         table,
         tagset(&[ST::SternPolygon, ST::Galaxie]),
-        tables.data_dict.get(&0).and_then(|m| m.get(&64)).cloned().unwrap_or_default(),
+        tables
+            .data_dict
+            .get(&0)
+            .and_then(|m| m.get(&64))
+            .cloned()
+            .unwrap_or_default(),
     );
 }
 
@@ -759,8 +866,10 @@ pub fn concat_mond_exponzieren_logarithmus_typ(
 
                 let mut parts = Vec::new();
 
-                for (k, (basis, exponent_minus_2)) in
-                    bases.into_iter().zip(exponents_minus_2.into_iter()).enumerate()
+                for (k, (basis, exponent_minus_2)) in bases
+                    .into_iter()
+                    .zip(exponents_minus_2.into_iter())
+                    .enumerate()
                 {
                     let mut insert = get_cell(table, basis, rownum).trim_end().to_string();
                     insert = insert.replace("<SG>", get_cell(table, i, 4).trim());
@@ -799,7 +908,12 @@ pub fn concat_mond_exponzieren_logarithmus_typ(
             rows_as_numbers,
             table,
             tags,
-            tables.data_dict.get(&0).and_then(|m| m.get(&64)).cloned().unwrap_or_default(),
+            tables
+                .data_dict
+                .get(&0)
+                .and_then(|m| m.get(&64))
+                .cloned()
+                .unwrap_or_default(),
         );
     }
 }
@@ -808,13 +922,12 @@ pub fn concat_mond_exponzieren_logarithmus_typ(
    8) concatVervielfacheZeile
 ------------------------------ */
 
-pub fn concat_vervielfache_zeile(
-    table: &mut Table,
-    rows_as_numbers: &RowSet,
-    tables: &Tables,
-) {
-    let spalten_to_vervielfache: Vec<usize> =
-        rows_as_numbers.iter().copied().filter(|s| *s == 90 || *s == 19).collect();
+pub fn concat_vervielfache_zeile(table: &mut Table, rows_as_numbers: &RowSet, tables: &Tables) {
+    let spalten_to_vervielfache: Vec<usize> = rows_as_numbers
+        .iter()
+        .copied()
+        .filter(|s| *s == 90 || *s == 19)
+        .collect();
 
     for s in spalten_to_vervielfache {
         let mut store: HashMap<(usize, usize), String> = HashMap::new();
@@ -863,9 +976,21 @@ pub fn concat_vervielfache_zeile(
             }
 
             let joined = if tables.html_output_yes {
-                format!("<ul>{}</ul>", items.into_iter().map(|x| format!("<li>{x}</li>")).collect::<String>())
+                format!(
+                    "<ul>{}</ul>",
+                    items
+                        .into_iter()
+                        .map(|x| format!("<li>{x}</li>"))
+                        .collect::<String>()
+                )
             } else if tables.bbcode_output_yes {
-                format!("[list]{}[/list]", items.into_iter().map(|x| format!("[*]{x}")).collect::<String>())
+                format!(
+                    "[list]{}[/list]",
+                    items
+                        .into_iter()
+                        .map(|x| format!("[*]{x}"))
+                        .collect::<String>()
+                )
             } else {
                 items.join(" | ")
             };
@@ -975,7 +1100,13 @@ pub fn concat_modallogik(
         for i in 0..=end {
             into.insert(i, vec![String::new()]);
             if i == 0 {
-                into.insert(i, vec!["Generiert: ".to_string(), get_cell(&table_copy, i, concept.0).to_string()]);
+                into.insert(
+                    i,
+                    vec![
+                        "Generiert: ".to_string(),
+                        get_cell(&table_copy, i, concept.0).to_string(),
+                    ],
+                );
             } else if !get_cell(&table_copy, i, concept.0).trim().is_empty() {
                 ein_mal_vorkommen.insert(i);
             }
@@ -985,13 +1116,19 @@ pub fn concat_modallogik(
         for ein_vorkommen in ein_mal_vorkommen {
             let mut vielfacher = 1usize;
             let mut ergebnis = vielfacher * ein_vorkommen;
-            vorkommen_vielfacher.entry(ergebnis as isize).or_default().push((ein_vorkommen, vielfacher));
+            vorkommen_vielfacher
+                .entry(ergebnis as isize)
+                .or_default()
+                .push((ein_vorkommen, vielfacher));
 
             while ergebnis < table_copy.len() {
                 vielfacher += 1;
                 ergebnis = vielfacher * ein_vorkommen;
                 if ergebnis < table_copy.len() {
-                    vorkommen_vielfacher.entry(ergebnis as isize).or_default().push((ein_vorkommen, vielfacher));
+                    vorkommen_vielfacher
+                        .entry(ergebnis as isize)
+                        .or_default()
+                        .push((ein_vorkommen, vielfacher));
                 }
             }
         }
@@ -999,16 +1136,28 @@ pub fn concat_modallogik(
         let mut vorkommen_vielfacher_b: VorkommenVielfacherB = BTreeMap::new();
         for i in 1..=end {
             for distance in distances {
-                prepare_modal_into_table(distance, i, &vorkommen_vielfacher, &mut vorkommen_vielfacher_b, &table_copy);
+                prepare_modal_into_table(
+                    distance,
+                    i,
+                    &vorkommen_vielfacher,
+                    &mut vorkommen_vielfacher_b,
+                    &table_copy,
+                );
             }
         }
 
         for i in 1..=end {
             for distance in distances {
-                let Some(distance_map) = vorkommen_vielfacher_b.get(&i) else { continue };
-                let Some(entry) = distance_map.get(&distance) else { continue };
+                let Some(distance_map) = vorkommen_vielfacher_b.get(&i) else {
+                    continue;
+                };
+                let Some(entry) = distance_map.get(&distance) else {
+                    continue;
+                };
 
-                for (modal_operatoren, vervielfachter) in entry.modal_s.iter().zip(entry.vervielfachter.iter()) {
+                for (modal_operatoren, vervielfachter) in
+                    entry.modal_s.iter().zip(entry.vervielfachter.iter())
+                {
                     let into_its_content = if distance.abs() % 2 == 0 {
                         get_cell(&table_copy, *vervielfachter, concept.0)
                     } else {
@@ -1031,7 +1180,9 @@ pub fn concat_modallogik(
                         piece.push(' ');
                     }
 
-                    let normalized = if modal_operatoren.get(0).map(|s| s.as_str()) == Some(get_cell(&table_copy, 1, 97)) {
+                    let normalized = if modal_operatoren.get(0).map(|s| s.as_str())
+                        == Some(get_cell(&table_copy, 1, 97))
+                    {
                         into_its_content.to_string()
                     } else {
                         into_its_content
@@ -1060,8 +1211,7 @@ pub fn concat_modallogik(
                 }
             }
 
-            let condition_n_vs_1_per_n =
-                concept.0 == 62
+            let condition_n_vs_1_per_n = concept.0 == 62
                 || concept.0 == 63
                 || (358..=367).contains(&concept.0)
                 || (371..=374).contains(&concept.0);
@@ -1085,8 +1235,7 @@ pub fn concat_modallogik(
 
         append_generated_col(table, values);
 
-        let condition_n_vs_1_per_n =
-            concept.0 == 62
+        let condition_n_vs_1_per_n = concept.0 == 62
             || concept.0 == 63
             || (358..=367).contains(&concept.0)
             || (371..=374).contains(&concept.0);
@@ -1100,7 +1249,12 @@ pub fn concat_modallogik(
             } else {
                 tagset(&[ST::SternPolygon, ST::Galaxie])
             },
-            tables.data_dict.get(&1).and_then(|m| m.get(&concept.0)).cloned().unwrap_or_default(),
+            tables
+                .data_dict
+                .get(&1)
+                .and_then(|m| m.get(&concept.0))
+                .cloned()
+                .unwrap_or_default(),
         );
     }
 }
@@ -1121,7 +1275,9 @@ pub fn concat1_primzahlkreuz_pro_contra(
     }
 
     let dreli = table.clone();
-    let max_num = tables.hoechste_zeile_1024.max(dreli.len().saturating_sub(1));
+    let max_num = tables
+        .hoechste_zeile_1024
+        .max(dreli.len().saturating_sub(1));
 
     let headline = "Primzahlkreuz pro contra".to_string();
 
@@ -1143,7 +1299,11 @@ pub fn concat1_primzahlkreuz_pro_contra(
         pro_pro2.entry(num).or_default();
         contra_contra2.entry(num).or_default();
 
-        let mut into: Vec<String> = if num == 0 { vec![headline.clone()] } else { Vec::new() };
+        let mut into: Vec<String> = if num == 0 {
+            vec![headline.clone()]
+        } else {
+            Vec::new()
+        };
         let mut into1: Vec<String> = Vec::new();
         let mut into2: Vec<String> = Vec::new();
 
@@ -1152,18 +1312,18 @@ pub fn concat1_primzahlkreuz_pro_contra(
                 list1.push(num);
                 if num > 16 {
                     let gegen = if keine_primzahl_1 {
-    if let Some(&g) = list2.get(weiter1b + 1) {
-        weiter1b += 1;
-        g
-    } else {
-        continue;
-    }
-} else if let Some(&g) = list1.get(weiter1a) {
-    weiter1a += 1;
-    g
-} else {
-    continue;
-};
+                        if let Some(&g) = list2.get(weiter1b + 1) {
+                            weiter1b += 1;
+                            g
+                        } else {
+                            continue;
+                        }
+                    } else if let Some(&g) = list1.get(weiter1a) {
+                        weiter1a += 1;
+                        g
+                    } else {
+                        continue;
+                    };
                     contra_contra.insert(num, gegen);
                     contra_contra2.entry(num).or_default().insert(gegen);
                     into1.push(format!("gegen {}", gegen));
@@ -1225,7 +1385,11 @@ pub fn concat1_primzahlkreuz_pro_contra(
             for couple_a in paare {
                 if couple_a.0 != 1 && couple_a.1 != 1 {
                     for couple in [couple_a, (couple_a.1, couple_a.0)] {
-                        let firsts: Vec<usize> = if couple.0 != couple.1 { vec![1, 0] } else { vec![1] };
+                        let firsts: Vec<usize> = if couple.0 != couple.1 {
+                            vec![1, 0]
+                        } else {
+                            vec![1]
+                        };
 
                         for first_or_second in firsts {
                             let idx = first_or_second;
@@ -1282,11 +1446,17 @@ pub fn concat1_primzahlkreuz_pro_contra(
         } else {
             if !into1.is_empty() {
                 into_b.push(into1.join(", "));
-                into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                into_b.push(format!(
+                    " Darin kann sich die {} am Besten hineinversetzen.",
+                    num
+                ));
             }
             if !into2.is_empty() {
                 into_b.push(into2.join(", "));
-                into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                into_b.push(format!(
+                    " Darin kann sich die {} am Besten hineinversetzen.",
+                    num
+                ));
             }
             if !into.is_empty() {
                 into_b.push(into.join(", "));
@@ -1317,8 +1487,14 @@ pub fn concat1_primzahlkreuz_pro_contra(
     let mut second_generated_column = vec![String::new(); table.len()];
 
     for num in 0..table.len() {
-        let pro2: Vec<usize> = reverse_pro.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
-        let contra2: Vec<usize> = reverse_contra.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
+        let pro2: Vec<usize> = reverse_pro
+            .get(&num)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        let contra2: Vec<usize> = reverse_contra
+            .get(&num)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
 
         second_generated_column[num] = if num == 0 {
             headline.clone()
@@ -1344,17 +1520,31 @@ pub fn concat1_primzahlkreuz_pro_contra(
     rows_as_numbers.insert(new_col_1);
     rows_as_numbers.insert(new_col_2);
 
-    tables.generated_spalten_parameter_tags.insert(new_col_1, tagset(&[ST::SternPolygon, ST::Universum]));
-    tables.generated_spalten_parameter_tags.insert(new_col_2, tagset(&[ST::SternPolygon, ST::Universum]));
+    tables
+        .generated_spalten_parameter_tags
+        .insert(new_col_1, tagset(&[ST::SternPolygon, ST::Universum]));
+    tables
+        .generated_spalten_parameter_tags
+        .insert(new_col_2, tagset(&[ST::SternPolygon, ST::Universum]));
 
     let key1 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
     tables.generated_spalten_parameter.insert(
         key1,
-        format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0),
+        format!(
+            "{} | {} | {}",
+            parameters_main.bedeutung0,
+            parameters_main.procontra0,
+            parameters_main.grundstrukturen0
+        ),
     );
     let key2 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
     tables.generated_spalten_parameter.insert(
         key2,
-        format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0),
+        format!(
+            "{} | {} | {}",
+            parameters_main.bedeutung0,
+            parameters_main.procontra0,
+            parameters_main.grundstrukturen0
+        ),
     );
 }
