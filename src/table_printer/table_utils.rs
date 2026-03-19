@@ -350,20 +350,39 @@ pub fn convert_to_table_rows(
     column_widths: &[usize],
     row_ranges: &[RowRange],
 ) -> Vec<TableRow> {
-    let mut rows = Vec::with_capacity(data.len() + 1);
+    let mut rows = Vec::new();
     rows.push(build_header_row(headers, column_widths));
 
-    let row_numbers = row_numbers_for_data_len(data.len(), row_ranges);
+    if row_ranges.is_empty() {
+        for (idx, row_data) in data.iter().enumerate() {
+            let line_num = idx + 1;
+            rows.push(build_data_row(
+                row_data,
+                headers.len(),
+                column_widths,
+                line_num,
+            ));
+        }
+        return rows;
+    }
 
-    for (idx, row_data) in data.iter().enumerate() {
-        let line_num = row_numbers.get(idx).copied().unwrap_or(idx + 1);
+    for &(from, to) in row_ranges {
+        if from == 0 || to == 0 || from > to {
+            continue;
+        }
 
-        rows.push(build_data_row(
-            row_data,
-            headers.len(),
-            column_widths,
-            line_num,
-        ));
+        for line_num in from..=to {
+            let data_index = line_num - 1;
+
+            if let Some(row_data) = data.get(data_index) {
+                rows.push(build_data_row(
+                    row_data,
+                    headers.len(),
+                    column_widths,
+                    line_num,
+                ));
+            }
+        }
     }
 
     rows
