@@ -1,8 +1,6 @@
-use crate::cli::{TextBereich, parse_cli_args};
 use crate::cli::parser::{SpaltenNamen, SpaltenNamenListe};
+use crate::cli::{parse_cli_args, TextBereich};
 use crate::column_categories_complete::KategorieMap;
-use crate::table_printer::query::try_resolve_generated_pair;
-use std::collections::BTreeSet;
 use std::error::Error;
 
 fn normalize_category_key(s: &str) -> String {
@@ -40,21 +38,11 @@ impl<'a> SpaltenVerarbeiter<'a> {
         Ok((ergebnis.bereich, ergebnis.spalten_namen))
     }
 
-
     pub fn verarbeite(&self) -> Result<VerarbeitungsErgebnis, Box<dyn Error>> {
-        //println!("🔍 CLI Argumente: {:?}", self.args);
-
         let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste) =
             parse_cli_args(self.args, Some(self.kategorie_map));
 
-        //println!("📊 Bereich nach Parser: {:?}", bereich);
-        //println!("📝 Spaltennamen: {:?}", spalten_namen);
-
-        self.verarbeite_automatische_spalten(
-            &mut bereich,
-            &spalten_namen,
-            &spalten_namen_liste,
-        )?;
+        self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
 
         Ok(VerarbeitungsErgebnis {
             bereich,
@@ -62,127 +50,63 @@ impl<'a> SpaltenVerarbeiter<'a> {
         })
     }
 
-fn verarbeite_automatische_spalten(
-    &self,
-    bereich: &mut TextBereich,
-    spalten_namen: &SpaltenNamen,
-    spalten_namen_liste: &SpaltenNamenListe
-) -> Result<(), Box<dyn Error>> {
-let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
-    &spalten_namen.oberkategorie,
-    &spalten_namen.unterkategorie,
-);
+    fn verarbeite_automatische_spalten(
+        &self,
+        bereich: &mut TextBereich,
+        spalten_namen: &SpaltenNamen,
+        spalten_namen_liste: &SpaltenNamenListe,
+    ) -> Result<(), Box<dyn Error>> {
+        let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
 
-if !direkte_spalten.is_empty() {
-    println!("✅ Direkte Spalten gefunden");
-    self.setze_gefundene_spalten(bereich, direkte_spalten)?;
-    bereich.spalten_gefunden = true;
-    bereich.spalten_gesucht = true;
-    bereich.spalten_gesucht2 = false;
-    return Ok(());
-}
-
-if let Some(inference) = self.kategorie_map.infer_generated_pair(
-    &spalten_namen.oberkategorie,
-    &spalten_namen.unterkategorie,
-) {
-    if !inference.required_columns.is_empty() || !inference.generated_befehle.is_empty() {
-        println!(
-            "ℹ️ Generator-Inferenz: {:?} mit Basisspalten {:?}",
-            inference.generated_befehle,
-            inference.required_columns
-        );
-
-        if !inference.required_columns.is_empty() {
-            self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
+        if hat_manuelle_spalten {
+            return Ok(());
         }
 
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = true;
-        bereich.spalten_gesucht2 = false;
-
-        return Ok(());
-    }
-}
-/*    let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
-
-    if !hat_manuelle_spalten &&
-       (spalten_namen.oberkategorie != "oberkategorie" ||
-        spalten_namen.unterkategorie != "unterkategorie") {
-
-        /*println!(
-            "\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
-            spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );*/
+        if spalten_namen.oberkategorie == "oberkategorie"
+            && spalten_namen.unterkategorie == "unterkategorie"
+        {
+            return Ok(());
+        }
 
         if is_primzahlkreuz_pro_contra_request(
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie,
         ) {
-            //println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
-
             bereich.spalten_gefunden = true;
             bereich.spalten_gesucht = true;
             bereich.spalten_gesucht2 = false;
-
             return Ok(());
         }
 
-        // 🔥 ERST: normale direkte Spalten suchen
-let mut alle_gefundene_spalten: Vec<u32> = Vec::new();
-
-for spalten_namen in &spalten_namen_liste.eintraege {
-    let gefundene_spalten: Vec<u32> =
-        self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+        let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie,
         );
 
-    alle_gefundene_spalten.extend(gefundene_spalten);
-}
+        if !direkte_spalten.is_empty() {
+            self.setze_gefundene_spalten(bereich, direkte_spalten)?;
+            bereich.spalten_gefunden = true;
+            bereich.spalten_gesucht = true;
+            bereich.spalten_gesucht2 = false;
+            return Ok(());
+        }
 
-if !alle_gefundene_spalten.is_empty() {
-    //println!("✅ Direkte Spalten gefunden → KEIN Generator nötig");
+        if let Some(inference) = self.kategorie_map.infer_generated_pair(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        ) {
+            if !inference.required_columns.is_empty() {
+                self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
+            }
+            bereich.spalten_gefunden = true;
+            bereich.spalten_gesucht = true;
+            bereich.spalten_gesucht2 = false;
+            return Ok(());
+        }
 
-    alle_gefundene_spalten.sort_unstable();
-    alle_gefundene_spalten.dedup();
-
-    self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
-    bereich.spalten_gefunden = true;
-    bereich.spalten_gesucht = true;
-    bereich.spalten_gesucht2 = false;
-
-    return Ok(());
-}
-}*/
-// 🔥 ERST JETZT: Generator prüfen
-let mut generated_befehle = BTreeSet::new();
-let mut required_columns = BTreeSet::new();
-
-if try_resolve_generated_pair(
-    &spalten_namen.oberkategorie,
-    &spalten_namen.unterkategorie,
-    &mut generated_befehle,
-    &mut required_columns,
-) {
-    /*println!(
-        "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
-        generated_befehle, required_columns
-    );*/
-
-    let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
-    self.setze_gefundene_spalten(bereich, required)?;
-    bereich.spalten_gefunden = true;
-    bereich.spalten_gesucht = true;
-    bereich.spalten_gesucht2 = false;
-
-    return Ok(());
-}
-
-// 🔥 FALLBACK wie vorher
-self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
-            Ok(())
-}
+        self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
+        Ok(())
+    }
 
     fn suche_und_setze_spalten(
         &self,
@@ -192,47 +116,36 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         let mut alle_gefundene_spalten: Vec<u32> = Vec::new();
 
         for spalten_namen in &spalten_namen_liste.eintraege {
-            let gefundene_spalten: Vec<u32> =
-                self.kategorie_map.finde_spaltennummern_fuer_kategorien(
-                    &spalten_namen.oberkategorie,
-                    &spalten_namen.unterkategorie,
-                );
-
+            let gefundene_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+            );
             alle_gefundene_spalten.extend(gefundene_spalten);
         }
 
         if !alle_gefundene_spalten.is_empty() {
             alle_gefundene_spalten.sort_unstable();
             alle_gefundene_spalten.dedup();
-
             self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
-        } else {
-            if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
-                let mut generated_befehle = BTreeSet::new();
-                let mut required_columns = BTreeSet::new();
+            return Ok(());
+        }
 
-                if try_resolve_generated_pair(
-                    &letzte_spalten_namen.oberkategorie,
-                    &letzte_spalten_namen.unterkategorie,
-                    &mut generated_befehle,
-                    &mut required_columns,
-                ) {
-                    /*println!(
-                        "ℹ️ Fallback auf generierte Spaltenauflösung: {:?} → Basisspalten {:?}",
-                        generated_befehle, required_columns
-                    );*/
-
-                    let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
-                    self.setze_gefundene_spalten(bereich, required)?;
-                    bereich.spalten_gefunden = true;
-                    bereich.spalten_gesucht = true;
-                    bereich.spalten_gesucht2 = false;
-                } else {
-                    self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
+        if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
+            if let Some(inference) = self.kategorie_map.infer_generated_pair(
+                &letzte_spalten_namen.oberkategorie,
+                &letzte_spalten_namen.unterkategorie,
+            ) {
+                if !inference.required_columns.is_empty() {
+                    self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
                 }
+                bereich.spalten_gefunden = true;
+                bereich.spalten_gesucht = true;
+                bereich.spalten_gesucht2 = false;
             } else {
-                return Err("SpaltenNamenListe ist leer".into());
+                self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
             }
+        } else {
+            return Err("SpaltenNamenListe ist leer".into());
         }
 
         Ok(())
@@ -243,8 +156,6 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         bereich: &mut TextBereich,
         gefundene_spalten: Vec<u32>,
     ) -> Result<(), Box<dyn Error>> {
-        //println!("✅ Gefundene Spaltennummern: {:?}", gefundene_spalten);
-
         let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
         sorted.sort();
 
@@ -258,10 +169,6 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         if !bereich.spalten_bereiche.is_empty() {
             bereich.von_spalte = bereich.spalten_bereiche[0].0;
             bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
-            /*println!(
-                "📊 Automatisch erzeugte Spaltenbereiche: {:?}",
-                bereich.spalten_bereiche
-            );*/
         }
 
         Ok(())
@@ -270,26 +177,20 @@ self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
     fn fallback_zu_standards(
         &self,
         bereich: &mut TextBereich,
-        spalten_namen: &SpaltenNamen,
+        _spalten_namen: &SpaltenNamen,
     ) -> Result<(), Box<dyn Error>> {
-        /*println!(
-            "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
-            spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );*/
-
-        //self.zeige_alternative_kombinationen();
-
-        //println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
         bereich.von_spalte = 1;
         bereich.bis_spalte = 1;
-
         Ok(())
     }
 
     fn zeige_alternative_kombinationen(&self) {
         println!("ℹ️  Versuche es mit diesen Kombinationen:");
         println!("  --spaltenname 'Menschliches' 'Motive'");
-        println!("   --spaltenname 'Universum' 'Transzendentalien --spaltenname 'Menschliches' 'Liebe'");
+        println!(
+            "   --spaltenname 'Universum' 'Transzendentalien --spaltenname 'Menschliches' 'Liebe'"
+        );
         println!("  --spaltenname 'Religionen' 'Superkräfte'");
     }
 }
+

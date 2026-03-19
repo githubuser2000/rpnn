@@ -38,7 +38,11 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
 let generated_befehle: BTreeSet<String> =
     verarbeite_kategorien(&kategorie_map, &mut bereich, &spalten_namen)?;
 
-let parameters_main = ParametersMain::default();
+let parameters_main = ParametersMain {
+    bedeutung0: spalten_namen.oberkategorie.clone(),
+    procontra0: spalten_namen.oberkategorie.clone(),
+    grundstrukturen0: spalten_namen.oberkategorie.clone(),
+};
    // 4. Datenstruktur erstellen und ausgeben
     /*let meine_liste = create_example_structure();
     println!("Struktur wurde erstellt: {:?}", meine_liste);

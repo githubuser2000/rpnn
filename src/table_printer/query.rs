@@ -9,167 +9,6 @@ use unicode_width::UnicodeWidthStr;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 
-fn normalize_token(input: &str) -> String {
-    input
-        .trim()
-        .to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
-        .replace('-', "")
-        .replace('_', "")
-        .replace(' ', "")
-}
-
-fn token_is(token: &str, aliases: &[&str]) -> bool {
-    let token = normalize_token(token);
-    aliases.iter().any(|alias| token == normalize_token(alias))
-}
-
-fn generated_alias_present(generated_befehle: &BTreeSet<String>, aliases: &[&str]) -> bool {
-    generated_befehle
-        .iter()
-        .any(|token| token_is(token, aliases))
-}
-
-/// Best-effort Auflösung für generierte Spaltenpaare aus words.py.
-/// Das erste Wort ist die Hauptkategorie (`ParametersMain.*`), das zweite Wort
-/// ein Alias des konkreten Eintrags in `paraNdataMatrix`.
-///
-/// Rückgabe:
-/// - `generated_befehle` wird mit dem passenden Generator-Tag ergänzt
-/// - `required_columns` bekommt die Basisspalten, die der Generator erwartet
-pub fn try_resolve_generated_pair(
-    ober: &str,
-    unter: &str,
-    generated_befehle: &mut BTreeSet<String>,
-    required_columns: &mut BTreeSet<usize>,
-) -> bool {
-    let ober = normalize_token(ober);
-    let unter = normalize_token(unter);
-
-    let is_ober = |aliases: &[&str]| aliases.iter().any(|a| ober == normalize_token(a));
-    let is_unter = |aliases: &[&str]| aliases.iter().any(|a| unter == normalize_token(a));
-
-    // words.py:
-    // - ParametersMain.procontra + ("Primzahlkreuz pro contra", "primzahlkreuz")
-    // - ParametersMain.bedeutung + ("Primzahlkreuz pro contra", primzahlkreuzWort)
-    // -> {"primzahlkreuzprocontra"}
-    if is_ober(&["procontra", "bedeutung", "grundstrukturen"])
-        && is_unter(&[
-            "primzahlkreuz",
-            "nachvollziehen",
-            "nachvollziehen emotional oder geistig durch primzahl kreuz algorithmus",
-        ])
-    {
-        generated_befehle.insert("primzahlkreuzprocontra".to_string());
-        return true;
-    }
-
-    // words.py:
-    // ParametersMain.menschliches + ("Liebe", "liebe", "ethik") -> {8, 9, 28, ...}
-    // lib4tables_concat.py / generated_columns.rs: concatLovePolygon braucht Basis-Spalte 9
-    if is_ober(&["menschliches"]) && is_unter(&["liebe", "ethik"]) {
-        generated_befehle.insert("lovepolygon".to_string());
-        required_columns.insert(9);
-        return true;
-    }
-
-    // words.py:
-    // ParametersMain.menschliches + ("Gleichheit_Freiheit", "gleichheitfreiheit", "ungleichheit",
-    // "dominieren", "gleichheit", "freiheit") -> {132, ...}
-    // lib4tables_concat.py / generated_columns.rs: concatGleichheitFreiheitDominieren braucht 132
-    if is_ober(&["planet", "menschliches", "grundstrukturen"])
-        && is_unter(&[
-            "ordnen",
-            "ordnung",
-            "filterung",
-            "gleichheitfreiheit",
-            "ungleichheit",
-            "dominieren",
-            "gleichheit",
-            "freiheit",
-        ])
-    {
-        generated_befehle.insert("gleichheitfreiheit".to_string());
-        required_columns.insert(132);
-        return true;
-    }
-
-    // Best-effort aus words.py + concatGeistEmotionEnergieMaterieTopologie:
-    // die Generatorspalte hängt an Basis-Spalte 242
-    if is_ober(&["universum", "multiversum", "grundstrukturen", "menschliches"])
-        && is_unter(&[
-            "geist",
-            "bewusstsein",
-            "emotionen",
-            "gefuehle",
-            "gefuehl",
-            "gefühl",
-            "gefühle",
-        ])
-    {
-        generated_befehle.insert("geistemotionenergiematerietopologie".to_string());
-        required_columns.insert(242);
-        return true;
-    }
-
-    // 64-getriebene Generatoren aus generated_columns.rs:
-    // concatPrimCreativityType und concatMondExponzierenLogarithmusTyp
-    if is_ober(&["wichtigste", "bedeutung"])
-        && is_unter(&[
-            "gestirn",
-            "mond",
-            "sonne",
-            "planet",
-            "evolution",
-            "erwerben",
-            "persoenlichkeit",
-            "persönlichkeit",
-            "kreativitaet",
-            "kreativität",
-            "intelligenz",
-        ])
-    {
-        generated_befehle.insert("primcreativitytype".to_string());
-        generated_befehle.insert("mondexponzierenlogarithmustyp".to_string());
-        required_columns.insert(64);
-        return true;
-    }
-
-    // concatVervielfacheZeile arbeitet mit 19 / 90.
-    if is_ober(&["bedeutung", "wichtigste", "galaxie"])
-        && is_unter(&[
-            "primzahlen",
-            "vielfache",
-            "vielfacher",
-            "multis",
-            "multiplikationen",
-        ])
-    {
-        generated_befehle.insert("vervielfachezeile".to_string());
-        required_columns.insert(19);
-        required_columns.insert(90);
-        return true;
-    }
-
-    false
-}
-
-fn requires_full_table_for_generated(generated_befehle: &BTreeSet<String>) -> bool {
-    generated_alias_present(generated_befehle, &[
-        "primzahlkreuzprocontra",
-        "lovepolygon",
-        "gleichheitfreiheit",
-        "geistemotionenergiematerietopologie",
-        "primcreativitytype",
-        "mondexponzierenlogarithmustyp",
-        "vervielfachezeile",
-        "modallogik",
-    ])
-}
-
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
         let mut nums = Vec::new();
@@ -207,6 +46,109 @@ fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<us
     (1..=data_len).collect()
 }
 
+
+fn normalize_token(s: &str) -> String {
+    s.trim().to_lowercase()
+}
+
+fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
+    aliases.iter().any(|alias| tokens.contains(&normalize_token(alias)))
+}
+
+fn selected_by_pair(tokens: &BTreeSet<String>, first_aliases: &[&str], second_aliases: &[&str]) -> bool {
+    contains_any_alias(tokens, first_aliases) && contains_any_alias(tokens, second_aliases)
+}
+
+fn should_use_full_table_for_generated(
+    generated_befehle: &BTreeSet<String>,
+    parameters_main: &ParametersMain,
+) -> bool {
+    let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
+    if !parameters_main.bedeutung0.is_empty() { tokens.insert(normalize_token(&parameters_main.bedeutung0)); }
+    if !parameters_main.procontra0.is_empty() { tokens.insert(normalize_token(&parameters_main.procontra0)); }
+    if !parameters_main.grundstrukturen0.is_empty() { tokens.insert(normalize_token(&parameters_main.grundstrukturen0)); }
+
+    const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
+    const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
+    const GRUNDSTRUKTUREN: &[&str] = &["Grundstrukturen", "grundstrukturen"];
+    const MENSCHLICHES: &[&str] = &["Menschliches", "menschliches"];
+    const UNIVERSUM: &[&str] = &["Universum", "universum", "transzendentalien", "strukturalien", "kugel", "kugeln", "ball", "baelle", "bälle"];
+    const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
+    const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
+    const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
+    const GALAXIE: &[&str] = &["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"];
+
+    const PK_PROCONTRA_ALIASES: &[&str] = &[
+        "Primzahlkreuz pro contra",
+        "nachvollziehen emotional oder geistig durch Primzahl-Kreuz-Algorithmus",
+        "primzahlkreuz",
+        "nachvollziehen",
+        "primzahlkreuzprocontra",
+    ];
+    const LOVE_ALIASES: &[&str] = &["Liebe", "liebe", "ethik", "Liebe_(7)"];
+    const GLEICHHEIT_ALIASES: &[&str] = &[
+        "Gleichheit_Freiheit_Ordnung",
+        "Gleichheit_Freiheit",
+        "gleichheitfreiheit",
+        "ungleichheit",
+        "dominieren",
+        "gleichheit",
+        "freiheit",
+        "Ordnung_und_Filterung_12_und_1pro12",
+        "ordnen",
+        "ordnenundfiltern",
+        "filtern",
+    ];
+    const GEIST_ALIASES: &[&str] = &[
+        "Geist__(15)",
+        "Geist_(15)",
+        "geist",
+        "bewusstsein",
+    ];
+    const MOND64_ALIASES: &[&str] = &[
+        "Drittwichtigste",
+        "drittwichtigste",
+        "Gestirn",
+        "gestirn",
+        "mond",
+        "sonne",
+        "planet",
+    ];
+    const VERVIELFACHE_ALIASES: &[&str] = &[
+        "Zweitwichtigste",
+        "zweitwichtigste",
+        "Primzahlen",
+        "primzahlen",
+        "vielfache",
+        "vielfacher",
+        "Offenbarung_des_Johannes",
+        "offenbarung",
+        "offenbarungdesjohannes",
+        "johannes",
+        "bibel",
+        "offenbarungjohannes",
+    ];
+
+    tokens.contains("primzahlkreuzprocontra")
+        || selected_by_pair(&tokens, PROCONTRA, PK_PROCONTRA_ALIASES)
+        || selected_by_pair(&tokens, BEDEUTUNG, PK_PROCONTRA_ALIASES)
+        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, PK_PROCONTRA_ALIASES)
+        || selected_by_pair(&tokens, MENSCHLICHES, LOVE_ALIASES)
+        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, LOVE_ALIASES)
+        || selected_by_pair(&tokens, PLANET, GLEICHHEIT_ALIASES)
+        || selected_by_pair(&tokens, MENSCHLICHES, GLEICHHEIT_ALIASES)
+        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GLEICHHEIT_ALIASES)
+        || selected_by_pair(&tokens, UNIVERSUM, GEIST_ALIASES)
+        || selected_by_pair(&tokens, MULTIVERSUM, GEIST_ALIASES)
+        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GEIST_ALIASES)
+        || selected_by_pair(&tokens, WICHTIGSTE, MOND64_ALIASES)
+        || selected_by_pair(&tokens, BEDEUTUNG, MOND64_ALIASES)
+        || selected_by_pair(&tokens, WICHTIGSTE, VERVIELFACHE_ALIASES)
+        || selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
+        || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES)
+        || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
+}
+
 // --- Query-Funktion ---
 fn build_full_table_row_query(column_names: &[String]) -> String {
     let columns = column_names
@@ -218,36 +160,43 @@ fn build_full_table_row_query(column_names: &[String]) -> String {
     format!("SELECT {} FROM csv_data", columns)
 }
 
+
 pub fn query_column_by_index(
     conn: &Connection,
     mut bereich: TextBereich,
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
-    let column_names = get_column_names(conn)?;
+   let column_names = get_column_names(conn)?;
 
-    let (query, headers): (String, Vec<String>) =
-        if requires_full_table_for_generated(generated_befehle) {
-            println!("ℹ️ Generierte-Spalten-Sonderpfad: lade Volltabelle für Generator");
-            bereich.spalten_gefunden = true;
-            (build_full_table_row_query(&column_names), column_names.clone())
-        } else {
-            build_column_query(&column_names, &mut bereich)?
-        };
+let (query, headers): (String, Vec<String>) =
+    if should_use_full_table_for_generated(generated_befehle, parameters_main) {
+        println!("ℹ️ Generator-Sonderpfad: lade Volltabelle für generierte Spalten");
+        bereich.spalten_gefunden = true;
+        (build_full_table_row_query(&column_names), column_names.clone())
+    } else {
+        build_column_query(&column_names, &mut bereich)?
+    };
 
-    println!("Headerslänge vor Sortierung: {}", headers.len());
+println!("Headerslänge vor Sortierung: {}", headers.len());
     if !bereich.spalten_gefunden {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
-
+    
     // Berechne Header-Längen mit Unicode-Unterstützung
     let header_lengths: Vec<usize> = headers.iter()
         .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
-
+    
     let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
+    /* DEBUG: Zeige aktuelle Status
+    println!("=== 🔍 STATUS VOR SORTIERUNG ===");
+    println!("Spaltenreihenfolge: {:?}", bereich.spaltenreihenfolgeundnurdiese);
+    println!("Headers vor Sortierung: {} Stück", headers.len());
+    println!("Daten vor Sortierung: {} Zeilen", data.len());
+    */
     // SORTIERUNG DER SPALTEN: NUR wenn spaltenreihenfolgeundnurdiese befüllt ist
     let (mut final_headers, mut final_data) =
     if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
@@ -273,43 +222,24 @@ pub fn query_column_by_index(
         (headers.clone(), data.clone())
     };
 
-    apply_generated_columns(
-        &mut final_headers,
-        &mut final_data,
-        &bereich,
-        generated_befehle,
-        parameters_main,
-    )?;
+apply_generated_columns(
+    &mut final_headers,
+    &mut final_data,
+    &bereich,
+    generated_befehle,
+    parameters_main,
+)?;
 
-    // Rückwärtskompatibilität: alter Primzahlkreuz-Pfad hing nur die letzten 2 Spalten an.
-    if generated_alias_present(generated_befehle, &["primzahlkreuzprocontra"]) {
-        if final_headers.len() >= 2 {
-            let keep_from = final_headers.len() - 2;
-            final_headers = final_headers[keep_from..].to_vec();
+let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
 
-            final_data = final_data
-                .into_iter()
-                .map(|row| {
-                    if row.len() >= 2 {
-                        row[row.len() - 2..].to_vec()
-                    } else {
-                        row
-                    }
-                })
-                .collect();
-        }
-    }
-
-    let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
-
-    print_table_chunked_with_line_numbers(
-        &final_headers,
-        &final_data,
-        &bereich.breiten,
-        &original_line_numbers,
-        bereich.keineleereninhalte,
-    );
-    Ok(bereich)
+print_table_chunked_with_line_numbers(
+    &final_headers,
+    &final_data,
+    &bereich.breiten,
+    &original_line_numbers,
+    false,
+);
+      Ok(bereich)
 }
 
 fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T>, String> {
@@ -317,10 +247,10 @@ fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T
     if indices.is_empty() {
         return Ok(Vec::new());
     }
-
+    
     // Finde den maximalen Index
     let max_index = indices.iter().max().copied().unwrap_or(0);
-
+    
     // Überprüfe, ob alle Indizes gültig sind
     if max_index >= values.len() {
         return Err(format!(
@@ -329,17 +259,19 @@ fn sort_by_indices<T: Clone>(values: &Vec<T>, indices: &[usize]) -> Result<Vec<T
             values.len() - 1
         ));
     }
-
+    
     // Erstelle den sortierten Vektor basierend auf den Indizes
     let result = indices
         .iter()
         .map(|&i| {
+            // Diese Prüfung haben wir bereits oben durchgeführt, 
+            // aber zur Sicherheit behalten wir sie bei
             if i >= values.len() {
                 panic!("Unerwarteter Fehler: Index {} außerhalb der Grenzen", i);
             }
             values[i].clone()
         })
         .collect();
-
+    
     Ok(result)
 }
