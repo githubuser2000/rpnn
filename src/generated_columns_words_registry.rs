@@ -70,7 +70,9 @@ pub fn apply_generated_columns(
 
     let mut tables = Tables::default();
     let mut rows_as_numbers: BTreeSet<usize> = (0..original_header_len).collect();
-
+tables.spalten_vanilla_amount = original_header_len;
+tables.last_line_number = table.len().saturating_sub(1);
+tables.hoechste_zeile_1024 = table.len().saturating_sub(1);
     let mut tokens: BTreeSet<String> = generated_befehle
         .iter()
         .map(|s| normalize_token(s))
@@ -330,6 +332,12 @@ pub fn apply_generated_columns(
         })
         .collect();
 
+    println!("DEBUG keep_indices = {:?}", keep_indices);
+println!("DEBUG headers_after_generate = {:?}", headers);
+println!("DEBUG data_after_generate_len = {}", data.len());
+if let Some(first_row) = data.first() {
+    println!("DEBUG first_generated_row = {:?}", first_row);
+}
     Ok(())
 }
 
