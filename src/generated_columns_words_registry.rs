@@ -59,9 +59,6 @@ pub fn apply_generated_columns(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if generated_befehle.is_empty() {
-        return Ok(());
-    }
 
     let original_headers = headers.clone();
     let original_data = data.clone();

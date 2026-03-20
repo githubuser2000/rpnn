@@ -103,7 +103,14 @@ fn should_use_full_table_for_generated(
     const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
     const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
     const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
-    const GALAXIE: &[&str] = &["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"];
+    const GALAXIE: &[&str] = &[
+        "Galaxie",
+        "galaxie",
+        "alteschriften",
+        "kreis",
+        "galaxien",
+        "kreise",
+    ];
 
     const PK_PROCONTRA_ALIASES: &[&str] = &[
         "Primzahlkreuz pro contra",
@@ -248,10 +255,10 @@ pub fn query_column_by_index(
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-    let has_generated_request = !generated_befehle.is_empty();
-    let is_generated_mode =
-        has_generated_request && should_use_full_table_for_generated(generated_befehle, parameters_main);
+    let wants_generated = should_use_full_table_for_generated(generated_befehle, parameters_main)
+    || !generated_befehle.is_empty();
 
+let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
     let (query, headers): (String, Vec<String>) = if is_generated_mode {
         bereich.spalten_gefunden = true;
         (
@@ -300,16 +307,15 @@ pub fn query_column_by_index(
         (headers.clone(), data.clone())
     };
 
-    if has_generated_request {
-        apply_generated_columns(
-            &mut final_headers,
-            &mut final_data,
-            &bereich,
-            generated_befehle,
-            parameters_main,
-        )?;
-    }
-
+    if wants_generated {
+    apply_generated_columns(
+        &mut final_headers,
+        &mut final_data,
+        &bereich,
+        generated_befehle,
+        parameters_main,
+    )?;
+}
     final_headers = sanitize_headers(&final_headers);
 
     let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
