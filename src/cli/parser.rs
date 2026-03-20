@@ -27,45 +27,6 @@ fn is_flag(s: &str) -> bool {
     s.starts_with('-')
 }
 
-fn parse_vorhervonausschnitt_token(input: &str) -> (String, bool, bool) {
-    let trimmed = input.trim();
-    let mut vielfache = false;
-    let mut primfaktoren = false;
-
-    let mut core = trimmed;
-
-    loop {
-        let mut changed = false;
-
-        if let Some(rest) = core.strip_prefix('v') {
-            vielfache = true;
-            core = rest;
-            changed = true;
-        }
-        if let Some(rest) = core.strip_prefix('w') {
-            primfaktoren = true;
-            core = rest;
-            changed = true;
-        }
-        if let Some(rest) = core.strip_suffix('v') {
-            vielfache = true;
-            core = rest;
-            changed = true;
-        }
-        if let Some(rest) = core.strip_suffix('w') {
-            primfaktoren = true;
-            core = rest;
-            changed = true;
-        }
-
-        if !changed {
-            break;
-        }
-    }
-
-    (core.trim().to_string(), vielfache, primfaktoren)
-}
-
 fn print_all_oberkategorien(
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>,
 ) {
@@ -152,14 +113,33 @@ pub fn parse_cli_args(
                 if let Some((_, nachfolger)) = iter.next() {
                     println!("📋 Verarbeite --vorhervonausschnitt: {}", nachfolger);
 
-                    let (bereinigte_angabe, vielfache, primfaktoren) =
-                        parse_vorhervonausschnitt_token(nachfolger);
+                    let mut vielfache = false;
+                    let mut primfaktoren = false;
+                    let mut zeilentext = nachfolger.clone();
+
+                    while zeilentext.starts_with('v') || zeilentext.starts_with('w') {
+                        if zeilentext.starts_with('v') {
+                            vielfache = true;
+                        } else {
+                            primfaktoren = true;
+                        }
+                        zeilentext.remove(0);
+                    }
+
+                    while zeilentext.ends_with('v') || zeilentext.ends_with('w') {
+                        if zeilentext.ends_with('v') {
+                            vielfache = true;
+                        } else {
+                            primfaktoren = true;
+                        }
+                        zeilentext.pop();
+                    }
 
                     bereich.vorher_vielfache |= vielfache;
                     bereich.vorher_primfaktoren |= primfaktoren;
 
-                    if is_zeilen_angabe(&bereinigte_angabe) {
-                        if let Some(bereichspaare) = parse_zeilenangabe_zu_bereichen(&bereinigte_angabe) {
+                    if is_zeilen_angabe(&zeilentext) {
+                        if let Some(bereichspaare) = parse_zeilenangabe_zu_bereichen(&zeilentext) {
                             if !bereichspaare.is_empty() {
                                 bereich.zeilen_bereiche = bereichspaare.clone();
                                 bereich.von_zeile = bereichspaare[0].0;
@@ -168,7 +148,7 @@ pub fn parse_cli_args(
                                     bereich.bis_zeile = last_bereich.1;
                                 }
                             }
-                        } else if let Ok(zahl) = bereinigte_angabe.parse::<usize>() {
+                        } else if let Ok(zahl) = zeilentext.parse::<usize>() {
                             bereich.zeilen_bereiche.push((zahl, zahl));
                             bereich.von_zeile = zahl;
                             bereich.bis_zeile = zahl;

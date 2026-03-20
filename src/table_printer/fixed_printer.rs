@@ -27,7 +27,8 @@ fn filter_small_lines_in_cell(cell: &str) -> String {
         .filter(|line| line.chars().count() > 2)
         .map(ToOwned::to_owned)
         .collect::<Vec<String>>()
-        .join("\n")
+        .join("
+")
 }
 
 fn sanitize_chunk_data(chunk_data: &[Vec<String>], keineleereninhalte: bool) -> Vec<Vec<String>> {
@@ -55,29 +56,29 @@ fn row_has_visible_content(row: &[String]) -> bool {
 
 fn sanitize_chunk_data_with_rows(
     chunk_data: &[Vec<String>],
-    row_numbers: &[usize],
+    original_line_numbers: &[usize],
     keineleereninhalte: bool,
 ) -> (Vec<Vec<String>>, Vec<usize>) {
     if !keineleereninhalte {
-        return (chunk_data.to_vec(), row_numbers.to_vec());
+        return (chunk_data.to_vec(), original_line_numbers.to_vec());
     }
 
-    let mut new_data = Vec::new();
-    let mut new_rows = Vec::new();
+    let mut filtered_data = Vec::new();
+    let mut filtered_line_numbers = Vec::new();
 
-    for (row, &num) in chunk_data.iter().zip(row_numbers.iter()) {
+    for (row, &line_no) in chunk_data.iter().zip(original_line_numbers.iter()) {
         let cleaned_row: Vec<String> = row
             .iter()
             .map(|cell| filter_small_lines_in_cell(cell))
             .collect();
 
         if row_has_visible_content(&cleaned_row) {
-            new_data.push(cleaned_row);
-            new_rows.push(num);
+            filtered_data.push(cleaned_row);
+            filtered_line_numbers.push(line_no);
         }
     }
 
-    (new_data, new_rows)
+    (filtered_data, filtered_line_numbers)
 }
 
 fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String {
@@ -141,11 +142,8 @@ pub fn print_table_chunked_with_line_numbers(
             })
             .collect();
 
-        let (chunk_data, chunk_line_numbers) = sanitize_chunk_data_with_rows(
-            &raw_chunk_data,
-            original_line_numbers,
-            keineleereninhalte,
-        );
+        let (chunk_data, chunk_line_numbers) =
+            sanitize_chunk_data_with_rows(&raw_chunk_data, original_line_numbers, keineleereninhalte);
 
         let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
         let chunk_budget = available_total.saturating_sub(chunk_overhead);
@@ -187,7 +185,7 @@ pub fn print_table_chunked_with_line_numbers(
             &chunk_headers,
             &chunk_data,
             &chunk_widths,
-            original_line_numbers,
+            &chunk_line_numbers,
         );
 
         render_rows(term_width, chunk_widths, &table_rows);
