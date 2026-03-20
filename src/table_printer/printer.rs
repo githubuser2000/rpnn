@@ -151,7 +151,7 @@ pub fn print_table_chunked_with_line_numbers(
             original_line_numbers,
         );
 
-        render_rows(term_width, chunk_widths, &table_rows);
+        render_rows(term_width, chunk_widths, &table_rows, keineleereninhalte);
 
         if end < headers.len() {
             println!();
@@ -175,8 +175,14 @@ fn build_output<'a>(
     output
 }
 
-fn render_rows(term_width: usize, column_widths: Vec<usize>, table_rows: &[TableRow]) {
-    let tables = Tables::new(Some(100));
+fn render_rows(
+    term_width: usize,
+    column_widths: Vec<usize>,
+    table_rows: &[TableRow],
+    keineleereninhalte: bool,
+) {
+    let mut tables = Tables::new(Some(100));
+    tables.keine_leeren_inhalte = keineleereninhalte;
     let mut output = build_output(&tables, term_width, column_widths);
 
     let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
@@ -223,7 +229,7 @@ pub fn print_table_with_offset(
         original_start_line,
     );
 
-    render_rows(term_width, column_widths, &table_rows);
+    render_rows(term_width, column_widths, &table_rows, false);
 }
 
 fn estimate_natural_width_for_chunking(
@@ -363,7 +369,7 @@ pub fn print_table_chunked_with_offset(
             original_start_line,
         );
 
-        render_rows(term_width, chunk_widths, &table_rows);
+        render_rows(term_width, chunk_widths, &table_rows, keineleereninhalte);
 
         if end < headers.len() {
             println!();
@@ -383,5 +389,5 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
     let layout = build_table_layout(&sanitized_headers, data);
     let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
-    render_rows(layout.term_width, layout.column_widths, &table_rows);
+    render_rows(layout.term_width, layout.column_widths, &table_rows, false);
 }

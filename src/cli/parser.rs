@@ -155,8 +155,8 @@ pub fn parse_cli_args(
                     let (bereinigte_angabe, vielfache, primfaktoren) =
                         parse_vorhervonausschnitt_token(nachfolger);
 
-                    bereich.vorher_vielfache = vielfache;
-                    bereich.vorher_primfaktoren = primfaktoren;
+                    bereich.vorher_vielfache |= vielfache;
+                    bereich.vorher_primfaktoren |= primfaktoren;
 
                     if is_zeilen_angabe(&bereinigte_angabe) {
                         if let Some(bereichspaare) = parse_zeilenangabe_zu_bereichen(&bereinigte_angabe) {

@@ -439,7 +439,7 @@ pub fn query_column_by_index(
         &final_data,
         &bereich.breiten,
         &original_line_numbers,
-        false,
+        bereich.keineleereninhalte,
     );
 
     Ok(bereich)
