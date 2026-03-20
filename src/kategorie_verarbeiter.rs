@@ -144,10 +144,18 @@ pub fn verarbeite_kategorien(
 
     if !gefundene_spalten.is_empty() {
         bereich.spalten_gefunden = true;
-        bereich.spaltenreihenfolgeundnurdiese = gefundene_spalten
-            .iter()
-            .map(|&x| x as usize)
-            .collect();
+
+        // Wichtig: Eine explizit vom Benutzer gesetzte Reihenfolge wie
+        // `--spaltenreihenfolgeundnurdiese 3,2,1` darf hier NICHT überschrieben werden.
+        // Diese Reihenfolge bezieht sich auf die durch die Kategorie gefundenen Spalten
+        // und wird später in query.rs auf die bereits selektierten Spalten angewendet.
+        if bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+            bereich.spaltenreihenfolgeundnurdiese = gefundene_spalten
+                .iter()
+                .map(|&x| x as usize)
+                .collect();
+        }
+
         println!(
             "✅ Kategorie gefunden: {} → {} : {:?}",
             spalten_namen.oberkategorie,
