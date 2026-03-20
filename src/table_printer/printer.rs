@@ -187,7 +187,7 @@ pub fn print_table_chunked_with_line_numbers(
             &chunk_headers,
             &chunk_data,
             &chunk_widths,
-            original_line_numbers,
+            &chunk_line_numbers,
         );
 
         render_rows(term_width, chunk_widths, &table_rows);

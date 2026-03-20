@@ -358,29 +358,7 @@ pub fn query_column_by_index(
     let (data, _max_lengths) =
         fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
-    let (mut final_headers, mut final_data) = if is_generated_mode {
-        (headers.clone(), data.clone())
-    } else if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-        let null_basierte_indizes: Vec<usize> = bereich
-            .spaltenreihenfolgeundnurdiese
-            .iter()
-            .map(|&i| i.saturating_sub(1))
-            .collect();
-
-        let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
-            .unwrap_or_else(|_| headers.clone());
-
-        let sorted_data: Vec<Vec<String>> = data
-            .iter()
-            .map(|row| {
-                sort_by_indices(row, &null_basierte_indizes).unwrap_or_else(|_| row.clone())
-            })
-            .collect();
-
-        (sorted_headers, sorted_data)
-    } else {
-        (headers.clone(), data.clone())
-    };
+    let (mut final_headers, mut final_data) = (headers.clone(), data.clone());
 
     if wants_generated {
         apply_generated_columns(
@@ -390,6 +368,23 @@ pub fn query_column_by_index(
             generated_befehle,
             parameters_main,
         )?;
+    }
+
+    if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+        let null_basierte_indizes: Vec<usize> = bereich
+            .spaltenreihenfolgeundnurdiese
+            .iter()
+            .filter_map(|&i| i.checked_sub(1))
+            .collect();
+
+        if let Ok(sorted_headers) = sort_by_indices(&final_headers, &null_basierte_indizes) {
+            let sorted_data: Vec<Vec<String>> = final_data
+                .iter()
+                .map(|row| sort_by_indices(row, &null_basierte_indizes).unwrap_or_else(|_| row.clone()))
+                .collect();
+            final_headers = sorted_headers;
+            final_data = sorted_data;
+        }
     }
 
     final_headers = sanitize_headers(&final_headers);
