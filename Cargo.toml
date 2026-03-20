@@ -1,5 +1,5 @@
 [package]
-name = "mein-rpnn"
+name = "rpnn"
 version = "0.1.0"
 edition = "2024"
 
@@ -17,6 +17,6 @@ terminal_size = "0.4.1"
 regex = "1.12.2"
 lazy_static = "1.5.0"
 [[bin]]
-name = "mein-rpnn"
+name = "rpnn"
 path = "src/main.rs"
 
