@@ -62,6 +62,18 @@ impl<'a> SpaltenVerarbeiter<'a> {
             return Ok(());
         }
 
+        // Bei mehreren --spaltenname-Einträgen darf NICHT nur der letzte Eintrag
+        // (spalten_namen) ausgewertet werden. Sonst gewinnt der letzte Filter und
+        // frühere Kombinationen wie "Menschliches Motive" verschwinden.
+        if spalten_namen_liste.eintraege.len() > 1 {
+            self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
+            return Ok(());
+        }
+
+        if spalten_namen.oberkategorie.is_empty() && spalten_namen.unterkategorie.is_empty() {
+            return Ok(());
+        }
+
         if spalten_namen.oberkategorie == "oberkategorie"
             && spalten_namen.unterkategorie == "unterkategorie"
         {
