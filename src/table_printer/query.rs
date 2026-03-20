@@ -209,12 +209,7 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
                 .join(", ");
 
             return format!(
-                "SELECT {} FROM (
-                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num
-                    FROM csv_data
-                ) numbered_data
-                WHERE row_num IN ({})
-                ORDER BY row_num",
+                "SELECT {} FROM (\n                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n                    FROM csv_data\n                ) numbered_data\n                WHERE row_num IN ({})\n                ORDER BY row_num",
                 columns, row_numbers_str
             );
         }
@@ -256,9 +251,9 @@ pub fn query_column_by_index(
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
     let wants_generated = should_use_full_table_for_generated(generated_befehle, parameters_main)
-    || !generated_befehle.is_empty();
+        || !generated_befehle.is_empty();
+    let is_generated_mode = wants_generated;
 
-let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
     let (query, headers): (String, Vec<String>) = if is_generated_mode {
         bereich.spalten_gefunden = true;
         (
@@ -308,14 +303,15 @@ let is_generated_mode = should_use_full_table_for_generated(generated_befehle, p
     };
 
     if wants_generated {
-    apply_generated_columns(
-        &mut final_headers,
-        &mut final_data,
-        &bereich,
-        generated_befehle,
-        parameters_main,
-    )?;
-}
+        apply_generated_columns(
+            &mut final_headers,
+            &mut final_data,
+            &bereich,
+            generated_befehle,
+            parameters_main,
+        )?;
+    }
+
     final_headers = sanitize_headers(&final_headers);
 
     let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());

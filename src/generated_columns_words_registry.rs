@@ -684,9 +684,6 @@ pub fn geist_emotion_energie_materie_topologie(zahl: usize) -> String {
 ------------------------------ */
 
 pub fn concat_love_polygon(table: &mut Table, rows_as_numbers: &mut RowSet, tables: &mut Tables) {
-    if !rows_as_numbers.contains(&9) {
-        return;
-    }
 
     let values: Vec<String> = (0..table.len())
         .map(|i| {
@@ -727,9 +724,6 @@ pub fn concat_gleichheit_freiheit_dominieren(
     rows_as_numbers: &mut RowSet,
     tables: &mut Tables,
 ) {
-    if !rows_as_numbers.contains(&132) {
-        return;
-    }
 
     let values: Vec<String> = (0..=tables.last_line_number.min(table.len().saturating_sub(1)))
         .map(|i| {
@@ -766,9 +760,6 @@ pub fn concat_geist_emotion_energie_materie_topologie(
     rows_as_numbers: &mut RowSet,
     tables: &mut Tables,
 ) {
-    if !rows_as_numbers.contains(&242) {
-        return;
-    }
 
     let values: Vec<String> = (0..=tables.last_line_number.min(table.len().saturating_sub(1)))
         .map(|i| {
@@ -806,9 +797,6 @@ pub fn concat_prim_creativity_type(
     rows_as_numbers: &mut RowSet,
     tables: &mut Tables,
 ) {
-    if !rows_as_numbers.contains(&64) {
-        return;
-    }
 
     let end = tables.last_line_number.min(table.len().saturating_sub(1));
     let values: Vec<String> = (0..=end)
@@ -851,9 +839,6 @@ pub fn concat_mond_exponzieren_logarithmus_typ(
     rows_as_numbers: &mut RowSet,
     tables: &mut Tables,
 ) {
-    if !rows_as_numbers.contains(&64) {
-        return;
-    }
 
     let pairs = [
         (44usize, "Mond-Typ eines Sternpolygons"),
@@ -1279,9 +1264,6 @@ pub fn concat1_primzahlkreuz_pro_contra(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) {
-    if !generated_befehle.contains("primzahlkreuzprocontra") {
-        return;
-    }
 
     let dreli = table.clone();
     let max_num = tables
