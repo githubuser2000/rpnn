@@ -13,7 +13,6 @@ use crate::table_printer::table_utils::{
     RowRange,
 };
 
-
 fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize> {
     match explizite_breiten.len() {
         0 => None,
@@ -21,6 +20,7 @@ fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize
         _ => explizite_breiten.get(index).copied(),
     }
 }
+
 fn filter_small_lines_in_cell(cell: &str) -> String {
     cell.lines()
         .map(str::trim)
@@ -43,6 +43,16 @@ fn sanitize_chunk_data(chunk_data: &[Vec<String>], keineleereninhalte: bool) -> 
                 .collect()
         })
         .collect()
+}
+
+fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String {
+    let trimmed = header.trim();
+
+    if trimmed.is_empty() {
+        return format!("SQL-Spalte {}", global_index + 1);
+    }
+
+    trimmed.to_string()
 }
 
 pub fn print_table_chunked_with_line_numbers(
@@ -83,7 +93,9 @@ pub fn print_table_chunked_with_line_numbers(
             end = (start + 1).min(headers.len());
         }
 
-        let chunk_headers: Vec<String> = headers[start..end].to_vec();
+        let chunk_headers: Vec<String> = (start..end)
+            .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
+            .collect();
 
         let raw_chunk_data: Vec<Vec<String>> = data
             .iter()
@@ -107,6 +119,7 @@ pub fn print_table_chunked_with_line_numbers(
                 chunk_widths[local_i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
             }
         }
+
         let current_sum: usize = chunk_widths.iter().sum();
         if current_sum > chunk_budget {
             let mut shrinkable = chunk_widths.clone();
@@ -188,15 +201,22 @@ pub fn print_table_with_offset(
     row_ranges: &[RowRange],
     original_start_line: usize,
 ) {
+    let sanitized_headers: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .collect();
+
     let term_width = get_terminal_width();
     let available_budget = term_width
         .saturating_sub(1)
-        .saturating_sub(headers.len() * COLUMN_OVERHEAD);
+        .saturating_sub(sanitized_headers.len() * COLUMN_OVERHEAD);
 
-    let column_widths = compute_column_widths_from_global_mass(headers, data, available_budget);
+    let column_widths =
+        compute_column_widths_from_global_mass(&sanitized_headers, data, available_budget);
 
     let table_rows = convert_to_table_rows_with_offset(
-        headers,
+        &sanitized_headers,
         data,
         &column_widths,
         row_ranges,
@@ -261,7 +281,7 @@ pub fn print_table_chunked_with_offset(
         let mut used = 0usize;
 
         while end < headers.len() {
-            let guessed_width = if let Some(&breite) = explizite_breiten.get(end) {
+            let guessed_width = if let Some(breite) = get_explicit_width(explizite_breiten, end) {
                 breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
             } else {
                 estimate_natural_width_for_chunking(&headers[end], data, end)
@@ -284,7 +304,9 @@ pub fn print_table_chunked_with_offset(
             end = (start + 1).min(headers.len());
         }
 
-        let chunk_headers: Vec<String> = headers[start..end].to_vec();
+        let chunk_headers: Vec<String> = (start..end)
+            .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
+            .collect();
 
         let raw_chunk_data: Vec<Vec<String>> = data
             .iter()
@@ -304,7 +326,7 @@ pub fn print_table_chunked_with_offset(
             compute_column_widths_from_global_mass(&chunk_headers, &chunk_data, chunk_budget);
 
         for (local_i, global_i) in (start..end).enumerate() {
-            if let Some(&breite) = explizite_breiten.get(global_i) {
+            if let Some(breite) = get_explicit_width(explizite_breiten, global_i) {
                 chunk_widths[local_i] = breite.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
             }
         }
@@ -352,8 +374,14 @@ pub fn print_table_chunked_with_offset(
 }
 
 pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
-    let layout = build_table_layout(headers, data);
-    let table_rows = convert_to_table_rows(headers, data, &layout.column_widths, row_ranges);
+    let sanitized_headers: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .collect();
+
+    let layout = build_table_layout(&sanitized_headers, data);
+    let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
     render_rows(layout.term_width, layout.column_widths, &table_rows);
 }

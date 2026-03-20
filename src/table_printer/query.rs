@@ -1,4 +1,3 @@
-// table_printer/query.rs
 use std::collections::BTreeSet;
 use std::process;
 
@@ -25,7 +24,7 @@ fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<us
             }
         }
 
-        nums.sort();
+        nums.sort_unstable();
         nums.dedup();
 
         if nums.len() > data_len {
@@ -70,7 +69,9 @@ fn should_use_full_table_for_generated(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> bool {
-    let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
+    let mut tokens: BTreeSet<String> =
+        generated_befehle.iter().map(|s| normalize_token(s)).collect();
+
     if !parameters_main.bedeutung0.is_empty() {
         tokens.insert(normalize_token(&parameters_main.bedeutung0));
     }
@@ -179,14 +180,17 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
 
     if !bereich.zeilen_bereiche.is_empty() {
         let mut all_row_numbers = Vec::new();
+
         for &(start, end) in &bereich.zeilen_bereiche {
             if start == 0 || end == 0 || start > end {
                 continue;
             }
+
             for row in start..=end {
                 all_row_numbers.push(row);
             }
         }
+
         all_row_numbers.sort_unstable();
         all_row_numbers.dedup();
 
@@ -198,7 +202,12 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
                 .join(", ");
 
             return format!(
-                "SELECT {} FROM (\n    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n    FROM csv_data\n) numbered_data\nWHERE row_num IN ({})\nORDER BY row_num",
+                "SELECT {} FROM (
+                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num
+                    FROM csv_data
+                ) numbered_data
+                WHERE row_num IN ({})
+                ORDER BY row_num",
                 columns, row_numbers_str
             );
         }
@@ -207,6 +216,7 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
     if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
         let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
         let offset = bereich.von_zeile.saturating_sub(1);
+
         return format!(
             "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
             columns, anzahl, offset
@@ -216,6 +226,21 @@ fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) ->
     format!("SELECT {} FROM csv_data", columns)
 }
 
+fn sanitize_headers(headers: &[String]) -> Vec<String> {
+    headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            let trimmed = h.trim();
+            if trimmed.is_empty() {
+                format!("SQL-Spalte {}", i + 1)
+            } else {
+                trimmed.to_string()
+            }
+        })
+        .collect()
+}
+
 pub fn query_column_by_index(
     conn: &Connection,
     mut bereich: TextBereich,
@@ -223,14 +248,17 @@ pub fn query_column_by_index(
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-
     let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
 
     let (query, headers): (String, Vec<String>) = if is_generated_mode {
         bereich.spalten_gefunden = true;
-        (build_full_table_row_query(&column_names, &bereich), column_names.clone())
+        (
+            build_full_table_row_query(&column_names, &bereich),
+            sanitize_headers(&column_names),
+        )
     } else {
-        build_column_query(&column_names, &mut bereich)?
+        let (query, headers) = build_column_query(&column_names, &mut bereich)?;
+        (query, sanitize_headers(&headers))
     };
 
     if !bereich.spalten_gefunden {
@@ -243,7 +271,8 @@ pub fn query_column_by_index(
         .map(|h| UnicodeWidthStr::width(h.as_str()))
         .collect();
 
-    let (data, _max_lengths) = fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
+    let (data, _max_lengths) =
+        fetch_data_with_stats(conn, &query, headers.len(), &header_lengths)?;
 
     let (mut final_headers, mut final_data) = if is_generated_mode {
         (headers.clone(), data.clone())
@@ -251,7 +280,7 @@ pub fn query_column_by_index(
         let null_basierte_indizes: Vec<usize> = bereich
             .spaltenreihenfolgeundnurdiese
             .iter()
-            .map(|&i| if i == 0 { 0 } else { i - 1 })
+            .map(|&i| i.saturating_sub(1))
             .collect();
 
         let sorted_headers = sort_by_indices(&headers, &null_basierte_indizes)
@@ -276,6 +305,8 @@ pub fn query_column_by_index(
         generated_befehle,
         parameters_main,
     )?;
+
+    final_headers = sanitize_headers(&final_headers);
 
     let original_line_numbers = build_original_line_numbers(&bereich, final_data.len());
 
@@ -304,6 +335,5 @@ fn sort_by_indices<T: Clone>(values: &[T], indices: &[usize]) -> Result<Vec<T>, 
         ));
     }
 
-    let result = indices.iter().map(|&i| values[i].clone()).collect();
-    Ok(result)
+    Ok(indices.iter().map(|&i| values[i].clone()).collect())
 }
