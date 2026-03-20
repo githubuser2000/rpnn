@@ -248,7 +248,9 @@ pub fn query_column_by_index(
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
     let column_names = get_column_names(conn)?;
-    let is_generated_mode = should_use_full_table_for_generated(generated_befehle, parameters_main);
+    let has_generated_request = !generated_befehle.is_empty();
+    let is_generated_mode =
+        has_generated_request && should_use_full_table_for_generated(generated_befehle, parameters_main);
 
     let (query, headers): (String, Vec<String>) = if is_generated_mode {
         bereich.spalten_gefunden = true;
@@ -298,13 +300,15 @@ pub fn query_column_by_index(
         (headers.clone(), data.clone())
     };
 
-    apply_generated_columns(
-        &mut final_headers,
-        &mut final_data,
-        &bereich,
-        generated_befehle,
-        parameters_main,
-    )?;
+    if has_generated_request {
+        apply_generated_columns(
+            &mut final_headers,
+            &mut final_data,
+            &bereich,
+            generated_befehle,
+            parameters_main,
+        )?;
+    }
 
     final_headers = sanitize_headers(&final_headers);
 

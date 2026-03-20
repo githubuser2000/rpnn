@@ -59,6 +59,10 @@ pub fn apply_generated_columns(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if generated_befehle.is_empty() {
+        return Ok(());
+    }
+
     let original_headers = headers.clone();
     let original_data = data.clone();
 
@@ -70,9 +74,9 @@ pub fn apply_generated_columns(
 
     let mut tables = Tables::default();
     let mut rows_as_numbers: BTreeSet<usize> = (0..original_header_len).collect();
-tables.spalten_vanilla_amount = original_header_len;
-tables.last_line_number = table.len().saturating_sub(1);
-tables.hoechste_zeile_1024 = table.len().saturating_sub(1);
+    tables.spalten_vanilla_amount = original_header_len;
+    tables.last_line_number = table.len().saturating_sub(1);
+    tables.hoechste_zeile_1024 = table.len().saturating_sub(1);
     let mut tokens: BTreeSet<String> = generated_befehle
         .iter()
         .map(|s| normalize_token(s))
@@ -172,14 +176,14 @@ tables.hoechste_zeile_1024 = table.len().saturating_sub(1);
     let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
 
     if want_primzahlkreuz {
-    concat1_primzahlkreuz_pro_contra(
-        &mut table,
-        &mut rows_as_numbers,
-        &mut tables,
-        generated_befehle,
-        parameters_main,
-    );
-}
+        concat1_primzahlkreuz_pro_contra(
+            &mut table,
+            &mut rows_as_numbers,
+            &mut tables,
+            generated_befehle,
+            parameters_main,
+        );
+    }
 
     if want_love {
         concat_love_polygon(&mut table, &mut rows_as_numbers, &mut tables);
