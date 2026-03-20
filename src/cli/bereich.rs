@@ -13,6 +13,8 @@ pub struct TextBereich {
     pub spalten_gefunden: bool,  // NEU: Wurden Spalten explizit gefunden?
     pub spalten_gesucht: bool,  // NEU: Wurden Spalten explizit gefunden?
     pub spalten_gesucht2: bool,  // NEU: Wurden Spalten explizit gefunden?
+    pub vorher_vielfache: bool,
+    pub vorher_primfaktoren: bool,
 }
 
 impl Default for TextBereich {
@@ -30,6 +32,8 @@ impl Default for TextBereich {
             spalten_gefunden: false,  // Standard: nicht gefunden
             spalten_gesucht: false,  // Standard: nicht gefunden
             spalten_gesucht2: false,  // Standard: nicht gefunden
+            vorher_vielfache: false,
+            vorher_primfaktoren: false,
         }
     }
 }

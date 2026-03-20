@@ -1,14 +1,130 @@
 use std::collections::BTreeSet;
 use std::process;
 
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use unicode_width::UnicodeWidthStr;
 
 use crate::cli::TextBereich;
 use crate::column_manager::{build_column_query, get_column_names};
 use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
+use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
+
+
+fn collect_base_row_numbers(bereich: &TextBereich) -> Vec<usize> {
+    if !bereich.zeilen_bereiche.is_empty() {
+        let mut nums = Vec::new();
+
+        for &(from, to) in &bereich.zeilen_bereiche {
+            if from == 0 || to == 0 || from > to {
+                continue;
+            }
+
+            for n in from..=to {
+                nums.push(n);
+            }
+        }
+
+        nums.sort_unstable();
+        nums.dedup();
+        return nums;
+    }
+
+    if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
+        return (bereich.von_zeile..=bereich.bis_zeile).collect();
+    }
+
+    Vec::new()
+}
+
+fn add_multiples(target: &mut BTreeSet<usize>, numbers: &[usize], max_row: usize) {
+    for &n in numbers {
+        if n == 0 || n > max_row {
+            continue;
+        }
+
+        let mut current = n;
+        while current <= max_row {
+            target.insert(current);
+            match current.checked_add(n) {
+                Some(next) => current = next,
+                None => break,
+            }
+        }
+    }
+}
+
+fn expand_special_row_numbers(bereich: &TextBereich, total_rows: usize) -> Vec<usize> {
+    let base = collect_base_row_numbers(bereich);
+
+    if base.is_empty() {
+        return base;
+    }
+
+    if !bereich.vorher_vielfache && !bereich.vorher_primfaktoren {
+        return base;
+    }
+
+    let mut result: BTreeSet<usize> = base.iter().copied().filter(|&n| n <= total_rows).collect();
+
+    let mut prime_factor_numbers: BTreeSet<usize> = BTreeSet::new();
+
+    if bereich.vorher_primfaktoren {
+        for &n in &base {
+            for (prime, _power) in prime_factors(n as i64) {
+                if prime > 0 {
+                    let p = prime as usize;
+                    if p <= total_rows {
+                        result.insert(p);
+                    }
+                    prime_factor_numbers.insert(p);
+                }
+            }
+        }
+    }
+
+    if bereich.vorher_vielfache {
+        add_multiples(&mut result, &base, total_rows);
+
+        if bereich.vorher_primfaktoren {
+            let pf: Vec<usize> = prime_factor_numbers.into_iter().collect();
+            add_multiples(&mut result, &pf, total_rows);
+        }
+    }
+
+    result.into_iter().collect()
+}
+
+fn apply_special_row_expansion(
+    conn: &Connection,
+    bereich: &mut TextBereich,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if !bereich.vorher_vielfache && !bereich.vorher_primfaktoren {
+        return Ok(());
+    }
+
+    let total_rows: usize = conn.query_row(
+        "SELECT COUNT(*) FROM csv_data",
+        params![],
+        |row| row.get(0),
+    )?;
+
+    let expanded = expand_special_row_numbers(bereich, total_rows);
+
+    if expanded.is_empty() {
+        bereich.zeilen_bereiche.clear();
+        bereich.von_zeile = 0;
+        bereich.bis_zeile = 0;
+        return Ok(());
+    }
+
+    bereich.zeilen_bereiche = expanded.iter().map(|&n| (n, n)).collect();
+    bereich.von_zeile = expanded[0];
+    bereich.bis_zeile = *expanded.last().unwrap_or(&expanded[0]);
+
+    Ok(())
+}
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -249,6 +365,8 @@ pub fn query_column_by_index(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<TextBereich, Box<dyn std::error::Error>> {
+    apply_special_row_expansion(conn, &mut bereich)?;
+
     let column_names = get_column_names(conn)?;
     let wants_generated = should_use_full_table_for_generated(generated_befehle, parameters_main)
         || !generated_befehle.is_empty();
