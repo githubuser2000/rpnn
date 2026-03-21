@@ -191,11 +191,8 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
     //println!("🔍 Suche nach: '{}' → '{}'", ober, unter);
     // 🔴 NEU: Erst exakte Suche
-    println!("DEBUG suche: ober='{}' unter='{}'", ober, unter);
     let exakt = self.finde_spaltennummern_exakt(ober, unter);
-    println!("DEBUG exakt = {:?}", exakt);
     if !exakt.is_empty() {
-        println!("DEBUG nehme EXAKTES Ergebnis");
         return exakt;
     }
     let mut gefundene = Vec::new();
@@ -264,6 +261,13 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
 (vec!["Universum", "universum"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
         (vec!["Wichtigstes_zum_verstehen", "wichtigsteverstehen"], vec!["Wichtigste", "wichtigste"], vec![10, 5, 4, 8]),
         (vec!["Menschliches", "menschliches"], vec!["Mensch-zu-Tier", "menschtier", "tiermensch"], vec![314]),
+        (vec!["Menschliches", "menschliches"], vec!["Ränge", "Raenge", "ränge", "raenge"], vec![520, 521]),
+        (vec!["Menschliches", "menschliches"], vec!["Zeitalter", "zeitalter"], vec![522]),
+        (vec!["Menschliches", "menschliches"], vec!["Länderdachorganisationen", "laenderdachorganisationen"], vec![524]),
+        (vec!["Menschliches", "menschliches"], vec!["Computerspiele", "computerspiele"], vec![525]),
+        (vec!["Menschliches", "menschliches"], vec!["Lebensformen", "lebensformen"], vec![526]),
+        (vec!["Menschliches", "menschliches"], vec!["Sinne", "sinn"], vec![533]),
+        (vec!["Menschliches", "menschliches"], vec!["Götter", "goetter"], vec![534]),
         (vec!["Religionen", "religionen", "religion"], vec!["Superkräfte", "Superkraefte"], vec![444, 494, 496, 503]),
         (vec!["Galaxie", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"], vec!["Superkräfte", "Superkraefte"], vec![444, 494, 496]),
         (vec!["Universum", "universum", "transzendentalien", "strukturalien", "kugel", "kugeln", "ball", "baelle", "bälle"], vec!["Evolution_vs_Design_intelligent"], vec![519]),
