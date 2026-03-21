@@ -190,7 +190,14 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
 
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
     //println!("🔍 Suche nach: '{}' → '{}'", ober, unter);
-    
+    // 🔴 NEU: Erst exakte Suche
+    println!("DEBUG suche: ober='{}' unter='{}'", ober, unter);
+    let exakt = self.finde_spaltennummern_exakt(ober, unter);
+    println!("DEBUG exakt = {:?}", exakt);
+    if !exakt.is_empty() {
+        println!("DEBUG nehme EXAKTES Ergebnis");
+        return exakt;
+    }
     let mut gefundene = Vec::new();
     
     // Suche in der Hauptkategorien-Struktur
@@ -608,11 +615,17 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         (vec!["Multiplikationen", "multiplikationen"], vec!["Motiv_gleichförmige_Polygone_gebrochen-rational", "motivgebrgleichf"], vec![]),
         (vec!["Multiplikationen", "multiplikationen"], vec!["Struktur_gleichförmige_Polygone_gebrochen-rational", "strukgebrgleichf"], vec![]),
         (vec!["Multiplikationen", "multiplikationen"], vec!["beschrieben"], vec![]),
-        (vec!["Kontinuum", "kontinuum"], vec!["Q", "q", "Siebzehn"], vec![431, 432, 433, 434, 437, 441, 442, 443, 445, 450, 467, 468, 469, 487, 488]),
+        (vec!["Kontinuum", "kontinuum"], vec!["Q", "q", "Siebzehn"], vec![431, 432, 433, 434, 437, 441, 442, 443, 445, 450, 467, 468, 469, 487, 488, 722, 723, 700, 616, 544]),
+        (vec!["Kontinuum", "kontinuum"], vec!["AU", "au", "Siebenundvierzieg"], vec![743, 532]),
+        (vec!["Kontinuum", "kontinuum"], vec!["AK", "ak", "Siebenunddreißig"], vec![742, 532]),
+        (vec!["Kontinuum", "kontinuum"], vec!["AE", "ae", "Einunddreißig"], vec![741, 530]),
+        (vec!["Kontinuum", "kontinuum"], vec!["AD", "ad", "Dreißig"], vec![740, 547, 529]),
+        (vec!["Kontinuum", "kontinuum"], vec!["AC", "ac", "Neunundzwanzig"], vec![739, 528]),
+        (vec!["Kontinuum", "kontinuum"], vec!["W", "w", "Dreiundzwanzig"], vec![738, 527]),
         (vec!["Kontinuum", "kontinuum"], vec!["i", "I", "Neun"], vec![517]),
         (vec!["Kontinuum", "kontinuum"], vec!["G", "g", "Sieben"], vec![518]),
         (vec!["Kontinuum", "kontinuum"], vec!["J", "j", "Zehn"], vec![514]),
-        (vec!["Kontinuum", "kontinuum"], vec!["k", "K", "Elf"], vec![515]),
+        (vec!["Kontinuum", "kontinuum"], vec!["k", "K", "Elf"], vec![515, 705]),
         (vec!["Kontinuum", "kontinuum"], vec!["E", "e", "Fünf"], vec![511]),
         (vec!["Kontinuum", "kontinuum"], vec!["L", "l", "Zwölf"], vec![506]),
         (vec!["Kontinuum", "kontinuum"], vec!["Y", "y", "Fünfundzwanzig"], vec![507, 510]),
@@ -623,11 +636,10 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         (vec!["Kontinuum", "kontinuum"], vec!["N", "n", "Vierzehn"], vec![492]),
         (vec!["Kontinuum", "kontinuum"], vec!["M", "m", "Dreizehn"], vec![493]),
         (vec!["Kontinuum", "kontinuum"], vec!["T", "t", "Zwanzig"], vec![486]),
-        (vec!["Multiversum", "multiversum"], vec!["P", "p", "Sechszehn"], vec![435]),
+        (vec!["Multiversum", "multiversum"], vec!["P", "p", "Sechszehn"], vec![435, 663, 637, 605]),
         (vec!["Kontinuum", "kontinuum"], vec!["P5", "p5", "Sechszehn->Fünf"], vec![501]),
         (vec!["Multiversum", "multiversum"], vec!["P5", "p5", "Sechszehn->Fünf"], vec![501]),
-        (vec!["Kontinuum", "kontinuum"], vec!["P", "p", "Sechszehn"], vec![435]),
-        (vec!["Kontinuum", "kontinuum"], vec!["X", "x", "Vierundzwanzig"], vec![25, 55, 436, 386]),
+        (vec!["Kontinuum", "kontinuum"], vec!["X", "x", "Vierundzwanzig"], vec![25, 55, 436, 386, 591]),
         (vec!["Kontinuum", "kontinuum"], vec!["S", "s", "Neunzehn"], vec![504]),
         (vec!["Kontinuum", "kontinuum"], vec!["R", "r", "Achtzehn"], vec![451, 436]),
         (vec!["Kontinuum", "kontinuum"], vec!["A", "a", "Eins"], vec![446]),
