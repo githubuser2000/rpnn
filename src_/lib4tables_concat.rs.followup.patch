@@ -1,0 +1,110 @@
+--- /mnt/data/origsrc/src/lib4tables_concat.rs	2026-03-20 07:51:32.000000000 +0000
++++ /mnt/data/buildsrc/src/lib4tables_concat.rs	2026-03-22 10:35:10.691154725 +0000
+@@ -30,6 +30,7 @@
+     pub bedeutung0: String,
+     pub procontra0: String,
+     pub grundstrukturen0: String,
++    pub unter0: String,
+ }
+ 
+ #[derive(Debug, Clone, Default)]
+@@ -113,23 +114,87 @@
+     out
+ }
+ 
+-fn could_be_prime_number_primzahlkreuz(_n: usize) -> bool {
+-    unimplemented!()
++fn could_be_prime_number_primzahlkreuz(n: usize) -> bool {
++    matches!(n % 24, 1 | 5 | 7 | 11 | 13 | 17 | 19 | 23)
+ }
+-fn could_be_prime_number_primzahlkreuz_fuer_innen(_n: usize) -> bool {
+-    unimplemented!()
++fn could_be_prime_number_primzahlkreuz_fuer_innen(n: usize) -> bool {
++    matches!(n % 24, 5 | 11 | 17 | 23)
+ }
+-fn could_be_prime_number_primzahlkreuz_fuer_aussen(_n: usize) -> bool {
+-    unimplemented!()
++fn could_be_prime_number_primzahlkreuz_fuer_aussen(n: usize) -> bool {
++    matches!(n % 24, 1 | 7 | 13 | 19)
+ }
+-fn prim_creativity(_n: usize) -> usize {
+-    unimplemented!()
++fn prim_creativity(num: usize) -> usize {
++    if num == 0 {
++        return 0;
++    }
++
++    let fak = prim_repeat(primfaktoren(num));
++
++    if fak.len() == 1 && fak[0].1 == 1 {
++        return 1;
++    }
++    if fak.len() == 1 {
++        return 3;
++    }
++    if fak.is_empty() {
++        return 0;
++    }
++
++    let mut schnittmenge: Option<BTreeSet<usize>> = None;
++
++    for (_, prim_amount) in &fak {
++        let mut ds = divisors(*prim_amount);
++        ds.remove(&1);
++
++        if ds.is_empty() {
++            schnittmenge = None;
++            break;
++        }
++
++        schnittmenge = match schnittmenge {
++            None => Some(ds),
++            Some(prev) => Some(prev.intersection(&ds).copied().collect()),
++        };
++    }
++
++    match schnittmenge {
++        Some(s) if !s.is_empty() => 3,
++        _ => 2,
++    }
+ }
+-fn moon_number(_n: usize) -> (Vec<usize>, Vec<usize>) {
+-    unimplemented!()
++fn moon_number(num: usize) -> (Vec<usize>, Vec<usize>) {
++    if num < 2 {
++        return (Vec::new(), Vec::new());
++    }
++
++    let mut results = Vec::new();
++    let mut exponents_minus_2 = Vec::new();
++
++    for i in 2..num {
++        let one_result = (num as f64).powf(1.0 / i as f64);
++        let rounded = one_result.round();
++
++        if (rounded * 100000.0).round() == (one_result * 100000.0).round() {
++            let basis = rounded as usize;
++            if basis >= 2 && basis.pow(i as u32) == num {
++                results.push(basis);
++                exponents_minus_2.push(i - 2);
++            }
++        }
++    }
++
++    (results, exponents_minus_2)
+ }
+-fn prim_multiple(_n: usize) -> Vec<(usize, usize)> {
+-    unimplemented!()
++fn prim_multiple(n: usize) -> Vec<(usize, usize)> {
++    if n == 0 {
++        return Vec::new();
++    }
++
++    let mut multiples = vec![(1, n)];
++    for (prim, _) in prim_repeat(primfaktoren(n)) {
++        multiples.push((prim, n / prim));
++    }
++    multiples
+ }
+ 
+ fn tagset(tags: &[ST]) -> BTreeSet<ST> {

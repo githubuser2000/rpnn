@@ -9,14 +9,9 @@ use crate::tabellen_utils::{test_simple_table, show_usage};
 use crate::argument_verarbeiter::SpaltenVerarbeiter;
 use crate::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::generated_columns_words_registry::ParametersMain;
-use crate::exact_generator_bridge::try_run_exact_generator_bridge;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-
-    if try_run_exact_generator_bridge(&args[1..].to_vec())? {
-        return Ok(());
-    }
 
     if args.len() == 1 {
         show_usage();

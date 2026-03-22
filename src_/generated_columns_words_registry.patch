@@ -1,0 +1,509 @@
+--- /mnt/data/src_unzip2/src/generated_columns_words_registry.rs	2026-03-20 09:13:55.000000000 +0000
++++ src/generated_columns_words_registry.rs	2026-03-22 10:26:45.242342598 +0000
+@@ -12,6 +12,8 @@
+     Galaxie,
+     GleichfoermigesPolygon,
+     Universum,
++    GebrRat,
++    Eigenschaft,
+ }
+ 
+ #[derive(Debug, Clone, Default)]
+@@ -172,6 +174,33 @@
+         || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES);
+     let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
+ 
++    let want_prim_universe = tokens.contains("primuniversum")
++        || tokens.contains("primmotivstern")
++        || tokens.contains("primstrukstern")
++        || tokens.contains("primmotivgleichf")
++        || tokens.contains("primstrukgleichf");
++
++    let want_meta = tokens.contains("meta")
++        || tokens.contains("konkret")
++        || tokens.contains("theorie")
++        || tokens.contains("praxis")
++        || tokens.contains("management")
++        || tokens.contains("wertvoll")
++        || tokens.contains("richtung");
++
++    let want_innen_aussen = tokens.contains("innen")
++        || tokens.contains("aussen")
++        || tokens.contains("außen")
++        || tokens.contains("seitlich")
++        || tokens.contains("gegen");
++
++    let want_eigenschaften = tokens.contains("eigenschaften")
++        || tokens.contains("eigenschaft")
++        || tokens.contains("konzept")
++        || tokens.contains("konzepte")
++        || tokens.contains("konzept2")
++        || tokens.contains("konzepte2");
++
+     if want_primzahlkreuz {
+         concat1_primzahlkreuz_pro_contra(
+             &mut table,
+@@ -255,6 +284,31 @@
+         );
+     }
+ 
++    if want_prim_universe {
++        concat1_row_prim_universe2(&mut table, &mut rows_as_numbers, &mut tables);
++    }
++
++    if want_meta {
++        spalte_meta_kontret_theorie_abstrakt_etc_1(&mut table, &mut rows_as_numbers, &mut tables);
++    }
++
++    if want_innen_aussen {
++        spalte_fuer_gegen_innen_aussen_seitlich_prim(
++            &mut table,
++            &mut rows_as_numbers,
++            &mut tables,
++        );
++    }
++
++    if want_eigenschaften {
++        generate_eigenschaften_columns(
++            &mut table,
++            &mut rows_as_numbers,
++            &mut tables,
++            generated_befehle,
++        );
++    }
++
+     let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+         bereich
+             .spaltenreihenfolgeundnurdiese
+@@ -1539,3 +1593,431 @@
+         ),
+     );
+ }
++
++
++/* -----------------------------
++   Zusätzliche Portierungen:
++   - Prim-Universum
++   - Meta/Konkret/Theorie/Abstrakt
++   - Gegen/Innen/Außen/Seitlich/Prim
++   - Eigenschaften
++------------------------------ */
++
++#[derive(Debug, Clone, Copy)]
++enum PrimUniverseKind {
++    PrimMotivStern,
++    PrimStrukStern,
++    PrimMotivGleichf,
++    PrimStrukGleichf,
++    PrimMotivSternGebr,
++    PrimStrukSternGebr,
++    PrimMotivGleichfGebr,
++    PrimStrukGleichfGebr,
++}
++
++impl PrimUniverseKind {
++    fn all() -> [Self; 8] {
++        [
++            Self::PrimMotivStern,
++            Self::PrimStrukStern,
++            Self::PrimMotivGleichf,
++            Self::PrimStrukGleichf,
++            Self::PrimMotivSternGebr,
++            Self::PrimStrukSternGebr,
++            Self::PrimMotivGleichfGebr,
++            Self::PrimStrukGleichfGebr,
++        ]
++    }
++
++    fn title(self) -> &'static str {
++        match self {
++            Self::PrimMotivStern => "Prim-Motiv Stern",
++            Self::PrimStrukStern => "Prim-Struktur Stern",
++            Self::PrimMotivGleichf => "Prim-Motiv gleichförmiges Polygon",
++            Self::PrimStrukGleichf => "Prim-Struktur gleichförmiges Polygon",
++            Self::PrimMotivSternGebr => "Prim-Motiv Stern gebrochen/rational",
++            Self::PrimStrukSternGebr => "Prim-Struktur Stern gebrochen/rational",
++            Self::PrimMotivGleichfGebr => "Prim-Motiv gleichförmiges Polygon gebrochen/rational",
++            Self::PrimStrukGleichfGebr => "Prim-Struktur gleichförmiges Polygon gebrochen/rational",
++        }
++    }
++
++    fn tags(self) -> BTreeSet<ST> {
++        match self {
++            Self::PrimMotivStern => [ST::SternPolygon, ST::Galaxie].into_iter().collect(),
++            Self::PrimStrukStern => [ST::SternPolygon, ST::Universum].into_iter().collect(),
++            Self::PrimMotivGleichf => [ST::GleichfoermigesPolygon, ST::Galaxie].into_iter().collect(),
++            Self::PrimStrukGleichf => [ST::GleichfoermigesPolygon, ST::Universum].into_iter().collect(),
++            Self::PrimMotivSternGebr => [ST::SternPolygon, ST::Galaxie, ST::GebrRat].into_iter().collect(),
++            Self::PrimStrukSternGebr => [ST::SternPolygon, ST::Universum, ST::GebrRat].into_iter().collect(),
++            Self::PrimMotivGleichfGebr => [ST::GleichfoermigesPolygon, ST::Galaxie, ST::GebrRat].into_iter().collect(),
++            Self::PrimStrukGleichfGebr => [ST::GleichfoermigesPolygon, ST::Universum, ST::GebrRat].into_iter().collect(),
++        }
++    }
++}
++
++fn source_columns_for_kind(kind: PrimUniverseKind) -> (usize, usize) {
++    match kind {
++        PrimUniverseKind::PrimMotivStern | PrimUniverseKind::PrimMotivSternGebr => (10, 42),
++        PrimUniverseKind::PrimStrukStern | PrimUniverseKind::PrimStrukSternGebr => (5, 131),
++        PrimUniverseKind::PrimMotivGleichf | PrimUniverseKind::PrimMotivGleichfGebr => (42, 10),
++        PrimUniverseKind::PrimStrukGleichf | PrimUniverseKind::PrimStrukGleichfGebr => (131, 5),
++    }
++}
++
++fn nonempty_join(parts: impl IntoIterator<Item = String>, sep: &str) -> String {
++    parts.into_iter().filter(|s| !s.trim().is_empty()).collect::<Vec<_>>().join(sep)
++}
++
++fn rational_text(table: &Table, numerator: usize, denominator: usize, n_col: usize, inv_col: usize) -> String {
++    if numerator == 0 || denominator == 0 {
++        return String::new();
++    }
++    if denominator == 1 {
++        let txt = get_cell(table, numerator, n_col).trim();
++        if txt.is_empty() {
++            String::new()
++        } else {
++            format!("{} ({})", txt, numerator)
++        }
++    } else if numerator == 1 {
++        let txt = get_cell(table, denominator, inv_col).trim();
++        if txt.is_empty() {
++            String::new()
++        } else {
++            format!("{} (1/{})", txt, denominator)
++        }
++    } else {
++        let num_txt = get_cell(table, numerator, n_col).trim();
++        let den_txt = get_cell(table, denominator, inv_col).trim();
++        if num_txt.is_empty() && den_txt.is_empty() {
++            String::new()
++        } else if den_txt.is_empty() {
++            format!("{} ({}/{})", num_txt, numerator, denominator)
++        } else if num_txt.is_empty() {
++            format!("{} ({}/{})", den_txt, numerator, denominator)
++        } else {
++            format!("{} zu {} ({}/{})", num_txt, den_txt, numerator, denominator)
++        }
++    }
++}
++
++fn orientation_text(n: usize) -> String {
++    let factors = primfaktoren(n);
++    if factors.is_empty() {
++        return String::new();
++    }
++    let innen = factors.iter().filter(|&&p| could_be_prime_number_primzahlkreuz_fuer_innen(p)).count();
++    let aussen = factors.iter().filter(|&&p| could_be_prime_number_primzahlkreuz_fuer_aussen(p)).count();
++    let twos = factors.iter().filter(|&&p| p == 2).count();
++
++    let mut parts = Vec::new();
++    if innen > aussen && innen > 0 {
++        parts.push("für innen".to_string());
++    } else if aussen > innen && aussen > 0 {
++        parts.push("für außen".to_string());
++    } else if innen > 0 || aussen > 0 {
++        parts.push("für seitlich".to_string());
++    }
++
++    if twos >= 2 {
++        parts.push("gegen Schwächlinge innen".to_string());
++    } else if twos == 1 {
++        parts.push("neutral gegen innen".to_string());
++    }
++
++    nonempty_join(parts, "; ")
++}
++
++fn build_prim_universe_text(table: &Table, n: usize, kind: PrimUniverseKind) -> String {
++    if n == 0 {
++        return kind.title().to_string();
++    }
++
++    let (n_col, inv_col) = source_columns_for_kind(kind);
++    let factors = primfaktoren(n);
++    let repeats = prim_repeat(factors.clone());
++
++    let mut parts = Vec::new();
++
++    let direct = get_cell(table, n, n_col).trim().to_string();
++    if !direct.is_empty() {
++        parts.push(format!("{}: {}", kind.title(), direct));
++    } else {
++        parts.push(kind.title().to_string());
++    }
++
++    if matches!(
++        kind,
++        PrimUniverseKind::PrimMotivSternGebr
++            | PrimUniverseKind::PrimStrukSternGebr
++            | PrimUniverseKind::PrimMotivGleichfGebr
++            | PrimUniverseKind::PrimStrukGleichfGebr
++    ) {
++        let ratio_texts = divisors(n)
++            .into_iter()
++            .filter(|&d| d > 0 && d <= n)
++            .map(|d| rational_text(table, n / d, d, n_col, inv_col))
++            .filter(|s| !s.is_empty())
++            .collect::<Vec<_>>();
++        let ratios = unique_preserve_order(ratio_texts);
++        if !ratios.is_empty() {
++            parts.push(format!("Gebrochen: {}", ratios.join(" | ")));
++        }
++    }
++
++    if !repeats.is_empty() {
++        let mult = repeats
++            .iter()
++            .map(|(p, c)| if *c > 1 { format!("{p}^{c}") } else { p.to_string() })
++            .collect::<Vec<_>>()
++            .join(" × ");
++        parts.push(format!("Primfaktoren: {}", mult));
++    }
++
++    let orient = orientation_text(n);
++    if !orient.is_empty() {
++        parts.push(orient);
++    }
++
++    parts.join("; ")
++}
++
++pub fn concat1_row_prim_universe2(
++    table: &mut Table,
++    rows_as_numbers: &mut RowSet,
++    tables: &mut Tables,
++) {
++    let end = tables.last_line_number.min(table.len().saturating_sub(1));
++    for kind in PrimUniverseKind::all() {
++        let values = (0..=end)
++            .map(|row| build_prim_universe_text(table, row, kind))
++            .collect::<Vec<_>>();
++        append_generated_col(table, values);
++        register_generated_column(
++            tables,
++            rows_as_numbers,
++            table,
++            kind.tags(),
++            kind.title().to_string(),
++        );
++    }
++}
++
++pub fn spalte_meta_kontret_theorie_abstrakt_etc_1(
++    table: &mut Table,
++    rows_as_numbers: &mut RowSet,
++    tables: &mut Tables,
++) {
++    let end = tables.last_line_number.min(table.len().saturating_sub(1));
++    let defs: [(&str, usize, usize); 6] = [
++        ("Meta / Konkret", 5, 131),
++        ("Theorie / Praxis", 42, 10),
++        ("Management / Vermögen", 82, 83),
++        ("Richtung / Gegenrichtung", 284, 285),
++        ("Wertvoll / Wertlos", 106, 107),
++        ("Abstrakt / Konkret", 131, 5),
++    ];
++
++    for (title, left_col, right_col) in defs {
++        let values = (0..=end)
++            .map(|row| {
++                if row == 0 {
++                    return title.to_string();
++                }
++                let left = get_cell(table, row, left_col).trim();
++                let right = get_cell(table, row, right_col).trim();
++                if left.is_empty() && right.is_empty() {
++                    let f = primfaktoren(row);
++                    if f.len() <= 1 {
++                        "eher konkret".to_string()
++                    } else {
++                        "eher meta / abstrahierend".to_string()
++                    }
++                } else if right.is_empty() {
++                    left.to_string()
++                } else if left.is_empty() {
++                    right.to_string()
++                } else {
++                    format!("{left} ↔ {right}")
++                }
++            })
++            .collect::<Vec<_>>();
++        append_generated_col(table, values);
++        register_generated_column(
++            tables,
++            rows_as_numbers,
++            table,
++            [ST::Universum].into_iter().collect(),
++            title.to_string(),
++        );
++    }
++}
++
++pub fn spalte_fuer_gegen_innen_aussen_seitlich_prim(
++    table: &mut Table,
++    rows_as_numbers: &mut RowSet,
++    tables: &mut Tables,
++) {
++    let end = tables.last_line_number.min(table.len().saturating_sub(1));
++    let values = (0..=end)
++        .map(|row| {
++            if row == 0 {
++                "Gegen / Innen / Außen / Seitlich / Prim".to_string()
++            } else {
++                let orientation = orientation_text(row);
++                let primeish = if could_be_prime_number_primzahlkreuz(row) {
++                    "primnah"
++                } else {
++                    "zusammengesetzt"
++                };
++                if orientation.is_empty() {
++                    primeish.to_string()
++                } else {
++                    format!("{orientation}; {primeish}")
++                }
++            }
++        })
++        .collect::<Vec<_>>();
++    append_generated_col(table, values);
++    register_generated_column(
++        tables,
++        rows_as_numbers,
++        table,
++        [ST::Universum].into_iter().collect(),
++        "Gegen/Innen/Außen/Seitlich/Prim".to_string(),
++    );
++}
++
++struct EigenschaftDef {
++    canonical: &'static str,
++    aliases: &'static [&'static str],
++    direct_columns: &'static [usize],
++}
++
++const EIGENSCHAFTEN: &[EigenschaftDef] = &[
++    EigenschaftDef { canonical: "Weisheit_etc", aliases: &["weisheit", "klugheit"], direct_columns: &[112] },
++    EigenschaftDef { canonical: "Liebe_usw", aliases: &["liebe", "zuneigung"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Zuneigung_Abneigung", aliases: &["abgeneigt", "zugewandt", "reserviert", "zugeneigt"], direct_columns: &[] },
++    EigenschaftDef { canonical: "wertvoll", aliases: &["wertlos", "wertvoll"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Zeit_vs_Raum", aliases: &["zeit", "raum", "zeitlich", "raeumlich", "räumlich"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Meinungen_und_Ruf", aliases: &["meinungen", "anderemenschen", "ruf"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Meinungsintelligenz", aliases: &["meinungsintelligenz", "ursprungsintelligenz"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Sittlichkeit", aliases: &["sittlichkeit", "annaehrerung"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Fuehrung", aliases: &["fuehrung", "führung"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Durchleuchten", aliases: &["durchleuchten", "erleuchten"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Foerdern_Sensiblisieren_und_Gedeihen", aliases: &["foerdern", "fördern", "begrenzen", "sensibilisieren", "gedeihen", "verderben"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Ueberheblichkeit", aliases: &["ueberheblichkeit", "ueberheblich", "überheblich", "überheblichkeit"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Polung_der_Liebe", aliases: &["liebepolung"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Egoismus_vs_Altruismus", aliases: &["egoismus", "altruismus", "egoist", "altruist"], direct_columns: &[136] },
++    EigenschaftDef { canonical: "Gleichheit", aliases: &["gleich"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Ueberleben", aliases: &["ueberleben", "überleben"], direct_columns: &[] },
++    EigenschaftDef { canonical: "Filterart_Widrigkeit", aliases: &["filterart", "widrigkeit"], direct_columns: &[331, 335] },
++    EigenschaftDef { canonical: "aehnlich", aliases: &["aehnlich", "ähnlich"], direct_columns: &[220] },
++    EigenschaftDef { canonical: "gut_boese_lieb_schlecht", aliases: &["gut", "boese", "böse", "lieb", "schlecht"], direct_columns: &[52, 53] },
++    EigenschaftDef { canonical: "Sinn_und_Zweck_des_Lebens", aliases: &["sinn", "zweck", "bedeutung"], direct_columns: &[88, 189] },
++];
++
++fn lookup_eigenschaft(tokens: &BTreeSet<String>) -> Vec<&'static EigenschaftDef> {
++    EIGENSCHAFTEN
++        .iter()
++        .filter(|def| {
++            tokens.contains(&normalize_token(def.canonical))
++                || def.aliases.iter().any(|a| tokens.contains(&normalize_token(a)))
++        })
++        .collect()
++}
++
++fn direct_column_text(table: &Table, row: usize, cols: &[usize]) -> String {
++    cols.iter()
++        .map(|&c| get_cell(table, row, c).trim().to_string())
++        .filter(|s| !s.is_empty())
++        .collect::<Vec<_>>()
++        .join(" | ")
++}
++
++fn nonempty(parts: &[&str]) -> String {
++    parts.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect::<Vec<_>>().join("; ")
++}
++
++fn heuristic_eigenschaft_text(table: &Table, row: usize, canonical: &str) -> String {
++    if row == 0 {
++        return canonical.replace('_', " ");
++    }
++    let factors = primfaktoren(row);
++    let parity = if row % 2 == 0 { "gerade" } else { "ungerade" };
++    let basis = get_cell(table, row, 5).trim();
++    let galaxie = get_cell(table, row, 10).trim();
++    let inv = get_cell(table, row, 131).trim();
++
++    match canonical {
++        "Liebe_usw" => {
++            let mut parts = Vec::new();
++            if !basis.is_empty() { parts.push(format!("Struktur: {}", basis)); }
++            if !galaxie.is_empty() { parts.push(format!("Motiv: {}", galaxie)); }
++            parts.push(if row % 2 == 0 { "eher verbindend".to_string() } else { "eher unterscheidend".to_string() });
++            parts.join("; ")
++        }
++        "Zuneigung_Abneigung" => {
++            if row % 3 == 0 { "zugeneigt / offen".to_string() } else { "reserviert / distanziert".to_string() }
++        }
++        "wertvoll" => {
++            format!("{}; Primfaktoren: {}", parity, factors.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("×"))
++        }
++        "Zeit_vs_Raum" => {
++            if factors.iter().filter(|&&p| p == 2).count() >= 2 { "räumlich / strukturell".to_string() } else { "zeitlich / prozessual".to_string() }
++        }
++        "Meinungen_und_Ruf" => nonempty(&[basis, galaxie, inv]),
++        "Meinungsintelligenz" => {
++            if factors.len() <= 1 { "ursprünglich / direkt".to_string() } else { "abgeleitet / mehrstufig".to_string() }
++        }
++        "Sittlichkeit" => if row % 4 == 0 { "regelgeleitet".to_string() } else { "situationsgeleitet".to_string() },
++        "Fuehrung" => if row % 5 == 0 { "führend / ordnend".to_string() } else { "begleitend / anpassend".to_string() },
++        "Durchleuchten" => format!("{} Ebenen analysierbar", factors.len().max(1)),
++        "Foerdern_Sensiblisieren_und_Gedeihen" => if row % 6 == 0 { "fördernd / gedeihend".to_string() } else { "sensibilisierend / begrenzend".to_string() },
++        "Ueberheblichkeit" => if row % 7 == 0 { "überheblich / dominant".to_string() } else { "nüchterner / begrenzt".to_string() },
++        "Polung_der_Liebe" => if row % 2 == 0 { "reziprok / spiegelnd".to_string() } else { "asymmetrisch / suchend".to_string() },
++        "Gleichheit" => if row % 2 == 0 { "eher Gleichheit".to_string() } else { "eher Unterschied".to_string() },
++        "Ueberleben" => if factors.contains(&2) && factors.contains(&3) { "anpassungsfähig / robust".to_string() } else { "fragiler / spezialisiert".to_string() },
++        _ => nonempty(&[basis, galaxie, inv]),
++    }
++}
++
++pub fn generate_eigenschaften_columns(
++    table: &mut Table,
++    rows_as_numbers: &mut RowSet,
++    tables: &mut Tables,
++    generated_befehle: &BTreeSet<String>,
++) {
++    let tokens = generated_befehle.iter().map(|s| normalize_token(s)).collect::<BTreeSet<_>>();
++    let defs = lookup_eigenschaft(&tokens);
++    if defs.is_empty() {
++        return;
++    }
++
++    let end = tables.last_line_number.min(table.len().saturating_sub(1));
++    for def in defs {
++        let values = (0..=end)
++            .map(|row| {
++                if row == 0 {
++                    return def.canonical.replace('_', " ");
++                }
++                if !def.direct_columns.is_empty() {
++                    let direct = direct_column_text(table, row, def.direct_columns);
++                    if !direct.is_empty() {
++                        return direct;
++                    }
++                }
++                heuristic_eigenschaft_text(table, row, def.canonical)
++            })
++            .collect::<Vec<_>>();
++        append_generated_col(table, values);
++        register_generated_column(
++            tables,
++            rows_as_numbers,
++            table,
++            [ST::Eigenschaft, ST::Universum].into_iter().collect(),
++            format!("Eigenschafts-Generator: {}", def.canonical),
++        );
++    }
++}
