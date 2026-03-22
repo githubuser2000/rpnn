@@ -36,7 +36,8 @@ pub fn test_simple_table() {
 
     let zeilen_bereiche: Vec<(usize, usize)> = Vec::new();
     //print_table(&headers, data, &max_lengths, &zeilen_bereiche);
-    print_table(&headers, &data, &zeilen_bereiche);
+    print_table(&headers, &data, &zeilen_bereiche, &[]);
+    //print_table(&headers, &data, &zeilen_bereiche);
 }
 
 // 2. Funktion: Anzeige der Nutzungshinweise

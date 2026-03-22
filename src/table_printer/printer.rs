@@ -17,6 +17,14 @@ const CHUNK_MIN_COLUMN_WIDTH: usize = 21;
 const POTENZ_HEADER: &str = "P";
 const ZEILE_HEADER: &str = "Z";
 
+fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize> {
+    match explizite_breiten.len() {
+        0 => None,
+        1 => Some(explizite_breiten[0]), // --breite 20 => alle Spalten 20
+        _ => explizite_breiten.get(index).copied(), // --breiten 20,30,40 => erste n Spalten fest
+    }
+}
+
 fn effective_min_column_width() -> usize {
     CHUNK_MIN_COLUMN_WIDTH.max(MIN_COLUMN_WIDTH)
 }
@@ -25,12 +33,8 @@ fn clamp_chunk_width(width: usize) -> usize {
     width.clamp(effective_min_column_width(), MAX_COLUMN_WIDTH)
 }
 
-fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize> {
-    match explizite_breiten.len() {
-        0 => None,
-        1 => Some(explizite_breiten[0]),
-        _ => explizite_breiten.get(index).copied(),
-    }
+fn clamp_explicit_width(width: usize) -> usize {
+    width.clamp(1, MAX_COLUMN_WIDTH)
 }
 
 fn filter_small_lines_in_cell(cell: &str) -> String {
@@ -183,14 +187,30 @@ fn estimate_natural_width_for_chunking(
     clamp_chunk_width(guessed)
 }
 
-fn shrink_widths_to_budget(widths: &mut [usize], chunk_budget: usize, min_width: usize) {
+fn explicit_mask_for_range(
+    explizite_breiten: &[usize],
+    start: usize,
+    end: usize,
+) -> Vec<bool> {
+    (start..end)
+        .map(|global_i| get_explicit_width(explizite_breiten, global_i).is_some())
+        .collect()
+}
+
+fn shrink_widths_to_budget_preserving_explicit(
+    widths: &mut [usize],
+    chunk_budget: usize,
+    min_width: usize,
+    explicit_mask: &[bool],
+) {
     let mut current_total: usize = widths.iter().sum();
 
     while current_total > chunk_budget {
         let mut changed = false;
 
-        for w in widths.iter_mut() {
-            if *w > min_width && current_total > chunk_budget {
+        for (i, w) in widths.iter_mut().enumerate() {
+            let is_explicit = explicit_mask.get(i).copied().unwrap_or(false);
+            if !is_explicit && *w > min_width && current_total > chunk_budget {
                 *w -= 1;
                 current_total -= 1;
                 changed = true;
@@ -203,26 +223,31 @@ fn shrink_widths_to_budget(widths: &mut [usize], chunk_budget: usize, min_width:
     }
 }
 
-fn stretch_last_column_to_fill_budget(widths: &mut [usize], chunk_budget: usize) {
+fn stretch_last_non_explicit_or_last_column(
+    widths: &mut [usize],
+    chunk_budget: usize,
+    explicit_mask: &[bool],
+) {
     if widths.is_empty() {
         return;
     }
 
     let current_total: usize = widths.iter().sum();
-    if current_total < chunk_budget {
-        let extra = chunk_budget - current_total;
-        let last_idx = widths.len() - 1;
-        widths[last_idx] += extra;
-    }
-}
-
-fn fit_widths_exactly_to_budget(widths: &mut [usize], budget: usize, min_width: usize) {
-    if widths.is_empty() {
+    if current_total >= chunk_budget {
         return;
     }
 
-    shrink_widths_to_budget(widths, budget, min_width);
-    stretch_last_column_to_fill_budget(widths, budget);
+    let extra = chunk_budget - current_total;
+
+    if let Some(idx) = (0..widths.len())
+        .rev()
+        .find(|&i| !explicit_mask.get(i).copied().unwrap_or(false))
+    {
+        widths[idx] += extra;
+    } else {
+        let last_idx = widths.len() - 1;
+        widths[last_idx] += extra;
+    }
 }
 
 fn determine_chunk_end(
@@ -240,7 +265,7 @@ fn determine_chunk_end(
 
     while end < headers.len() {
         let guessed_width = if let Some(breite) = get_explicit_width(explizite_breiten, end) {
-            clamp_chunk_width(breite)
+            clamp_explicit_width(breite)
         } else {
             estimate_natural_width_for_chunking(&headers[end], data, end)
         };
@@ -296,11 +321,21 @@ fn build_chunk_widths(
 
     for (local_i, global_i) in (start..end).enumerate() {
         if let Some(breite) = get_explicit_width(explizite_breiten, global_i) {
-            chunk_widths[local_i] = clamp_chunk_width(breite);
+            chunk_widths[local_i] = clamp_explicit_width(breite);
         }
     }
 
-    fit_widths_exactly_to_budget(&mut chunk_widths, chunk_budget, min_width);
+    let explicit_mask = explicit_mask_for_range(explizite_breiten, start, end);
+
+    shrink_widths_to_budget_preserving_explicit(
+        &mut chunk_widths,
+        chunk_budget,
+        min_width,
+        &explicit_mask,
+    );
+
+    stretch_last_non_explicit_or_last_column(&mut chunk_widths, chunk_budget, &explicit_mask);
+
     chunk_widths
 }
 
@@ -355,6 +390,19 @@ fn prepend_meta_columns(
     (headers, data, meta_widths)
 }
 
+fn stretch_last_column_to_fill_budget(widths: &mut [usize], chunk_budget: usize) {
+    if widths.is_empty() {
+        return;
+    }
+
+    let current_total: usize = widths.iter().sum();
+    if current_total < chunk_budget {
+        let extra = chunk_budget - current_total;
+        let last_idx = widths.len() - 1;
+        widths[last_idx] += extra;
+    }
+}
+
 pub fn print_table_chunked_with_line_numbers(
     headers: &[String],
     data: &[Vec<String>],
@@ -363,7 +411,7 @@ pub fn print_table_chunked_with_line_numbers(
     keineleereninhalte: bool,
 ) {
     let term_width = get_terminal_width();
-    let available_total = term_width.saturating_sub(3);
+    let available_total = term_width.saturating_sub(1);
     let render_width = available_total;
     let mut start = 0usize;
 
@@ -423,7 +471,10 @@ pub fn print_table_chunked_with_line_numbers(
         let total_overhead = augmented_widths.len() * (COLUMN_OVERHEAD + 1);
         let total_budget = render_width.saturating_sub(total_overhead);
 
-        fit_widths_exactly_to_budget(&mut augmented_widths, total_budget, 1);
+        // Ganz wichtig:
+        // Hier NICHT mehr alles erneut schrumpfen.
+        // Sonst werden explizite Breiten wieder kaputt gemacht.
+        stretch_last_column_to_fill_budget(&mut augmented_widths, total_budget);
 
         let table_rows = convert_to_table_rows_with_line_numbers(
             &augmented_headers,
@@ -478,8 +529,13 @@ fn render_rows(
     output.cli_out(&display_lines, table_rows, rows_range);
 }
 
-pub fn print_table(headers: &[String], data: &[Vec<String>], row_ranges: &[RowRange]) {
-    print_table_with_offset(headers, data, row_ranges, 1);
+pub fn print_table(
+    headers: &[String],
+    data: &[Vec<String>],
+    row_ranges: &[RowRange],
+    explizite_breiten: &[usize],
+) {
+    print_table_with_offset(headers, data, row_ranges, 1, explizite_breiten);
 }
 
 pub fn print_table_with_offset(
@@ -487,6 +543,7 @@ pub fn print_table_with_offset(
     data: &[Vec<String>],
     row_ranges: &[RowRange],
     original_start_line: usize,
+    explizite_breiten: &[usize],
 ) {
     let sanitized_headers: Vec<String> = headers
         .iter()
@@ -499,8 +556,14 @@ pub fn print_table_with_offset(
         .saturating_sub(1)
         .saturating_sub(sanitized_headers.len() * COLUMN_OVERHEAD);
 
-    let column_widths =
+    let mut column_widths =
         compute_column_widths_from_global_mass(&sanitized_headers, data, available_budget);
+
+    for (i, width) in column_widths.iter_mut().enumerate() {
+        if let Some(explicit) = get_explicit_width(explizite_breiten, i) {
+            *width = clamp_explicit_width(explicit);
+        }
+    }
 
     let table_rows = convert_to_table_rows_with_offset(
         &sanitized_headers,
@@ -510,7 +573,8 @@ pub fn print_table_with_offset(
         original_start_line,
     );
 
-    render_rows(term_width, column_widths, &table_rows, true);
+    let available_total = term_width.saturating_sub(3);
+    render_rows(available_total, column_widths, &table_rows, true);
 }
 
 pub fn print_table_chunked(
