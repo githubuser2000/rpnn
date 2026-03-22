@@ -1,18 +1,22 @@
 use std::collections::BTreeSet;
-use std::env;
 use std::path::PathBuf;
-
-use crate::argument_verarbeiter::SpaltenVerarbeiter;
+use std::env;
 use crate::column_categories_complete::lade_kategorie_map;
-use crate::column_manager::get_column_names;
 use crate::csv_importer::import_csvs_to_sqlite;
-use crate::generated_columns_words_registry::ParametersMain;
-use crate::kategorie_verarbeiter::verarbeite_kategorien;
-use crate::tabellen_utils::show_usage;
 use crate::table_printer::query_column_by_index;
+use crate::column_manager::get_column_names;
+use crate::tabellen_utils::{test_simple_table, show_usage};
+use crate::argument_verarbeiter::SpaltenVerarbeiter;
+use crate::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::generated_columns_words_registry::ParametersMain;
+use crate::exact_generator_bridge::try_run_exact_generator_bridge;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
+
+    if try_run_exact_generator_bridge(&args[1..].to_vec())? {
+        return Ok(());
+    }
 
     if args.len() == 1 {
         show_usage();
@@ -23,9 +27,8 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
     let (mut bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
 
-    let mut generated_befehle: BTreeSet<String> =
+    let generated_befehle: BTreeSet<String> =
         verarbeite_kategorien(&kategorie_map, &mut bereich, &spalten_namen)?;
-    generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
 
     let parameters_main = ParametersMain {
         bedeutung0: spalten_namen.oberkategorie.clone(),

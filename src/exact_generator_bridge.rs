@@ -1,148 +1,105 @@
-use std::env;
-use std::process::{Command, Stdio};
+use std::collections::BTreeSet;
 
-#[derive(Debug, Clone)]
-pub struct ExactGeneratorRequest {
-    pub mode: String,
-    pub value: String,
-    pub row_range: Option<String>,
+use crate::python_exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+
+#[derive(Debug, Clone, Default)]
+pub struct ExactResolved {
+    pub direct_columns: Vec<u32>,
+    pub pair_columns: Vec<u32>,
+    pub generated_befehle: BTreeSet<String>,
 }
 
 fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
+    s.trim()
+        .to_lowercase()
+        .replace('ä', "ae")
+        .replace('ö', "oe")
+        .replace('ü', "ue")
+        .replace('ß', "ss")
         .replace('_', "")
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
 }
 
-fn take_arg_value(args: &[String], idx: usize) -> Option<String> {
-    args.get(idx + 1).cloned().filter(|s| !s.starts_with('-'))
-}
-
-fn parse_row_range(args: &[String]) -> Option<String> {
-    let mut i = 0usize;
-    while i < args.len() {
-        let arg = &args[i];
-        if arg == "--vorhervonausschnitt" {
-            return take_arg_value(args, i);
-        }
-        if let Some(v) = arg.strip_prefix("--vorhervonausschnitt=") {
-            return Some(v.to_string());
-        }
-        i += 1;
-    }
-    None
-}
-
-fn parse_spaltenname_pairs(args: &[String]) -> Vec<(String, String)> {
+fn stable_dedup(values: &[u32]) -> Vec<u32> {
+    let mut seen = BTreeSet::new();
     let mut out = Vec::new();
-    let mut i = 0usize;
-    while i < args.len() {
-        if args[i] == "--spaltenname" {
-            if let (Some(ober), Some(unter)) = (take_arg_value(args, i), take_arg_value(args, i + 1)) {
-                out.push((ober, unter));
-            }
+    for &v in values {
+        if v > 0 && seen.insert(v) {
+            out.push(v);
         }
-        i += 1;
     }
     out
 }
 
-fn map_mode_from_oberkategorie(ober: &str) -> Option<&'static str> {
+fn mode_from_oberkategorie(ober: &str) -> Option<&'static str> {
     let n = normalize_key(ober);
     match n.as_str() {
         "universummetakonkret" | "metakonkret" | "meta" | "konkret" => Some("universummetakonkret"),
-        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaften1n" | "konzept" | "konzepte" => {
-            Some("eigenschaften")
-        }
+        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaften1n" => Some("eigenschaften"),
+        "konzept" | "konzepte" => Some("konzept"),
+        "konzept2" | "konzepte2" => Some("konzept2"),
         _ => None,
     }
 }
 
-pub fn detect_exact_generator_request(args: &[String]) -> Option<ExactGeneratorRequest> {
-    let row_range = parse_row_range(args);
-    let pairs = parse_spaltenname_pairs(args);
-    if pairs.len() != 1 {
-        return None;
+fn resolve_meta_konkret(value: &str) -> ExactResolved {
+    let needle = normalize_key(value);
+    let mut out = ExactResolved::default();
+
+    for (aliases, (group, side)) in META_KONKRET_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == needle) {
+            let base = (*group as u32).saturating_sub(2) * 2 + 1;
+            let left = base;
+            let right = base + 1;
+            let chosen = if *side == 0 { left } else { right };
+            out.direct_columns.push(chosen);
+            out.pair_columns.push(left);
+            out.pair_columns.push(right);
+            out.generated_befehle.insert("modallogik".to_string());
+        }
     }
 
-    let (ober, unter) = &pairs[0];
-    let mode = map_mode_from_oberkategorie(ober)?;
-
-    Some(ExactGeneratorRequest {
-        mode: mode.to_string(),
-        value: unter.clone(),
-        row_range,
-    })
+    out.direct_columns = stable_dedup(&out.direct_columns);
+    out.pair_columns = stable_dedup(&out.pair_columns);
+    out
 }
 
-pub fn try_run_exact_generator_bridge(
-    args: &[String],
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let Some(req) = detect_exact_generator_request(args) else {
-        return Ok(false);
+fn resolve_eigenschaft_like(value: &str) -> ExactResolved {
+    let needle = normalize_key(value);
+    let mut out = ExactResolved::default();
+
+    for (aliases, directs, pair) in EIGENSCHAFT_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == needle) {
+            out.direct_columns.extend(directs.iter().map(|&v| v as u32));
+            if let Some((a, b)) = pair {
+                out.pair_columns.push(*a as u32);
+                out.pair_columns.push(*b as u32);
+                out.generated_befehle.insert("modallogik".to_string());
+            }
+        }
+    }
+
+    out.direct_columns = stable_dedup(&out.direct_columns);
+    out.pair_columns = stable_dedup(&out.pair_columns);
+    out
+}
+
+pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved> {
+    let mode = mode_from_oberkategorie(ober)?;
+    let resolved = match mode {
+        "universummetakonkret" => resolve_meta_konkret(unter),
+        "eigenschaften" | "konzept" | "konzept2" => resolve_eigenschaft_like(unter),
+        _ => ExactResolved::default(),
     };
 
-    let row_range = req.row_range.unwrap_or_else(|| "1-20".to_string());
-
-    let mut cmd = Command::new("reta");
-    cmd.arg("-zeilen")
-        .arg(format!("--vorhervonausschnitt={row_range}"))
-        .arg("-spalten")
-        .arg(format!("--{}={}", req.mode, req.value))
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    match cmd.status() {
-        Ok(status) if status.success() => return Ok(true),
-        Ok(status) => {
-            return Err(format!(
-                "Exakter Generator-Bridge-Aufruf `reta --{}={}` fehlgeschlagen mit Exit-Status {}",
-                req.mode, req.value, status
-            )
-            .into())
-        }
-        Err(first_err) => {
-            let current_dir = env::current_dir()?;
-            let local_candidates = [
-                current_dir.join("src/reta_exact/reta.todel/reta.py"),
-                current_dir.join("reta.todel/reta.py"),
-                current_dir.join("src/reta.py"),
-            ];
-            for path in local_candidates {
-                if !path.exists() {
-                    continue;
-                }
-                let status = Command::new("python3")
-                    .arg(&path)
-                    .arg("-zeilen")
-                    .arg(format!("--vorhervonausschnitt={row_range}"))
-                    .arg("-spalten")
-                    .arg(format!("--{}={}", req.mode, req.value))
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .status();
-                match status {
-                    Ok(s) if s.success() => return Ok(true),
-                    Ok(s) => {
-                        return Err(format!(
-                            "Exakter Generator-Bridge-Aufruf über {} fehlgeschlagen mit Exit-Status {}",
-                            path.display(),
-                            s
-                        )
-                        .into())
-                    }
-                    Err(_) => continue,
-                }
-            }
-            Err(format!(
-                "Konnte den exakten Generator weder über `reta` noch über lokale reta.py starten: {}",
-                first_err
-            )
-            .into())
-        }
+    if resolved.direct_columns.is_empty()
+        && resolved.pair_columns.is_empty()
+        && resolved.generated_befehle.is_empty()
+    {
+        None
+    } else {
+        Some(resolved)
     }
 }

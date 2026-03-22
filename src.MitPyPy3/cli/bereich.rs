@@ -1,5 +1,4 @@
-use std::collections::BTreeSet;
-
+// src/cli/bereich.rs
 #[derive(Debug, Clone)]
 pub struct TextBereich {
     pub von_zeile: usize,
@@ -13,10 +12,9 @@ pub struct TextBereich {
     pub spalten_bereiche: Vec<(usize, usize)>,
     pub spaltenreihenfolgeundnurdiese: Vec<usize>,
     pub breiten: Vec<usize>,
-    pub spalten_gefunden: bool,
-    pub spalten_gesucht: bool,
-    pub spalten_gesucht2: bool,
-    pub exact_generated_befehle: BTreeSet<String>,
+    pub spalten_gefunden: bool,  // NEU: Wurden Spalten explizit gefunden?
+    pub spalten_gesucht: bool,  // NEU: Wurden Spalten explizit gefunden?
+    pub spalten_gesucht2: bool,  // NEU: Wurden Spalten explizit gefunden?
 }
 
 impl Default for TextBereich {
@@ -33,10 +31,11 @@ impl Default for TextBereich {
             spalten_bereiche: Vec::new(),
             breiten: Vec::new(),
             spaltenreihenfolgeundnurdiese: Vec::new(),
-            spalten_gefunden: false,
-            spalten_gesucht: false,
-            spalten_gesucht2: false,
-            exact_generated_befehle: BTreeSet::new(),
+            spalten_gefunden: false,  // Standard: nicht gefunden
+            spalten_gesucht: false,  // Standard: nicht gefunden
+            spalten_gesucht2: false,  // Standard: nicht gefunden
         }
     }
 }
+
+

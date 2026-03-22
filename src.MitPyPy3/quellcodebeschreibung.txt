@@ -1,0 +1,50 @@
+main startet nur workflow
+in workflow macht er:
+Lade Kategorien map aus column_categories_complete.rs im Hauptordner 
+verarbeite Kategorien
+beide csv dateien in sql laden 
+spalten abfragen mit query_column_by_index im Ordner table_printer in query.rs.
+get_column_names im Ordner column_manager Datei column_selector.rs
+
+let conn = import_csvs_to_sqlite(&dateien)?;
+
+query.rs query_column_by_index in table_printer:
+    get_column_names conn.prepare("PRAGMA table_info(csv_data)")?;
+    build_column_query siehe unten
+    validate_spalten_input if bereich....
+    collect_spalten_nummern if bereich..... Spaltennummern ausgewählt
+    resolve_spaltennamen Spalte {} existiert
+    build_row_query SELECT {} FROM csv_data
+if !bereich.spalten_gefunden 
+header_lengths: Vec<usize>
+let (data, _max_lengths) = fetch_data_with_stats
+Sortiere Headers
+sort_by_indices
+Sortiere Datenzeilen
+// 2. Daten sortieren: JEDE ZEILE muss ihre SPALTEN in der gleichen Reihenfolge haben
+println!("  Ausgabe-Spalte {} {}: '{}'", i + 1, original_index, header);
+print_table_chunked
+
+build_column_query Ok((query, selected_names))
+   validate_spalten_input
+   collect_spalten_nummern Spaltennummern ausgewählt
+   resolve_spaltennamen 
+   build_row_query
+
+
+
+print_table in printer.rs in ordner table_printer
+  let tables = Tables::new(Some(100));
+  get_terminal_width
+  compute_column_widths
+  convert_to_table_rows
+      // --- Hilfsfunktion: Konvertiere Daten in TableRow-Strukturen MIT KORREKTEN ZEILENNUMMERN ---
+  let mut output = CliOutput::new(&tables, OutputSyntax::Plain);
+
+
+
+
+
+
+column_selector.rs get_column_names in column_manager:
+println!("Die Tabelle hat {} Spalten.", column_names.len());
