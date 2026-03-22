@@ -1,15 +1,15 @@
-use std::collections::BTreeSet;
-use std::env;
-use std::path::PathBuf;
 
-use crate::argument_verarbeiter::SpaltenVerarbeiter;
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use std::env;
 use crate::column_categories_complete::lade_kategorie_map;
-use crate::column_manager::get_column_names;
 use crate::csv_importer::import_csvs_to_sqlite;
-use crate::generated_columns_words_registry::ParametersMain;
-use crate::kategorie_verarbeiter::verarbeite_kategorien;
-use crate::tabellen_utils::show_usage;
 use crate::table_printer::query_column_by_index;
+use crate::column_manager::get_column_names;
+use crate::tabellen_utils::show_usage;
+use crate::argument_verarbeiter::SpaltenVerarbeiter;
+use crate::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::generated_columns_words_registry::ParametersMain;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();

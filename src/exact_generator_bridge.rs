@@ -1,105 +1,98 @@
+
 use std::collections::BTreeSet;
 
 use crate::python_exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 
 #[derive(Debug, Clone, Default)]
 pub struct ExactResolved {
-    pub direct_columns: Vec<u32>,
-    pub pair_columns: Vec<u32>,
+    pub direct_columns: Vec<usize>,
+    pub modal_pairs: Vec<(usize, usize)>,
+    pub meta_konkret_specs: Vec<(usize, usize)>,
     pub generated_befehle: BTreeSet<String>,
 }
 
 fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
+    s.to_lowercase()
         .replace('_', "")
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
 }
 
-fn stable_dedup(values: &[u32]) -> Vec<u32> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::new();
-    for &v in values {
-        if v > 0 && seen.insert(v) {
-            out.push(v);
-        }
-    }
-    out
+fn dedup_vec<T: Ord + Clone>(items: &mut Vec<T>) {
+    items.sort();
+    items.dedup();
 }
 
-fn mode_from_oberkategorie(ober: &str) -> Option<&'static str> {
-    let n = normalize_key(ober);
-    match n.as_str() {
-        "universummetakonkret" | "metakonkret" | "meta" | "konkret" => Some("universummetakonkret"),
-        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaften1n" => Some("eigenschaften"),
-        "konzept" | "konzepte" => Some("konzept"),
-        "konzept2" | "konzepte2" => Some("konzept2"),
+fn push_unique<T: PartialEq + Copy>(vec: &mut Vec<T>, value: T) {
+    if !vec.contains(&value) {
+        vec.push(value);
+    }
+}
+
+fn resolve_meta_konkret(value: &str) -> Option<ExactResolved> {
+    let key = normalize_key(value);
+    let mut out = ExactResolved::default();
+
+    for (aliases, pair) in META_KONKRET_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == key) {
+            out.meta_konkret_specs.push(*pair);
+            out.generated_befehle.insert("universummetakonkret".to_string());
+            // Basis-Spalten für den Generator: Strukturalie + inverse Strukturalie.
+            out.direct_columns.push(6);   // Python 0-based 5
+            out.direct_columns.push(132); // Python 0-based 131
+            // Zusätzliche Textspalten, die der Python-Generator im Universums-Fall referenziert.
+            out.direct_columns.push(199); // Python 0-based 198
+            out.direct_columns.push(202); // Python 0-based 201
+            dedup_vec(&mut out.direct_columns);
+            return Some(out);
+        }
+    }
+
+    None
+}
+
+fn resolve_eigenschaften_like(value: &str) -> Option<ExactResolved> {
+    let key = normalize_key(value);
+    let mut out = ExactResolved::default();
+
+    for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == key) {
+            for &col in *direct_columns {
+                // Rust/CLI arbeitet 1-basiert
+                push_unique(&mut out.direct_columns, col + 1);
+            }
+            if let Some((a, b)) = maybe_pair {
+                out.modal_pairs.push((*a, *b)); // hier 0-basiert lassen, concat_modallogik erwartet 0-basiert
+                out.generated_befehle.insert("modallogik".to_string());
+                push_unique(&mut out.direct_columns, *a + 1);
+                push_unique(&mut out.direct_columns, *b + 1);
+            }
+            dedup_vec(&mut out.direct_columns);
+            dedup_vec(&mut out.modal_pairs);
+            return Some(out);
+        }
+    }
+
+    None
+}
+
+pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved> {
+    let ober_n = normalize_key(ober);
+
+    match ober_n.as_str() {
+        "universummetakonkret" | "metakonkret" => resolve_meta_konkret(unter),
+        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaftenn1" => {
+            resolve_eigenschaften_like(unter)
+        }
+        "konzept" | "konzepte" | "konzept2" => resolve_eigenschaften_like(unter),
         _ => None,
     }
 }
 
-fn resolve_meta_konkret(value: &str) -> ExactResolved {
-    let needle = normalize_key(value);
-    let mut out = ExactResolved::default();
-
-    for (aliases, (group, side)) in META_KONKRET_MAPPINGS {
-        if aliases.iter().any(|a| normalize_key(a) == needle) {
-            let base = (*group as u32).saturating_sub(2) * 2 + 1;
-            let left = base;
-            let right = base + 1;
-            let chosen = if *side == 0 { left } else { right };
-            out.direct_columns.push(chosen);
-            out.pair_columns.push(left);
-            out.pair_columns.push(right);
-            out.generated_befehle.insert("modallogik".to_string());
-        }
-    }
-
-    out.direct_columns = stable_dedup(&out.direct_columns);
-    out.pair_columns = stable_dedup(&out.pair_columns);
-    out
-}
-
-fn resolve_eigenschaft_like(value: &str) -> ExactResolved {
-    let needle = normalize_key(value);
-    let mut out = ExactResolved::default();
-
-    for (aliases, directs, pair) in EIGENSCHAFT_MAPPINGS {
-        if aliases.iter().any(|a| normalize_key(a) == needle) {
-            out.direct_columns.extend(directs.iter().map(|&v| v as u32));
-            if let Some((a, b)) = pair {
-                out.pair_columns.push(*a as u32);
-                out.pair_columns.push(*b as u32);
-                out.generated_befehle.insert("modallogik".to_string());
-            }
-        }
-    }
-
-    out.direct_columns = stable_dedup(&out.direct_columns);
-    out.pair_columns = stable_dedup(&out.pair_columns);
-    out
-}
-
-pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved> {
-    let mode = mode_from_oberkategorie(ober)?;
-    let resolved = match mode {
-        "universummetakonkret" => resolve_meta_konkret(unter),
-        "eigenschaften" | "konzept" | "konzept2" => resolve_eigenschaft_like(unter),
-        _ => ExactResolved::default(),
-    };
-
-    if resolved.direct_columns.is_empty()
-        && resolved.pair_columns.is_empty()
-        && resolved.generated_befehle.is_empty()
-    {
-        None
-    } else {
-        Some(resolved)
-    }
+// Altpfad absichtlich inert.
+pub fn try_run_exact_generator_bridge(
+    _args: &[String],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    Ok(false)
 }

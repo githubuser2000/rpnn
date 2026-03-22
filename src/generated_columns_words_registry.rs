@@ -210,35 +210,41 @@ pub fn apply_generated_columns(
     if want_modal {
         let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
 
-        let selected_zero_based: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-            bereich
-                .spaltenreihenfolgeundnurdiese
-                .iter()
-                .filter_map(|&i| i.checked_sub(1))
-                .collect()
-        } else if !bereich.spalten_bereiche.is_empty() {
-            let mut cols = Vec::new();
-            for &(from, to) in &bereich.spalten_bereiche {
-                if from == 0 || to == 0 || from > to {
-                    continue;
-                }
-                for c in from..=to {
-                    if let Some(zero) = c.checked_sub(1) {
-                        cols.push(zero);
+        for pair in &bereich.exact_modal_pairs {
+            modal_concepts.insert(*pair);
+        }
+
+        if modal_concepts.is_empty() {
+            let selected_zero_based: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+                bereich
+                    .spaltenreihenfolgeundnurdiese
+                    .iter()
+                    .filter_map(|&i| i.checked_sub(1))
+                    .collect()
+            } else if !bereich.spalten_bereiche.is_empty() {
+                let mut cols = Vec::new();
+                for &(from, to) in &bereich.spalten_bereiche {
+                    if from == 0 || to == 0 || from > to {
+                        continue;
+                    }
+                    for c in from..=to {
+                        if let Some(zero) = c.checked_sub(1) {
+                            cols.push(zero);
+                        }
                     }
                 }
-            }
-            cols.sort_unstable();
-            cols.dedup();
-            cols
-        } else {
-            Vec::new()
-        };
+                cols.sort_unstable();
+                cols.dedup();
+                cols
+            } else {
+                Vec::new()
+            };
 
-        if selected_zero_based.len() >= 2 {
-            for pair in selected_zero_based.chunks(2) {
-                if pair.len() == 2 {
-                    modal_concepts.insert((pair[0], pair[1]));
+            if selected_zero_based.len() >= 2 {
+                for pair in selected_zero_based.chunks(2) {
+                    if pair.len() == 2 {
+                        modal_concepts.insert((pair[0], pair[1]));
+                    }
                 }
             }
         }
@@ -255,7 +261,22 @@ pub fn apply_generated_columns(
         );
     }
 
-    let mut keep_indices: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+    if !bereich.exact_meta_konkret_specs.is_empty() {
+        concat_universum_meta_konkret(
+            &mut table,
+            &bereich.exact_meta_konkret_specs,
+            &mut rows_as_numbers,
+            &mut tables,
+        );
+    }
+
+    let mut keep_indices: Vec<usize> = if !bereich.exact_visible_columns.is_empty() {
+        bereich
+            .exact_visible_columns
+            .iter()
+            .filter_map(|&i| i.checked_sub(1))
+            .collect()
+    } else if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
         bereich
             .spaltenreihenfolgeundnurdiese
             .iter()
@@ -333,13 +354,154 @@ pub fn apply_generated_columns(
         })
         .collect();
 
-    println!("DEBUG keep_indices = {:?}", keep_indices);
-println!("DEBUG headers_after_generate = {:?}", headers);
-println!("DEBUG data_after_generate_len = {}", data.len());
-if let Some(first_row) = data.first() {
-    println!("DEBUG first_generated_row = {:?}", first_row);
-}
     Ok(())
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct SimpleFraction {
+    num: usize,
+    den: usize,
+}
+
+impl SimpleFraction {
+    fn new(num: usize, den: usize) -> Option<Self> {
+        if num == 0 || den == 0 { return None; }
+        let g = gcd(num, den);
+        Some(Self { num: num / g, den: den / g })
+    }
+}
+
+fn gcd(mut a: usize, mut b: usize) -> usize {
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a.max(1)
+}
+
+fn meta_pair_labels(metavariable: usize, side: usize) -> (&'static str, &'static str, &'static str) {
+    match (metavariable, side) {
+        (2, 0) => ("Meta-Thema: ", "Meta-", "Meta für n"),
+        (2, 1) => ("Konkretes: ", "Konkret-", "Konkretes für n"),
+        (3, 0) => ("Theorie-Thema: ", "Theorie-", "Theorie für n"),
+        (3, 1) => ("Praxis: ", "Praxis-", "Praxis für n"),
+        (4, 0) => ("Planungs-Thema: ", "Planung-", "Management für n"),
+        (4, 1) => ("Umsetzungs-Thema: ", "Umsetzung-", "verändernd für n"),
+        (5, 0) => ("Anlass-Thema: ", "Anlass-", "ganzheitlich für n"),
+        (5, 1) => ("Wirkungs-Thema: ", "wirkung-", "darüber hinaus gehend für n"),
+        (6, 0) => ("Kraft-Gebung: ", "Kraft-geben-", "Verwertung, Unternehmung, Geschäft für n"),
+        (6, 1) => ("Verstärkungs-Thema: ", "Verstärkung-", "wertvoll für n"),
+        (7, 0) => ("Beherrschung: ", "beherrschend-", "regieren, beherrschen für n"),
+        (7, 1) => ("Richtung-Thema: ", "Richtung-", "Richtung für n"),
+        _ => ("", "", ""),
+    }
+}
+
+fn make_prefix(repetitions: usize, base: &str) -> String {
+    if repetitions <= 1 { base.to_string() } else { base.repeat(repetitions) }
+}
+
+fn lookup_universe_fraction(table: &Table, frac: SimpleFraction, struct_cols: (usize, usize)) -> String {
+    if frac.den == 1 {
+        let text = get_cell(table, frac.num, struct_cols.0);
+        if text.trim().len() > 3 {
+            return format!("{} ({})", text, frac.num);
+        }
+        return String::new();
+    }
+    if frac.num == 1 {
+        let text = get_cell(table, frac.den, struct_cols.1);
+        if text.trim().len() > 3 {
+            return format!("{} (1/{})", text, frac.den);
+        }
+        return String::new();
+    }
+    String::new()
+}
+
+pub fn concat_universum_meta_konkret(
+    table: &mut Table,
+    specs: &[(usize, usize)],
+    rows_as_numbers: &mut RowSet,
+    tables: &mut Tables,
+) {
+    let end = tables.last_line_number.min(table.len().saturating_sub(1));
+    let struct_cols = (5usize, 131usize);
+
+    for &(metavariable, side01) in specs {
+        let side = if side01 == 0 { 0usize } else { 1usize };
+        let (_, repeated_label, heading) = meta_pair_labels(metavariable, side);
+        let mut values = vec![String::new(); table.len()];
+        if !values.is_empty() { values[0] = heading.to_string(); }
+        if values.len() > 1 { values[1] = String::new(); }
+
+        for i in 2..=end {
+            let mut pieces: Vec<String> = Vec::new();
+            let mut more = i;
+            let mut less_num = i;
+            let mut less_den = 1usize;
+            let mut current_col = struct_cols.1;
+            let mut level = 0usize;
+            let mut seen_fracs: BTreeSet<SimpleFraction> = BTreeSet::new();
+
+            loop {
+                current_col = if current_col == struct_cols.1 { struct_cols.0 } else { struct_cols.1 };
+                level += 1;
+
+                let next_more = more.checked_mul(metavariable).filter(|&v| v < table.len());
+                let next_less = SimpleFraction::new(less_num, less_den.checked_mul(metavariable).unwrap_or(usize::MAX));
+
+                if next_more.is_none() && next_less.is_none() {
+                    break;
+                }
+
+                let pref = make_prefix(level, repeated_label);
+                if side == 0 {
+                    if let Some(r) = next_more {
+                        let txt = get_cell(table, r, current_col);
+                        if txt.trim().len() > 3 {
+                            let inv = if current_col != struct_cols.0 && r != 1 { "1/" } else { "" };
+                            pieces.push(format!("{}{} ({}{})", pref, txt, inv, r));
+                        }
+                        more = r;
+                    } else {
+                        more = table.len();
+                    }
+                } else {
+                    if let Some(fr) = next_less {
+                        if !seen_fracs.insert(fr) { break; }
+                        let txt = if fr.den == 1 || fr.num == 1 {
+                            lookup_universe_fraction(table, fr, struct_cols)
+                        } else {
+                            String::new()
+                        };
+                        if txt.trim().len() > 3 {
+                            pieces.push(format!("{}{}", pref, txt));
+                        }
+                        less_num = fr.num;
+                        less_den = fr.den;
+                    } else {
+                        break;
+                    }
+                }
+
+                if level > 32 { break; }
+            }
+
+            values[i] = unique_preserve_order(pieces).join(" | ");
+        }
+
+        append_generated_col(table, values);
+        register_generated_column(
+            tables,
+            rows_as_numbers,
+            table,
+            tagset(&[ST::SternPolygon, ST::Universum]),
+            heading.to_string(),
+        );
+    }
 }
 
 #[derive(Debug, Clone, Default)]

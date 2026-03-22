@@ -1,3 +1,5 @@
+
+// src/cli/bereich.rs
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
@@ -17,6 +19,9 @@ pub struct TextBereich {
     pub spalten_gesucht: bool,
     pub spalten_gesucht2: bool,
     pub exact_generated_befehle: BTreeSet<String>,
+    pub exact_modal_pairs: Vec<(usize, usize)>, // 0-basiert für concat_modallogik
+    pub exact_meta_konkret_specs: Vec<(usize, usize)>, // (metavariable, side0or1)
+    pub exact_visible_columns: Vec<usize>, // 1-basiert sichtbare Spalten aus exaktem Resolver
 }
 
 impl Default for TextBereich {
@@ -37,6 +42,9 @@ impl Default for TextBereich {
             spalten_gesucht: false,
             spalten_gesucht2: false,
             exact_generated_befehle: BTreeSet::new(),
+            exact_modal_pairs: Vec::new(),
+            exact_meta_konkret_specs: Vec::new(),
+            exact_visible_columns: Vec::new(),
         }
     }
 }

@@ -14,22 +14,15 @@ pub fn collect_spalten_nummern(
 ) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
     let mut nums = Vec::new();
 
-    if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+    if !bereich.spalten_bereiche.is_empty() {
         bereich.spalten_gefunden = true;
-        nums.extend(
-            bereich
-                .spaltenreihenfolgeundnurdiese
-                .iter()
-                .copied()
-                .filter(|&n| n > 0),
-        );
-    } else if !bereich.spalten_bereiche.is_empty() {
-        bereich.spalten_gefunden = true;
+
         for &(von, bis) in &bereich.spalten_bereiche {
             for i in von..=bis {
                 nums.push(i);
             }
         }
+        println!("NUMS {:?}", nums);
     } else if bereich.von_spalte > 0 && bereich.bis_spalte > 0 {
         if bereich.von_spalte > bereich.bis_spalte {
             return Err("Startspalte > Endspalte".into());
@@ -44,18 +37,14 @@ pub fn collect_spalten_nummern(
         nums.push(1);
     }
 
-    let mut deduped = Vec::new();
-    for n in nums {
-        if !deduped.contains(&n) {
-            deduped.push(n);
-        }
-    }
+    nums.sort();
+    nums.dedup();
 
-    if deduped.is_empty() {
+    if nums.is_empty() {
         return Err("Keine Spaltennummern ausgewählt".into());
     }
 
-    Ok(deduped)
+    Ok(nums)
 }
 
 pub fn resolve_spaltennamen(
