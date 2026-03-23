@@ -27,6 +27,16 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         verarbeite_kategorien(&kategorie_map, &mut bereich, &spalten_namen)?;
     generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
 
+    let wants_gebr_prim_generator = generated_befehle.iter().any(|g| g.contains("gebr") && g.contains("prim"));
+    if wants_gebr_prim_generator {
+        let upper = if bereich.bis_zeile > 1 { bereich.bis_zeile.min(23) } else { 23 };
+        for n in 2..=upper {
+            bereich.pypy_compat.gebrochengalaxie.insert(n);
+            bereich.pypy_compat.gebrochenuniversum.insert(n);
+        }
+        bereich.pypy_compat.hidden_fraction_inputs = true;
+    }
+
     let parameters_main = ParametersMain {
         bedeutung0: spalten_namen.oberkategorie.clone(),
         procontra0: spalten_namen.oberkategorie.clone(),

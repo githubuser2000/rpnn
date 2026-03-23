@@ -412,21 +412,27 @@ pub fn apply_pypy_compat(
     appended.dedup();
     if !appended.is_empty() {
         let mut combined = existing_selected;
-        combined.extend(appended.iter().copied());
-        combined.sort_unstable();
-        combined.dedup();
+        if !bereich.pypy_compat.hidden_fraction_inputs {
+            combined.extend(appended.iter().copied());
+            combined.sort_unstable();
+            combined.dedup();
+        }
 
-        bereich.spalten_bereiche = combined.iter().map(|&col| (col, col)).collect();
+        if !combined.is_empty() {
+            bereich.spalten_bereiche = combined.iter().map(|&col| (col, col)).collect();
+        }
 
-        let mut visible = bereich.exact_visible_columns.clone();
-        visible.extend(appended.iter().copied());
-        visible.sort_unstable();
-        visible.dedup();
-        bereich.exact_visible_columns = visible;
+        if !bereich.pypy_compat.hidden_fraction_inputs {
+            let mut visible = bereich.exact_visible_columns.clone();
+            visible.extend(appended.iter().copied());
+            visible.sort_unstable();
+            visible.dedup();
+            bereich.exact_visible_columns = visible;
+        }
 
         if had_explicit_order {
             bereich.spaltenreihenfolgeundnurdiese = explicit_order_before;
-        } else {
+        } else if !combined.is_empty() {
             bereich.spaltenreihenfolgeundnurdiese = combined;
         }
 

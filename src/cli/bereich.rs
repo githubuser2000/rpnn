@@ -11,6 +11,7 @@ pub struct PypyCompatConfig {
     pub kombi_galaxie: BTreeSet<usize>,
     pub kombi_universum: BTreeSet<usize>,
     pub added_headers: BTreeMap<String, Vec<usize>>,
+    pub hidden_fraction_inputs: bool,
 }
 
 #[derive(Debug, Clone)]

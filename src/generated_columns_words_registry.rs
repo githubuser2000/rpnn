@@ -1,5 +1,7 @@
 use crate::cli::TextBereich;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fs;
+use std::path::PathBuf;
 
 pub type Table = Vec<Vec<String>>;
 pub type RowSet = BTreeSet<usize>;
@@ -172,6 +174,15 @@ pub fn apply_generated_columns(
         || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES);
     let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
 
+    let want_primmotivstern = tokens.contains("primmotivstern");
+    let want_primstrukstern = tokens.contains("primstrukstern");
+    let want_primmotivgleichf = tokens.contains("primmotivgleichf");
+    let want_primstrukgleichf = tokens.contains("primstrukgleichf");
+    let want_primmotivsterngebr = tokens.contains("primmotivsterngebr");
+    let want_primstruksterngebr = tokens.contains("primstruksterngebr");
+    let want_primmotivgleichfgebr = tokens.contains("primmotivgleichfgebr");
+    let want_primstrukgleichfgebr = tokens.contains("primstrukgleichfgebr");
+
     if want_primzahlkreuz {
         concat1_primzahlkreuz_pro_contra(
             &mut table,
@@ -205,6 +216,31 @@ pub fn apply_generated_columns(
 
     if want_vervielfache {
         concat_vervielfache_zeile(&mut table, &mut rows_as_numbers, &mut tables);
+    }
+
+    if want_primmotivstern {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 0, 0);
+    }
+    if want_primstrukstern {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 0, 1);
+    }
+    if want_primmotivgleichf {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 1, 0);
+    }
+    if want_primstrukgleichf {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 1, 1);
+    }
+    if want_primmotivsterngebr {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 0, 0);
+    }
+    if want_primstruksterngebr {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 0, 1);
+    }
+    if want_primmotivgleichfgebr {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 1, 0);
+    }
+    if want_primstrukgleichfgebr {
+        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 1, 1);
     }
 
     if want_modal {
@@ -273,12 +309,6 @@ pub fn apply_generated_columns(
     let mut keep_indices: Vec<usize> = if !bereich.exact_visible_columns.is_empty() {
         bereich
             .exact_visible_columns
-            .iter()
-            .filter_map(|&i| i.checked_sub(1))
-            .collect()
-    } else if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-        bereich
-            .spaltenreihenfolgeundnurdiese
             .iter()
             .filter_map(|&i| i.checked_sub(1))
             .collect()
@@ -369,6 +399,23 @@ impl SimpleFraction {
         if num == 0 || den == 0 { return None; }
         let g = gcd(num, den);
         Some(Self { num: num / g, den: den / g })
+    }
+
+    fn mul(self, other: Self) -> Option<Self> {
+        Self::new(self.num.saturating_mul(other.num), self.den.saturating_mul(other.den))
+    }
+
+    fn div(self, other: Self) -> Option<Self> {
+        if other.num == 0 { return None; }
+        Self::new(self.num.saturating_mul(other.den), self.den.saturating_mul(other.num))
+    }
+
+    fn inv(self) -> Option<Self> {
+        Self::new(self.den, self.num)
+    }
+
+    fn is_integer(self) -> bool {
+        self.den == 1
     }
 }
 
@@ -503,6 +550,364 @@ pub fn concat_universum_meta_konkret(
         );
     }
 }
+
+fn find_header_index_casefold(headers: &[String], wanted: &str) -> Option<usize> {
+    let w = wanted.trim().to_lowercase();
+    headers.iter().position(|h| h.trim().to_lowercase() == w)
+}
+
+fn cell_by_header(table: &Table, row: usize, wanted: &str) -> String {
+    let idx = match table.first().and_then(|h| find_header_index_casefold(h, wanted)) {
+        Some(i) => i,
+        None => return String::new(),
+    };
+    table.get(row).and_then(|r| r.get(idx)).cloned().unwrap_or_default()
+}
+
+fn csv_path(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("csv").join(name)
+}
+
+fn read_semicolon_csv(name: &str) -> Vec<Vec<String>> {
+    let path = csv_path(name);
+    let Ok(content) = fs::read_to_string(path) else { return Vec::new(); };
+    content
+        .lines()
+        .map(|line| line.split(';').map(|s| s.to_string()).collect::<Vec<_>>())
+        .collect()
+}
+
+fn transpose_csv(table: &[Vec<String>]) -> Vec<Vec<String>> {
+    let rows = table.len();
+    let cols = table.iter().map(|r| r.len()).max().unwrap_or(0);
+    let mut out = vec![vec![String::new(); rows]; cols];
+    for (r, row) in table.iter().enumerate() {
+        for (c, cell) in row.iter().enumerate() {
+            out[c][r] = cell.clone();
+        }
+    }
+    out
+}
+
+fn get_all_brueche(table: &[Vec<String>]) -> Vec<SimpleFraction> {
+    let mut set = BTreeSet::new();
+    for (i, row) in table.iter().enumerate().skip(1) {
+        for (k, cell) in row.iter().enumerate().skip(1) {
+            if cell.trim().chars().count() > 3 {
+                if let Some(fr) = SimpleFraction::new(i + 1, k + 1) {
+                    if fr.den != 1 && fr.num != 1 {
+                        set.insert(fr);
+                    }
+                }
+            }
+        }
+    }
+    set.into_iter().collect()
+}
+
+fn fraction_source_text(
+    table: &Table,
+    frac: SimpleFraction,
+    n_and_invers_cols: (usize, usize),
+    gebr_table: &[Vec<String>],
+    is_not_universe: bool,
+) -> Option<String> {
+    let is_universe = !is_not_universe;
+    if frac.den == 0 || frac.num == 0 {
+        return Some(String::new());
+    }
+    if frac.den > 100 || frac.num > 100 {
+        return None;
+    }
+    if frac.num == 1 {
+        let main = get_cell(table, frac.den, n_and_invers_cols.1).trim().to_string();
+        if main.chars().count() <= 3 {
+            return Some(String::new());
+        }
+        if is_universe {
+            let extra = get_cell(table, frac.den, 201).trim();
+            if extra.chars().count() > 2 {
+                return Some(format!("{} (1/{}) ; {}", main, frac.den, extra));
+            }
+        }
+        return Some(main);
+    }
+    if frac.den == 1 {
+        let main = get_cell(table, frac.num, n_and_invers_cols.0).trim().to_string();
+        if main.chars().count() <= 3 {
+            return Some(String::new());
+        }
+        if is_universe {
+            let extra = get_cell(table, frac.num, 198).trim();
+            if extra.chars().count() > 2 {
+                return Some(format!("{} ({}) ; {}", main, frac.num, extra));
+            }
+        }
+        return Some(main);
+    }
+    let r = frac.num - 1;
+    let c = frac.den - 1;
+    Some(gebr_table.get(r).and_then(|row| row.get(c)).cloned().unwrap_or_default())
+}
+
+fn add_pair_unique(map: &mut BTreeMap<usize, Vec<(SimpleFraction, SimpleFraction)>>, key: usize, pair: (SimpleFraction, SimpleFraction)) {
+    let vec = map.entry(key).or_default();
+    let canon = if pair.0 <= pair.1 { pair } else { (pair.1, pair.0) };
+    if !vec.iter().any(|&(a,b)| { let c = if a <= b {(a,b)} else {(b,a)}; c == canon }) {
+        vec.push(pair);
+    }
+}
+
+fn build_fraction_pairs_for_row(max_row: usize, poly: usize, combo: usize) -> BTreeMap<usize, Vec<(SimpleFraction, SimpleFraction)>> {
+    let gal_csv = read_semicolon_csv("gebrochen-rational-galaxie.csv");
+    let uni_csv = read_semicolon_csv("gebrochen-rational-universum.csv");
+    let gal_t = transpose_csv(&gal_csv);
+    let uni_t = transpose_csv(&uni_csv);
+    let gal_fracs = get_all_brueche(&gal_csv);
+    let uni_fracs = get_all_brueche(&uni_csv);
+    let (fracs1, fracs2) = match combo {
+        0 => (&gal_fracs, &gal_fracs),
+        1 => (&gal_fracs, &uni_fracs),
+        2 => (&uni_fracs, &gal_fracs),
+        3 => (&uni_fracs, &uni_fracs),
+        _ => (&gal_fracs, &gal_fracs),
+    };
+    let gleichf = poly == 1;
+    let mut out: BTreeMap<usize, Vec<(SimpleFraction, SimpleFraction)>> = BTreeMap::new();
+
+    for &a in fracs1 {
+        for &b in fracs2 {
+            if a == b { continue; }
+            let value = if gleichf { a.mul(b).and_then(|x| x.inv()) } else { a.mul(b) };
+            if let Some(v) = value {
+                if v.is_integer() && v.num <= max_row {
+                    add_pair_unique(&mut out, v.num, (a, b));
+                }
+            }
+        }
+    }
+
+    if !gleichf {
+        for &frac in fracs1 {
+            for zusatz in 1..=max_row {
+                let Some(f2) = SimpleFraction::new(frac.den.saturating_mul(zusatz), 1) else { continue; };
+                let Some(v) = frac.mul(f2) else { continue; };
+                if !v.is_integer() { continue; }
+                if v.num > max_row { break; }
+                add_pair_unique(&mut out, v.num, (frac, f2));
+            }
+        }
+        let fracs2set: BTreeSet<SimpleFraction> = fracs2.iter().copied().collect();
+        for &frac in fracs1 {
+            for zusatz in (1..=max_row).rev() {
+                let Some(faktor) = SimpleFraction::new(frac.den, zusatz) else { continue; };
+                if fracs2set.contains(&faktor) || faktor.num == 1 {
+                    let Some(v) = frac.mul(faktor) else { continue; };
+                    if v.is_integer() && v.num <= max_row {
+                        add_pair_unique(&mut out, v.num, (frac, faktor));
+                    }
+                }
+            }
+        }
+    } else {
+        for &frac in fracs1 {
+            for zusatz in 1..=max_row {
+                let Some(f2) = SimpleFraction::new(1, frac.num.saturating_mul(zusatz)) else { continue; };
+                let Some(prod) = frac.mul(f2) else { continue; };
+                let Some(v) = prod.inv() else { continue; };
+                if !v.is_integer() { continue; }
+                if v.num > max_row { break; }
+                add_pair_unique(&mut out, v.num, (frac, f2));
+            }
+        }
+        let fracs2set: BTreeSet<SimpleFraction> = fracs2.iter().copied().collect();
+        for &frac in fracs1 {
+            let Some(inv_frac) = frac.inv() else { continue; };
+            for zusatz in 1..=max_row {
+                let Some(faktor) = SimpleFraction::new(inv_frac.num, inv_frac.den.saturating_mul(zusatz)) else { continue; };
+                if fracs2set.contains(&faktor) || faktor.num == 1 {
+                    let Some(prod) = frac.mul(faktor) else { continue; };
+                    let Some(v) = prod.inv() else { continue; };
+                    if v.is_integer() && v.num <= max_row {
+                        add_pair_unique(&mut out, v.num, (frac, faktor));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn exact_gebr_prim_source(table: &Table, poly: usize, combo: usize, pair: (SimpleFraction, SimpleFraction)) -> Option<(String, String)> {
+    let gal_csv = read_semicolon_csv("gebrochen-rational-galaxie.csv");
+    let gal_t = transpose_csv(&gal_csv);
+    let gal_cols = (10usize, 42usize);
+    let uni_cols = (5usize, 131usize);
+    let gal_or_uni = match combo {
+        0 => (gal_cols, gal_cols),
+        1 => (gal_cols, uni_cols),
+        2 => (uni_cols, gal_cols),
+        3 => (uni_cols, uni_cols),
+        _ => (gal_cols, gal_cols),
+    };
+    let n_and_invers = if poly == 0 { gal_or_uni.0 } else { gal_or_uni.1 };
+    let (left_table, left_not_universe) = if combo >= 2 { (&gal_csv, false) } else { (&gal_t, true) };
+    let (right_table, right_not_universe) = if combo == 1 || combo == 3 { (&gal_csv, false) } else { (&gal_t, true) };
+    let left = fraction_source_text(table, pair.0, n_and_invers, left_table, left_not_universe)?;
+    let right = fraction_source_text(table, pair.1, n_and_invers, right_table, right_not_universe)?;
+    Some((left, right))
+}
+
+fn plain_prim_source(table: &Table, row: usize, poly: usize, role: usize, combo: usize) -> String {
+    let stern_motiv = 10usize;
+    let stern_struk = 5usize;
+    let gleichf_motiv = 42usize;
+    let gleichf_struk = 131usize;
+    let (motiv_col, struk_col) = if poly == 0 { (stern_motiv, stern_struk) } else { (gleichf_motiv, gleichf_struk) };
+    let left_col = if combo <= 1 { motiv_col } else { struk_col };
+    let right_col = if combo == 0 || combo == 2 { motiv_col } else { struk_col };
+    let col = if role == 0 { left_col } else { right_col };
+    get_cell(table, row, col).trim().to_string()
+}
+
+fn gebr_prim_source(table: &Table, row: usize, role: usize, combo: usize, denom: usize) -> String {
+    let (base, normal_form) = match (combo, role) {
+        // Motiv -> Motiv
+        (0, 0) => ("Galaxie", true),
+        (0, 1) => ("Galaxie", false),
+        // Motiv -> Struktur
+        (1, 0) => ("Galaxie", true),
+        (1, 1) => ("Universum", false),
+        // Struktur -> Motiv
+        (2, 0) => ("Universum", true),
+        (2, 1) => ("Galaxie", false),
+        // Struktur -> Struktur
+        (3, 0) => ("Universum", true),
+        (3, 1) => ("Universum", false),
+        _ => ("Galaxie", true),
+    };
+    let header = if normal_form {
+        format!("n/{} {}", denom, base)
+    } else {
+        format!("{}/n {}", denom, base)
+    };
+    cell_by_header(table, row, &header).trim().to_string()
+}
+
+pub fn concat_prim_universe_generated(
+    table: &mut Table,
+    rows_as_numbers: &mut RowSet,
+    tables: &mut Tables,
+    gebr: bool,
+    poly: usize,
+    kind: usize,
+) {
+    let combos: [usize; 3] = if kind == 0 { [0, 1, 2] } else { [1, 2, 3] };
+    let poly_name = if poly == 0 { "Sternpolygone" } else { "gleichförmige Polygone" };
+    let kind_name = if kind == 0 { "Motiv" } else { "Struktur" };
+    let combo_names = ["Motiv -> Motiv", "Motiv -> Struktur", "Struktur -> Motiv", "Struktur -> Struktur"];
+    let suffix = if gebr { ", mit Faktoren aus gebrochen-rationalen Zahlen" } else { "" };
+
+    let exact_fraction_pairs: BTreeMap<usize, BTreeMap<usize, Vec<(SimpleFraction, SimpleFraction)>>> =
+        if gebr {
+            combos
+                .iter()
+                .copied()
+                .map(|combo| {
+                    (
+                        combo,
+                        build_fraction_pairs_for_row(table.len().saturating_sub(1), poly, combo),
+                    )
+                })
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
+
+    for combo in combos {
+        let mut values = vec![String::new(); table.len()];
+        if !values.is_empty() {
+            values[0] = format!(
+                "generierte Multiplikationen {} {} {}{}",
+                poly_name, kind_name, combo_names[combo], suffix
+            );
+        }
+
+        for i in 1..table.len() {
+            let mut parts: Vec<String> = Vec::new();
+
+            if gebr {
+                if let Some(pairs_for_rows) = exact_fraction_pairs.get(&combo) {
+                    if let Some(pairs) = pairs_for_rows.get(&i) {
+                        for &pair in pairs {
+                            if let Some((left, right)) = exact_gebr_prim_source(table, poly, combo, pair) {
+                                let left_clean = left.trim().trim_matches('"');
+                                let right_clean = right.trim().trim_matches('"');
+
+                                if left_clean.chars().count() > 3 && right_clean.chars().count() > 3 {
+                                    let frac_left = format!("{}/{}", pair.0.num, pair.0.den);
+                                    let frac_right = format!("{}/{}", pair.1.num, pair.1.den);
+
+                                    let term = format!(
+                                        "\"{}\" ({})*({}) \"{}\"",
+                                        left_clean,
+                                        frac_left,
+                                        frac_right,
+                                        right_clean
+                                    );
+                                    parts.push(term);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (a, b) in prim_multiple(i) {
+                    if a == 0 || b == 0 {
+                        continue;
+                    }
+
+                    let left = plain_prim_source(table, a, poly, 0, combo);
+                    let right = plain_prim_source(table, b, poly, 1, combo);
+
+                    let left_clean = left.trim().trim_matches('"');
+                    let right_clean = right.trim().trim_matches('"');
+
+                    if left_clean.chars().count() > 2 && right_clean.chars().count() > 2 {
+                        parts.push(format!("(\"{}\") * (\"{}\")", left_clean, right_clean));
+                    }
+                }
+            }
+
+            values[i] = parts.join(" | außerdem: ");
+        }
+
+        append_generated_col(table, values);
+
+        let tag_poly = if poly == 0 {
+            ST::SternPolygon
+        } else {
+            ST::GleichfoermigesPolygon
+        };
+
+        let mut tags = vec![tag_poly];
+        if gebr {
+            tags.push(ST::Galaxie);
+            tags.push(ST::Universum);
+        } else {
+            tags.push(ST::Galaxie);
+        }
+
+        register_generated_column(
+            tables,
+            rows_as_numbers,
+            table,
+            tagset(&tags),
+            format!("{} {} {}{}", poly_name, kind_name, combo_names[combo], suffix),
+        );
+    }
+}
+
 
 #[derive(Debug, Clone, Default)]
 pub struct ConcatState {

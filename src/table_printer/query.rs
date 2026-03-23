@@ -238,6 +238,7 @@ fn should_use_full_table_for_generated(
     ];
 
     tokens.contains("primzahlkreuzprocontra")
+        || tokens.iter().any(|t| t.starts_with("primmotiv") || t.starts_with("primstruk"))
         || selected_by_pair(&tokens, PROCONTRA, PK_PROCONTRA_ALIASES)
         || selected_by_pair(&tokens, BEDEUTUNG, PK_PROCONTRA_ALIASES)
         || selected_by_pair(&tokens, GRUNDSTRUKTUREN, PK_PROCONTRA_ALIASES)

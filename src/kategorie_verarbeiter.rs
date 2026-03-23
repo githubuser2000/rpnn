@@ -26,6 +26,7 @@ fn infer_generator_only_request(ober: &str, unter: &str) -> BTreeSet<String> {
     let is_planet = ober_n == "planet" || ober_n == "planet(10undoder12)";
     let is_menschliches = ober_n == "menschliches";
     let is_galaxie = matches!(ober_n.as_str(), "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise");
+    let is_primvielfache = matches!(ober_n.as_str(), "primvielfache" | "primvielfach" | "primvielfaches");
 
     if (is_bedeutung || is_procontra || is_universum)
         && contains_any_alias(&unter_n, &["primzahlkreuzprocontra", "primzahlkreuz"])
@@ -127,6 +128,33 @@ fn infer_generator_only_request(ober: &str, unter: &str) -> BTreeSet<String> {
         out.insert("modallogik".to_string());
     }
 
+    if is_primvielfache {
+        if contains_any_alias(&unter_n, &["motivgleichfoermig", "motivgleichförmig", "motivegleichfoermigepolygone", "motivegleichförmige polygone"]) {
+            out.insert("primmotivgleichf".to_string());
+        }
+        if contains_any_alias(&unter_n, &["strukturgleichfoermig", "strukturgleichförmig", "strukturgleichfoermigepolygone", "strukturgleichförmige polygone"]) {
+            out.insert("primstrukgleichf".to_string());
+        }
+        if contains_any_alias(&unter_n, &["motivstern", "motivesternpolygone", "motivesternpolygon"]) {
+            out.insert("primmotivstern".to_string());
+        }
+        if contains_any_alias(&unter_n, &["strukturstern", "struktursternpolygone", "struktursternpolygon"]) {
+            out.insert("primstrukstern".to_string());
+        }
+        if contains_any_alias(&unter_n, &["motivgebrstern", "motivsternpolygongebrochenrational", "motivsternpolygongebrochen-rational"]) {
+            out.insert("primmotivsterngebr".to_string());
+        }
+        if contains_any_alias(&unter_n, &["strukgebrstern", "struktursternpolyongebrochenrational", "struktursternpolygongebrochen-rational"]) {
+            out.insert("primstruksterngebr".to_string());
+        }
+        if contains_any_alias(&unter_n, &["motivgebrgleichf", "motivgleichfoermigepolygonegebrochenrational", "motivgleichförmigepolygonegebrochen-rational"]) {
+            out.insert("primmotivgleichfgebr".to_string());
+        }
+        if contains_any_alias(&unter_n, &["strukgebrgleichf", "strukturgleichfoermigepolygonegebrochenrational", "strukturgleichförmigepolygonegebrochen-rational"]) {
+            out.insert("primstrukgleichfgebr".to_string());
+        }
+    }
+
     out
 }
 
@@ -156,12 +184,6 @@ pub fn verarbeite_kategorien(
                 .collect();
         }
 
-        println!(
-            "✅ Kategorie gefunden: {} → {} : {:?}",
-            spalten_namen.oberkategorie,
-            spalten_namen.unterkategorie,
-            gefundene_spalten
-        );
     }
 
     generated_befehle.extend(infer_generator_only_request(
@@ -173,12 +195,6 @@ pub fn verarbeite_kategorien(
         bereich.spalten_gefunden = true;
         bereich.spalten_gesucht = false;
         bereich.spalten_gesucht2 = false;
-        println!(
-            "✅ Generator erkannt: {} → {} : {:?}",
-            spalten_namen.oberkategorie,
-            spalten_namen.unterkategorie,
-            generated_befehle
-        );
         return Ok(generated_befehle);
     }
 
