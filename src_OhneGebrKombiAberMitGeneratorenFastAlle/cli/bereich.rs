@@ -1,17 +1,6 @@
 
 // src/cli/bereich.rs
-use std::collections::{BTreeMap, BTreeSet};
-
-#[derive(Debug, Clone, Default)]
-pub struct PypyCompatConfig {
-    pub gebrochengalaxie: BTreeSet<usize>,
-    pub gebrochenuniversum: BTreeSet<usize>,
-    pub gebrochenemotion: BTreeSet<usize>,
-    pub gebrochengroesse: BTreeSet<usize>,
-    pub kombi_galaxie: BTreeSet<usize>,
-    pub kombi_universum: BTreeSet<usize>,
-    pub added_headers: BTreeMap<String, Vec<usize>>,
-}
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
 pub struct TextBereich {
@@ -33,7 +22,6 @@ pub struct TextBereich {
     pub exact_modal_pairs: Vec<(usize, usize)>, // 0-basiert für concat_modallogik
     pub exact_meta_konkret_specs: Vec<(usize, usize)>, // (metavariable, side0or1)
     pub exact_visible_columns: Vec<usize>, // 1-basiert sichtbare Spalten aus exaktem Resolver
-    pub pypy_compat: PypyCompatConfig,
 }
 
 impl Default for TextBereich {
@@ -57,7 +45,6 @@ impl Default for TextBereich {
             exact_modal_pairs: Vec::new(),
             exact_meta_konkret_specs: Vec::new(),
             exact_visible_columns: Vec::new(),
-            pypy_compat: PypyCompatConfig::default(),
         }
     }
 }

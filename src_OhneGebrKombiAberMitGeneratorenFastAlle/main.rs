@@ -18,7 +18,6 @@ mod multiples_teiler;  // war multiples_teiler
 mod generated_columns_words_registry;
 mod exact_generator_bridge;
 mod python_exact_mappings;
-mod pypy_compat;
 use workflows::main_workflow;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

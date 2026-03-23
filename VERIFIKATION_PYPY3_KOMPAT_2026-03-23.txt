@@ -1,0 +1,43 @@
+Verifikation gegen Python-Referenz (codebasiert, nicht Rust-buildbasiert)
+
+1. Gebrochen-rationale Tabellen
+- Die Auswahl folgt jetzt der Python-Regel aus lib4tables_concat.py:
+  - Auswahlbedingung: u + 2 in concatTableSelection
+  - Daraus folgt: CLI-Wert k mappt auf die CSV-Denominator-/Column-Nummer k-1
+  - Beispiel: --gebrochenuniversum=2 waehlt die erste gebrochen-rationale Spalte (n/1 und 1/n)
+- Beide Varianten werden wie in Python erzeugt:
+  - n/x
+  - x/n
+- Exakte Struktur/Invers-Spalten wurden direkt aus der Python-Referenz uebernommen:
+  - Galaxie: (10, 42)
+  - Universum: (5, 131)
+  - Emotion: (243, 284)
+  - Strukturgroesse: (4, 197)
+- Spezialfaelle aus der Python-Funktion spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie wurden portiert:
+  - numerator == 1 -> Haupttabelle mit inverser Spalte
+  - denominator == 1 -> Haupttabelle mit normaler Spalte
+  - Universum bekommt zusaetzlich die Spalten 198 bzw. 201 als Anhang, wie in Python
+  - sonst direkter Lookup in der gebrochen-rationalen CSV bei [numerator-1][denominator-1]
+
+2. Kombi-Tabellen
+- kombi.csv und kombi-meta.csv werden getrennt geladen
+- Auswahlspalten folgen der Python-Regel rowsOfcombi / rowsOfcombi2:
+  - CLI-Wert 1 meint die erste Nutzspalte nach der Relationsspalte
+- Die erste Spalte wird wie in Python in Zahlenmengen zerlegt:
+  - '|', Vorzeichen, Klammern und '/' werden rekursiv verarbeitet
+- Zugeordnete Inhalte werden wie in Python mit dem Relationsausdruck umklammert:
+  - (relationsspalte) inhalt (relationsspalte)
+
+3. CLI-Parameter
+- Direkte Unterstuetzung fuer PyPy3-artige Aufrufe eingebaut:
+  - -spalten --gebrochengalaxie=...
+  - -spalten --gebrochenuniversum=...
+  - -spalten --gebrochenemotion=...
+  - -spalten --gebrochengroesse=...
+  - -kombination --galaxie=...
+  - -kombination --universum=...
+- Die Argumente werden auch direkt erkannt, falls sie ohne den Vorspann -spalten/-kombination auftauchen.
+
+4. Was noch nicht als mathematisch bewiesen "bytegenau" gelten kann
+- Im Container gibt es kein rustc/cargo. Deshalb konnte kein echter Rust-Build und kein 1:1 Laufvergleich Rust-vs-Python ausgefuehrt werden.
+- Die Portierung folgt fuer diese Teilfunktionalitaet jetzt direkt den Python-Formeln statt einer Annaeherung.

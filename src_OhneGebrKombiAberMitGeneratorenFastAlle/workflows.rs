@@ -5,11 +5,11 @@ use std::env;
 use crate::column_categories_complete::lade_kategorie_map;
 use crate::csv_importer::import_csvs_to_sqlite;
 use crate::table_printer::query_column_by_index;
+use crate::column_manager::get_column_names;
 use crate::tabellen_utils::show_usage;
 use crate::argument_verarbeiter::SpaltenVerarbeiter;
 use crate::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::generated_columns_words_registry::ParametersMain;
-use crate::pypy_compat::apply_pypy_compat;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -40,9 +40,10 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let dateien = [pfad1, pfad2];
 
     let conn = import_csvs_to_sqlite(&dateien)?;
-    apply_pypy_compat(&conn, &mut bereich, &proj_path)?;
     query_column_by_index(&conn, bereich, &generated_befehle, &parameters_main)?;
 
+    let column_names = get_column_names(&conn)?;
+    println!("Die Tabelle hat {} Spalten.", column_names.len());
 
     Ok(())
 }

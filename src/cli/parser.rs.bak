@@ -27,64 +27,6 @@ fn is_flag(s: &str) -> bool {
     s.starts_with('-')
 }
 
-fn parse_pypy_number_set(text: &str) -> BTreeSet<usize> {
-    text.split(',')
-        .filter_map(|part| {
-            let trimmed = part.trim();
-            if trimmed.is_empty() {
-                return None;
-            }
-            trimmed.parse::<isize>().ok().map(|v| v.unsigned_abs())
-        })
-        .filter(|&v| v > 1)
-        .collect()
-}
-
-
-fn parse_usize_csv_list(text: &str, flag_name: &str) -> Vec<usize> {
-    let values: Vec<usize> = text
-        .split(',')
-        .map(|s| {
-            let trimmed = s.trim();
-            trimmed.parse::<usize>().unwrap_or_else(|_| {
-                panic!(
-                    "Ungültige Liste für {}: '{}' ist keine Zahl",
-                    flag_name, trimmed
-                )
-            })
-        })
-        .collect();
-
-    if values.is_empty() {
-        panic!("{} darf nicht leer sein", flag_name);
-    }
-
-    values
-}
-
-fn apply_pypy_compat_arg(bereich: &mut TextBereich, arg: &str) -> bool {
-    let mut parts = arg.splitn(2, '=');
-    let key = parts.next().unwrap_or("");
-    let value = parts.next().unwrap_or("");
-    let numbers = parse_pypy_number_set(value);
-    if numbers.is_empty() {
-        return false;
-    }
-
-    match key {
-        "--gebrochengalaxie" => bereich.pypy_compat.gebrochengalaxie.extend(numbers),
-        "--gebrochenuniversum" => bereich.pypy_compat.gebrochenuniversum.extend(numbers),
-        "--gebrochenemotion" => bereich.pypy_compat.gebrochenemotion.extend(numbers),
-        "--gebrochengroesse" => bereich.pypy_compat.gebrochengroesse.extend(numbers),
-        "--galaxie" => bereich.pypy_compat.kombi_galaxie.extend(numbers),
-        "--universum" => bereich.pypy_compat.kombi_universum.extend(numbers),
-        _ => return false,
-    }
-
-    true
-}
-
-
 fn print_all_oberkategorien(
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>,
 ) {
@@ -166,25 +108,10 @@ pub fn parse_cli_args(
             }
         }
 
-        if let Some(value) = arg.strip_prefix("--breite=") {
-            let breite = value.trim().parse::<usize>().unwrap_or_else(|_| {
-                panic!("Ungültige Breite '{}': keine Zahl", value)
-            });
-
-            if breite == 0 {
-                panic!("--breite muss größer als 0 sein");
-            }
-
-            bereich.breiten = vec![breite];
-        } else if let Some(value) = arg.strip_prefix("--breiten=") {
-            bereich.breiten = parse_usize_csv_list(value, "--breiten");
-        } else if let Some(value) = arg.strip_prefix("--spaltenreihenfolgeundnurdiese=") {
-            bereich.spaltenreihenfolgeundnurdiese =
-                parse_usize_csv_list(value, "--spaltenreihenfolgeundnurdiese");
-        } else {
         match arg.as_str() {
             "--vorhervonausschnitt" => {
                 if let Some((_, nachfolger)) = iter.next() {
+                    println!("📋 Verarbeite --vorhervonausschnitt: {}", nachfolger);
 
                     let mut vielfache = false;
                     let mut primfaktoren = false;
@@ -254,18 +181,26 @@ pub fn parse_cli_args(
 
             "--breiten" => {
                 if let Some((_, nachfolger)) = iter.next() {
-                    bereich.breiten = parse_usize_csv_list(nachfolger, "--breiten");
+                    let breiten: Vec<usize> = nachfolger
+                        .split(',')
+                        .map(|s| {
+                            let trimmed = s.trim();
+                            trimmed.parse::<usize>().unwrap_or_else(|_| {
+                                panic!(
+                                    "Ungültige Breitenliste '{}': '{}' ist keine Zahl",
+                                    nachfolger, trimmed
+                                )
+                            })
+                        })
+                        .collect();
+
+                    if breiten.is_empty() {
+                        panic!("--breiten darf nicht leer sein");
+                    }
+
+                    bereich.breiten = breiten;
                 } else {
                     panic!("--breiten erwartet eine kommagetrennte Zahlenliste");
-                }
-            }
-
-            "-spalten" | "-kombination" => {
-                if let Some((_, nachfolger)) = iter.peek() {
-                    let candidate = (*nachfolger).as_str();
-                    if apply_pypy_compat_arg(&mut bereich, candidate) {
-                        iter.next();
-                    }
                 }
             }
 
@@ -317,8 +252,23 @@ pub fn parse_cli_args(
 
             "--spaltenreihenfolgeundnurdiese" => {
                 if let Some((_, nachfolger)) = iter.next() {
-                    bereich.spaltenreihenfolgeundnurdiese =
-                        parse_usize_csv_list(nachfolger, "--spaltenreihenfolgeundnurdiese");
+                    let spalten: Vec<usize> = nachfolger
+                        .split(',')
+                        .map(|s| {
+                            s.parse::<usize>().unwrap_or_else(|_| {
+                                panic!(
+                                    "Ungültige Spaltenliste '{}': '{}' ist keine Zahl",
+                                    nachfolger, s
+                                )
+                            })
+                        })
+                        .collect();
+
+                    if spalten.is_empty() {
+                        panic!("--spaltenreihenfolgeundnurdiese darf nicht leer sein");
+                    }
+
+                    bereich.spaltenreihenfolgeundnurdiese = spalten;
                 } else {
                     panic!("--spaltenreihenfolgeundnurdiese erwartet eine kommagetrennte Zahlenliste");
                 }
@@ -386,11 +336,7 @@ pub fn parse_cli_args(
                 println!("  mein-rpnn --spalten Universum Transzendentalien --zeilevon 1 --zeilebis 10");
             }
 
-            _ => {
-                let _ = apply_pypy_compat_arg(&mut bereich, arg);
-            }
-        }
-
+            _ => {}
         }
 
         let param = if dash_count > 0 {

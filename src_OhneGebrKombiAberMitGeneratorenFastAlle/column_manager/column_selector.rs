@@ -22,6 +22,7 @@ pub fn collect_spalten_nummern(
                 nums.push(i);
             }
         }
+        println!("NUMS {:?}", nums);
     } else if bereich.von_spalte > 0 && bereich.bis_spalte > 0 {
         if bereich.von_spalte > bereich.bis_spalte {
             return Err("Startspalte > Endspalte".into());

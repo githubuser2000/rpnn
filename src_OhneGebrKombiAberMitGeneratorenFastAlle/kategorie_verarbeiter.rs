@@ -186,10 +186,6 @@ pub fn verarbeite_kategorien(
         return Ok(generated_befehle);
     }
 
-    if spalten_namen.oberkategorie.trim().is_empty() && spalten_namen.unterkategorie.trim().is_empty() {
-        return Ok(generated_befehle);
-    }
-
     println!(
         "⚠️ Keine Kategorie-Spalten gefunden für: {} → {}",
         spalten_namen.oberkategorie,
