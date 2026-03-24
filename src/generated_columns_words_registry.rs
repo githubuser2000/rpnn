@@ -756,6 +756,20 @@ fn exact_gebr_prim_source(table: &Table, poly: usize, combo: usize, pair: (Simpl
     Some((left, right))
 }
 
+
+fn normalize_generated_operand(text: &str) -> String {
+    let mut s = text.trim().replace(r#"\""#, r#"""#);
+    loop {
+        let trimmed = s.trim();
+        if trimmed.len() >= 2 && trimmed.starts_with('"') && trimmed.ends_with('"') {
+            s = trimmed[1..trimmed.len()-1].to_string();
+            continue;
+        }
+        break;
+    }
+    s.trim().to_string()
+}
+
 fn plain_prim_source(table: &Table, row: usize, poly: usize, role: usize, combo: usize) -> String {
     let stern_motiv = 10usize;
     let stern_struk = 5usize;
@@ -802,12 +816,12 @@ pub fn concat_prim_universe_generated(
                     if let Some(pairs) = pairs_for_rows.get(&i) {
                         for &pair in pairs {
                             if let Some((left, right)) = exact_gebr_prim_source(table, poly, combo, pair) {
-                                let left_clean = left.trim().trim_matches('"');
-                                let right_clean = right.trim().trim_matches('"');
+                                let left_clean = normalize_generated_operand(&left);
+                                let right_clean = normalize_generated_operand(&right);
                                 if left_clean.chars().count() > 3 && right_clean.chars().count() > 3 {
                                     let frac_left = format!("{}/{}", pair.0.num, pair.0.den);
                                     let frac_right = format!("{}/{}", pair.1.num, pair.1.den);
-                                    parts.push(format!(r#""{}" ({})*({}) "{}""#, left_clean, frac_left, frac_right, right_clean));
+                                    parts.push(format!(r#"("{}") ({})*({}) ("{}")"#, left_clean, frac_left, frac_right, right_clean));
                                 }
                             }
                         }
@@ -820,8 +834,8 @@ pub fn concat_prim_universe_generated(
                     }
                     let left = plain_prim_source(table, a, poly, 0, combo);
                     let right = plain_prim_source(table, b, poly, 1, combo);
-                    let left_clean = left.trim().trim_matches('"');
-                    let right_clean = right.trim().trim_matches('"');
+                    let left_clean = normalize_generated_operand(&left);
+                    let right_clean = normalize_generated_operand(&right);
                     if left_clean.chars().count() > 2 && right_clean.chars().count() > 2 {
                         parts.push(format!(r#"("{}") * ("{}")"#, left_clean, right_clean));
                     }
