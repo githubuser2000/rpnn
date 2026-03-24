@@ -72,6 +72,19 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
                 "multis",
                 "multiplikationen",
             ]))
+        || (is_ober(&["multiplikationen", "multiplikation"])
+            && is_unter(&[
+                "motivgleichfoermig",
+                "motivgleichförmig",
+                "strukturgleichfoermig",
+                "strukturgleichförmig",
+                "motivstern",
+                "strukturstern",
+                "motivgebrstern",
+                "strukgebrstern",
+                "motivgebrgleichf",
+                "strukgebrgleichf",
+            ]))
 }
 
 fn validate_spalten_input_inner(

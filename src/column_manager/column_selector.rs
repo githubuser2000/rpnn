@@ -31,7 +31,7 @@ pub fn collect_spalten_nummern(
         }
     } else {
         if bereich.spalten_gesucht2 {
-            return Err("Spalten wurden gesucht, aber keine verarbeitet".into());
+            return Ok(Vec::new());
         }
         nums.push(1);
     }
@@ -40,7 +40,7 @@ pub fn collect_spalten_nummern(
     nums.dedup();
 
     if nums.is_empty() {
-        return Err("Keine Spaltennummern ausgewählt".into());
+        return Ok(nums);
     }
 
     Ok(nums)

@@ -26,7 +26,7 @@ fn infer_generator_only_request(ober: &str, unter: &str) -> BTreeSet<String> {
     let is_planet = ober_n == "planet" || ober_n == "planet(10undoder12)";
     let is_menschliches = ober_n == "menschliches";
     let is_galaxie = matches!(ober_n.as_str(), "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise");
-    let is_primvielfache = matches!(ober_n.as_str(), "primvielfache" | "primvielfach" | "primvielfaches");
+    let is_multiplikationen = matches!(ober_n.as_str(), "multiplikationen" | "multiplikation");
 
     if (is_bedeutung || is_procontra || is_universum)
         && contains_any_alias(&unter_n, &["primzahlkreuzprocontra", "primzahlkreuz"])
@@ -128,7 +128,7 @@ fn infer_generator_only_request(ober: &str, unter: &str) -> BTreeSet<String> {
         out.insert("modallogik".to_string());
     }
 
-    if is_primvielfache {
+    if is_multiplikationen {
         if contains_any_alias(&unter_n, &["motivgleichfoermig", "motivgleichförmig", "motivegleichfoermigepolygone", "motivegleichförmige polygone"]) {
             out.insert("primmotivgleichf".to_string());
         }
