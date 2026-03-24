@@ -26,6 +26,9 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
     let is_ober = |aliases: &[&str]| aliases.iter().any(|a| ober == normalize_token(a));
     let is_unter = |aliases: &[&str]| aliases.iter().any(|a| unter == normalize_token(a));
 
+    let is_prim_generated_group =
+        is_ober(&["primvielfache", "primvielfach", "primvielfaches", "multiplikationen", "multiplikation"]);
+
     (is_ober(&["procontra", "bedeutung", "grundstrukturen"])
         && is_unter(&["primzahlkreuz", "nachvollziehen"]))
         || (is_ober(&["menschliches"]) && is_unter(&["liebe", "ethik"]))
@@ -71,6 +74,17 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
                 "vielfacher",
                 "multis",
                 "multiplikationen",
+            ]))
+        || (is_prim_generated_group
+            && is_unter(&[
+                "motivgleichfoermig",
+                "strukturgleichfoermig",
+                "motivstern",
+                "strukturstern",
+                "motivgebrstern",
+                "strukgebrstern",
+                "motivgebrgleichf",
+                "strukgebrgleichf",
             ]))
 }
 

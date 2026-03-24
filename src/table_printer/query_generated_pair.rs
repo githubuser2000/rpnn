@@ -69,7 +69,6 @@ pub fn try_resolve_generated_pair(
 
     // words.py:
     // ParametersMain.menschliches + ("Liebe", "liebe", "ethik") -> {8, 9, 28, ...}
-    // lib4tables_concat.py / generated_columns.rs: concatLovePolygon braucht Basis-Spalte 9
     if is_ober(&["menschliches"]) && is_unter(&["liebe", "ethik"]) {
         generated_befehle.insert("lovepolygon".to_string());
         required_columns.insert(9);
@@ -77,9 +76,7 @@ pub fn try_resolve_generated_pair(
     }
 
     // words.py:
-    // ParametersMain.menschliches + ("Gleichheit_Freiheit", "gleichheitfreiheit", "ungleichheit",
-    // "dominieren", "gleichheit", "freiheit") -> {132, ...}
-    // lib4tables_concat.py / generated_columns.rs: concatGleichheitFreiheitDominieren braucht 132
+    // ParametersMain.menschliches + ("Gleichheit_Freiheit", ...)
     if is_ober(&["planet", "menschliches", "grundstrukturen"])
         && is_unter(&[
             "ordnen",
@@ -97,8 +94,7 @@ pub fn try_resolve_generated_pair(
         return true;
     }
 
-    // Best-effort aus words.py + concatGeistEmotionEnergieMaterieTopologie:
-    // die Generatorspalte hängt an Basis-Spalte 242
+    // Geist/Emotion/etc.
     if is_ober(&["universum", "multiversum", "grundstrukturen", "menschliches"])
         && is_unter(&[
             "geist",
@@ -115,8 +111,7 @@ pub fn try_resolve_generated_pair(
         return true;
     }
 
-    // 64-getriebene Generatoren aus generated_columns.rs:
-    // concatPrimCreativityType und concatMondExponzierenLogarithmusTyp
+    // 64-getriebene Generatoren
     if is_ober(&["wichtigste", "bedeutung"])
         && is_unter(&[
             "gestirn",
@@ -151,6 +146,50 @@ pub fn try_resolve_generated_pair(
         generated_befehle.insert("vervielfachezeile".to_string());
         required_columns.insert(19);
         required_columns.insert(90);
+        return true;
+    }
+
+    // Neu: primvielfache / multiplikationen -> Polygon-/Stern-Generatorfamilie
+    let is_prim_generated_group =
+        is_ober(&["primvielfache", "primvielfach", "primvielfaches", "multiplikationen", "multiplikation"]);
+
+    if is_prim_generated_group && is_unter(&["motivgleichfoermig"]) {
+        generated_befehle.insert("primmotgleichf".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["strukturgleichfoermig"]) {
+        generated_befehle.insert("primstrukgleichf".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["motivstern"]) {
+        generated_befehle.insert("primmotivstern".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["strukturstern"]) {
+        generated_befehle.insert("primstrukturstern".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["motivgebrstern"]) {
+        generated_befehle.insert("primmotivsterngebr".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["strukgebrstern"]) {
+        generated_befehle.insert("primstruktursterngebr".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["motivgebrgleichf"]) {
+        generated_befehle.insert("primmotgleichfgebr".to_string());
+        return true;
+    }
+
+    if is_prim_generated_group && is_unter(&["strukgebrgleichf"]) {
+        generated_befehle.insert("primstrukgleichfgebr".to_string());
         return true;
     }
 
