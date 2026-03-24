@@ -64,28 +64,13 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
                 "kreativität",
                 "intelligenz",
             ]))
-        || (is_ober(&["bedeutung", "wichtigste", "galaxie"])
+        || (is_ober(&["bedeutung", "wichtigste", "galaxie", "multiplikationen", "primvielfache"])
             && is_unter(&[
                 "primzahlen",
                 "vielfache",
                 "vielfacher",
                 "multis",
                 "multiplikationen",
-            ]))
-        || (is_ober(&["primvielfache", "primvielfach", "multiplikationen", "multiplikation"])
-            && is_unter(&[
-                "rahmen",
-                "beschrieben",
-                "motivgleichfoermig",
-                "motivgleichförmig",
-                "strukturgleichfoermig",
-                "strukturgleichförmig",
-                "motivstern",
-                "strukturstern",
-                "motivgebrstern",
-                "strukgebrstern",
-                "motivgebrgleichf",
-                "strukgebrgleichf",
             ]))
 }
 

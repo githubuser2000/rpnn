@@ -70,24 +70,6 @@ impl KategorieMap {
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
 
-        let is_mul_oder_prim = matches!(ober_n.as_str(), "primvielfache" | "primvielfach" | "primvielfaches" | "multiplikationen" | "multiplikation");
-
-        if is_mul_oder_prim {
-            match unter_n.as_str() {
-                "rahmen" | "rahmenbedingungen" => required_columns.push(226),
-                "motivgleichfoermig" | "motivgleichförmig" | "motivegleichfoermigepolygone" | "motivegleichförmigepolygone" => generated_befehle.push("primmotivgleichf".to_string()),
-                "strukturgleichfoermig" | "strukturgleichförmig" | "strukturgleichfoermigepolygone" | "strukturgleichförmigepolygone" => generated_befehle.push("primstrukgleichf".to_string()),
-                "motivstern" | "motivesternpolygone" | "motivesternpolygon" => generated_befehle.push("primmotivstern".to_string()),
-                "strukturstern" | "struktursternpolygone" | "struktursternpolygon" => generated_befehle.push("primstrukstern".to_string()),
-                "motivgebrstern" | "motivsternpolygongebrochenrational" | "motivsternpolygongebrochen-rational" => generated_befehle.push("primmotivsterngebr".to_string()),
-                "strukgebrstern" | "struktursternpolyongebrochenrational" | "struktursternpolygongebrochen-rational" => generated_befehle.push("primstruksterngebr".to_string()),
-                "motivgebrgleichf" | "motivgleichfoermigepolygonegebrochenrational" | "motivgleichförmigepolygonegebrochen-rational" => generated_befehle.push("primmotivgleichfgebr".to_string()),
-                "strukgebrgleichf" | "strukturgleichfoermigepolygonegebrochenrational" | "strukturgleichförmigepolygonegebrochen-rational" => generated_befehle.push("primstrukgleichfgebr".to_string()),
-                "beschrieben" => required_columns.push(2),
-                _ => {}
-            }
-        }
-
         // reiner Generatorfall aus words.py / column_categories_complete:
         // procontra|bedeutung + primzahlkreuz -> leere direkte Spaltenliste
         if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
@@ -691,6 +673,16 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         (vec!["Kontinuum", "kontinuum"], vec!["C", "c", "Drei"], vec![448]),
         (vec!["Kontinuum", "kontinuum"], vec!["AA", "aa", "Siebenundzwanzig"], vec![558, 559]),
         (vec!["Kontinuum", "kontinuum"], vec!["D", "d", "Vier"], vec![449]),
+        (vec!["Multiplikationen", "multiplikationen"], vec!["Rahmen-Bedingungen", "rahmen"], vec![226]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Motive_gleichförmige_Polygone", "motivgleichfoermig"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Struktur_gleichförmige_Polygone", "strukturgleichfoermig"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Motive_Sternpolygone", "motivstern"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Struktur_Sternpolygone", "strukturstern"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Motiv_Sternpolygon_gebrochen-rational", "motivgebrstern"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Struktur_Sternpolyon_gebrochen-rational", "strukgebrstern"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Motiv_gleichförmige_Polygone_gebrochen-rational", "motivgebrgleichf"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["Struktur_gleichförmige_Polygone_gebrochen-rational", "strukgebrgleichf"], vec![]),
+(vec!["Multiplikationen", "multiplikationen"], vec!["beschrieben"], vec![]),
     ];
 
     // Jetzt verwenden wir data

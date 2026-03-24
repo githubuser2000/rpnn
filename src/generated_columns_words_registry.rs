@@ -758,17 +758,44 @@ fn exact_gebr_prim_source(table: &Table, poly: usize, combo: usize, pair: (Simpl
 
 
 fn normalize_generated_operand(text: &str) -> String {
-    let mut s = text.trim().replace(r#"\""#, r#"""#);
+    let mut s = text.trim().replace(r#"\""#, r#"""#).trim().to_string();
+
     loop {
+        let before = s.clone();
         let trimmed = s.trim();
-        if trimmed.len() >= 2 && trimmed.starts_with('"') && trimmed.ends_with('"') {
-            s = trimmed[1..trimmed.len()-1].to_string();
-            continue;
+
+        let mut start = 0usize;
+        let mut end = trimmed.len();
+
+        while start < end {
+            let rest = &trimmed[start..end];
+            if rest.starts_with('"') || rest.starts_with('„') || rest.starts_with('“') {
+                start += rest.chars().next().map(|c| c.len_utf8()).unwrap_or(0);
+            } else {
+                break;
+            }
         }
-        break;
+
+        while end > start {
+            let rest = &trimmed[start..end];
+            if rest.ends_with('"') || rest.ends_with('“') || rest.ends_with('”') {
+                let ch_len = rest.chars().next_back().map(|c| c.len_utf8()).unwrap_or(0);
+                end -= ch_len;
+            } else {
+                break;
+            }
+        }
+
+        s = trimmed[start..end].trim().replace("\"\"", "\"");
+
+        if s == before {
+            break;
+        }
     }
-    s.trim().to_string()
+
+    s.trim().replace("\"\"", "\"")
 }
+
 
 fn plain_prim_source(table: &Table, row: usize, poly: usize, role: usize, combo: usize) -> String {
     let stern_motiv = 10usize;
@@ -842,7 +869,7 @@ pub fn concat_prim_universe_generated(
                 }
             }
 
-            values[i] = parts.join(" | außerdem: ");
+            values[i] = unique_preserve_order(parts).join(" | außerdem: ");
         }
 
         append_generated_col(table, values);

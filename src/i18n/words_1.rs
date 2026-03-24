@@ -181,7 +181,7 @@ pub fn fill_remaining_matrix(m: &mut Vec<ParaNdataEntry>) {
     m.push(ParaNdataEntry::new(ParametersMain::GebrochenGroesse, &["Bruch_Strukturgröße", "gebrochen_groesse"], &[487, 488]));
 
     // --- Primvielfache & Wirkungen ---
-    m.push(ParaNdataEntry::new(ParametersMain::Primvielfache, &["Prim_Vielfache", "primvielfache", "primvielfach", "Primvielfache"], &[101, 103, 107, 109]));
+    m.push(ParaNdataEntry::new(ParametersMain::Primvielfache, &["Prim_Vielfache", "primvielfache", "Primvielfach", "primvielfach"], &[101, 103, 107, 109]));
     m.push(ParaNdataEntry::new(ParametersMain::Primzahlwirkung, &["Primzahlwirkung", "wirkung"], &[127, 131, 137, 139]));
 
     // --- Strukturen (Kleinere & Grundstrukturen) ---
