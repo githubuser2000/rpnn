@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use crate::cli::{TextBereich, parser::SpaltenNamen};
-use crate::column_categories_complete::KategorieMap;
+use crate::domain::categories::KategorieMap;
 
 fn normalize_category_key(s: &str) -> String {
     s.to_lowercase()

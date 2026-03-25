@@ -2,14 +2,14 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::env;
-use crate::column_categories_complete::lade_kategorie_map;
-use crate::data_access::import_csvs_to_sqlite;
+use crate::domain::categories::lade_kategorie_map;
+use crate::data_access::csv_importer::import_csvs_to_sqlite;
 use crate::table_printer::query_column_by_index;
-use crate::tabellen_utils::show_usage;
-use crate::processing::SpaltenVerarbeiter;
-use crate::processing::verarbeite_kategorien;
-use crate::generated_columns_words_registry::ParametersMain;
-use crate::pypy_compat::apply_pypy_compat;
+use crate::domain::tabellen_utils::show_usage;
+use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
+use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::domain::generator_registry::ParametersMain;
+use crate::domain::pypy_compat::apply_pypy_compat;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();

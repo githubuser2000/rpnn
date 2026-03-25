@@ -4,7 +4,7 @@ use std::process;
 use rusqlite::Connection;
 use crate::cli::TextBereich;
 use crate::column_manager::{get_column_names, build_column_query};
-use crate::data_access::fetch_data_with_stats;
+use crate::data_fetcher::fetch_data_with_stats;
 use unicode_width::UnicodeWidthStr;
 use crate::generated_columns::{apply_generated_columns, ParametersMain};
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;

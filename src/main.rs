@@ -1,23 +1,30 @@
+mod app;
+mod processing;
+mod data_access;
+mod domain;
 
 mod cli;
-mod data;
-//mod utils;
-mod app;
-mod data_access;
-mod processing;
 mod column_manager;
+mod data;
+mod if_is_zeilen_angabe;
+mod input_help;
+mod multiples_teiler;
+mod reta_ausgabe;
 mod table_printer;
+
+mod workflows;
+mod argument_verarbeiter;
+mod kategorie_verarbeiter;
+mod csv_importer;
+mod data_fetcher;
 mod tabellen_utils;
-mod reta_ausgabe;  // war retaAusgabe
-mod if_is_zeilen_angabe;  // war if_is_zeilen_angabe
-mod column_categories_complete;  // war column_categories_complete
-mod input_help;  // war input_help
-mod multiples_teiler;  // war multiples_teiler
+mod column_categories_complete;
 mod generated_columns_words_registry;
 mod exact_generator_bridge;
 mod python_exact_mappings;
 mod pypy_compat;
-use app::main_workflow;
+
+use app::workflow::main_workflow;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     main_workflow()
