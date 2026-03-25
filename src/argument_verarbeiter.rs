@@ -182,12 +182,27 @@ impl<'a> SpaltenVerarbeiter<'a> {
 
         if exact_hit {
             for col in alle_gefundene_spalten {
-                bereich.spalten_bereiche.push((col as usize, col as usize));
+                let c = col as usize;
+                bereich.spalten_bereiche.push((c, c));
+                if !bereich.exact_visible_columns.contains(&c) {
+                    bereich.exact_visible_columns.push(c);
+                }
+                if !bereich.spaltenreihenfolgeundnurdiese.contains(&c) {
+                    bereich.spaltenreihenfolgeundnurdiese.push(c);
+                }
             }
+
+            bereich.exact_visible_columns.sort_unstable();
+            bereich.exact_visible_columns.dedup();
+            bereich.spaltenreihenfolgeundnurdiese.sort_unstable();
+            bereich.spaltenreihenfolgeundnurdiese.dedup();
+
             self.finalize_found_columns(bereich);
+            bereich.spalten_gefunden = true;
+            bereich.spalten_gesucht = true;
+            bereich.spalten_gesucht2 = false;
             return Ok(());
         }
-
         if !alle_gefundene_spalten.is_empty() {
             alle_gefundene_spalten.sort_unstable();
             alle_gefundene_spalten.dedup();
@@ -225,29 +240,46 @@ impl<'a> SpaltenVerarbeiter<'a> {
         }
     }
 
-    fn setze_gefundene_spalten(
-        &self,
-        bereich: &mut TextBereich,
-        gefundene_spalten: Vec<u32>,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
-        sorted.sort();
+fn setze_gefundene_spalten(
+    &self,
+    bereich: &mut TextBereich,
+    gefundene_spalten: Vec<u32>,
+) -> Result<(), Box<dyn Error>> {
+    let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
+    sorted.sort_unstable();
+    sorted.dedup();
 
-        let mut bereich_fuer_spalten = TextBereich::default();
-        for &num in &sorted {
-            bereich_fuer_spalten.spalten_bereiche.push((num, num));
+    bereich.spalten_bereiche = sorted.iter().map(|&num| (num, num)).collect();
+
+    for &num in &sorted {
+        if !bereich.exact_visible_columns.contains(&num) {
+            bereich.exact_visible_columns.push(num);
         }
-
-        bereich.spalten_bereiche = bereich_fuer_spalten.spalten_bereiche;
-
-        if !bereich.spalten_bereiche.is_empty() {
-            bereich.von_spalte = bereich.spalten_bereiche[0].0;
-            bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
+        if !bereich.spaltenreihenfolgeundnurdiese.contains(&num) {
+            bereich.spaltenreihenfolgeundnurdiese.push(num);
         }
-
-        Ok(())
     }
 
+    bereich.exact_visible_columns.sort_unstable();
+    bereich.exact_visible_columns.dedup();
+
+    bereich.spaltenreihenfolgeundnurdiese.sort_unstable();
+    bereich.spaltenreihenfolgeundnurdiese.dedup();
+
+    if !bereich.spalten_bereiche.is_empty() {
+        bereich.von_spalte = bereich.spalten_bereiche[0].0;
+        bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
+    } else {
+        bereich.von_spalte = usize::MAX;
+        bereich.bis_spalte = usize::MAX;
+    }
+
+    bereich.spalten_gefunden = !sorted.is_empty();
+    bereich.spalten_gesucht = !sorted.is_empty();
+    bereich.spalten_gesucht2 = false;
+
+    Ok(())
+}
 fn fallback_zu_standards(
     &self,
     bereich: &mut TextBereich,
