@@ -1,4 +1,4 @@
-use crate::cli::parser::{SpaltenNamen, SpaltenNamenListe};
+use crate::cli::parser::{SpaltenAuswahlModus, SpaltenNamen, SpaltenNamenListe};
 use crate::cli::{parse_cli_args, TextBereich};
 use crate::domain::categories::KategorieMap;
 use crate::processing::spalten_support::defaults::fallback_zu_standards;
@@ -31,12 +31,43 @@ impl<'a> SpaltenVerarbeiter<'a> {
     }
 
     pub fn verarbeite(&self) -> Result<VerarbeitungsErgebnis, Box<dyn Error>> {
-        let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste) =
+        let (_dashes, _params, mut bereich, spalten_namen, spalten_namen_liste, auswahl_modus) =
             parse_cli_args(self.args, Some(self.kategorie_map));
 
-        self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
+        match auswahl_modus {
+            SpaltenAuswahlModus::Alle => {
+                self.setze_alle_spalten(&mut bereich);
+                bereich.mark_columns_resolved();
+            }
+            SpaltenAuswahlModus::Explizit => {
+                self.verarbeite_automatische_spalten(
+                    &mut bereich,
+                    &spalten_namen,
+                    &spalten_namen_liste,
+                )?;
+            }
+        }
 
         Ok(VerarbeitungsErgebnis { bereich, spalten_namen })
+    }
+
+    fn setze_alle_spalten(&self, bereich: &mut TextBereich) {
+        let mut alle_gefundene_spalten: Vec<u32> = self
+            .kategorie_map
+            .alle_eintraege
+            .iter()
+            .flat_map(|eintrag| eintrag.spaltennummern.iter().copied())
+            .collect();
+
+        if alle_gefundene_spalten.is_empty() {
+            fallback_zu_standards(bereich);
+            return;
+        }
+
+        alle_gefundene_spalten.sort_unstable();
+        alle_gefundene_spalten.dedup();
+        setze_gefundene_spalten(bereich, alle_gefundene_spalten);
+        finalize_found_columns(bereich);
     }
 
     fn verarbeite_automatische_spalten(
@@ -46,22 +77,33 @@ impl<'a> SpaltenVerarbeiter<'a> {
         spalten_namen_liste: &SpaltenNamenListe,
     ) -> Result<(), Box<dyn Error>> {
         let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
-        if hat_manuelle_spalten { return Ok(()); }
+        if hat_manuelle_spalten {
+            return Ok(());
+        }
 
         if spalten_namen_liste.eintraege.len() > 1 {
             self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
             return Ok(());
         }
 
-        if spalten_namen.oberkategorie.is_empty() && spalten_namen.unterkategorie.is_empty() { return Ok(()); }
-        if spalten_namen.oberkategorie == "oberkategorie" && spalten_namen.unterkategorie == "unterkategorie" { return Ok(()); }
+        if spalten_namen.oberkategorie.is_empty() && spalten_namen.unterkategorie.is_empty() {
+            return Ok(());
+        }
+        if spalten_namen.oberkategorie == "oberkategorie"
+            && spalten_namen.unterkategorie == "unterkategorie"
+        {
+            return Ok(());
+        }
 
         if merge_exact(bereich, &spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
             finalize_found_columns(bereich);
             return Ok(());
         }
 
-        if is_primzahlkreuz_pro_contra_request(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
+        if is_primzahlkreuz_pro_contra_request(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        ) {
             bereich.mark_columns_resolved();
             return Ok(());
         }

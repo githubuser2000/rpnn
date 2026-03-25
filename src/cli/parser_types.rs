@@ -9,6 +9,13 @@ pub struct SpaltenNamenListe {
     pub eintraege: Vec<SpaltenNamen>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SpaltenAuswahlModus {
+    #[default]
+    Explizit,
+    Alle,
+}
+
 impl Default for SpaltenNamen {
     fn default() -> Self {
         Self {

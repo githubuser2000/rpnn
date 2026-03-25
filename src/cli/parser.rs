@@ -6,18 +6,26 @@ use super::parser_support::{
     apply_pypy_compat_arg, is_flag, parse_usize_csv_list, print_all_oberkategorien,
     print_passende_unterkategorien,
 };
-pub use super::parser_types::{SpaltenNamen, SpaltenNamenListe};
+pub use super::parser_types::{SpaltenAuswahlModus, SpaltenNamen, SpaltenNamenListe};
 
 pub fn parse_cli_args(
     args: &[String],
     kategorie_map: Option<&crate::column_categories_complete::KategorieMap>,
-) -> (Vec<usize>, Vec<String>, TextBereich, SpaltenNamen, SpaltenNamenListe) {
+) -> (
+    Vec<usize>,
+    Vec<String>,
+    TextBereich,
+    SpaltenNamen,
+    SpaltenNamenListe,
+    SpaltenAuswahlModus,
+) {
     let mut minuses = Vec::with_capacity(args.len());
     let mut params = Vec::with_capacity(args.len());
 
     let mut bereich = TextBereich::default();
     let mut spalten_namen = SpaltenNamen::default();
     let mut spalten_namen_liste = SpaltenNamenListe::default();
+    let mut spalten_auswahl_modus = SpaltenAuswahlModus::Explizit;
 
     let automatische_spalten_suche = false;
     let gesuchte_oberkategorie = String::new();
@@ -137,6 +145,35 @@ pub fn parse_cli_args(
                         }
                     }
                 }
+                "--alles" => {
+                    spalten_auswahl_modus = SpaltenAuswahlModus::Alle;
+                    bereich.mark_columns_requested();
+
+                    if let Some(kategorie_map) = kategorie_map {
+                        let mut alle_paare = kategorie_map.alle_eintraege.clone();
+                        alle_paare.sort_by(|a, b| {
+                            a.oberkategorie
+                                .cmp(&b.oberkategorie)
+                                .then(a.unterkategorie.cmp(&b.unterkategorie))
+                        });
+                        alle_paare.dedup_by(|a, b| {
+                            a.oberkategorie == b.oberkategorie
+                                && a.unterkategorie == b.unterkategorie
+                        });
+
+                        spalten_namen_liste.eintraege = alle_paare
+                            .into_iter()
+                            .map(|eintrag| SpaltenNamen {
+                                oberkategorie: eintrag.oberkategorie,
+                                unterkategorie: eintrag.unterkategorie,
+                            })
+                            .collect();
+
+                        if let Some(letztes) = spalten_namen_liste.eintraege.last().cloned() {
+                            spalten_namen = letztes;
+                        }
+                    }
+                }
                 "--spaltenname" => {
                     let first = match iter.peek() {
                         None => {
@@ -234,6 +271,7 @@ pub fn parse_cli_args(
                     println!("📖 Hilfe:");
                     println!("  --spalten OBER UNTER      Suche Spaltennummern für Kategorien");
                     println!("  --spaltenname OBER UNTER  Setze Spaltennamen (für SQL)");
+                    println!("  --alles                   Wähle alle Ober- und Unterkategorien");
                     println!("  --vorhervonausschnitt Z   Zeilenbereiche (z.B. 1-10, 1,3,5)");
                     println!("  --zeilevon ZAHL           Startzeile");
                     println!("  --zeilebis ZAHL           Endzeile");
@@ -246,6 +284,7 @@ pub fn parse_cli_args(
                     println!(
                         "  mein-rpnn --spalten Universum Transzendentalien --zeilevon 1 --zeilebis 10"
                     );
+                    println!("  mein-rpnn --alles --vorhervonausschnitt 1-10");
                 }
                 _ => {
                     let _ = apply_pypy_compat_arg(&mut bereich, arg);
@@ -299,5 +338,12 @@ pub fn parse_cli_args(
         }
     }
 
-    (minuses, params, bereich, spalten_namen, spalten_namen_liste)
+    (
+        minuses,
+        params,
+        bereich,
+        spalten_namen,
+        spalten_namen_liste,
+        spalten_auswahl_modus,
+    )
 }
