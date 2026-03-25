@@ -1,3 +1,4 @@
+use crate::reta_ausgabe::OutputSyntax;
 use crate::if_is_zeilen_angabe::is_zeilen_angabe;
 
 use super::bereich::TextBereich;
@@ -59,6 +60,13 @@ pub fn parse_cli_args(
         } else if let Some(value) = arg.strip_prefix("--spaltenreihenfolgeundnurdiese=") {
             bereich.spaltenreihenfolgeundnurdiese =
                 parse_usize_csv_list(value, "--spaltenreihenfolgeundnurdiese");
+        } else if let Some(value) = arg.strip_prefix("--art=") {
+            bereich.output_syntax = OutputSyntax::from_art_value(value).unwrap_or_else(|| {
+                panic!(
+                    "Ungültiger Wert für --art: '{}'. Erlaubt sind: shell, html, bbcode, csv, markdown, emacs, nichts",
+                    value
+                )
+            });
         } else {
             match arg.as_str() {
                 "--vorhervonausschnitt" => {
@@ -129,6 +137,19 @@ pub fn parse_cli_args(
                 }
                 "--keineleereninhalte" => {
                     bereich.enable_empty_content_filter();
+                }
+                "--art" => {
+                    if let Some((_, nachfolger)) = iter.next() {
+                        bereich.output_syntax = OutputSyntax::from_art_value(nachfolger)
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "Ungültiger Wert für --art: '{}'. Erlaubt sind: shell, html, bbcode, csv, markdown, emacs, nichts",
+                                    nachfolger
+                                )
+                            });
+                    } else {
+                        panic!("--art erwartet genau einen Wert");
+                    }
                 }
                 "--breiten" => {
                     if let Some((_, nachfolger)) = iter.next() {
@@ -277,6 +298,7 @@ pub fn parse_cli_args(
                     println!("  --zeilebis ZAHL           Endzeile");
                     println!("  --spaltevon ZAHL          Startspalte");
                     println!("  --spaltebis ZAHL          Endspalte");
+                    println!("  --art ART                 Ausgabeformat: shell|html|bbcode|csv|markdown|emacs|nichts");
                     println!("  --help, -h                Diese Hilfe");
                     println!();
                     println!("Beispiele:");
@@ -285,6 +307,7 @@ pub fn parse_cli_args(
                         "  mein-rpnn --spalten Universum Transzendentalien --zeilevon 1 --zeilebis 10"
                     );
                     println!("  mein-rpnn --alles --vorhervonausschnitt 1-10");
+                    println!("  mein-rpnn --art markdown --vorhervonausschnitt 1-5 --spaltenname Universum Geist");
                 }
                 _ => {
                     let _ = apply_pypy_compat_arg(&mut bereich, arg);

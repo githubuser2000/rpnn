@@ -27,6 +27,7 @@ pub fn print_table_chunked_with_line_numbers(
     explizite_breiten: &[usize],
     original_line_numbers: &[usize],
     keineleereninhalte: bool,
+    out_type: OutputSyntax,
 ) {
     let term_width = get_terminal_width();
     let available_total = term_width.saturating_sub(1);
@@ -98,7 +99,7 @@ pub fn print_table_chunked_with_line_numbers(
             &chunk_line_numbers,
         );
 
-        render_rows(render_width, augmented_widths, &table_rows, false);
+        render_rows(render_width, augmented_widths, &table_rows, false, out_type);
 
         if end < headers.len() {
             println!();
@@ -113,9 +114,10 @@ fn build_output<'a>(
     render_width: usize,
     column_widths: Vec<usize>,
     line_numbering: bool,
+    out_type: OutputSyntax,
 ) -> CliOutput<'a> {
-    let mut output = CliOutput::new(tables, OutputSyntax::Plain);
-    output.color_enabled = true;
+    let mut output = CliOutput::new(tables, out_type);
+    output.color_enabled = out_type.uses_terminal_colors();
     output.table_width = render_width;
     output.column_widths = column_widths;
     output.line_numbering = line_numbering;
@@ -128,9 +130,10 @@ fn render_rows(
     column_widths: Vec<usize>,
     table_rows: &[TableRow],
     line_numbering: bool,
+    out_type: OutputSyntax,
 ) {
     let tables = Tables::new(Some(100));
-    let mut output = build_output(&tables, render_width, column_widths, line_numbering);
+    let mut output = build_output(&tables, render_width, column_widths, line_numbering, out_type);
 
     let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
 
@@ -192,7 +195,7 @@ pub fn print_table_with_offset(
     );
 
     let available_total = term_width.saturating_sub(3);
-    render_rows(available_total, column_widths, &table_rows, true);
+    render_rows(available_total, column_widths, &table_rows, true, OutputSyntax::Plain);
 }
 
 pub fn print_table_chunked(
@@ -260,7 +263,7 @@ pub fn print_table_chunked_with_offset(
             original_start_line,
         );
 
-        render_rows(render_width, chunk_widths, &table_rows, true);
+        render_rows(render_width, chunk_widths, &table_rows, true, OutputSyntax::Plain);
 
         if end < headers.len() {
             println!();
@@ -280,5 +283,11 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
     let layout = build_table_layout(&sanitized_headers, data);
     let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
-    render_rows(layout.term_width, layout.column_widths, &table_rows, true);
+    render_rows(
+    layout.term_width,
+    layout.column_widths,
+    &table_rows,
+    true,
+    OutputSyntax::Plain,
+);
 }
