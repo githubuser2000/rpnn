@@ -11,6 +11,9 @@ use crate::generated_columns_words_registry::{apply_generated_columns, Parameter
 use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 
+use crate::domain::categories::KategorieMap;
+use crate::domain::reverse_request_report::print_reverse_request_pairs;
+
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
         let mut nums = Vec::new();
@@ -288,8 +291,9 @@ pub fn query_column_by_index(
     mut bereich: TextBereich,
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
-) -> Result<TextBereich, Box<dyn std::error::Error>> {
-    expand_bereich_rows(conn, &mut bereich)?;
+    kategorie_map: &KategorieMap,
+) -> Result<(), Box<dyn std::error::Error>> {
+   expand_bereich_rows(conn, &mut bereich)?;
     let column_names = get_column_names(conn)?;
     let wants_generated = should_use_full_table_for_generated(generated_befehle, parameters_main)
         || !generated_befehle.is_empty();
@@ -377,7 +381,9 @@ pub fn query_column_by_index(
         bereich.pretty_output,
     );
 
-    Ok(bereich)
+    print_reverse_request_pairs(kategorie_map, &bereich, generated_befehle);
+
+    Ok(())
 }
 
 fn sort_by_indices<T: Clone>(values: &[T], indices: &[usize]) -> Result<Vec<T>, String> {

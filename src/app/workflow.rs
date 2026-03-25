@@ -59,7 +59,14 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
 
     let conn = import_csvs_to_sqlite(&dateien)?;
     apply_pypy_compat(&conn, &mut bereich, &proj_path)?;
-    query_column_by_index(&conn, bereich, &generated_befehle, &parameters_main)?;
+    //query_column_by_index(&conn, bereich, &generated_befehle, &parameters_main)?;
+    query_column_by_index(
+    &conn,
+    bereich,
+    &generated_befehle,
+    &parameters_main,
+    &kategorie_map,
+)?;
 
     Ok(())
 }
