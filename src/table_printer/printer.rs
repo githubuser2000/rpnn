@@ -6,7 +6,7 @@ use crate::table_printer::meta_columns::{
     build_meta_widths, build_power_bucket_strings, prepend_meta_columns,
 };
 use crate::table_printer::sanitize::{
-    sanitize_chunk_data, sanitize_chunk_data_with_rows, sanitize_header_preserve_id,
+    sanitize_chunk_data, sanitize_chunk_data_with_rows, sanitize_header_for_output, sanitize_header_preserve_id,
 };
 use crate::table_printer::table_utils::{
     build_table_layout,
@@ -34,7 +34,7 @@ fn render_structured_single_table(
     let sanitized_headers: Vec<String> = headers
         .iter()
         .enumerate()
-        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .map(|(i, h)| sanitize_header_for_output(h, i, !matches!(out_type, OutputSyntax::Plain)))
         .collect();
 
     let (sanitized_data, sanitized_line_numbers) =
@@ -114,7 +114,7 @@ pub fn print_table_chunked_with_line_numbers(
         );
 
         let chunk_headers: Vec<String> = (start..end)
-            .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
+            .map(|global_i| sanitize_header_for_output(&headers[global_i], global_i, false))
             .collect();
 
         let raw_chunk_data: Vec<Vec<String>> = data
@@ -230,7 +230,7 @@ pub fn print_table_with_offset(
     let sanitized_headers: Vec<String> = headers
         .iter()
         .enumerate()
-        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .map(|(i, h)| sanitize_header_for_output(h, i, false))
         .collect();
 
     let term_width = get_terminal_width();
@@ -296,7 +296,7 @@ pub fn print_table_chunked_with_offset(
         let end = determine_chunk_end(headers, data, explizite_breiten, start, available_total);
 
         let chunk_headers: Vec<String> = (start..end)
-            .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
+            .map(|global_i| sanitize_header_for_output(&headers[global_i], global_i, false))
             .collect();
 
         let raw_chunk_data: Vec<Vec<String>> = data
@@ -341,7 +341,7 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
     let sanitized_headers: Vec<String> = headers
         .iter()
         .enumerate()
-        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .map(|(i, h)| sanitize_header_for_output(h, i, false))
         .collect();
 
     let layout = build_table_layout(&sanitized_headers, data);

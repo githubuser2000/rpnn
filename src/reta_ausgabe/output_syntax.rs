@@ -11,36 +11,22 @@ pub enum OutputSyntax {
     Nichts,
 }
 
-impl Default for OutputSyntax {
-    fn default() -> Self {
-        Self::Plain
-    }
-}
-
 impl OutputSyntax {
     pub fn from_art_value(value: &str) -> Option<Self> {
-        match value.trim().to_lowercase().as_str() {
+        match value.trim() {
             "shell" => Some(Self::Plain),
-            "markdown" => Some(Self::Markdown),
-            "bbcode" => Some(Self::BBCode),
             "html" => Some(Self::HTML),
+            "bbcode" => Some(Self::BBCode),
             "csv" => Some(Self::CSV),
+            "markdown" => Some(Self::Markdown),
             "emacs" => Some(Self::Emacs),
             "nichts" => Some(Self::Nichts),
             _ => None,
         }
     }
 
-    pub fn as_art_name(self) -> &'static str {
-        match self {
-            Self::Plain => "shell",
-            Self::Markdown => "markdown",
-            Self::BBCode => "bbcode",
-            Self::HTML => "html",
-            Self::CSV => "csv",
-            Self::Emacs => "emacs",
-            Self::Nichts => "nichts",
-        }
+    pub fn uses_terminal_colors(self) -> bool {
+        matches!(self, Self::Plain)
     }
 
     pub fn begin_table(self) -> &'static str {
@@ -53,7 +39,7 @@ impl OutputSyntax {
 
     pub fn end_table(self) -> &'static str {
         match self {
-            Self::HTML => "</table>\n",
+            Self::HTML => "</table>",
             Self::BBCode => "[/table]",
             _ => "",
         }
@@ -68,8 +54,8 @@ impl OutputSyntax {
         match self {
             Self::HTML => "<td>".to_string(),
             Self::BBCode => "[td]".to_string(),
-            Self::Markdown | Self::Emacs => "|".to_string(),
-            _ => String::new(),
+            Self::Markdown => "|".to_string(),
+            _ => "".to_string(),
         }
     }
 
@@ -87,13 +73,10 @@ impl OutputSyntax {
 
     pub fn end_zeile(self) -> &'static str {
         match self {
-            Self::HTML => "</tr>\n",
-            Self::BBCode => "[/tr]\n",
+            Self::HTML => "</tr>",
+            Self::BBCode => "[/tr]",
+            Self::Markdown => "|",
             _ => "\n",
         }
-    }
-
-    pub fn uses_terminal_colors(self) -> bool {
-        matches!(self, Self::Plain)
     }
 }

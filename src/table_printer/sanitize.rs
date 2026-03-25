@@ -68,3 +68,24 @@ pub fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String 
 
     trimmed.to_string()
 }
+
+
+pub fn sanitize_header_for_output(header: &str, global_index: usize, structured: bool) -> String {
+    let trimmed = header.trim();
+
+    if trimmed.is_empty() {
+        return format!("SQL-Spalte {}", global_index + 1);
+    }
+
+    if !structured {
+        return trimmed.to_string();
+    }
+
+    if let Some(pos) = trimmed.rfind(" (ID_") {
+        if trimmed.ends_with(')') {
+            return trimmed[..pos].trim_end().to_string();
+        }
+    }
+
+    trimmed.to_string()
+}

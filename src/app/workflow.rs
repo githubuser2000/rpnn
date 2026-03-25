@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::env;
+
 use crate::domain::categories::lade_kategorie_map;
 use crate::data_access::csv_importer::import_csvs_to_sqlite;
 use crate::table_printer::query_column_by_index;
@@ -11,13 +11,14 @@ use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
 
     if args.len() == 1 {
         show_usage();
         return Ok(());
     }
 
+    let proj_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let kategorie_map = lade_kategorie_map();
     let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
     let (mut bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
@@ -52,7 +53,6 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         unter0: spalten_namen.unterkategorie.clone(),
     };
 
-    let proj_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let pfad1 = proj_path.to_string_lossy().into_owned() + "/csv/religion.csv";
     let pfad2 = proj_path.to_string_lossy().into_owned() + "/csv/merged_filtered.csv";
     let dateien = [pfad1, pfad2];

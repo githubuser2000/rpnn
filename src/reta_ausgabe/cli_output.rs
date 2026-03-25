@@ -221,31 +221,35 @@ impl<'a> CliOutput<'a> {
     }
 
     fn html_row_style(line_num: i32) -> &'static str {
-        let n = line_num.max(0);
-        let number_type = Self::prim_creativity_type(n);
-
-        if n == 0 {
-            "background-color:#ff2222;color:#002222;"
-        } else if number_type == 1 {
-            if n % 2 == 0 {
-                "background-color:#66ff66;color:#000000;"
-            } else {
-                "background-color:#009900;color:#ffffff;"
+        match line_num.max(0) {
+            0 => "background-color:#ff2222;color:#002222;",
+            1 => "background-color:#555500;color:#aaaaff;",
+            2 => "background-color:#66ff66;color:#000000;",
+            3 => "background-color:#009900;color:#ffffff;",
+            n => {
+                let number_type = Self::prim_creativity_type(n);
+                if number_type == 1 {
+                    if n % 2 == 0 {
+                        "background-color:#66ff66;color:#000000;"
+                    } else {
+                        "background-color:#009900;color:#ffffff;"
+                    }
+                } else if number_type == 2 || n == 1 {
+                    if n % 2 == 0 {
+                        "background-color:#ffff66;color:#000099;"
+                    } else {
+                        "background-color:#555500;color:#aaaaff;"
+                    }
+                } else if n % 2 == 0 {
+                    "background-color:#9999ff;color:#202000;"
+                } else {
+                    "background-color:#000099;color:#ffff66;"
+                }
             }
-        } else if number_type == 2 || n == 1 {
-            if n % 2 == 0 {
-                "background-color:#ffff66;color:#000099;"
-            } else {
-                "background-color:#555500;color:#aaaaff;"
-            }
-        } else if n % 2 == 0 {
-            "background-color:#9999ff;color:#202000;"
-        } else {
-            "background-color:#000099;color:#ffff66;"
         }
     }
 
-    fn html_cell_attrs(row_line_num: i32, col_idx: usize, content: &str) -> String {
+    fn html_cell_attrs(row_line_num: i32, col_idx: usize, _content: &str) -> String {
         if row_line_num == 0 {
             return match col_idx {
                 0 => " class=\"z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_\" style=\"background-color:#ffffff;color:#000000;\"".to_string(),
@@ -254,12 +258,8 @@ impl<'a> CliOutput<'a> {
             };
         }
 
-        if col_idx == 0 || col_idx == 1 {
-            if content.parse::<i32>().ok().map(|n| n % 2 == 0).unwrap_or(false) {
-                " style=\"background-color:#000000;color:#ffffff;\"".to_string()
-            } else {
-                " style=\"background-color:#ffffff;color:#000000;\"".to_string()
-            }
+        if col_idx == 0 {
+            " style=\"background-color:#ffffff;color:#000000;\"".to_string()
         } else {
             String::new()
         }
@@ -282,7 +282,7 @@ impl<'a> CliOutput<'a> {
                     .map(|(col_idx, cell)| {
                         let attrs = Self::html_cell_attrs(row_line_num, col_idx, cell);
                         let content = Self::html_display_cell_content(row_line_num, col_idx, cell);
-                        format!(" <td{}> {} </td>", attrs, content)
+                        format!("<td{}> {} </td>", attrs, content)
                     })
                     .collect::<Vec<_>>()
                     .join("");
