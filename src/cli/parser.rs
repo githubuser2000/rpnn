@@ -61,13 +61,10 @@ pub fn parse_cli_args(
             bereich.spaltenreihenfolgeundnurdiese =
                 parse_usize_csv_list(value, "--spaltenreihenfolgeundnurdiese");
         } else if let Some(value) = arg.strip_prefix("--art=") {
-            bereich.output_syntax = OutputSyntax::from_art_value(value).unwrap_or_else(|| {
-                panic!(
-                    "Ungültiger Wert für --art: '{}'. Erlaubt sind: shell, html, bbcode, csv, markdown, emacs, nichts",
-                    value
-                )
-            });
-        } else {
+            if let Some(out) = OutputSyntax::from_art_value(value) {
+    bereich.output_syntax = out;
+}
+       } else {
             match arg.as_str() {
                 "--vorhervonausschnitt" => {
                     if let Some((_, nachfolger)) = iter.next() {
@@ -140,16 +137,13 @@ pub fn parse_cli_args(
                 }
                 "--art" => {
                     if let Some((_, nachfolger)) = iter.next() {
-                        bereich.output_syntax = OutputSyntax::from_art_value(nachfolger)
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "Ungültiger Wert für --art: '{}'. Erlaubt sind: shell, html, bbcode, csv, markdown, emacs, nichts",
-                                    nachfolger
-                                )
-                            });
-                    } else {
-                        panic!("--art erwartet genau einen Wert");
-                    }
+                        if let Some(out) = OutputSyntax::from_art_value(nachfolger) {
+    bereich.output_syntax = out;
+}
+                   
+    } else {
+        panic!("--art erwartet genau einen Wert");
+    }
                 }
                 "--breiten" => {
                     if let Some((_, nachfolger)) = iter.next() {
