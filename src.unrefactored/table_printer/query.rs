@@ -6,7 +6,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::cli::TextBereich;
 use crate::column_manager::{build_column_query, get_column_names};
-use crate::data_access::fetch_data_with_stats;
+use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
