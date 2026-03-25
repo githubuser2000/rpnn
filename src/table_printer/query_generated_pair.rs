@@ -341,6 +341,8 @@ pub fn query_column_by_index(
         &bereich.breiten,
         &original_line_numbers,
         bereich.drops_empty_content(),
+        bereich.output_syntax,
+        bereich.pretty_output,
     );
     Ok(bereich)
 }

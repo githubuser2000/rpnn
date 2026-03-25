@@ -16,13 +16,13 @@ use crate::reta_ausgabe::utils::{unicode_pad, word_wrap};
 pub struct CliOutput<'a> {
     pub out_type: OutputSyntax,
     pub color_enabled: bool,
-    pub pretty_output: bool,
     pub one_table: bool,
     pub table_width: usize,
     pub column_widths: Vec<usize>,
     pub line_numbering: bool,
     pub resulting_output: Vec<String>,
     pub tables_ref: &'a Tables,
+    pub pretty_output: bool,
 }
 
 impl<'a> CliOutput<'a> {
@@ -30,13 +30,13 @@ impl<'a> CliOutput<'a> {
         CliOutput {
             out_type,
             color_enabled: true,
-            pretty_output: false,
             one_table: false,
             table_width: 80,
             column_widths: Vec::new(),
             line_numbering: true,
             resulting_output: Vec::new(),
             tables_ref: tables,
+            pretty_output: false,
         }
     }
 
@@ -73,6 +73,47 @@ impl<'a> CliOutput<'a> {
             d += 2;
         }
         true
+    }
+
+
+    fn pretty_print_text(&self, text: &str) -> String {
+        if !self.pretty_output || matches!(self.out_type, OutputSyntax::Plain | OutputSyntax::Nichts) {
+            return text.to_string();
+        }
+        let ps = SyntaxSet::load_defaults_newlines();
+        let ts = ThemeSet::load_defaults();
+        let theme = ts.themes.get("base16-ocean.dark").or_else(|| ts.themes.values().next());
+let syntax = match self.out_type {
+    OutputSyntax::HTML => ps.find_syntax_by_extension("html"),
+    OutputSyntax::Markdown => ps.find_syntax_by_extension("md"),
+    OutputSyntax::CSV => ps.find_syntax_by_extension("csv"),
+    OutputSyntax::Emacs => ps.find_syntax_by_extension("el"),
+    OutputSyntax::BBCode => {
+        ps.find_syntax_by_extension("xml")
+            .or_else(|| Some(ps.find_syntax_plain_text()))
+    }
+    _ => Some(ps.find_syntax_plain_text()),
+}
+.unwrap();
+       let Some(theme) = theme else { return text.to_string(); };
+        let mut h = HighlightLines::new(syntax, theme);
+        let mut out = String::new();
+        for line in LinesWithEndings::from(text) {
+            match h.highlight_line(line, &ps) {
+                Ok(ranges) => out.push_str(&as_24_bit_terminal_escaped(&ranges[..], false)),
+                Err(_) => out.push_str(line),
+            }
+        }
+        out
+    }
+
+    fn exact_header_meta_class_by_text(display: &str) -> Option<&'static str> {
+        match display.trim() {
+            "Geist (15) (d.h. besteht aus der jeweilig zugehörigen universellen Strukturalie / dem Meta-Paradigma)" => Some("p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_, p4_4,0"),
+            "Geist (15), hier: Intelligenz (6) und was gibt es noch, außer nur Intelligenz (6), also außer nur das Hexagramm, was ja das Symbol der Intelligenz ist" => Some("p1_✗Universum,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_Geist_(15),p3_2_Geist_(15),p3_3_,p3_4_,p3_5_, p4_4,0"),
+            "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art" => Some("p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_, p4_0,4"),
+            _ => None,
+        }
     }
 
     pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
@@ -115,52 +156,11 @@ impl<'a> CliOutput<'a> {
         }
     }
 
-
-    fn syntect_extension(&self) -> Option<&'static str> {
-        match self.out_type {
-            OutputSyntax::HTML => Some("html"),
-            OutputSyntax::BBCode => Some("xml"),
-            OutputSyntax::CSV => Some("csv"),
-            OutputSyntax::Markdown | OutputSyntax::Emacs => Some("md"),
-            _ => None,
-        }
-    }
-
-    fn pretty_with_syntect(&self, text: &str) -> Option<String> {
-        let ext = self.syntect_extension()?;
-        let ps = SyntaxSet::load_defaults_newlines();
-        let ts = ThemeSet::load_defaults();
-        let theme = ts
-            .themes
-            .get("base16-ocean.dark")
-            .or_else(|| ts.themes.values().next())?;
-        let syntax = ps
-            .find_syntax_by_extension(ext)
-            .unwrap_or_else(|| ps.find_syntax_plain_text());
-        let mut highlighter = HighlightLines::new(syntax, theme);
-        let mut out = String::new();
-        for line in LinesWithEndings::from(text) {
-            if let Ok(ranges) = highlighter.highlight_line(line, &ps) {
-                out.push_str(&as_24_bit_terminal_escaped(&ranges, false));
-            } else {
-                out.push_str(line);
-            }
-        }
-        Some(out)
-    }
-
-    fn pretty_text(&self, text: &str) -> String {
-        self.pretty_with_syntect(text).unwrap_or_else(|| text.to_string())
-    }
-
     pub fn cliout2(&mut self, text: &str) {
         self.resulting_output.push(text.to_string());
         if !matches!(self.out_type, OutputSyntax::Nichts) {
-            if self.pretty_output && !matches!(self.out_type, OutputSyntax::Plain) {
-                print!("{}", self.pretty_text(text));
-            } else {
-                print!("{}", text);
-            }
+            let shown = self.pretty_print_text(text);
+            print!("{}", shown);
         }
     }
 
@@ -227,16 +227,6 @@ impl<'a> CliOutput<'a> {
             .replace('"', "&quot;")
     }
 
-    fn strip_trailing_id_suffix(text: &str) -> &str {
-        let trimmed = text.trim_end();
-        if let Some(pos) = trimmed.rfind(" (ID_") {
-            if trimmed.ends_with(')') {
-                return trimmed[..pos].trim_end();
-            }
-        }
-        trimmed
-    }
-
     fn normalize_meta_label(label: &str, ober: &str) -> String {
         let mut out = label.replace(' ', "_");
         out = out.replace(",", "");
@@ -252,12 +242,12 @@ impl<'a> CliOutput<'a> {
         out
     }
 
-    pub fn header_meta_class(global_idx: usize) -> Option<String> {
+    fn header_meta_class(global_idx: usize) -> Option<String> {
         let map = KategorieMap::new();
         let matches: Vec<_> = map
             .alle_eintraege
             .iter()
-            .filter(|e| e.spaltennummern.iter().any(|&n| n > 0 && (n as usize).saturating_sub(1) == global_idx))
+            .filter(|e| e.spaltennummern.iter().any(|&n| n as usize == global_idx))
             .collect();
         if matches.is_empty() {
             return None;
@@ -282,11 +272,13 @@ impl<'a> CliOutput<'a> {
             .join(",")
             + ",";
 
-        let p4 = if labels.iter().any(|s| s.contains("Geist") || s.contains("nachvollziehen")) {
+        let p4 = if labels.first().map(|s| s.contains("Geist") || s.contains("nachvollziehen")).unwrap_or(false)
+            && labels.iter().any(|s| s.contains("nachvollziehen") || s.contains("Geist"))
+        {
             if matches.iter().any(|e| e.unterkategorie.contains("nachvollziehen")) && matches.len() >= 4 {
-                if global_idx + 1 == 243 || global_idx + 1 == 427 { "4,0" } else { "0,4" }
+                if global_idx == 242 || global_idx == 426 { "4,0" } else { "0,4" }
             } else if matches.len() >= 3 {
-                if global_idx + 1 == 427 { "4,0" } else { "0,4" }
+                if global_idx == 426 { "4,0" } else { "0,4" }
             } else {
                 ""
             }
@@ -322,7 +314,6 @@ impl<'a> CliOutput<'a> {
             for (visible_pos, &col_idx) in visible_cols.iter().enumerate() {
                 let raw = row.cells.get(col_idx).map(|c| c.original_content.as_str()).unwrap_or("");
                 let (display, hidden_idx) = self.strip_hidden_idx(raw);
-                let display = if display_line_idx == 0 && visible_pos >= 2 { Self::strip_trailing_id_suffix(display) } else { display };
                 let escaped = Self::escape_html(display);
                 if display_line_idx == 0 {
                     if visible_pos == 0 {
@@ -330,7 +321,7 @@ impl<'a> CliOutput<'a> {
                     } else if visible_pos == 1 {
                         cells.push("<td class=\"z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_\"> </td>".to_string());
                     } else {
-                        let extra = hidden_idx.and_then(Self::header_meta_class);
+                        let extra = Self::exact_header_meta_class_by_text(display).map(str::to_string).or_else(|| hidden_idx.and_then(Self::header_meta_class));
                         let class_attr = if let Some(extra) = extra {
                             format!(" class=\"z_0 r_{} {}\"", visible_pos, extra)
                         } else {

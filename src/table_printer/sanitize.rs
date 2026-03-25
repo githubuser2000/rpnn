@@ -82,14 +82,14 @@ pub fn sanitize_header_for_output(header: &str, global_index: usize, structured:
     }
 
     let mut out = trimmed.to_string();
-    while let Some(pos) = out.rfind(" (ID_") {
-        if out.ends_with(')') {
-            out = out[..pos].trim_end().to_string();
-        } else {
-            break;
+    loop {
+        if let Some(pos) = out.rfind(" (ID_") {
+            if out.ends_with(')') {
+                out = out[..pos].trim_end().to_string();
+                continue;
+            }
         }
+        break;
     }
-    return out;
-
-    trimmed.to_string()
+    out
 }

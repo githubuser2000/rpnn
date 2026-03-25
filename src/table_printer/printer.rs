@@ -53,12 +53,12 @@ pub fn print_table_chunked_with_line_numbers(
         let chunk_headers: Vec<String> = (start..end)
             .map(|global_i| {
                 let structured = !matches!(out_type, OutputSyntax::Plain);
-                let mut header = sanitize_header_for_output(&headers[global_i], global_i, structured);
-                if matches!(out_type, OutputSyntax::HTML) {
-                    header.push('\u{1f}');
-                    header.push_str(&format!("IDX:{}", global_i));
+                let base = sanitize_header_for_output(&headers[global_i], global_i, structured);
+                if structured {
+                    format!("{}\u{1f}IDX:{}", base, global_i + 1)
+                } else {
+                    sanitize_header_preserve_id(&headers[global_i], global_i)
                 }
-                header
             })
             .collect();
 
@@ -127,8 +127,8 @@ fn build_output<'a>(
     pretty_output: bool,
 ) -> CliOutput<'a> {
     let mut output = CliOutput::new(tables, out_type);
-    output.color_enabled = out_type.uses_terminal_colors();
     output.pretty_output = pretty_output;
+    output.color_enabled = out_type.uses_terminal_colors();
     output.table_width = render_width;
     output.column_widths = column_widths;
     output.line_numbering = line_numbering;
