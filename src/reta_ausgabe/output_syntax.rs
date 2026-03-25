@@ -20,13 +20,13 @@ impl Default for OutputSyntax {
 impl OutputSyntax {
     pub fn from_art_value(value: &str) -> Option<Self> {
         match value.trim().to_lowercase().as_str() {
-            "shell" | "plain" => Some(Self::Plain),
-            "markdown" | "md" => Some(Self::Markdown),
+            "shell" => Some(Self::Plain),
+            "markdown" => Some(Self::Markdown),
             "bbcode" => Some(Self::BBCode),
             "html" => Some(Self::HTML),
             "csv" => Some(Self::CSV),
-            "emacs" | "org" | "orgmode" => Some(Self::Emacs),
-            "nichts" | "nothing" | "none" => Some(Self::Nichts),
+            "emacs" => Some(Self::Emacs),
+            "nichts" => Some(Self::Nichts),
             _ => None,
         }
     }
@@ -45,7 +45,7 @@ impl OutputSyntax {
 
     pub fn begin_table(self) -> &'static str {
         match self {
-            Self::HTML => "<table>",
+            Self::HTML => "<table border=0 id=\"bigtable\">",
             Self::BBCode => "[table]",
             _ => "",
         }
@@ -53,18 +53,23 @@ impl OutputSyntax {
 
     pub fn end_table(self) -> &'static str {
         match self {
-            Self::HTML => "</table>",
+            Self::HTML => "</table>\n",
             Self::BBCode => "[/table]",
             _ => "",
         }
     }
 
-    pub fn generate_cell(self, _col_index: i32, _params: &HashMap<String, String>, _line_num: i32) -> String {
+    pub fn generate_cell(
+        self,
+        _col_index: i32,
+        _params: &HashMap<String, String>,
+        _line_num: i32,
+    ) -> String {
         match self {
             Self::HTML => "<td>".to_string(),
             Self::BBCode => "[td]".to_string(),
             Self::Markdown | Self::Emacs => "|".to_string(),
-            _ => "".to_string(),
+            _ => String::new(),
         }
     }
 
@@ -82,12 +87,9 @@ impl OutputSyntax {
 
     pub fn end_zeile(self) -> &'static str {
         match self {
-            Self::HTML => "</tr>
-",
-            Self::BBCode => "[/tr]
-",
-            Self::Markdown | Self::Emacs | Self::CSV | Self::Plain | Self::Nichts => "
-",
+            Self::HTML => "</tr>\n",
+            Self::BBCode => "[/tr]\n",
+            _ => "\n",
         }
     }
 

@@ -62,9 +62,9 @@ pub fn parse_cli_args(
                 parse_usize_csv_list(value, "--spaltenreihenfolgeundnurdiese");
         } else if let Some(value) = arg.strip_prefix("--art=") {
             if let Some(out) = OutputSyntax::from_art_value(value) {
-    bereich.output_syntax = out;
-}
-       } else {
+                bereich.output_syntax = out;
+            }
+        } else {
             match arg.as_str() {
                 "--vorhervonausschnitt" => {
                     if let Some((_, nachfolger)) = iter.next() {
@@ -138,12 +138,11 @@ pub fn parse_cli_args(
                 "--art" => {
                     if let Some((_, nachfolger)) = iter.next() {
                         if let Some(out) = OutputSyntax::from_art_value(nachfolger) {
-    bereich.output_syntax = out;
-}
-                   
-    } else {
-        panic!("--art erwartet genau einen Wert");
-    }
+                            bereich.output_syntax = out;
+                        }
+                    } else {
+                        panic!("--art erwartet genau einen Wert");
+                    }
                 }
                 "--breiten" => {
                     if let Some((_, nachfolger)) = iter.next() {

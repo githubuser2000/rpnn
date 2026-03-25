@@ -10,6 +10,7 @@ use crate::table_printer::sanitize::{
 };
 use crate::table_printer::table_utils::{
     build_table_layout,
+    compute_max_lengths,
     convert_to_table_rows,
     convert_to_table_rows_with_line_numbers,
     convert_to_table_rows_with_offset,
@@ -21,6 +22,57 @@ use crate::table_printer::widths::{
     get_explicit_width, stretch_last_column_to_fill_budget,
 };
 
+
+fn render_structured_single_table(
+    headers: &[String],
+    data: &[Vec<String>],
+    explizite_breiten: &[usize],
+    original_line_numbers: &[usize],
+    keineleereninhalte: bool,
+    out_type: OutputSyntax,
+) {
+    let sanitized_headers: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| sanitize_header_preserve_id(h, i))
+        .collect();
+
+    let (sanitized_data, sanitized_line_numbers) =
+        sanitize_chunk_data_with_rows(data, original_line_numbers, keineleereninhalte);
+
+    let (augmented_headers, augmented_data, meta_widths) =
+        prepend_meta_columns(&sanitized_headers, &sanitized_data, &sanitized_line_numbers);
+
+    let mut all_widths = compute_max_lengths(&augmented_headers, &augmented_data);
+
+    for (i, width) in meta_widths.iter().copied().enumerate() {
+        if i < all_widths.len() {
+            all_widths[i] = all_widths[i].max(width);
+        }
+    }
+
+    let data_offset = meta_widths.len();
+    for (data_idx, explicit) in explizite_breiten.iter().copied().enumerate() {
+        if explicit == 0 {
+            continue;
+        }
+        let target_idx = data_offset + data_idx;
+        if target_idx < all_widths.len() {
+            all_widths[target_idx] = explicit;
+        }
+    }
+
+    let render_width = all_widths.iter().sum::<usize>() + all_widths.len() * (COLUMN_OVERHEAD + 1) + 8;
+    let table_rows = convert_to_table_rows_with_line_numbers(
+        &augmented_headers,
+        &augmented_data,
+        &all_widths,
+        &sanitized_line_numbers,
+    );
+
+    render_rows(render_width, all_widths, &table_rows, false, out_type);
+}
+
 pub fn print_table_chunked_with_line_numbers(
     headers: &[String],
     data: &[Vec<String>],
@@ -29,6 +81,18 @@ pub fn print_table_chunked_with_line_numbers(
     keineleereninhalte: bool,
     out_type: OutputSyntax,
 ) {
+    if !matches!(out_type, OutputSyntax::Plain) {
+        render_structured_single_table(
+            headers,
+            data,
+            explizite_breiten,
+            original_line_numbers,
+            keineleereninhalte,
+            out_type,
+        );
+        return;
+    }
+
     let term_width = get_terminal_width();
     let available_total = term_width.saturating_sub(1);
     let render_width = available_total;
@@ -121,7 +185,7 @@ fn build_output<'a>(
     output.table_width = render_width;
     output.column_widths = column_widths;
     output.line_numbering = line_numbering;
-    output.one_table = true;
+    output.one_table = !matches!(out_type, OutputSyntax::Plain);
     output
 }
 
@@ -284,10 +348,10 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
     let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
     render_rows(
-    layout.term_width,
-    layout.column_widths,
-    &table_rows,
-    true,
-    OutputSyntax::Plain,
-);
+        layout.term_width,
+        layout.column_widths,
+        &table_rows,
+        true,
+        OutputSyntax::Plain,
+    );
 }

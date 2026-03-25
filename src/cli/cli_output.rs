@@ -1,4 +1,3 @@
-// src/reta_ausgabe/cli_output.rs
 use std::collections::{BTreeSet, HashMap};
 
 use colored::*;
@@ -23,9 +22,9 @@ pub struct CliOutput<'a> {
 
 impl<'a> CliOutput<'a> {
     pub fn new(tables: &'a Tables, out_type: OutputSyntax) -> Self {
-        CliOutput {
+        Self {
             out_type,
-            color_enabled: out_type.uses_terminal_colors(),
+            color_enabled: true,
             one_table: false,
             table_width: 80,
             column_widths: Vec::new(),
@@ -36,18 +35,23 @@ impl<'a> CliOutput<'a> {
     }
 
     fn is_perfect_power(n: i32) -> bool {
-        if n < 4 {
+        if n < 4 || n == 8 {
             return false;
         }
 
-        let n64 = n as i64;
-        let max_exp = 31 - (n as u32).leading_zeros();
-
-        for exp in 2..=max_exp {
-            let base = (n as f64).powf(1.0 / exp as f64).round() as i64;
-            if base > 1 && base.pow(exp) == n64 {
+        let mut base = 2i32;
+        while base.saturating_mul(base) <= n {
+            let mut value = base.saturating_mul(base);
+            while value < n {
+                match value.checked_mul(base) {
+                    Some(next) => value = next,
+                    None => break,
+                }
+            }
+            if value == n {
                 return true;
             }
+            base += 1;
         }
 
         false
@@ -71,8 +75,20 @@ impl<'a> CliOutput<'a> {
             }
             d += 2;
         }
-
         true
+    }
+
+    fn prim_creativity_type(n: i32) -> i32 {
+        if n <= 0 {
+            return 0;
+        }
+        if Self::is_perfect_power(n) {
+            1
+        } else if Self::is_prime(n) || n == 1 {
+            2
+        } else {
+            3
+        }
     }
 
     pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
@@ -122,7 +138,6 @@ impl<'a> CliOutput<'a> {
 
     pub fn cliout2(&mut self, text: &str) {
         self.resulting_output.push(text.to_string());
-
         if !matches!(self.out_type, OutputSyntax::Nichts) {
             print!("{}", text);
         }
@@ -133,7 +148,11 @@ impl<'a> CliOutput<'a> {
     }
 
     fn wrapped_cell_lines(&self, cell: &TableCell, width: usize) -> Vec<String> {
-        word_wrap(&cell.original_content, width)
+        if matches!(self.out_type, OutputSyntax::Plain) {
+            word_wrap(&cell.original_content, width)
+        } else {
+            vec![cell.original_content.clone()]
+        }
     }
 
     fn row_wrapped_lines(&self, row: &TableRow, visible_col_indices: &[usize]) -> Vec<Vec<String>> {
@@ -182,7 +201,6 @@ impl<'a> CliOutput<'a> {
             .replace('<', "&lt;")
             .replace('>', "&gt;")
             .replace('"', "&quot;")
-            .replace('\'', "&#39;")
     }
 
     fn escape_markdown(text: &str) -> String {
@@ -198,28 +216,77 @@ impl<'a> CliOutput<'a> {
         }
     }
 
-    fn format_cell_content(&self, content: &str) -> String {
-        match self.out_type {
-            OutputSyntax::HTML => Self::escape_html(content),
-            OutputSyntax::Markdown | OutputSyntax::Emacs => Self::escape_markdown(content),
-            OutputSyntax::CSV => Self::escape_csv(content),
-            _ => content.to_string(),
-        }
-    }
-
     fn line_number_title(&self) -> &'static str {
         "Z"
     }
 
-    fn render_structured_row(&self, cells: &[String]) -> String {
+    fn html_row_style(line_num: i32) -> &'static str {
+        let n = line_num.max(0);
+        let number_type = Self::prim_creativity_type(n);
+
+        if n == 0 {
+            "background-color:#ff2222;color:#002222;"
+        } else if number_type == 1 {
+            if n % 2 == 0 {
+                "background-color:#66ff66;color:#000000;"
+            } else {
+                "background-color:#009900;color:#ffffff;"
+            }
+        } else if number_type == 2 || n == 1 {
+            if n % 2 == 0 {
+                "background-color:#ffff66;color:#000099;"
+            } else {
+                "background-color:#555500;color:#aaaaff;"
+            }
+        } else if n % 2 == 0 {
+            "background-color:#9999ff;color:#202000;"
+        } else {
+            "background-color:#000099;color:#ffff66;"
+        }
+    }
+
+    fn html_cell_attrs(row_line_num: i32, col_idx: usize, content: &str) -> String {
+        if row_line_num == 0 {
+            return match col_idx {
+                0 => " class=\"z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_\" style=\"background-color:#ffffff;color:#000000;\"".to_string(),
+                1 => " class=\"z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_\"".to_string(),
+                _ => format!(" class=\"z_0 r_{}\"", col_idx),
+            };
+        }
+
+        if col_idx == 0 || col_idx == 1 {
+            if content.parse::<i32>().ok().map(|n| n % 2 == 0).unwrap_or(false) {
+                " style=\"background-color:#000000;color:#ffffff;\"".to_string()
+            } else {
+                " style=\"background-color:#ffffff;color:#000000;\"".to_string()
+            }
+        } else {
+            String::new()
+        }
+    }
+
+    fn html_display_cell_content(row_line_num: i32, col_idx: usize, content: &str) -> String {
+        if row_line_num == 0 && (col_idx == 0 || col_idx == 1) {
+            String::new()
+        } else {
+            Self::escape_html(content)
+        }
+    }
+
+    fn render_structured_row(&self, row_line_num: i32, cells: &[String]) -> String {
         match self.out_type {
             OutputSyntax::HTML => {
                 let inner = cells
                     .iter()
-                    .map(|cell| format!("<td>{}</td>", Self::escape_html(cell)))
+                    .enumerate()
+                    .map(|(col_idx, cell)| {
+                        let attrs = Self::html_cell_attrs(row_line_num, col_idx, cell);
+                        let content = Self::html_display_cell_content(row_line_num, col_idx, cell);
+                        format!(" <td{}> {} </td>", attrs, content)
+                    })
                     .collect::<Vec<_>>()
                     .join("");
-                format!("<tr>{}</tr>\n", inner)
+                format!("<tr style=\"{}\">{}</tr>\n", Self::html_row_style(row_line_num), inner)
             }
             OutputSyntax::BBCode => {
                 let inner = cells
@@ -275,7 +342,7 @@ impl<'a> CliOutput<'a> {
         }
 
         let mut display_lines_list: Vec<usize> = finally_display_lines.iter().copied().collect();
-        display_lines_list.sort();
+        display_lines_list.sort_unstable();
 
         for &display_line_idx in &display_lines_list {
             let Some(row) = table.get(display_line_idx) else {
@@ -315,8 +382,7 @@ impl<'a> CliOutput<'a> {
                         } else {
                             "     ".to_string()
                         };
-                        let colored_num = self.colorize(&shown, row.original_line_num, false);
-                        plain_parts.push(colored_num);
+                        plain_parts.push(self.colorize(&shown, row.original_line_num, false));
                     } else {
                         raw_cells.push(num_str);
                     }
@@ -344,8 +410,7 @@ impl<'a> CliOutput<'a> {
                         plain_parts.push(colored);
                         plain_parts.push(" ".to_string());
                     } else {
-                        let _ = width;
-                        raw_cells.push(self.format_cell_content(content));
+                        raw_cells.push(content.to_string());
                     }
                 }
 
@@ -366,12 +431,8 @@ impl<'a> CliOutput<'a> {
                         full_line.push_str(self.out_type.end_zeile());
                         self.cliout2(&full_line);
                     }
-                    OutputSyntax::Markdown
-                    | OutputSyntax::Emacs
-                    | OutputSyntax::HTML
-                    | OutputSyntax::BBCode
-                    | OutputSyntax::CSV => {
-                        let row_text = self.render_structured_row(&raw_cells);
+                    OutputSyntax::Markdown | OutputSyntax::Emacs | OutputSyntax::HTML | OutputSyntax::BBCode | OutputSyntax::CSV => {
+                        let row_text = self.render_structured_row(row.original_line_num, &raw_cells);
                         self.cliout2(&row_text);
 
                         if display_line_idx == 0 && subline_idx == 0 {

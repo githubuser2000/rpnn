@@ -31,6 +31,8 @@ pub struct TextBereich {
     pub spaltenreihenfolgeundnurdiese: Vec<usize>,
     pub breiten: Vec<usize>,
     pub output_syntax: OutputSyntax,
+    pub output_one_table: bool,
+    pub output_unbounded_width: bool,
     pub column_request_state: ColumnRequestState,
     pub exact_generated_befehle: BTreeSet<String>,
     pub exact_modal_pairs: Vec<(usize, usize)>,
@@ -97,6 +99,24 @@ impl TextBereich {
     pub fn fraction_inputs_visible(&self) -> bool {
         self.pypy_compat.fraction_input_visibility.inputs_visible()
     }
+
+    pub fn apply_output_syntax_effects(&mut self) {
+        self.output_one_table = matches!(
+            self.output_syntax,
+            OutputSyntax::Markdown
+                | OutputSyntax::BBCode
+                | OutputSyntax::HTML
+                | OutputSyntax::CSV
+                | OutputSyntax::Emacs
+                | OutputSyntax::Nichts
+        );
+
+        self.output_unbounded_width = match self.output_syntax {
+            OutputSyntax::CSV | OutputSyntax::Markdown | OutputSyntax::Emacs => true,
+            OutputSyntax::HTML | OutputSyntax::BBCode => self.breiten.is_empty(),
+            OutputSyntax::Plain | OutputSyntax::Nichts => false,
+        };
+    }
 }
 
 impl Default for TextBereich {
@@ -113,6 +133,8 @@ impl Default for TextBereich {
             spaltenreihenfolgeundnurdiese: Vec::new(),
             breiten: Vec::new(),
             output_syntax: OutputSyntax::default(),
+            output_one_table: false,
+            output_unbounded_width: false,
             column_request_state: ColumnRequestState::default(),
             exact_generated_befehle: BTreeSet::new(),
             exact_modal_pairs: Vec::new(),
