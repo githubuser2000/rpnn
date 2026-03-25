@@ -84,9 +84,7 @@ fn verarbeite_automatische_spalten(
         ) {
             println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
 
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
 
             return Ok(());
         }
@@ -107,9 +105,7 @@ fn verarbeite_automatische_spalten(
 
             let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
             self.setze_gefundene_spalten(bereich, required)?;
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
             return Ok(());
         }
 
@@ -159,9 +155,7 @@ fn verarbeite_automatische_spalten(
 
                     let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
                     self.setze_gefundene_spalten(bereich, required)?;
-                    bereich.spalten_gefunden = true;
-                    bereich.spalten_gesucht = true;
-                    bereich.spalten_gesucht2 = false;
+                    bereich.mark_columns_resolved();
                 } else {
                     self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
                 }
@@ -221,9 +215,7 @@ fn fallback_zu_standards(
     bereich.von_spalte = usize::MAX;
     bereich.bis_spalte = usize::MAX;
 
-    bereich.spalten_gefunden = false;
-    bereich.spalten_gesucht = false;
-    bereich.spalten_gesucht2 = false;
+    bereich.reset_column_request();
 
     Ok(())
 }

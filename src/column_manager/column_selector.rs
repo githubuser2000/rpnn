@@ -15,7 +15,7 @@ pub fn collect_spalten_nummern(
     let mut nums = Vec::new();
 
     if !bereich.spalten_bereiche.is_empty() {
-        bereich.spalten_gefunden = true;
+        bereich.mark_columns_resolved();
 
         for &(von, bis) in &bereich.spalten_bereiche {
             for i in von..=bis {
@@ -30,7 +30,7 @@ pub fn collect_spalten_nummern(
             nums.push(i);
         }
     } else {
-        if bereich.spalten_gesucht2 {
+        if bereich.columns_pending() {
             return Err("Spalten wurden gesucht, aber keine verarbeitet".into());
         }
         nums.push(1);

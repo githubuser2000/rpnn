@@ -82,9 +82,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         bereich.exact_visible_columns.dedup();
         bereich.spalten_bereiche.sort_unstable();
         bereich.spalten_bereiche.dedup();
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = true;
-        bereich.spalten_gesucht2 = false;
+        bereich.mark_columns_resolved();
         true
     }
 
@@ -124,9 +122,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
             &spalten_namen.oberkategorie,
             &spalten_namen.unterkategorie,
         ) {
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
             return Ok(());
         }
 
@@ -137,9 +133,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
 
         if !direkte_spalten.is_empty() {
             self.setze_gefundene_spalten(bereich, direkte_spalten)?;
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
             return Ok(());
         }
 
@@ -150,9 +144,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
             if !inference.required_columns.is_empty() {
                 self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
             }
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
             return Ok(());
         }
 
@@ -198,9 +190,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
             bereich.spaltenreihenfolgeundnurdiese.dedup();
 
             self.finalize_found_columns(bereich);
-            bereich.spalten_gefunden = true;
-            bereich.spalten_gesucht = true;
-            bereich.spalten_gesucht2 = false;
+            bereich.mark_columns_resolved();
             return Ok(());
         }
         if !alle_gefundene_spalten.is_empty() {
@@ -218,9 +208,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
                 if !inference.required_columns.is_empty() {
                     self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
                 }
-                bereich.spalten_gefunden = true;
-                bereich.spalten_gesucht = true;
-                bereich.spalten_gesucht2 = false;
+                bereich.mark_columns_resolved();
             } else {
                 self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
             }
@@ -274,9 +262,11 @@ fn setze_gefundene_spalten(
         bereich.bis_spalte = usize::MAX;
     }
 
-    bereich.spalten_gefunden = !sorted.is_empty();
-    bereich.spalten_gesucht = !sorted.is_empty();
-    bereich.spalten_gesucht2 = false;
+    if sorted.is_empty() {
+        bereich.reset_column_request();
+    } else {
+        bereich.mark_columns_resolved();
+    }
 
     Ok(())
 }
@@ -292,9 +282,7 @@ fn fallback_zu_standards(
     bereich.von_spalte = usize::MAX;
     bereich.bis_spalte = usize::MAX;
 
-    bereich.spalten_gefunden = false;
-    bereich.spalten_gesucht = false;
-    bereich.spalten_gesucht2 = false;
+    bereich.reset_column_request();
 
     Ok(())
 }

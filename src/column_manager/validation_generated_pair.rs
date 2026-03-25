@@ -78,11 +78,11 @@ fn validate_spalten_input_inner(
     bereich: &TextBereich,
     generated_pair_detected: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !bereich.spalten_gesucht {
+    if !bereich.columns_requested() {
         return Err("Kein Spalten-Input angegeben".into());
     }
 
-    if bereich.spalten_gesucht2
+    if bereich.columns_pending()
         && bereich.spalten_bereiche.is_empty()
         && !generated_pair_detected
     {

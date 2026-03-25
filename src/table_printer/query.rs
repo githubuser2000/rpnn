@@ -52,7 +52,7 @@ fn expand_bereich_rows(
     conn: &Connection,
     bereich: &mut TextBereich,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !bereich.vorher_vielfache && !bereich.vorher_primfaktoren {
+    if !bereich.expands_with_multiples() && !bereich.expands_with_prime_factors() {
         return Ok(());
     }
 
@@ -82,7 +82,7 @@ fn expand_bereich_rows(
     let mut result: BTreeSet<usize> = basis.clone();
     let mut prims: BTreeSet<usize> = BTreeSet::new();
 
-    if bereich.vorher_primfaktoren {
+    if bereich.expands_with_prime_factors() {
         for &n in &basis {
             for (p, _) in prime_factors(n as i64) {
                 if p > 0 {
@@ -93,9 +93,9 @@ fn expand_bereich_rows(
         result.extend(prims.iter().copied());
     }
 
-    if bereich.vorher_vielfache {
+    if bereich.expands_with_multiples() {
         let mut multiple_sources: BTreeSet<usize> = basis.clone();
-        if bereich.vorher_primfaktoren {
+        if bereich.expands_with_prime_factors() {
             multiple_sources.extend(prims.iter().copied());
         }
 
@@ -336,7 +336,7 @@ pub fn query_column_by_index(
     let is_generated_mode = wants_generated;
 
     let (query, headers): (String, Vec<String>) = if is_generated_mode {
-        bereich.spalten_gefunden = true;
+        bereich.mark_columns_resolved();
         (
             build_full_table_row_query(&column_names, &bereich),
             sanitize_headers(&column_names),
@@ -346,7 +346,7 @@ pub fn query_column_by_index(
         (query, sanitize_headers(&headers))
     };
 
-    if !bereich.spalten_gefunden {
+    if !bereich.columns_resolved() {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
@@ -397,7 +397,7 @@ pub fn query_column_by_index(
         &final_data,
         &bereich.breiten,
         &original_line_numbers,
-        bereich.keineleereninhalte,
+        bereich.drops_empty_content(),
     );
 
     Ok(bereich)

@@ -268,14 +268,14 @@ pub fn query_column_by_index(
     let (query, headers): (String, Vec<String>) =
         if requires_full_table_for_generated(generated_befehle) {
             println!("ℹ️ Generierte-Spalten-Sonderpfad: lade Volltabelle für Generator");
-            bereich.spalten_gefunden = true;
+            bereich.mark_columns_resolved();
             (build_full_table_row_query(&column_names), column_names.clone())
         } else {
             build_column_query(&column_names, &mut bereich)?
         };
 
     println!("Headerslänge vor Sortierung: {}", headers.len());
-    if !bereich.spalten_gefunden {
+    if !bereich.columns_resolved() {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
@@ -340,7 +340,7 @@ pub fn query_column_by_index(
         &final_data,
         &bereich.breiten,
         &original_line_numbers,
-        bereich.keineleereninhalte,
+        bereich.drops_empty_content(),
     );
     Ok(bereich)
 }

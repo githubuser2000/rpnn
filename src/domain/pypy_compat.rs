@@ -415,7 +415,7 @@ pub fn apply_pypy_compat(
         if !appended.is_empty() {
         let mut combined = existing_selected;
 
-        if !bereich.pypy_compat.hidden_fraction_inputs {
+        if bereich.fraction_inputs_visible() {
             combined.extend(appended.iter().copied());
             combined.sort_unstable();
             combined.dedup();
@@ -423,7 +423,7 @@ pub fn apply_pypy_compat(
 
         bereich.spalten_bereiche = combined.iter().map(|&col| (col, col)).collect();
 
-        if !bereich.pypy_compat.hidden_fraction_inputs {
+        if bereich.fraction_inputs_visible() {
             let mut visible = bereich.exact_visible_columns.clone();
             visible.extend(appended.iter().copied());
             visible.sort_unstable();
@@ -433,7 +433,7 @@ pub fn apply_pypy_compat(
 
         if had_explicit_order {
             let mut merged = explicit_order_before.clone();
-            if !bereich.pypy_compat.hidden_fraction_inputs {
+            if bereich.fraction_inputs_visible() {
                 merged.extend(appended.iter().copied());
                 merged.sort_unstable();
                 merged.dedup();
@@ -454,9 +454,11 @@ pub fn apply_pypy_compat(
             bereich.bis_spalte = usize::MAX;
         }
 
-        bereich.spalten_gefunden = !combined.is_empty();
-        bereich.spalten_gesucht = !combined.is_empty();
-        bereich.spalten_gesucht2 = false;
+        if combined.is_empty() {
+            bereich.reset_column_request();
+        } else {
+            bereich.mark_columns_resolved();
+        }
     }
     Ok(())
 }

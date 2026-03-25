@@ -77,8 +77,12 @@ pub fn parse_cli_args(
                             zeilentext.pop();
                         }
 
-                        bereich.vorher_vielfache |= vielfache;
-                        bereich.vorher_primfaktoren |= primfaktoren;
+                        if vielfache {
+                            bereich.enable_row_expansion_multiples();
+                        }
+                        if primfaktoren {
+                            bereich.enable_row_expansion_prime_factors();
+                        }
 
                         if is_zeilen_angabe(&zeilentext) {
                             if let Some(bereichspaare) =
@@ -116,7 +120,7 @@ pub fn parse_cli_args(
                     }
                 }
                 "--keineleereninhalte" => {
-                    bereich.keineleereninhalte = true;
+                    bereich.enable_empty_content_filter();
                 }
                 "--breiten" => {
                     if let Some((_, nachfolger)) = iter.next() {
@@ -172,8 +176,7 @@ pub fn parse_cli_args(
                         unterkategorie: second,
                     });
 
-                    bereich.spalten_gesucht = true;
-                    bereich.spalten_gesucht2 = true;
+                    bereich.mark_columns_requested();
                 }
                 "--spaltenreihenfolgeundnurdiese" => {
                     if let Some((_, nachfolger)) = iter.next() {
@@ -212,7 +215,7 @@ pub fn parse_cli_args(
                         if let Ok(zahl) = nachfolger.parse::<usize>() {
                             bereich.von_spalte = zahl;
                             bereich.spalten_bereiche.push((zahl, zahl));
-                            bereich.spalten_gesucht = true;
+                            bereich.mark_columns_requested();
                         }
                     }
                 }
@@ -222,7 +225,7 @@ pub fn parse_cli_args(
                             bereich.bis_spalte = zahl;
                             if let Some(last) = bereich.spalten_bereiche.last_mut() {
                                 last.1 = zahl;
-                                bereich.spalten_gesucht = true;
+                                bereich.mark_columns_requested();
                             }
                         }
                     }
@@ -292,9 +295,7 @@ pub fn parse_cli_args(
             bereich.exact_visible_columns.clear();
             bereich.von_spalte = usize::MAX;
             bereich.bis_spalte = usize::MAX;
-            bereich.spalten_gefunden = false;
-            bereich.spalten_gesucht = false;
-            bereich.spalten_gesucht2 = false;
+            bereich.reset_column_request();
         }
     }
 

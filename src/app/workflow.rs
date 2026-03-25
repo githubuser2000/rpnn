@@ -43,7 +43,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
             bereich.pypy_compat.gebrochengalaxie.insert(n);
             bereich.pypy_compat.gebrochenuniversum.insert(n);
         }
-        bereich.pypy_compat.hidden_fraction_inputs = true;
+        bereich.hide_fraction_inputs();
     }
 
     let parameters_main = ParametersMain {

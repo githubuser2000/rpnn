@@ -349,9 +349,7 @@ pub fn verarbeite_kategorien(
     );
 
     if fraction_requested || kombi_requested {
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = true;
-        bereich.spalten_gesucht2 = false;
+        bereich.mark_columns_resolved();
     }
 
     let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
@@ -360,9 +358,7 @@ pub fn verarbeite_kategorien(
     );
 
     if !gefundene_spalten.is_empty() {
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = true;
-        bereich.spalten_gesucht2 = false;
+        bereich.mark_columns_resolved();
 
         // Nicht nur beim ersten Treffer setzen, sondern weitere exakte Treffer
         // an bestehende Auswahl anhängen.
@@ -396,13 +392,11 @@ pub fn verarbeite_kategorien(
     ));
 
     if !generated_befehle.is_empty() {
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = false;
-        bereich.spalten_gesucht2 = false;
+        bereich.mark_columns_resolved();
         return Ok(generated_befehle);
     }
 
-    if bereich.spalten_gefunden {
+    if bereich.columns_resolved() {
         return Ok(generated_befehle);
     }
 
