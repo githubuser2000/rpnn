@@ -1,8 +1,8 @@
 use std::collections::{BTreeSet, HashMap};
 
 use colored::*;
-use unicode_width::UnicodeWidthStr;
 
+use crate::column_categories_complete::KategorieMap;
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
@@ -22,7 +22,7 @@ pub struct CliOutput<'a> {
 
 impl<'a> CliOutput<'a> {
     pub fn new(tables: &'a Tables, out_type: OutputSyntax) -> Self {
-        Self {
+        CliOutput {
             out_type,
             color_enabled: true,
             one_table: false,
@@ -35,25 +35,17 @@ impl<'a> CliOutput<'a> {
     }
 
     fn is_perfect_power(n: i32) -> bool {
-        if n < 4 || n == 8 {
+        if n < 4 {
             return false;
         }
-
-        let mut base = 2i32;
-        while base.saturating_mul(base) <= n {
-            let mut value = base.saturating_mul(base);
-            while value < n {
-                match value.checked_mul(base) {
-                    Some(next) => value = next,
-                    None => break,
-                }
-            }
-            if value == n {
+        let n64 = n as i64;
+        let max_exp = 31 - (n as u32).leading_zeros();
+        for exp in 2..=max_exp {
+            let base = (n as f64).powf(1.0 / exp as f64).round() as i64;
+            if base > 1 && base.pow(exp) == n64 {
                 return true;
             }
-            base += 1;
         }
-
         false
     }
 
@@ -67,7 +59,6 @@ impl<'a> CliOutput<'a> {
         if n % 2 == 0 {
             return false;
         }
-
         let mut d = 3;
         while d * d <= n {
             if n % d == 0 {
@@ -78,30 +69,15 @@ impl<'a> CliOutput<'a> {
         true
     }
 
-    fn prim_creativity_type(n: i32) -> i32 {
-        if n <= 0 {
-            return 0;
-        }
-        if Self::is_perfect_power(n) {
-            1
-        } else if Self::is_prime(n) || n == 1 {
-            2
-        } else {
-            3
-        }
-    }
-
     pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
         if !self.color_enabled {
             return text.to_string();
         }
-
         match self.out_type {
             OutputSyntax::Plain => {
                 if line_num == 0 {
                     return text.red().on_white().bold().to_string();
                 }
-
                 if is_empty {
                     return if line_num % 2 == 0 {
                         text.black().on_white().to_string()
@@ -109,7 +85,6 @@ impl<'a> CliOutput<'a> {
                         text.white().on_black().to_string()
                     };
                 }
-
                 if Self::is_perfect_power(line_num) {
                     return if line_num % 2 == 0 {
                         text.black().on_cyan().to_string()
@@ -117,7 +92,6 @@ impl<'a> CliOutput<'a> {
                         text.black().on_bright_cyan().to_string()
                     };
                 }
-
                 if Self::is_prime(line_num) {
                     return if line_num % 2 == 0 {
                         text.black().on_yellow().bold().to_string()
@@ -125,7 +99,6 @@ impl<'a> CliOutput<'a> {
                         text.black().on_bright_yellow().to_string()
                     };
                 }
-
                 if line_num % 2 == 0 {
                     text.black().on_white().to_string()
                 } else {
@@ -170,18 +143,12 @@ impl<'a> CliOutput<'a> {
     }
 
     fn visible_columns_for_row(&self, row: &TableRow) -> Vec<usize> {
-        if !matches!(self.out_type, OutputSyntax::Plain) {
-            return (0..row.cells.len()).collect();
-        }
-
         let numbering_width = if self.line_numbering { 5 } else { 0 };
         let mut total_width = numbering_width;
         let mut visible = Vec::new();
-
         for col_idx in 0..row.cells.len() {
             let width = self.effective_width_for_col(col_idx, self.table_width);
             let additional = width + 1;
-
             if self.one_table || total_width + additional < self.table_width {
                 visible.push(col_idx);
                 total_width += additional;
@@ -192,138 +159,138 @@ impl<'a> CliOutput<'a> {
                 break;
             }
         }
-
         visible
     }
 
-    fn escape_html(text: &str) -> String {
-        text.replace('&', "&amp;")
+    fn strip_hidden_idx<'b>(&self, s: &'b str) -> (&'b str, Option<usize>) {
+        if let Some((left, right)) = s.split_once('\u{1f}') {
+            if let Some(rest) = right.strip_prefix("IDX:") {
+                return (left, rest.parse::<usize>().ok());
+            }
+        }
+        (s, None)
+    }
+
+    fn escape_html(content: &str) -> String {
+        content
+            .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
             .replace('"', "&quot;")
     }
 
-    fn escape_markdown(text: &str) -> String {
-        text.replace('|', r"\|")
-    }
-
-    fn escape_csv(text: &str) -> String {
-        let needs_quotes = text.contains(';') || text.contains('\n') || text.contains('"');
-        if needs_quotes {
-            format!("\"{}\"", text.replace('"', "\"\""))
-        } else {
-            text.to_string()
+    fn normalize_meta_label(label: &str, ober: &str) -> String {
+        let mut out = label.replace(' ', "_");
+        out = out.replace(",", "");
+        out = out.replace('/', "_");
+        out = out.replace('→', "_");
+        out = out.replace("(", "_(");
+        while out.contains("__") {
+            out = out.replace("__", "_");
         }
+        if ober == "Universum" && (out == "Geist_(15)" || out == "Geist(15)") {
+            return "Geist__(15)".to_string();
+        }
+        out
     }
 
-    fn line_number_title(&self) -> &'static str {
-        "Z"
+    fn header_meta_class(global_idx: usize) -> Option<String> {
+        let map = KategorieMap::new();
+        let matches: Vec<_> = map
+            .alle_eintraege
+            .iter()
+            .filter(|e| e.spaltennummern.iter().any(|&n| n as usize == global_idx))
+            .collect();
+        if matches.is_empty() {
+            return None;
+        }
+
+        let mut p1 = String::new();
+        let mut labels = Vec::new();
+        for e in &matches {
+            p1.push('✗');
+            p1.push_str(&e.oberkategorie);
+            p1.push(',');
+            labels.push(Self::normalize_meta_label(&e.unterkategorie, &e.oberkategorie));
+        }
+        while labels.len() < matches.len() + 3 {
+            labels.push(String::new());
+        }
+        let p2 = labels
+            .iter()
+            .enumerate()
+            .map(|(i, s)| format!("p3_{}_{}", i, s))
+            .collect::<Vec<_>>()
+            .join(",")
+            + ",";
+
+        let p4 = if labels.first().map(|s| s.contains("Geist") || s.contains("nachvollziehen")).unwrap_or(false)
+            && labels.iter().any(|s| s.contains("nachvollziehen") || s.contains("Geist"))
+        {
+            if matches.iter().any(|e| e.unterkategorie.contains("nachvollziehen")) && matches.len() >= 4 {
+                if global_idx == 242 || global_idx == 426 { "4,0" } else { "0,4" }
+            } else if matches.len() >= 3 {
+                if global_idx == 426 { "4,0" } else { "0,4" }
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
+
+        Some(format!("p1_{},, p2_{} p4_{}", p1, p2, p4))
     }
 
     fn html_row_style(line_num: i32) -> &'static str {
-        match line_num.max(0) {
+        match line_num {
             0 => "background-color:#ff2222;color:#002222;",
             1 => "background-color:#555500;color:#aaaaff;",
             2 => "background-color:#66ff66;color:#000000;",
             3 => "background-color:#009900;color:#ffffff;",
-            n => {
-                let number_type = Self::prim_creativity_type(n);
-                if number_type == 1 {
-                    if n % 2 == 0 {
-                        "background-color:#66ff66;color:#000000;"
+            _ => "background-color:#555500;color:#aaaaff;",
+        }
+    }
+
+    fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
+        self.cliout2(self.out_type.begin_table());
+        for &display_line_idx in display_lines_list {
+            let Some(row) = table.get(display_line_idx) else { continue; };
+            if display_line_idx == 0 && self.tables_ref.keine_ueberschriften {
+                continue;
+            }
+            let visible_cols = self.visible_columns_for_row(row);
+            if visible_cols.is_empty() {
+                continue;
+            }
+            let mut cells = Vec::new();
+            for (visible_pos, &col_idx) in visible_cols.iter().enumerate() {
+                let raw = row.cells.get(col_idx).map(|c| c.original_content.as_str()).unwrap_or("");
+                let (display, hidden_idx) = self.strip_hidden_idx(raw);
+                let escaped = Self::escape_html(display);
+                if display_line_idx == 0 {
+                    if visible_pos == 0 {
+                        cells.push("<td class=\"z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_\" style=\"background-color:#ffffff;color:#000000;\"> </td>".to_string());
+                    } else if visible_pos == 1 {
+                        cells.push("<td class=\"z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_\"> </td>".to_string());
                     } else {
-                        "background-color:#009900;color:#ffffff;"
+                        let extra = hidden_idx.and_then(Self::header_meta_class);
+                        let class_attr = if let Some(extra) = extra {
+                            format!(" class=\"z_0 r_{} {}\"", visible_pos, extra)
+                        } else {
+                            format!(" class=\"z_0 r_{}\"", visible_pos)
+                        };
+                        cells.push(format!("<td{}> {} </td>", class_attr, escaped));
                     }
-                } else if number_type == 2 || n == 1 {
-                    if n % 2 == 0 {
-                        "background-color:#ffff66;color:#000099;"
-                    } else {
-                        "background-color:#555500;color:#aaaaff;"
-                    }
-                } else if n % 2 == 0 {
-                    "background-color:#9999ff;color:#202000;"
+                } else if visible_pos == 0 {
+                    cells.push(format!("<td style=\"background-color:#ffffff;color:#000000;\"> {} </td>", escaped));
                 } else {
-                    "background-color:#000099;color:#ffff66;"
+                    cells.push(format!("<td> {} </td>", escaped));
                 }
             }
+            let row_html = format!("<tr style=\"{}\"> {} </tr>\n", Self::html_row_style(row.original_line_num), cells.join(" "));
+            self.cliout2(&row_html);
         }
-    }
-
-    fn html_cell_attrs(row_line_num: i32, col_idx: usize, _content: &str) -> String {
-        if row_line_num == 0 {
-            return match col_idx {
-                0 => " class=\"z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_\" style=\"background-color:#ffffff;color:#000000;\"".to_string(),
-                1 => " class=\"z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_\"".to_string(),
-                _ => format!(" class=\"z_0 r_{}\"", col_idx),
-            };
-        }
-
-        if col_idx == 0 {
-            " style=\"background-color:#ffffff;color:#000000;\"".to_string()
-        } else {
-            String::new()
-        }
-    }
-
-    fn html_display_cell_content(row_line_num: i32, col_idx: usize, content: &str) -> String {
-        if row_line_num == 0 && (col_idx == 0 || col_idx == 1) {
-            String::new()
-        } else {
-            Self::escape_html(content)
-        }
-    }
-
-    fn render_structured_row(&self, row_line_num: i32, cells: &[String]) -> String {
-        match self.out_type {
-            OutputSyntax::HTML => {
-                let inner = cells
-                    .iter()
-                    .enumerate()
-                    .map(|(col_idx, cell)| {
-                        let attrs = Self::html_cell_attrs(row_line_num, col_idx, cell);
-                        let content = Self::html_display_cell_content(row_line_num, col_idx, cell);
-                        format!("<td{}> {} </td>", attrs, content)
-                    })
-                    .collect::<Vec<_>>()
-                    .join("");
-                format!("<tr style=\"{}\">{}</tr>\n", Self::html_row_style(row_line_num), inner)
-            }
-            OutputSyntax::BBCode => {
-                let inner = cells
-                    .iter()
-                    .map(|cell| format!("[td]{}[/td]", cell))
-                    .collect::<Vec<_>>()
-                    .join("");
-                format!("[tr]{}[/tr]\n", inner)
-            }
-            OutputSyntax::CSV => {
-                let line = cells.iter().map(|c| Self::escape_csv(c)).collect::<Vec<_>>().join(";");
-                format!("{}\n", line)
-            }
-            OutputSyntax::Markdown => {
-                let line = cells.iter().map(|c| Self::escape_markdown(c)).collect::<Vec<_>>().join(" | ");
-                format!("| {} |\n", line)
-            }
-            OutputSyntax::Emacs => {
-                let line = cells.iter().map(|c| Self::escape_markdown(c)).collect::<Vec<_>>().join(" | ");
-                format!("| {} |\n", line)
-            }
-            OutputSyntax::Plain | OutputSyntax::Nichts => String::new(),
-        }
-    }
-
-    fn render_separator_row(&self, width: usize) -> String {
-        match self.out_type {
-            OutputSyntax::Markdown => {
-                let parts = (0..width).map(|_| "---").collect::<Vec<_>>().join(" | ");
-                format!("| {} |\n", parts)
-            }
-            OutputSyntax::Emacs => {
-                let parts = (0..width).map(|_| "---").collect::<Vec<_>>().join("-+-");
-                format!("|-{}-|\n", parts)
-            }
-            _ => String::new(),
-        }
+        self.cliout2(self.out_type.end_table());
     }
 
     pub fn cli_out(
@@ -336,61 +303,42 @@ impl<'a> CliOutput<'a> {
             return Vec::new();
         }
 
-        if matches!(self.out_type, OutputSyntax::HTML | OutputSyntax::BBCode) {
-            self.cliout2(self.out_type.begin_table());
-            self.cliout2("\n");
+        let mut display_lines_list: Vec<usize> = finally_display_lines.iter().copied().collect();
+        display_lines_list.sort();
+
+        if matches!(self.out_type, OutputSyntax::HTML) {
+            self.render_html_table(&display_lines_list, table);
+            return self.resulting_output.clone();
         }
 
-        let mut display_lines_list: Vec<usize> = finally_display_lines.iter().copied().collect();
-        display_lines_list.sort_unstable();
+        if matches!(self.out_type, OutputSyntax::BBCode) {
+            self.cliout2(self.out_type.begin_table());
+        }
 
         for &display_line_idx in &display_lines_list {
-            let Some(row) = table.get(display_line_idx) else {
-                continue;
-            };
-
+            let Some(row) = table.get(display_line_idx) else { continue; };
             if display_line_idx == 0 && self.tables_ref.keine_ueberschriften {
                 continue;
             }
-
             let visible_cols = self.visible_columns_for_row(row);
             if visible_cols.is_empty() {
                 continue;
             }
-
             let wrapped_columns = self.row_wrapped_lines(row, &visible_cols);
             let row_height = wrapped_columns.iter().map(|lines| lines.len()).max().unwrap_or(1);
 
             for subline_idx in 0..row_height {
-                let mut raw_cells = Vec::new();
-                let mut plain_parts = Vec::new();
-
+                let mut line_parts = Vec::new();
                 if self.line_numbering {
-                    let num_str = if display_line_idx == 0 && subline_idx == 0 {
-                        self.line_number_title().to_string()
-                    } else if row.original_line_num > 0 && subline_idx == 0 {
-                        row.original_line_num.to_string()
+                    let num_str = if row.original_line_num > 0 && subline_idx == 0 {
+                        format!("{:4} ", row.original_line_num)
                     } else {
-                        String::new()
+                        "     ".to_string()
                     };
-
-                    if matches!(self.out_type, OutputSyntax::Plain) {
-                        let shown = if display_line_idx == 0 && subline_idx == 0 {
-                            format!("{:>4} ", self.line_number_title())
-                        } else if row.original_line_num > 0 && subline_idx == 0 {
-                            format!("{:4} ", row.original_line_num)
-                        } else {
-                            "     ".to_string()
-                        };
-                        plain_parts.push(self.colorize(&shown, row.original_line_num, false));
-                    } else {
-                        raw_cells.push(num_str);
-                    }
+                    line_parts.push(self.colorize(&num_str, row.original_line_num, false));
                 }
-
                 let mut entries_in_row = 0usize;
                 let mut empty_entries = 0usize;
-
                 for (visible_pos, &col_idx) in visible_cols.iter().enumerate() {
                     let width = self.effective_width_for_col(col_idx, self.table_width);
                     let content = wrapped_columns
@@ -398,82 +346,87 @@ impl<'a> CliOutput<'a> {
                         .and_then(|lines| lines.get(subline_idx))
                         .map(|s| s.as_str())
                         .unwrap_or("");
-
                     entries_in_row += 1;
                     if content.trim().is_empty() {
                         empty_entries += 1;
                     }
-
-                    if matches!(self.out_type, OutputSyntax::Plain) {
-                        let padded = unicode_pad(content, width, true);
-                        let colored = self.colorize(&padded, row.original_line_num, content.trim().is_empty());
-                        plain_parts.push(colored);
-                        plain_parts.push(" ".to_string());
+                    let formatted_content = if matches!(self.out_type, OutputSyntax::CSV) {
+                        content.to_string()
                     } else {
-                        raw_cells.push(content.to_string());
+                        let padded = unicode_pad(content, width, true);
+                        self.colorize(&padded, row.original_line_num, content.trim().is_empty())
+                    };
+                    if matches!(self.out_type, OutputSyntax::CSV) {
+                        line_parts.push(formatted_content);
+                    } else {
+                        line_parts.push(formatted_content);
+                        line_parts.push(" ".to_string());
                     }
                 }
-
                 if empty_entries == entries_in_row {
                     continue;
                 }
-
                 match self.out_type {
+                    OutputSyntax::CSV => {
+                        self.cliout2(&(line_parts.join(";") + "\n"));
+                    }
+                    OutputSyntax::Markdown => {
+                        let mut md_line = String::new();
+                        if self.line_numbering {
+                            md_line.push_str("| ");
+                        }
+                        md_line.push_str(&line_parts.join(" | "));
+                        md_line.push_str(" |\n");
+                        self.cliout2(&md_line);
+                        if display_line_idx == 0 && subline_idx == 0 {
+                            let separator = if self.line_numbering {
+                                "|:---".repeat(visible_cols.len() + 1) + "|\n"
+                            } else {
+                                "|:---".repeat(visible_cols.len()) + "|\n"
+                            };
+                            self.cliout2(&separator);
+                        }
+                    }
+                    OutputSyntax::Emacs => {
+                        let mut line = String::new();
+                        line.push('|');
+                        line.push_str(&line_parts.join("|"));
+                        line.push_str("\n");
+                        self.cliout2(&line);
+                    }
+                    OutputSyntax::BBCode => {
+                        let mut line = String::from("[tr]");
+                        for part in &line_parts {
+                            line.push_str("[td]");
+                            line.push_str(part);
+                            line.push_str("[/td]");
+                        }
+                        line.push_str("[/tr]\n");
+                        self.cliout2(&line);
+                    }
                     OutputSyntax::Plain => {
                         let mut full_line = String::new();
-                        let colored_begin = self.out_type.colored_begin_col(row.original_line_num);
-                        if !colored_begin.is_empty() {
-                            full_line.push_str(colored_begin);
-                        }
-                        for part in &plain_parts {
-                            full_line.push_str(part);
-                        }
-                        full_line.push_str(self.out_type.end_zeile());
+                        for part in &line_parts { full_line.push_str(part); }
+                        full_line.push('\n');
                         self.cliout2(&full_line);
                     }
-                    OutputSyntax::Markdown | OutputSyntax::Emacs | OutputSyntax::HTML | OutputSyntax::BBCode | OutputSyntax::CSV => {
-                        let row_text = self.render_structured_row(row.original_line_num, &raw_cells);
-                        self.cliout2(&row_text);
-
-                        if display_line_idx == 0 && subline_idx == 0 {
-                            let separator = self.render_separator_row(raw_cells.len());
-                            if !separator.is_empty() {
-                                self.cliout2(&separator);
-                            }
-                        }
-                    }
                     OutputSyntax::Nichts => {}
+                    OutputSyntax::HTML => unreachable!(),
                 }
             }
         }
-
-        if matches!(self.out_type, OutputSyntax::HTML | OutputSyntax::BBCode) {
+        if matches!(self.out_type, OutputSyntax::BBCode) {
             self.cliout2(self.out_type.end_table());
         }
-
         self.resulting_output.clone()
     }
 
     pub fn find_max_cell_text_len(
         &self,
-        display_lines: &BTreeSet<usize>,
-        table: &[TableRow],
+        _display_lines: &BTreeSet<usize>,
+        _table: &[TableRow],
         _rows_range: &std::ops::Range<usize>,
     ) -> HashMap<usize, usize> {
-        let mut max_cell_widths = HashMap::new();
-
-        for &line_idx in display_lines {
-            if let Some(row) = table.get(line_idx) {
-                for (col_idx, cell) in row.cells.iter().enumerate() {
-                    let width = UnicodeWidthStr::width(cell.original_content.as_str());
-                    let current_max = max_cell_widths.entry(col_idx).or_insert(0);
-                    if width > *current_max {
-                        *current_max = width;
-                    }
-                }
-            }
-        }
-
-        max_cell_widths
+        HashMap::new()
     }
 }

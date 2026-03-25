@@ -1,7 +1,7 @@
+use crate::reta_ausgabe::OutputSyntax;
 use crate::if_is_zeilen_angabe::is_zeilen_angabe;
 
 use super::bereich::TextBereich;
-use crate::reta_ausgabe::OutputSyntax;
 use super::parser_ranges::parse_zeilenangabe_zu_bereichen;
 use super::parser_support::{
     apply_pypy_compat_arg, is_flag, parse_usize_csv_list, print_all_oberkategorien,
@@ -140,6 +140,8 @@ pub fn parse_cli_args(
                         if let Some(out) = OutputSyntax::from_art_value(nachfolger) {
                             bereich.output_syntax = out;
                         }
+                    } else {
+                        panic!("--art erwartet genau einen Wert");
                     }
                 }
                 "--breiten" => {
@@ -289,6 +291,7 @@ pub fn parse_cli_args(
                     println!("  --zeilebis ZAHL           Endzeile");
                     println!("  --spaltevon ZAHL          Startspalte");
                     println!("  --spaltebis ZAHL          Endspalte");
+                    println!("  --art ART                 Ausgabeformat: shell|html|bbcode|csv|markdown|emacs|nichts");
                     println!("  --help, -h                Diese Hilfe");
                     println!();
                     println!("Beispiele:");
@@ -297,6 +300,7 @@ pub fn parse_cli_args(
                         "  mein-rpnn --spalten Universum Transzendentalien --zeilevon 1 --zeilebis 10"
                     );
                     println!("  mein-rpnn --alles --vorhervonausschnitt 1-10");
+                    println!("  mein-rpnn --art markdown --vorhervonausschnitt 1-5 --spaltenname Universum Geist");
                 }
                 _ => {
                     let _ = apply_pypy_compat_arg(&mut bereich, arg);
