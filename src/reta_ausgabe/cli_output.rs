@@ -6,7 +6,6 @@ use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
 
-use crate::column_categories_complete::KategorieMap;
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
@@ -106,16 +105,6 @@ let syntax = match self.out_type {
         }
         out
     }
-
-    fn exact_header_meta_class_by_text(display: &str) -> Option<&'static str> {
-        match display.trim() {
-            "Geist (15) (d.h. besteht aus der jeweilig zugehörigen universellen Strukturalie / dem Meta-Paradigma)" => Some("p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_, p4_4,0"),
-            "Geist (15), hier: Intelligenz (6) und was gibt es noch, außer nur Intelligenz (6), also außer nur das Hexagramm, was ja das Symbol der Intelligenz ist" => Some("p1_✗Universum,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_Geist_(15),p3_2_Geist_(15),p3_3_,p3_4_,p3_5_, p4_4,0"),
-            "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art" => Some("p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_, p4_0,4"),
-            _ => None,
-        }
-    }
-
     pub fn colorize(&self, text: &str, line_num: i32, is_empty: bool) -> String {
         if !self.color_enabled {
             return text.to_string();
@@ -243,104 +232,71 @@ let syntax = match self.out_type {
     }
 
     fn header_meta_class(global_idx: usize) -> Option<String> {
-        let map = KategorieMap::new();
-        let matches: Vec<_> = map
-            .alle_eintraege
-            .iter()
-            .filter(|e| e.spaltennummern.iter().any(|&n| n as usize == global_idx))
-            .collect();
-        if matches.is_empty() {
-            return None;
+        None
+    }
+fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
+    self.cliout2("<table border=0 id=\"bigtable\">\n");
+
+    for &display_line_idx in display_lines_list {
+        let Some(row) = table.get(display_line_idx) else { continue; };
+        if display_line_idx == 0 && self.tables_ref.keine_ueberschriften {
+            continue;
         }
 
-        let mut p1 = String::new();
-        let mut labels = Vec::new();
-        for e in &matches {
-            p1.push('✗');
-            p1.push_str(&e.oberkategorie);
-            p1.push(',');
-            labels.push(Self::normalize_meta_label(&e.unterkategorie, &e.oberkategorie));
-        }
-        while labels.len() < matches.len() + 3 {
-            labels.push(String::new());
-        }
-        let p2 = labels
-            .iter()
-            .enumerate()
-            .map(|(i, s)| format!("p3_{}_{}", i, s))
-            .collect::<Vec<_>>()
-            .join(",")
-            + ",";
-
-        let p4 = if labels.first().map(|s| s.contains("Geist") || s.contains("nachvollziehen")).unwrap_or(false)
-            && labels.iter().any(|s| s.contains("nachvollziehen") || s.contains("Geist"))
-        {
-            if matches.iter().any(|e| e.unterkategorie.contains("nachvollziehen")) && matches.len() >= 4 {
-                if global_idx == 242 || global_idx == 426 { "4,0" } else { "0,4" }
-            } else if matches.len() >= 3 {
-                if global_idx == 426 { "4,0" } else { "0,4" }
-            } else {
-                ""
-            }
-        } else {
-            ""
+        let bg_fg = match row.original_line_num {
+            0 => ("#ff2222", "#002222"),
+            1 => ("#555500", "#aaaaff"),
+            2 => ("#66ff66", "#000000"),
+            3 => ("#009900", "#ffffff"),
+            _ => ("#555500", "#aaaaff"),
         };
 
-        Some(format!("p1_{},, p2_{} p4_{}", p1, p2, p4))
-    }
+        let mut line = format!(
+            "<tr style=\"background-color:{};color:{};\"> ",
+            bg_fg.0, bg_fg.1
+        );
 
-    fn html_row_style(line_num: i32) -> &'static str {
-        match line_num {
-            0 => "background-color:#ff2222;color:#002222;",
-            1 => "background-color:#555500;color:#aaaaff;",
-            2 => "background-color:#66ff66;color:#000000;",
-            3 => "background-color:#009900;color:#ffffff;",
-            _ => "background-color:#555500;color:#aaaaff;",
-        }
-    }
+        for (col_idx, cell) in row.cells.iter().enumerate() {
+            let (visible_content, hidden_idx) = self.strip_hidden_idx(&cell.original_content);
+            let content = Self::escape_html(visible_content);
 
-    fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
-        self.cliout2(self.out_type.begin_table());
-        for &display_line_idx in display_lines_list {
-            let Some(row) = table.get(display_line_idx) else { continue; };
-            if display_line_idx == 0 && self.tables_ref.keine_ueberschriften {
-                continue;
-            }
-            let visible_cols = self.visible_columns_for_row(row);
-            if visible_cols.is_empty() {
-                continue;
-            }
-            let mut cells = Vec::new();
-            for (visible_pos, &col_idx) in visible_cols.iter().enumerate() {
-                let raw = row.cells.get(col_idx).map(|c| c.original_content.as_str()).unwrap_or("");
-                let (display, hidden_idx) = self.strip_hidden_idx(raw);
-                let escaped = Self::escape_html(display);
-                if display_line_idx == 0 {
-                    if visible_pos == 0 {
-                        cells.push("<td class=\"z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_\" style=\"background-color:#ffffff;color:#000000;\"> </td>".to_string());
-                    } else if visible_pos == 1 {
-                        cells.push("<td class=\"z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_\"> </td>".to_string());
+            if display_line_idx == 0 {
+                let class_attr = if let Some(global_idx) = hidden_idx {
+                    if let Some(meta) = Self::header_meta_class(global_idx) {
+                        format!(" class=\"z_0 r_{} {}\"", col_idx, meta)
                     } else {
-                        let extra = Self::exact_header_meta_class_by_text(display).map(str::to_string).or_else(|| hidden_idx.and_then(Self::header_meta_class));
-                        let class_attr = if let Some(extra) = extra {
-                            format!(" class=\"z_0 r_{} {}\"", visible_pos, extra)
-                        } else {
-                            format!(" class=\"z_0 r_{}\"", visible_pos)
-                        };
-                        cells.push(format!("<td{}> {} </td>", class_attr, escaped));
+                        format!(" class=\"z_0 r_{}\"", col_idx)
                     }
-                } else if visible_pos == 0 {
-                    cells.push(format!("<td style=\"background-color:#ffffff;color:#000000;\"> {} </td>", escaped));
                 } else {
-                    cells.push(format!("<td> {} </td>", escaped));
+                    format!(" class=\"z_0 r_{}\"", col_idx)
+                };
+
+                if col_idx == 0 {
+                    line.push_str(&format!(
+                        "<td{} style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
+                        class_attr, content
+                    ));
+                } else {
+                    line.push_str(&format!("<td{}> {} </td> ", class_attr, content));
+                }
+            } else {
+                if col_idx == 0 {
+                    line.push_str(&format!(
+                        "<td style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
+                        content
+                    ));
+                } else {
+                    line.push_str(&format!("<td> {} </td> ", content));
                 }
             }
-            let row_html = format!("<tr style=\"{}\"> {} </tr>\n", Self::html_row_style(row.original_line_num), cells.join(" "));
-            self.cliout2(&row_html);
         }
-        self.cliout2(self.out_type.end_table());
+
+        line.push_str("</tr>\n");
+        self.cliout2(&line);
     }
 
+    self.cliout2("</table>");
+}
     pub fn cli_out(
         &mut self,
         finally_display_lines: &BTreeSet<usize>,
