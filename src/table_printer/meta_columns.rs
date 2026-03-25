@@ -95,7 +95,17 @@ pub fn prepend_meta_columns(
     chunk_data: &[Vec<String>],
     chunk_line_numbers: &[usize],
 ) -> (Vec<String>, Vec<Vec<String>>, Vec<usize>) {
-    let power_buckets = build_power_bucket_strings(chunk_line_numbers);
+    let effective_line_numbers: Vec<usize> = if chunk_line_numbers.len() == chunk_data.len() {
+        chunk_line_numbers.to_vec()
+    } else {
+        chunk_data
+            .iter()
+            .enumerate()
+            .map(|(idx, _)| chunk_line_numbers.get(idx).copied().unwrap_or(idx + 1))
+            .collect()
+    };
+
+    let power_buckets = build_power_bucket_strings(&effective_line_numbers);
 
     let mut headers = vec![POTENZ_HEADER.to_string(), ZEILE_HEADER.to_string()];
     headers.extend(chunk_headers.iter().cloned());
@@ -103,13 +113,19 @@ pub fn prepend_meta_columns(
     let mut data = Vec::with_capacity(chunk_data.len());
     for (idx, row) in chunk_data.iter().enumerate() {
         let mut new_row = Vec::with_capacity(row.len() + 2);
-        new_row.push(power_buckets[idx].clone());
-        new_row.push(chunk_line_numbers[idx].to_string());
+        new_row.push(power_buckets.get(idx).cloned().unwrap_or_else(|| "".to_string()));
+        new_row.push(
+            effective_line_numbers
+                .get(idx)
+                .copied()
+                .unwrap_or(idx + 1)
+                .to_string(),
+        );
         new_row.extend(row.iter().cloned());
         data.push(new_row);
     }
 
-    let (meta_widths, _) = build_meta_widths(&power_buckets, chunk_line_numbers, usize::MAX);
+    let (meta_widths, _) = build_meta_widths(&power_buckets, &effective_line_numbers, usize::MAX);
 
     (headers, data, meta_widths)
 }

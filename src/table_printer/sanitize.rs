@@ -35,14 +35,16 @@ pub fn sanitize_chunk_data_with_rows(
     row_numbers: &[usize],
     keineleereninhalte: bool,
 ) -> (Vec<Vec<String>>, Vec<usize>) {
-    if !keineleereninhalte {
-        return (chunk_data.to_vec(), row_numbers.to_vec());
-    }
-
-    let mut new_data = Vec::new();
-    let mut new_rows = Vec::new();
+    let mut new_data = Vec::with_capacity(row_numbers.len().min(chunk_data.len()));
+    let mut new_rows = Vec::with_capacity(row_numbers.len().min(chunk_data.len()));
 
     for (row, &num) in chunk_data.iter().zip(row_numbers.iter()) {
+        if !keineleereninhalte {
+            new_data.push(row.clone());
+            new_rows.push(num);
+            continue;
+        }
+
         let cleaned_row: Vec<String> = row
             .iter()
             .map(|cell| filter_small_lines_in_cell(cell))
