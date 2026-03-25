@@ -331,11 +331,9 @@ pub fn query_column_by_index(
         )?;
     }
 
-    let is_primzahlkreuz_mode = generated_befehle
-        .iter()
-        .any(|s| normalize_token(s) == "primzahlkreuzprocontra");
+    let should_filter_generated_rows_after_build = is_generated_mode;
 
-    if is_primzahlkreuz_mode {
+    if should_filter_generated_rows_after_build {
         let mut selected_line_numbers = build_original_line_numbers(&bereich, usize::MAX);
         selected_line_numbers.sort_unstable();
         selected_line_numbers.dedup();
