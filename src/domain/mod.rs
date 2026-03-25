@@ -4,5 +4,6 @@ pub mod exact_mappings;
 pub mod generator_registry;
 pub mod pypy_compat;
 pub mod tabellen_utils;
-
 pub mod selection_state;
+pub mod generator_logic;
+pub mod category_map;

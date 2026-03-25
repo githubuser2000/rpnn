@@ -1,6 +1,5 @@
-// file: column_categories_complete.rs
+// file: src/domain/categories.rs
 use std::collections::{HashMap, HashSet};
-
 // Öffentliche Struktur für Kategorien
 #[derive(Debug, Clone)]
 pub struct KategorieEintrag {

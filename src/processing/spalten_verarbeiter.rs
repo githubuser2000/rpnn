@@ -1,24 +1,14 @@
-
 use crate::cli::parser::{SpaltenNamen, SpaltenNamenListe};
 use crate::cli::{parse_cli_args, TextBereich};
 use crate::domain::categories::KategorieMap;
-use crate::domain::exact_generator_bridge::resolve_exact_generator;
+use crate::processing::spalten_support::defaults::fallback_zu_standards;
+use crate::processing::spalten_support::exact_merge::merge_exact;
+use crate::processing::spalten_support::normalize::is_primzahlkreuz_pro_contra_request;
+use crate::processing::spalten_support::selection_sync::{
+    finalize_found_columns,
+    setze_gefundene_spalten,
+};
 use std::error::Error;
-
-fn normalize_category_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-}
-
-fn is_primzahlkreuz_pro_contra_request(ober: &str, unter: &str) -> bool {
-    let ober = normalize_category_key(ober);
-    let unter = normalize_category_key(unter);
-
-    matches!(ober.as_str(), "bedeutung" | "procontra" | "universum" )
-        && matches!(unter.as_str(), "primzahlkreuzprocontra" | "primzahlkreuz")
-}
 
 pub struct SpaltenVerarbeiter<'a> {
     args: &'a [String],
@@ -46,44 +36,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
 
         self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
 
-        Ok(VerarbeitungsErgebnis {
-            bereich,
-            spalten_namen,
-        })
-    }
-
-    fn merge_exact(&self, bereich: &mut TextBereich, ober: &str, unter: &str) -> bool {
-        let Some(exact) = resolve_exact_generator(ober, unter) else {
-            return false;
-        };
-
-        let exact_is_meta = exact.generated_befehle.contains("universummetakonkret");
-        for cmd in exact.generated_befehle {
-            bereich.exact_generated_befehle.insert(cmd);
-        }
-        for pair in exact.modal_pairs {
-            if !bereich.exact_modal_pairs.contains(&pair) {
-                bereich.exact_modal_pairs.push(pair);
-            }
-        }
-        for spec in exact.meta_konkret_specs {
-            if !bereich.exact_meta_konkret_specs.contains(&spec) {
-                bereich.exact_meta_konkret_specs.push(spec);
-            }
-        }
-        for col in exact.direct_columns {
-            if !exact_is_meta && !bereich.exact_visible_columns.contains(&col) {
-                bereich.exact_visible_columns.push(col);
-            }
-            bereich.spalten_bereiche.push((col, col));
-        }
-
-        bereich.exact_visible_columns.sort_unstable();
-        bereich.exact_visible_columns.dedup();
-        bereich.spalten_bereiche.sort_unstable();
-        bereich.spalten_bereiche.dedup();
-        bereich.mark_columns_resolved();
-        true
+        Ok(VerarbeitungsErgebnis { bereich, spalten_namen })
     }
 
     fn verarbeite_automatische_spalten(
@@ -93,35 +46,22 @@ impl<'a> SpaltenVerarbeiter<'a> {
         spalten_namen_liste: &SpaltenNamenListe,
     ) -> Result<(), Box<dyn Error>> {
         let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
-
-        if hat_manuelle_spalten {
-            return Ok(());
-        }
+        if hat_manuelle_spalten { return Ok(()); }
 
         if spalten_namen_liste.eintraege.len() > 1 {
             self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
             return Ok(());
         }
 
-        if spalten_namen.oberkategorie.is_empty() && spalten_namen.unterkategorie.is_empty() {
+        if spalten_namen.oberkategorie.is_empty() && spalten_namen.unterkategorie.is_empty() { return Ok(()); }
+        if spalten_namen.oberkategorie == "oberkategorie" && spalten_namen.unterkategorie == "unterkategorie" { return Ok(()); }
+
+        if merge_exact(bereich, &spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
+            finalize_found_columns(bereich);
             return Ok(());
         }
 
-        if spalten_namen.oberkategorie == "oberkategorie"
-            && spalten_namen.unterkategorie == "unterkategorie"
-        {
-            return Ok(());
-        }
-
-        if self.merge_exact(bereich, &spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
-            self.finalize_found_columns(bereich);
-            return Ok(());
-        }
-
-        if is_primzahlkreuz_pro_contra_request(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        ) {
+        if is_primzahlkreuz_pro_contra_request(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
             bereich.mark_columns_resolved();
             return Ok(());
         }
@@ -132,7 +72,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         );
 
         if !direkte_spalten.is_empty() {
-            self.setze_gefundene_spalten(bereich, direkte_spalten)?;
+            setze_gefundene_spalten(bereich, direkte_spalten);
             bereich.mark_columns_resolved();
             return Ok(());
         }
@@ -142,7 +82,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
             &spalten_namen.unterkategorie,
         ) {
             if !inference.required_columns.is_empty() {
-                self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
+                setze_gefundene_spalten(bereich, inference.required_columns.clone());
             }
             bereich.mark_columns_resolved();
             return Ok(());
@@ -161,7 +101,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         let mut exact_hit = false;
 
         for spalten_namen in &spalten_namen_liste.eintraege {
-            if self.merge_exact(bereich, &spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
+            if merge_exact(bereich, &spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
                 exact_hit = true;
                 continue;
             }
@@ -183,20 +123,19 @@ impl<'a> SpaltenVerarbeiter<'a> {
                     bereich.spaltenreihenfolgeundnurdiese.push(c);
                 }
             }
-
             bereich.exact_visible_columns.sort_unstable();
             bereich.exact_visible_columns.dedup();
             bereich.spaltenreihenfolgeundnurdiese.sort_unstable();
             bereich.spaltenreihenfolgeundnurdiese.dedup();
-
-            self.finalize_found_columns(bereich);
+            finalize_found_columns(bereich);
             bereich.mark_columns_resolved();
             return Ok(());
         }
+
         if !alle_gefundene_spalten.is_empty() {
             alle_gefundene_spalten.sort_unstable();
             alle_gefundene_spalten.dedup();
-            self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
+            setze_gefundene_spalten(bereich, alle_gefundene_spalten);
             return Ok(());
         }
 
@@ -206,11 +145,11 @@ impl<'a> SpaltenVerarbeiter<'a> {
                 &letzte_spalten_namen.unterkategorie,
             ) {
                 if !inference.required_columns.is_empty() {
-                    self.setze_gefundene_spalten(bereich, inference.required_columns.clone())?;
+                    setze_gefundene_spalten(bereich, inference.required_columns.clone());
                 }
                 bereich.mark_columns_resolved();
             } else {
-                self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
+                fallback_zu_standards(bereich);
             }
         } else {
             return Err("SpaltenNamenListe ist leer".into());
@@ -218,72 +157,4 @@ impl<'a> SpaltenVerarbeiter<'a> {
 
         Ok(())
     }
-
-    fn finalize_found_columns(&self, bereich: &mut TextBereich) {
-        bereich.spalten_bereiche.sort_unstable();
-        bereich.spalten_bereiche.dedup();
-        if !bereich.spalten_bereiche.is_empty() {
-            bereich.von_spalte = bereich.spalten_bereiche[0].0;
-            bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
-        }
-    }
-
-fn setze_gefundene_spalten(
-    &self,
-    bereich: &mut TextBereich,
-    gefundene_spalten: Vec<u32>,
-) -> Result<(), Box<dyn Error>> {
-    let mut sorted: Vec<usize> = gefundene_spalten.iter().map(|&n| n as usize).collect();
-    sorted.sort_unstable();
-    sorted.dedup();
-
-    bereich.spalten_bereiche = sorted.iter().map(|&num| (num, num)).collect();
-
-    for &num in &sorted {
-        if !bereich.exact_visible_columns.contains(&num) {
-            bereich.exact_visible_columns.push(num);
-        }
-        if !bereich.spaltenreihenfolgeundnurdiese.contains(&num) {
-            bereich.spaltenreihenfolgeundnurdiese.push(num);
-        }
-    }
-
-    bereich.exact_visible_columns.sort_unstable();
-    bereich.exact_visible_columns.dedup();
-
-    bereich.spaltenreihenfolgeundnurdiese.sort_unstable();
-    bereich.spaltenreihenfolgeundnurdiese.dedup();
-
-    if !bereich.spalten_bereiche.is_empty() {
-        bereich.von_spalte = bereich.spalten_bereiche[0].0;
-        bereich.bis_spalte = bereich.spalten_bereiche.last().unwrap().1;
-    } else {
-        bereich.von_spalte = usize::MAX;
-        bereich.bis_spalte = usize::MAX;
-    }
-
-    if sorted.is_empty() {
-        bereich.reset_column_request();
-    } else {
-        bereich.mark_columns_resolved();
-    }
-
-    Ok(())
-}
-fn fallback_zu_standards(
-    &self,
-    bereich: &mut TextBereich,
-    _spalten_namen: &SpaltenNamen,
-) -> Result<(), Box<dyn Error>> {
-    bereich.spalten_bereiche.clear();
-    bereich.spaltenreihenfolgeundnurdiese.clear();
-    bereich.exact_visible_columns.clear();
-
-    bereich.von_spalte = usize::MAX;
-    bereich.bis_spalte = usize::MAX;
-
-    bereich.reset_column_request();
-
-    Ok(())
-}
 }

@@ -2,6 +2,8 @@ use crate::cli::TextBereich;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use crate::domain::generator_logic::common::{contains_any_alias, normalize_token, selected_by_pair};
+use crate::domain::generator_logic::number_theory::gcd;
 
 pub type Table = Vec<Vec<String>>;
 pub type RowSet = BTreeSet<usize>;
@@ -34,24 +36,6 @@ pub struct ParametersMain {
     pub procontra0: String,
     pub grundstrukturen0: String,
     pub unter0: String,
-}
-
-fn normalize_token(s: &str) -> String {
-    s.trim().to_lowercase()
-}
-
-fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
-    aliases
-        .iter()
-        .any(|alias| tokens.contains(&normalize_token(alias)))
-}
-
-fn selected_by_pair(
-    tokens: &BTreeSet<String>,
-    first_aliases: &[&str],
-    second_aliases: &[&str],
-) -> bool {
-    contains_any_alias(tokens, first_aliases) && contains_any_alias(tokens, second_aliases)
 }
 
 pub fn apply_generated_columns(
@@ -389,43 +373,34 @@ pub fn apply_generated_columns(
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct SimpleFraction {
-    num: usize,
-    den: usize,
+pub(crate) struct SimpleFraction {
+    pub(crate) num: usize,
+    pub(crate) den: usize,
 }
 
 impl SimpleFraction {
-    fn new(num: usize, den: usize) -> Option<Self> {
+    pub(crate) fn new(num: usize, den: usize) -> Option<Self> {
         if num == 0 || den == 0 { return None; }
         let g = gcd(num, den);
         Some(Self { num: num / g, den: den / g })
     }
 
-    fn mul(self, other: Self) -> Option<Self> {
+    pub(crate) fn mul(self, other: Self) -> Option<Self> {
         Self::new(self.num.saturating_mul(other.num), self.den.saturating_mul(other.den))
     }
 
-    fn div(self, other: Self) -> Option<Self> {
+    pub(crate) fn div(self, other: Self) -> Option<Self> {
         if other.num == 0 { return None; }
         Self::new(self.num.saturating_mul(other.den), self.den.saturating_mul(other.num))
     }
 
-    fn inv(self) -> Option<Self> {
+    pub(crate) fn inv(self) -> Option<Self> {
         Self::new(self.den, self.num)
     }
 
-    fn is_integer(self) -> bool {
+    pub(crate) fn is_integer(self) -> bool {
         self.den == 1
     }
-}
-
-fn gcd(mut a: usize, mut b: usize) -> usize {
-    while b != 0 {
-        let t = a % b;
-        a = b;
-        b = t;
-    }
-    a.max(1)
 }
 
 fn meta_pair_labels(metavariable: usize, side: usize) -> (&'static str, &'static str, &'static str) {
