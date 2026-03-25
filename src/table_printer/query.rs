@@ -258,52 +258,12 @@ fn should_use_full_table_for_generated(
         || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
 }
 
-fn build_full_table_row_query(column_names: &[String], bereich: &TextBereich) -> String {
+fn build_full_table_row_query(column_names: &[String], _bereich: &TextBereich) -> String {
     let columns = column_names
         .iter()
         .map(|name| format!("\"{}\"", name.replace('"', "\"\"")))
         .collect::<Vec<_>>()
         .join(", ");
-
-    if !bereich.zeilen_bereiche.is_empty() {
-        let mut all_row_numbers = Vec::new();
-
-        for &(start, end) in &bereich.zeilen_bereiche {
-            if start == 0 || end == 0 || start > end {
-                continue;
-            }
-
-            for row in start..=end {
-                all_row_numbers.push(row);
-            }
-        }
-
-        all_row_numbers.sort_unstable();
-        all_row_numbers.dedup();
-
-        if !all_row_numbers.is_empty() {
-            let row_numbers_str = all_row_numbers
-                .iter()
-                .map(|n| (n - 1).to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            return format!(
-                "SELECT {} FROM (\n                    SELECT *, ROW_NUMBER() OVER (ORDER BY rowid) - 1 as row_num\n                    FROM csv_data\n                ) numbered_data\n                WHERE row_num IN ({})\n                ORDER BY row_num",
-                columns, row_numbers_str
-            );
-        }
-    }
-
-    if bereich.von_zeile > 0 && bereich.bis_zeile >= bereich.von_zeile {
-        let anzahl = bereich.bis_zeile - bereich.von_zeile + 1;
-        let offset = bereich.von_zeile.saturating_sub(1);
-
-        return format!(
-            "SELECT {} FROM csv_data LIMIT {} OFFSET {}",
-            columns, anzahl, offset
-        );
-    }
 
     format!("SELECT {} FROM csv_data", columns)
 }
@@ -369,6 +329,23 @@ pub fn query_column_by_index(
             generated_befehle,
             parameters_main,
         )?;
+    }
+
+    let is_primzahlkreuz_mode = generated_befehle
+        .iter()
+        .any(|s| normalize_token(s) == "primzahlkreuzprocontra");
+
+    if is_primzahlkreuz_mode {
+        let mut selected_line_numbers = build_original_line_numbers(&bereich, usize::MAX);
+        selected_line_numbers.sort_unstable();
+        selected_line_numbers.dedup();
+
+        if !selected_line_numbers.is_empty() {
+            final_data = selected_line_numbers
+                .iter()
+                .filter_map(|&line_no| final_data.get(line_no.saturating_sub(1)).cloned())
+                .collect();
+        }
     }
 
     if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
