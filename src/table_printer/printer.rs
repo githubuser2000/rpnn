@@ -1,407 +1,25 @@
 use std::collections::BTreeSet;
 
 use crate::reta_ausgabe::{CliOutput, OutputSyntax, TableRow, Tables};
-use crate::table_printer::config::{COLUMN_OVERHEAD, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH};
+use crate::table_printer::config::COLUMN_OVERHEAD;
+use crate::table_printer::meta_columns::{
+    build_meta_widths, build_power_bucket_strings, prepend_meta_columns,
+};
+use crate::table_printer::sanitize::{
+    sanitize_chunk_data, sanitize_chunk_data_with_rows, sanitize_header_preserve_id,
+};
 use crate::table_printer::table_utils::{
     build_table_layout,
-    compute_column_stats,
-    compute_column_widths_from_global_mass,
     convert_to_table_rows,
     convert_to_table_rows_with_line_numbers,
     convert_to_table_rows_with_offset,
     get_terminal_width,
     RowRange,
 };
-
-const CHUNK_MIN_COLUMN_WIDTH: usize = 21;
-const POTENZ_HEADER: &str = "P";
-const ZEILE_HEADER: &str = "Z";
-
-fn get_explicit_width(explizite_breiten: &[usize], index: usize) -> Option<usize> {
-    match explizite_breiten.len() {
-        0 => None,
-        1 => Some(explizite_breiten[0]), // --breite 20 => alle Spalten 20
-        _ => explizite_breiten.get(index).copied(), // --breiten 20,30,40 => erste n Spalten fest
-    }
-}
-
-fn effective_min_column_width() -> usize {
-    CHUNK_MIN_COLUMN_WIDTH.max(MIN_COLUMN_WIDTH)
-}
-
-fn clamp_chunk_width(width: usize) -> usize {
-    width.clamp(effective_min_column_width(), MAX_COLUMN_WIDTH)
-}
-
-fn clamp_explicit_width(width: usize) -> usize {
-    width.clamp(1, MAX_COLUMN_WIDTH)
-}
-
-fn filter_small_lines_in_cell(cell: &str) -> String {
-    cell.lines()
-        .map(str::trim)
-        .filter(|line| line.chars().count() > 2)
-        .map(ToOwned::to_owned)
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
-fn sanitize_chunk_data(chunk_data: &[Vec<String>], keineleereninhalte: bool) -> Vec<Vec<String>> {
-    if !keineleereninhalte {
-        return chunk_data.to_vec();
-    }
-
-    chunk_data
-        .iter()
-        .map(|row| {
-            row.iter()
-                .map(|cell| filter_small_lines_in_cell(cell))
-                .collect()
-        })
-        .collect()
-}
-
-fn row_has_visible_content(row: &[String]) -> bool {
-    row.iter().any(|cell| {
-        cell.lines()
-            .map(str::trim)
-            .any(|line| line.chars().count() > 2)
-    })
-}
-
-fn sanitize_chunk_data_with_rows(
-    chunk_data: &[Vec<String>],
-    row_numbers: &[usize],
-    keineleereninhalte: bool,
-) -> (Vec<Vec<String>>, Vec<usize>) {
-    if !keineleereninhalte {
-        return (chunk_data.to_vec(), row_numbers.to_vec());
-    }
-
-    let mut new_data = Vec::new();
-    let mut new_rows = Vec::new();
-
-    for (row, &num) in chunk_data.iter().zip(row_numbers.iter()) {
-        let cleaned_row: Vec<String> = row
-            .iter()
-            .map(|cell| filter_small_lines_in_cell(cell))
-            .collect();
-
-        if row_has_visible_content(&cleaned_row) {
-            new_data.push(cleaned_row);
-            new_rows.push(num);
-        }
-    }
-
-    (new_data, new_rows)
-}
-
-fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String {
-    let trimmed = header.trim();
-
-    if trimmed.is_empty() {
-        return format!("SQL-Spalte {}", global_index + 1);
-    }
-
-    trimmed.to_string()
-}
-
-fn is_special_power(n: usize) -> bool {
-    if n < 4 || n == 8 {
-        return false;
-    }
-
-    let mut base = 2usize;
-    while base.saturating_mul(base) <= n {
-        let mut value = base.saturating_mul(base);
-
-        while value < n {
-            match value.checked_mul(base) {
-                Some(next) => value = next,
-                None => break,
-            }
-        }
-
-        if value == n {
-            return true;
-        }
-
-        base += 1;
-    }
-
-    false
-}
-
-fn next_special_power(after: usize) -> usize {
-    let mut candidate = after.saturating_add(1);
-
-    loop {
-        if is_special_power(candidate) {
-            return candidate;
-        }
-        candidate = candidate.saturating_add(1);
-    }
-}
-
-fn power_bucket_for_line(line_number: usize) -> usize {
-    if line_number == 0 {
-        return 0;
-    }
-
-    let mut bucket = 1usize;
-    let mut boundary = 4usize;
-
-    while line_number > boundary {
-        bucket += 1;
-        boundary = next_special_power(boundary);
-    }
-
-    bucket
-}
-
-fn build_power_bucket_strings(line_numbers: &[usize]) -> Vec<String> {
-    line_numbers
-        .iter()
-        .map(|&n| power_bucket_for_line(n).to_string())
-        .collect()
-}
-
-fn estimate_natural_width_for_chunking(
-    header: &String,
-    data: &[Vec<String>],
-    col_idx: usize,
-) -> usize {
-    let single_header = vec![header.clone()];
-
-    let single_col_data: Vec<Vec<String>> = data
-        .iter()
-        .map(|row| vec![row.get(col_idx).cloned().unwrap_or_default()])
-        .collect();
-
-    let stats = compute_column_stats(&single_header, &single_col_data);
-    let guessed = stats
-        .first()
-        .map(|s| s.avg_width.ceil() as usize)
-        .unwrap_or(effective_min_column_width());
-
-    clamp_chunk_width(guessed)
-}
-
-fn explicit_mask_for_range(
-    explizite_breiten: &[usize],
-    start: usize,
-    end: usize,
-) -> Vec<bool> {
-    (start..end)
-        .map(|global_i| get_explicit_width(explizite_breiten, global_i).is_some())
-        .collect()
-}
-
-fn shrink_widths_to_budget_preserving_explicit(
-    widths: &mut [usize],
-    chunk_budget: usize,
-    min_width: usize,
-    explicit_mask: &[bool],
-) {
-    let mut current_total: usize = widths.iter().sum();
-
-    while current_total > chunk_budget {
-        let mut changed = false;
-
-        for (i, w) in widths.iter_mut().enumerate() {
-            let is_explicit = explicit_mask.get(i).copied().unwrap_or(false);
-            if !is_explicit && *w > min_width && current_total > chunk_budget {
-                *w -= 1;
-                current_total -= 1;
-                changed = true;
-            }
-        }
-
-        if !changed {
-            break;
-        }
-    }
-}
-
-fn stretch_last_non_explicit_or_last_column(
-    widths: &mut [usize],
-    chunk_budget: usize,
-    explicit_mask: &[bool],
-) {
-    if widths.is_empty() {
-        return;
-    }
-
-    let current_total: usize = widths.iter().sum();
-    if current_total >= chunk_budget {
-        return;
-    }
-
-    let extra = chunk_budget - current_total;
-
-    if let Some(idx) = (0..widths.len())
-        .rev()
-        .find(|&i| !explicit_mask.get(i).copied().unwrap_or(false))
-    {
-        widths[idx] += extra;
-    } else {
-        let last_idx = widths.len() - 1;
-        widths[last_idx] += extra;
-    }
-}
-
-fn determine_chunk_end(
-    headers: &[String],
-    data: &[Vec<String>],
-    explizite_breiten: &[usize],
-    start: usize,
-    available_total: usize,
-) -> usize {
-    let min_width = effective_min_column_width();
-    let squeeze_threshold = available_total.saturating_mul(2) / 5;
-
-    let mut end = start;
-    let mut used = 0usize;
-
-    while end < headers.len() {
-        let guessed_width = if let Some(breite) = get_explicit_width(explizite_breiten, end) {
-            clamp_explicit_width(breite)
-        } else {
-            estimate_natural_width_for_chunking(&headers[end], data, end)
-        };
-
-        let needed = guessed_width + COLUMN_OVERHEAD + 1;
-
-        if used + needed > available_total {
-            let remaining_total = available_total.saturating_sub(used);
-            let remaining_content = remaining_total.saturating_sub(COLUMN_OVERHEAD + 1);
-
-            if end > start && remaining_total >= squeeze_threshold && remaining_content >= min_width {
-                end += 1;
-            } else if end == start {
-                end += 1;
-            }
-
-            break;
-        }
-
-        used += needed;
-        end += 1;
-    }
-
-    if end <= start {
-        (start + 1).min(headers.len())
-    } else {
-        end
-    }
-}
-
-fn build_chunk_widths(
-    chunk_headers: &[String],
-    chunk_data: &[Vec<String>],
-    explizite_breiten: &[usize],
-    start: usize,
-    end: usize,
-    available_total: usize,
-) -> Vec<usize> {
-    let min_width = effective_min_column_width();
-    let chunk_overhead = chunk_headers.len() * (COLUMN_OVERHEAD + 1);
-    let chunk_budget = available_total.saturating_sub(chunk_overhead);
-
-    let mut chunk_widths =
-        compute_column_widths_from_global_mass(chunk_headers, chunk_data, chunk_budget);
-
-    if chunk_widths.len() != chunk_headers.len() {
-        chunk_widths.resize(chunk_headers.len(), min_width);
-    }
-
-    for width in chunk_widths.iter_mut() {
-        *width = clamp_chunk_width(*width);
-    }
-
-    for (local_i, global_i) in (start..end).enumerate() {
-        if let Some(breite) = get_explicit_width(explizite_breiten, global_i) {
-            chunk_widths[local_i] = clamp_explicit_width(breite);
-        }
-    }
-
-    let explicit_mask = explicit_mask_for_range(explizite_breiten, start, end);
-
-    shrink_widths_to_budget_preserving_explicit(
-        &mut chunk_widths,
-        chunk_budget,
-        min_width,
-        &explicit_mask,
-    );
-
-    stretch_last_non_explicit_or_last_column(&mut chunk_widths, chunk_budget, &explicit_mask);
-
-    chunk_widths
-}
-
-fn build_meta_widths(
-    power_buckets: &[String],
-    line_numbers: &[usize],
-    available_total: usize,
-) -> (Vec<usize>, usize) {
-    let power_width = power_buckets
-        .iter()
-        .map(|s| s.chars().count())
-        .max()
-        .unwrap_or(1)
-        .max(POTENZ_HEADER.chars().count());
-
-    let line_width = line_numbers
-        .iter()
-        .map(|n| n.to_string().chars().count())
-        .max()
-        .unwrap_or(1)
-        .max(ZEILE_HEADER.chars().count());
-
-    let widths = vec![power_width, line_width];
-    let overhead = widths.len() * (COLUMN_OVERHEAD + 1);
-    let content = widths.iter().sum::<usize>();
-    let reserved_total = (content + overhead).min(available_total);
-
-    (widths, reserved_total)
-}
-
-fn prepend_meta_columns(
-    chunk_headers: &[String],
-    chunk_data: &[Vec<String>],
-    chunk_line_numbers: &[usize],
-) -> (Vec<String>, Vec<Vec<String>>, Vec<usize>) {
-    let power_buckets = build_power_bucket_strings(chunk_line_numbers);
-
-    let mut headers = vec![POTENZ_HEADER.to_string(), ZEILE_HEADER.to_string()];
-    headers.extend(chunk_headers.iter().cloned());
-
-    let mut data = Vec::with_capacity(chunk_data.len());
-    for (idx, row) in chunk_data.iter().enumerate() {
-        let mut new_row = Vec::with_capacity(row.len() + 2);
-        new_row.push(power_buckets[idx].clone());
-        new_row.push(chunk_line_numbers[idx].to_string());
-        new_row.extend(row.iter().cloned());
-        data.push(new_row);
-    }
-
-    let (meta_widths, _) = build_meta_widths(&power_buckets, chunk_line_numbers, usize::MAX);
-
-    (headers, data, meta_widths)
-}
-
-fn stretch_last_column_to_fill_budget(widths: &mut [usize], chunk_budget: usize) {
-    if widths.is_empty() {
-        return;
-    }
-
-    let current_total: usize = widths.iter().sum();
-    if current_total < chunk_budget {
-        let extra = chunk_budget - current_total;
-        let last_idx = widths.len() - 1;
-        widths[last_idx] += extra;
-    }
-}
+use crate::table_printer::widths::{
+    build_chunk_widths, clamp_explicit_width, determine_chunk_end, effective_min_column_width,
+    get_explicit_width, stretch_last_column_to_fill_budget,
+};
 
 pub fn print_table_chunked_with_line_numbers(
     headers: &[String],
@@ -471,9 +89,6 @@ pub fn print_table_chunked_with_line_numbers(
         let total_overhead = augmented_widths.len() * (COLUMN_OVERHEAD + 1);
         let total_budget = render_width.saturating_sub(total_overhead);
 
-        // Ganz wichtig:
-        // Hier NICHT mehr alles erneut schrumpfen.
-        // Sonst werden explizite Breiten wieder kaputt gemacht.
         stretch_last_column_to_fill_budget(&mut augmented_widths, total_budget);
 
         let table_rows = convert_to_table_rows_with_line_numbers(
@@ -556,8 +171,11 @@ pub fn print_table_with_offset(
         .saturating_sub(1)
         .saturating_sub(sanitized_headers.len() * COLUMN_OVERHEAD);
 
-    let mut column_widths =
-        compute_column_widths_from_global_mass(&sanitized_headers, data, available_budget);
+    let mut column_widths = crate::table_printer::table_utils::compute_column_widths_from_global_mass(
+        &sanitized_headers,
+        data,
+        available_budget,
+    );
 
     for (i, width) in column_widths.iter_mut().enumerate() {
         if let Some(explicit) = get_explicit_width(explizite_breiten, i) {
@@ -608,13 +226,7 @@ pub fn print_table_chunked_with_offset(
     let mut start = 0usize;
 
     while start < headers.len() {
-        let end = determine_chunk_end(
-            headers,
-            data,
-            explizite_breiten,
-            start,
-            available_total,
-        );
+        let end = determine_chunk_end(headers, data, explizite_breiten, start, available_total);
 
         let chunk_headers: Vec<String> = (start..end)
             .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
@@ -666,8 +278,7 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
         .collect();
 
     let layout = build_table_layout(&sanitized_headers, data);
-    let table_rows =
-        convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
+    let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
     render_rows(layout.term_width, layout.column_widths, &table_rows, true);
 }

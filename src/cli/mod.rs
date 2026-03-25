@@ -1,8 +1,10 @@
-// src/cli/mod.rs
 mod bereich;
 pub mod parser;
+pub mod parser_ranges;
+pub mod parser_support;
+pub mod parser_types;
 pub mod utils;
 
 pub use bereich::TextBereich;
-// Exportiere die parse_cli_args Funktion aus dem parser-Modul
 pub use parser::parse_cli_args;
+pub use parser_types::{SpaltenNamen, SpaltenNamenListe};
