@@ -1,6 +1,10 @@
 use std::collections::{BTreeSet, HashMap};
 
 use colored::*;
+use syntect::easy::HighlightLines;
+use syntect::highlighting::ThemeSet;
+use syntect::parsing::SyntaxSet;
+use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
 
 use crate::column_categories_complete::KategorieMap;
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
@@ -111,92 +115,42 @@ impl<'a> CliOutput<'a> {
         }
     }
 
-    fn pretty_html(&self, text: &str) -> String {
-        let mut out = String::with_capacity(text.len() * 2);
-        let mut chars = text.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch == '<' {
-                let mut tag = String::from("<");
-                while let Some(&c) = chars.peek() {
-                    tag.push(c);
-                    chars.next();
-                    if c == '>' {
-                        break;
-                    }
-                }
-                out.push_str(&tag.bright_cyan().bold().to_string());
-            } else {
-                let mut txt = String::new();
-                txt.push(ch);
-                while let Some(&c) = chars.peek() {
-                    if c == '<' {
-                        break;
-                    }
-                    txt.push(c);
-                    chars.next();
-                }
-                out.push_str(&txt.white().to_string());
-            }
+
+    fn syntect_extension(&self) -> Option<&'static str> {
+        match self.out_type {
+            OutputSyntax::HTML => Some("html"),
+            OutputSyntax::BBCode => Some("xml"),
+            OutputSyntax::CSV => Some("csv"),
+            OutputSyntax::Markdown | OutputSyntax::Emacs => Some("md"),
+            _ => None,
         }
-        out
     }
 
-    fn pretty_bbcode(&self, text: &str) -> String {
-        let mut out = String::with_capacity(text.len() * 2);
-        let mut chars = text.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch == '[' {
-                let mut tag = String::from("[");
-                while let Some(&c) = chars.peek() {
-                    tag.push(c);
-                    chars.next();
-                    if c == ']' {
-                        break;
-                    }
-                }
-                out.push_str(&tag.bright_magenta().bold().to_string());
+    fn pretty_with_syntect(&self, text: &str) -> Option<String> {
+        let ext = self.syntect_extension()?;
+        let ps = SyntaxSet::load_defaults_newlines();
+        let ts = ThemeSet::load_defaults();
+        let theme = ts
+            .themes
+            .get("base16-ocean.dark")
+            .or_else(|| ts.themes.values().next())?;
+        let syntax = ps
+            .find_syntax_by_extension(ext)
+            .unwrap_or_else(|| ps.find_syntax_plain_text());
+        let mut highlighter = HighlightLines::new(syntax, theme);
+        let mut out = String::new();
+        for line in LinesWithEndings::from(text) {
+            if let Ok(ranges) = highlighter.highlight_line(line, &ps) {
+                out.push_str(&as_24_bit_terminal_escaped(&ranges, false));
             } else {
-                out.push(ch);
+                out.push_str(line);
             }
         }
-        out
-    }
-
-    fn pretty_csv(&self, text: &str) -> String {
-        let mut out = String::with_capacity(text.len() * 2);
-        for ch in text.chars() {
-            if ch == ';' {
-                out.push_str(&";".bright_black().bold().to_string());
-            } else if ch == '\n' || ch == '\r' {
-                out.push(ch);
-            } else {
-                out.push_str(&ch.to_string().green().to_string());
-            }
-        }
-        out
-    }
-
-    fn pretty_markdown(&self, text: &str) -> String {
-        let mut out = String::with_capacity(text.len() * 2);
-        for ch in text.chars() {
-            match ch {
-                '|' => out.push_str(&"|".bright_black().bold().to_string()),
-                '#' => out.push_str(&"#".bright_blue().bold().to_string()),
-                '*' | '_' | '`' => out.push_str(&ch.to_string().bright_magenta().bold().to_string()),
-                _ => out.push(ch),
-            }
-        }
-        out
+        Some(out)
     }
 
     fn pretty_text(&self, text: &str) -> String {
-        match self.out_type {
-            OutputSyntax::HTML => self.pretty_html(text),
-            OutputSyntax::BBCode => self.pretty_bbcode(text),
-            OutputSyntax::CSV => self.pretty_csv(text),
-            OutputSyntax::Markdown | OutputSyntax::Emacs => self.pretty_markdown(text),
-            _ => text.to_string(),
-        }
+        self.pretty_with_syntect(text).unwrap_or_else(|| text.to_string())
     }
 
     pub fn cliout2(&mut self, text: &str) {
@@ -273,6 +227,16 @@ impl<'a> CliOutput<'a> {
             .replace('"', "&quot;")
     }
 
+    fn strip_trailing_id_suffix(text: &str) -> &str {
+        let trimmed = text.trim_end();
+        if let Some(pos) = trimmed.rfind(" (ID_") {
+            if trimmed.ends_with(')') {
+                return trimmed[..pos].trim_end();
+            }
+        }
+        trimmed
+    }
+
     fn normalize_meta_label(label: &str, ober: &str) -> String {
         let mut out = label.replace(' ', "_");
         out = out.replace(",", "");
@@ -293,7 +257,7 @@ impl<'a> CliOutput<'a> {
         let matches: Vec<_> = map
             .alle_eintraege
             .iter()
-            .filter(|e| e.spaltennummern.iter().any(|&n| n as usize == global_idx))
+            .filter(|e| e.spaltennummern.iter().any(|&n| n > 0 && (n as usize).saturating_sub(1) == global_idx))
             .collect();
         if matches.is_empty() {
             return None;
@@ -318,13 +282,11 @@ impl<'a> CliOutput<'a> {
             .join(",")
             + ",";
 
-        let p4 = if labels.first().map(|s| s.contains("Geist") || s.contains("nachvollziehen")).unwrap_or(false)
-            && labels.iter().any(|s| s.contains("nachvollziehen") || s.contains("Geist"))
-        {
+        let p4 = if labels.iter().any(|s| s.contains("Geist") || s.contains("nachvollziehen")) {
             if matches.iter().any(|e| e.unterkategorie.contains("nachvollziehen")) && matches.len() >= 4 {
-                if global_idx == 242 || global_idx == 426 { "4,0" } else { "0,4" }
+                if global_idx + 1 == 243 || global_idx + 1 == 427 { "4,0" } else { "0,4" }
             } else if matches.len() >= 3 {
-                if global_idx == 426 { "4,0" } else { "0,4" }
+                if global_idx + 1 == 427 { "4,0" } else { "0,4" }
             } else {
                 ""
             }
@@ -360,6 +322,7 @@ impl<'a> CliOutput<'a> {
             for (visible_pos, &col_idx) in visible_cols.iter().enumerate() {
                 let raw = row.cells.get(col_idx).map(|c| c.original_content.as_str()).unwrap_or("");
                 let (display, hidden_idx) = self.strip_hidden_idx(raw);
+                let display = if display_line_idx == 0 && visible_pos >= 2 { Self::strip_trailing_id_suffix(display) } else { display };
                 let escaped = Self::escape_html(display);
                 if display_line_idx == 0 {
                     if visible_pos == 0 {
