@@ -6,7 +6,7 @@ use crate::table_printer::meta_columns::{
     build_meta_widths, build_power_bucket_strings, prepend_meta_columns,
 };
 use crate::table_printer::sanitize::{
-    sanitize_chunk_data, sanitize_chunk_data_with_rows, sanitize_header_preserve_id,
+    sanitize_chunk_data, sanitize_chunk_data_with_rows, sanitize_header_for_output, sanitize_header_preserve_id,
 };
 use crate::table_printer::table_utils::{
     build_table_layout,
@@ -28,6 +28,7 @@ pub fn print_table_chunked_with_line_numbers(
     original_line_numbers: &[usize],
     keineleereninhalte: bool,
     out_type: OutputSyntax,
+    pretty_output: bool,
 ) {
     let term_width = get_terminal_width();
     let available_total = term_width.saturating_sub(1);
@@ -50,7 +51,15 @@ pub fn print_table_chunked_with_line_numbers(
         );
 
         let chunk_headers: Vec<String> = (start..end)
-            .map(|global_i| sanitize_header_preserve_id(&headers[global_i], global_i))
+            .map(|global_i| {
+                let structured = !matches!(out_type, OutputSyntax::Plain);
+                let mut header = sanitize_header_for_output(&headers[global_i], global_i, structured);
+                if matches!(out_type, OutputSyntax::HTML) {
+                    header.push('\u{1f}');
+                    header.push_str(&format!("IDX:{}", global_i));
+                }
+                header
+            })
             .collect();
 
         let raw_chunk_data: Vec<Vec<String>> = data
@@ -99,7 +108,7 @@ pub fn print_table_chunked_with_line_numbers(
             &chunk_line_numbers,
         );
 
-        render_rows(render_width, augmented_widths, &table_rows, false, out_type);
+        render_rows(render_width, augmented_widths, &table_rows, false, out_type, pretty_output);
 
         if end < headers.len() {
             println!();
@@ -115,9 +124,11 @@ fn build_output<'a>(
     column_widths: Vec<usize>,
     line_numbering: bool,
     out_type: OutputSyntax,
+    pretty_output: bool,
 ) -> CliOutput<'a> {
     let mut output = CliOutput::new(tables, out_type);
     output.color_enabled = out_type.uses_terminal_colors();
+    output.pretty_output = pretty_output;
     output.table_width = render_width;
     output.column_widths = column_widths;
     output.line_numbering = line_numbering;
@@ -131,9 +142,10 @@ fn render_rows(
     table_rows: &[TableRow],
     line_numbering: bool,
     out_type: OutputSyntax,
+    pretty_output: bool,
 ) {
     let tables = Tables::new(Some(100));
-    let mut output = build_output(&tables, render_width, column_widths, line_numbering, out_type);
+    let mut output = build_output(&tables, render_width, column_widths, line_numbering, out_type, pretty_output);
 
     let display_lines: BTreeSet<usize> = (0..table_rows.len()).collect();
 
@@ -195,7 +207,7 @@ pub fn print_table_with_offset(
     );
 
     let available_total = term_width.saturating_sub(3);
-    render_rows(available_total, column_widths, &table_rows, true, OutputSyntax::Plain);
+    render_rows(available_total, column_widths, &table_rows, true, OutputSyntax::Plain, false);
 }
 
 pub fn print_table_chunked(
@@ -263,7 +275,7 @@ pub fn print_table_chunked_with_offset(
             original_start_line,
         );
 
-        render_rows(render_width, chunk_widths, &table_rows, true, OutputSyntax::Plain);
+        render_rows(render_width, chunk_widths, &table_rows, true, OutputSyntax::Plain, false);
 
         if end < headers.len() {
             println!();
@@ -283,5 +295,5 @@ pub fn print_table_auto(headers: &[String], data: &[Vec<String>], row_ranges: &[
     let layout = build_table_layout(&sanitized_headers, data);
     let table_rows = convert_to_table_rows(&sanitized_headers, data, &layout.column_widths, row_ranges);
 
-    render_rows(layout.term_width, layout.column_widths, &table_rows, true, OutputSyntax::Plain);
+    render_rows(layout.term_width, layout.column_widths, &table_rows, true, OutputSyntax::Plain, false);
 }

@@ -37,6 +37,7 @@ pub struct TextBereich {
     pub exact_visible_columns: Vec<usize>,
     pub pypy_compat: PypyCompatConfig,
     pub output_syntax: OutputSyntax,
+    pub pretty_output: bool,
 }
 
 impl TextBereich {
@@ -119,6 +120,7 @@ impl Default for TextBereich {
             exact_visible_columns: Vec::new(),
             pypy_compat: PypyCompatConfig::default(),
             output_syntax: OutputSyntax::Plain,
+            pretty_output: false,
         }
     }
 }

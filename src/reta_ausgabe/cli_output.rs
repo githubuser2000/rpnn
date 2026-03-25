@@ -12,6 +12,7 @@ use crate::reta_ausgabe::utils::{unicode_pad, word_wrap};
 pub struct CliOutput<'a> {
     pub out_type: OutputSyntax,
     pub color_enabled: bool,
+    pub pretty_output: bool,
     pub one_table: bool,
     pub table_width: usize,
     pub column_widths: Vec<usize>,
@@ -25,6 +26,7 @@ impl<'a> CliOutput<'a> {
         CliOutput {
             out_type,
             color_enabled: true,
+            pretty_output: false,
             one_table: false,
             table_width: 80,
             column_widths: Vec::new(),
@@ -109,10 +111,102 @@ impl<'a> CliOutput<'a> {
         }
     }
 
+    fn pretty_html(&self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len() * 2);
+        let mut chars = text.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '<' {
+                let mut tag = String::from("<");
+                while let Some(&c) = chars.peek() {
+                    tag.push(c);
+                    chars.next();
+                    if c == '>' {
+                        break;
+                    }
+                }
+                out.push_str(&tag.bright_cyan().bold().to_string());
+            } else {
+                let mut txt = String::new();
+                txt.push(ch);
+                while let Some(&c) = chars.peek() {
+                    if c == '<' {
+                        break;
+                    }
+                    txt.push(c);
+                    chars.next();
+                }
+                out.push_str(&txt.white().to_string());
+            }
+        }
+        out
+    }
+
+    fn pretty_bbcode(&self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len() * 2);
+        let mut chars = text.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '[' {
+                let mut tag = String::from("[");
+                while let Some(&c) = chars.peek() {
+                    tag.push(c);
+                    chars.next();
+                    if c == ']' {
+                        break;
+                    }
+                }
+                out.push_str(&tag.bright_magenta().bold().to_string());
+            } else {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
+    fn pretty_csv(&self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len() * 2);
+        for ch in text.chars() {
+            if ch == ';' {
+                out.push_str(&";".bright_black().bold().to_string());
+            } else if ch == '\n' || ch == '\r' {
+                out.push(ch);
+            } else {
+                out.push_str(&ch.to_string().green().to_string());
+            }
+        }
+        out
+    }
+
+    fn pretty_markdown(&self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len() * 2);
+        for ch in text.chars() {
+            match ch {
+                '|' => out.push_str(&"|".bright_black().bold().to_string()),
+                '#' => out.push_str(&"#".bright_blue().bold().to_string()),
+                '*' | '_' | '`' => out.push_str(&ch.to_string().bright_magenta().bold().to_string()),
+                _ => out.push(ch),
+            }
+        }
+        out
+    }
+
+    fn pretty_text(&self, text: &str) -> String {
+        match self.out_type {
+            OutputSyntax::HTML => self.pretty_html(text),
+            OutputSyntax::BBCode => self.pretty_bbcode(text),
+            OutputSyntax::CSV => self.pretty_csv(text),
+            OutputSyntax::Markdown | OutputSyntax::Emacs => self.pretty_markdown(text),
+            _ => text.to_string(),
+        }
+    }
+
     pub fn cliout2(&mut self, text: &str) {
         self.resulting_output.push(text.to_string());
         if !matches!(self.out_type, OutputSyntax::Nichts) {
-            print!("{}", text);
+            if self.pretty_output && !matches!(self.out_type, OutputSyntax::Plain) {
+                print!("{}", self.pretty_text(text));
+            } else {
+                print!("{}", text);
+            }
         }
     }
 
@@ -194,7 +288,7 @@ impl<'a> CliOutput<'a> {
         out
     }
 
-    fn header_meta_class(global_idx: usize) -> Option<String> {
+    pub fn header_meta_class(global_idx: usize) -> Option<String> {
         let map = KategorieMap::new();
         let matches: Vec<_> = map
             .alle_eintraege

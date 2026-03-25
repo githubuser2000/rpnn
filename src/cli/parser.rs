@@ -135,6 +135,9 @@ pub fn parse_cli_args(
                 "--keineleereninhalte" => {
                     bereich.enable_empty_content_filter();
                 }
+                "--pretty" => {
+                    bereich.pretty_output = true;
+                }
                 "--art" => {
                     if let Some((_, nachfolger)) = iter.next() {
                         if let Some(out) = OutputSyntax::from_art_value(nachfolger) {
