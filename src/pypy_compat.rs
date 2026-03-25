@@ -432,11 +432,16 @@ pub fn apply_pypy_compat(
         }
 
         if had_explicit_order {
-            bereich.spaltenreihenfolgeundnurdiese = explicit_order_before;
-        } else {
+            let mut merged = explicit_order_before.clone();
+            if !bereich.pypy_compat.hidden_fraction_inputs {
+                merged.extend(appended.iter().copied());
+                merged.sort_unstable();
+                merged.dedup();
+            }
+            bereich.spaltenreihenfolgeundnurdiese = merged;
+        } else if !combined.is_empty() {
             bereich.spaltenreihenfolgeundnurdiese = combined.clone();
         }
-
         if let Some(&(first_from, _)) = bereich.spalten_bereiche.first() {
             bereich.von_spalte = first_from;
         } else {

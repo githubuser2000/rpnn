@@ -19,16 +19,25 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let kategorie_map = lade_kategorie_map();
+        let kategorie_map = lade_kategorie_map();
     let verarbeiter = SpaltenVerarbeiter::new(&args, &kategorie_map);
     let (mut bereich, spalten_namen) = verarbeiter.verarbeite_zu_tupel()?;
 
-    let mut generated_befehle: BTreeSet<String> =
-        verarbeite_kategorien(&kategorie_map, &mut bereich, &spalten_namen)?;
+    let (_dashes, _params, _bereich2, _last_spaltenname, spalten_namen_liste) =
+        crate::cli::parse_cli_args(&args, Some(&kategorie_map));
+
+    let mut generated_befehle: BTreeSet<String> = BTreeSet::new();
+
+    for spalten_namen in &spalten_namen_liste.eintraege {
+        generated_befehle.extend(
+            verarbeite_kategorien(&kategorie_map, &mut bereich, spalten_namen)?
+        );
+    }
+
     generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
 
     let wants_gebr_prim_generator = generated_befehle.iter().any(|g| g.contains("gebr") && g.contains("prim"));
-    if wants_gebr_prim_generator {
+   if wants_gebr_prim_generator {
         let upper = if bereich.bis_zeile > 1 { bereich.bis_zeile.min(23) } else { 23 };
         for n in 2..=upper {
             bereich.pypy_compat.gebrochengalaxie.insert(n);

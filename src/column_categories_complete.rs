@@ -72,7 +72,7 @@ impl KategorieMap {
 
         // reiner Generatorfall aus words.py / column_categories_complete:
         // procontra|bedeutung + primzahlkreuz -> leere direkte Spaltenliste
-        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
+        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum" )
             && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
         {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
