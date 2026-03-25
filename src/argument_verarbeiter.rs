@@ -248,13 +248,22 @@ impl<'a> SpaltenVerarbeiter<'a> {
         Ok(())
     }
 
-    fn fallback_zu_standards(
-        &self,
-        bereich: &mut TextBereich,
-        _spalten_namen: &SpaltenNamen,
-    ) -> Result<(), Box<dyn Error>> {
-        bereich.von_spalte = 1;
-        bereich.bis_spalte = 1;
-        Ok(())
-    }
+fn fallback_zu_standards(
+    &self,
+    bereich: &mut TextBereich,
+    _spalten_namen: &SpaltenNamen,
+) -> Result<(), Box<dyn Error>> {
+    bereich.spalten_bereiche.clear();
+    bereich.spaltenreihenfolgeundnurdiese.clear();
+    bereich.exact_visible_columns.clear();
+
+    bereich.von_spalte = usize::MAX;
+    bereich.bis_spalte = usize::MAX;
+
+    bereich.spalten_gefunden = false;
+    bereich.spalten_gesucht = false;
+    bereich.spalten_gesucht2 = false;
+
+    Ok(())
+}
 }

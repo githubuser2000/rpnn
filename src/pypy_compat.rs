@@ -337,7 +337,9 @@ pub fn apply_pypy_compat(
     let had_explicit_order = !bereich.spaltenreihenfolgeundnurdiese.is_empty();
     let explicit_order_before = bereich.spaltenreihenfolgeundnurdiese.clone();
 
-    let _dbs = build_extra_csv_dbs(base)?;
+    // Die gebrochen-rationalen CSVs werden direkt als zusätzliche Spalten
+    // in die bestehende Haupttabelle csv_data eingereiht.
+    // Keine separaten Hilfs-SQL-Tabellen mehr nötig.
     let (mut headers, mut rows) = load_table(conn)?;
 
     let gal = read_csv_matrix(&csv_path(base, "gebrochen-rational-galaxie.csv"))?;
@@ -410,17 +412,16 @@ pub fn apply_pypy_compat(
     appended.extend(bereich.pypy_compat.added_headers.values().flat_map(|v| v.iter().copied()));
     appended.sort_unstable();
     appended.dedup();
-    if !appended.is_empty() {
+        if !appended.is_empty() {
         let mut combined = existing_selected;
+
         if !bereich.pypy_compat.hidden_fraction_inputs {
             combined.extend(appended.iter().copied());
             combined.sort_unstable();
             combined.dedup();
         }
 
-        if !combined.is_empty() {
-            bereich.spalten_bereiche = combined.iter().map(|&col| (col, col)).collect();
-        }
+        bereich.spalten_bereiche = combined.iter().map(|&col| (col, col)).collect();
 
         if !bereich.pypy_compat.hidden_fraction_inputs {
             let mut visible = bereich.exact_visible_columns.clone();
@@ -432,20 +433,25 @@ pub fn apply_pypy_compat(
 
         if had_explicit_order {
             bereich.spaltenreihenfolgeundnurdiese = explicit_order_before;
-        } else if !combined.is_empty() {
-            bereich.spaltenreihenfolgeundnurdiese = combined;
+        } else {
+            bereich.spaltenreihenfolgeundnurdiese = combined.clone();
         }
 
         if let Some(&(first_from, _)) = bereich.spalten_bereiche.first() {
             bereich.von_spalte = first_from;
+        } else {
+            bereich.von_spalte = usize::MAX;
         }
+
         if let Some(&(_, last_to)) = bereich.spalten_bereiche.last() {
             bereich.bis_spalte = last_to;
+        } else {
+            bereich.bis_spalte = usize::MAX;
         }
-        bereich.spalten_gefunden = true;
-        bereich.spalten_gesucht = true;
+
+        bereich.spalten_gefunden = !combined.is_empty();
+        bereich.spalten_gesucht = !combined.is_empty();
         bereich.spalten_gesucht2 = false;
     }
-
     Ok(())
 }

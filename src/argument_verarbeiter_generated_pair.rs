@@ -202,25 +202,31 @@ fn verarbeite_automatische_spalten(
         Ok(())
     }
 
-    fn fallback_zu_standards(
-        &self,
-        bereich: &mut TextBereich,
-        spalten_namen: &SpaltenNamen,
-    ) -> Result<(), Box<dyn Error>> {
-        println!(
-            "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
-            spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );
+fn fallback_zu_standards(
+    &self,
+    bereich: &mut TextBereich,
+    spalten_namen: &SpaltenNamen,
+) -> Result<(), Box<dyn Error>> {
+    println!(
+        "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
+        spalten_namen.oberkategorie, spalten_namen.unterkategorie
+    );
 
-        self.zeige_alternative_kombinationen();
+    self.zeige_alternative_kombinationen();
 
-        println!("⚠️  Verwende Standard-Spalte 1 als Fallback");
-        bereich.von_spalte = 1;
-        bereich.bis_spalte = 1;
+    bereich.spalten_bereiche.clear();
+    bereich.spaltenreihenfolgeundnurdiese.clear();
+    bereich.exact_visible_columns.clear();
 
-        Ok(())
-    }
+    bereich.von_spalte = usize::MAX;
+    bereich.bis_spalte = usize::MAX;
 
+    bereich.spalten_gefunden = false;
+    bereich.spalten_gesucht = false;
+    bereich.spalten_gesucht2 = false;
+
+    Ok(())
+}
     fn zeige_alternative_kombinationen(&self) {
         println!("ℹ️  Versuche es mit diesen Kombinationen:");
         println!("  --spaltenname 'Menschliches' 'Motive'");

@@ -7,11 +7,55 @@ fn normalize_category_key(s: &str) -> String {
         .replace('_', "")
         .replace('-', "")
         .replace(' ', "")
+        .replace('/', "")
 }
 
 fn contains_any_alias(token: &str, aliases: &[&str]) -> bool {
     let t = normalize_category_key(token);
     aliases.iter().any(|a| normalize_category_key(a) == t)
+}
+fn map_fraction_category_to_pypy_compat(
+    bereich: &mut TextBereich,
+    ober: &str,
+    unter: &str,
+) -> bool {
+    let ober_n = normalize_category_key(ober);
+    let unter_n = normalize_category_key(unter);
+
+    let n = match unter_n.parse::<usize>() {
+        Ok(v) if (2..=23).contains(&v) => v,
+        _ => return false,
+    };
+
+    match ober_n.as_str() {
+        "gebrochenrationalgalaxienm"
+        | "gebrochenrationalgalaxien"
+        | "gebrochenrationalgalaxiennm"
+        | "gebrochengalaxie" => {
+            bereich.pypy_compat.gebrochengalaxie.insert(n);
+        }
+        "gebrochenrationaluniversumnm"
+        | "gebrochenrationaluniversum"
+        | "gebrochenrationaluniversumn"
+        | "gebrochenuniversum" => {
+            bereich.pypy_compat.gebrochenuniversum.insert(n);
+        }
+        "gebrochenrationalgefuehlenm"
+        | "gebrochenrationalgefuehle"
+        | "gebrochenrationalemotionen"
+        | "gebrochenemotion" => {
+            bereich.pypy_compat.gebrochenemotion.insert(n);
+        }
+        "gebrochenrationalstrukturgroessenm"
+        | "gebrochenrationalstrukturgroesse"
+        | "gebrochenrationalgroesse"
+        | "gebrochengroesse" => {
+            bereich.pypy_compat.gebrochengroesse.insert(n);
+        }
+        _ => return false,
+    }
+
+    true
 }
 
 fn infer_generator_only_request(ober: &str, unter: &str) -> BTreeSet<String> {
@@ -159,7 +203,6 @@ if is_prim_generated_group {
 
     out
 }
-
 pub fn verarbeite_kategorien(
     kategorie_map: &KategorieMap,
     bereich: &mut TextBereich,
@@ -167,6 +210,17 @@ pub fn verarbeite_kategorien(
 ) -> Result<BTreeSet<String>, Box<dyn std::error::Error>> {
     let mut generated_befehle = BTreeSet::new();
 
+    let fraction_requested = map_fraction_category_to_pypy_compat(
+        bereich,
+        &spalten_namen.oberkategorie,
+        &spalten_namen.unterkategorie,
+    );
+
+    if fraction_requested {
+        bereich.spalten_gefunden = true;
+        bereich.spalten_gesucht = true;
+        bereich.spalten_gesucht2 = false;
+    }
     let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
         &spalten_namen.oberkategorie,
         &spalten_namen.unterkategorie,
@@ -175,17 +229,12 @@ pub fn verarbeite_kategorien(
     if !gefundene_spalten.is_empty() {
         bereich.spalten_gefunden = true;
 
-        // Wichtig: Eine explizit vom Benutzer gesetzte Reihenfolge wie
-        // `--spaltenreihenfolgeundnurdiese 3,2,1` darf hier NICHT überschrieben werden.
-        // Diese Reihenfolge bezieht sich auf die durch die Kategorie gefundenen Spalten
-        // und wird später in query.rs auf die bereits selektierten Spalten angewendet.
         if bereich.spaltenreihenfolgeundnurdiese.is_empty() {
             bereich.spaltenreihenfolgeundnurdiese = gefundene_spalten
                 .iter()
                 .map(|&x| x as usize)
                 .collect();
         }
-
     }
 
     generated_befehle.extend(infer_generator_only_request(
@@ -216,3 +265,4 @@ pub fn verarbeite_kategorien(
 
     Ok(generated_befehle)
 }
+

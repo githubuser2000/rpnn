@@ -560,11 +560,11 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         (vec!["Bedeutung", "bedeutung"], vec!["Gestirn", "gestirn", "mond", "sonne", "planet"], vec![64, 154]),
         (vec!["Bedeutung", "bedeutung"], vec!["Konjunktiv_Wurzelbildung", "konjunktiv", "wurzel"], vec![106]),
         (vec!["Bedeutung", "bedeutung"], vec!["Mechanismen_der_Züchtung", "mechanismen", "wesen", "zuechtung", "züchtung", "züchten", "zuechten"], vec![107, 108, 109]),
-        (vec!["gebrochen-rational_Galaxie_n/m", "gebrochengalaxie"], vec!["{'2'", "'3'", "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "'10'", "'11'", "'12'", "'13'", "'14'", "'15'", "'16'", "'17'", "'18'", "'19'", "'20'", "'21'", "'22'", "'23'}"], vec![]),
-        (vec!["gebrochen-rational_Universum_n/m", "gebrochenuniversum"], vec!["{'2'", "'3'", "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "'10'", "'11'", "'12'", "'13'", "'14'", "'15'", "'16'", "'17'", "'18'", "'19'", "'20'", "'21'", "'22'", "'23'}"], vec![]),
-        (vec!["gebrochen-rational_Gefuehle_n/m", "gebrochenemotion"], vec!["{'2'", "'3'", "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "'10'", "'11'", "'12'", "'13'", "'14'", "'15'", "'16'", "'17'", "'18'", "'19'", "'20'", "'21'", "'22'", "'23'}"], vec![]),
-        (vec!["gebrochen-rational_Strukturgroesse_n/m", "gebrochengroesse"], vec!["{'2'", "'3'", "'4'", "'5'", "'6'", "'7'", "'8'", "'9'", "'10'", "'11'", "'12'", "'13'", "'14'", "'15'", "'16'", "'17'", "'18'", "'19'", "'20'", "'21'", "'22'", "'23'}"], vec![]),
-        (vec!["Symbole", "symbole"], vec!["Religionen"], vec![36, 37]),
+                (vec!["gebrochen-rational_Galaxie_n/m", "gebrochengalaxie"], vec!["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"], vec![]),
+        (vec!["gebrochen-rational_Universum_n/m", "gebrochenuniversum"], vec!["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"], vec![]),
+        (vec!["gebrochen-rational_Gefuehle_n/m", "gebrochenemotion"], vec!["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"], vec![]),
+        (vec!["gebrochen-rational_Strukturgroesse_n/m", "gebrochengroesse"], vec!["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"], vec![]),
+       (vec!["Symbole", "symbole"], vec!["Religionen"], vec![36, 37]),
         (vec!["Symbole", "symbole"], vec!["Drei"], vec![452, 460]),
         (vec!["Symbole", "symbole"], vec!["Vier"], vec![453]),
         (vec!["Symbole", "symbole"], vec!["Fünf", "Fuenf"], vec![454]),
@@ -736,6 +736,7 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     }
     
     // Methode um Kategorien nach Spaltennummer zu filtern
+    // Diese Funktion wird niemals verwendet. Wahrscheinlich kommt sie in den Warnings
     pub fn filtere_nach_spaltennummern(&self, nummern: &[usize]) -> Vec<&KategorieEintrag> {
         let nummern_set: HashSet<u32> = nummern.iter().map(|&n| n as u32).collect();
         
@@ -750,6 +751,7 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     // In column_categories_complete.rs, innerhalb des impl KategorieMap:
 
     // Methode um SQL-SELECTs zu generieren
+    // Diese Funktion wird niemals verwendet. Wahrscheinlich kommt sie in den Warnings
     pub fn generiere_sql_selects(&self, 
                                  oberkategorie_name: &str, 
                                  unterkategorie_name: &str,

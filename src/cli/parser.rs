@@ -430,10 +430,15 @@ pub fn parse_cli_args(
             }
         } else {
             println!("⚠️  Kategoriedaten nicht verfügbar");
-            bereich.spalten_bereiche.push((1, 1));
-            bereich.von_spalte = 1;
-            bereich.bis_spalte = 1;
-        }
+            bereich.spalten_bereiche.clear();
+            bereich.spaltenreihenfolgeundnurdiese.clear();
+            bereich.exact_visible_columns.clear();
+            bereich.von_spalte = usize::MAX;
+            bereich.bis_spalte = usize::MAX;
+            bereich.spalten_gefunden = false;
+            bereich.spalten_gesucht = false;
+            bereich.spalten_gesucht2 = false;
+       }
     }
 
     (minuses, params, bereich, spalten_namen, spalten_namen_liste)
