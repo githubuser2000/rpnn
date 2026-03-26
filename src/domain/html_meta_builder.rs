@@ -48,7 +48,7 @@ fn p2_slots_for_column(col0: u32) -> Vec<Option<String>> {
     // - bei 3 Hauptgruppen: p3_0..p3_26 => 27 Slots
     //
     // Also: 25 + (Anzahl konkreter Hierarchieeinträge - 1)
-    let total_slots = 25 + concrete_slots.len().saturating_sub(1);
+    let total_slots = 15 + concrete_slots.len().saturating_sub(1);
 
     let mut out: Vec<Option<String>> = concrete_slots.into_iter().map(Some).collect();
     while out.len() < total_slots {
