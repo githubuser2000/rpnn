@@ -1,27 +1,7 @@
 use std::collections::BTreeSet;
-use std::fmt;
 
 use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseCliValueError {
-    EmptyList { flag_name: String },
-    InvalidNumber { flag_name: String, value: String },
-}
-
-impl fmt::Display for ParseCliValueError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmptyList { flag_name } => write!(f, "{} darf nicht leer sein", flag_name),
-            Self::InvalidNumber { flag_name, value } => {
-                write!(f, "Ungültige Liste für {}: '{}' ist keine Zahl", flag_name, value)
-            }
-        }
-    }
-}
-
-impl std::error::Error for ParseCliValueError {}
 
 pub fn is_flag(s: &str) -> bool {
     s.starts_with('-')
@@ -40,29 +20,25 @@ pub fn parse_pypy_number_set(text: &str) -> BTreeSet<usize> {
         .collect()
 }
 
-pub fn try_parse_usize_csv_list(text: &str, flag_name: &str) -> Result<Vec<usize>, ParseCliValueError> {
+pub fn parse_usize_csv_list(text: &str, flag_name: &str) -> Vec<usize> {
     let values: Vec<usize> = text
         .split(',')
         .map(|s| {
             let trimmed = s.trim();
-            trimmed.parse::<usize>().map_err(|_| ParseCliValueError::InvalidNumber {
-                flag_name: flag_name.to_string(),
-                value: trimmed.to_string(),
+            trimmed.parse::<usize>().unwrap_or_else(|_| {
+                panic!(
+                    "Ungültige Liste für {}: '{}' ist keine Zahl",
+                    flag_name, trimmed
+                )
             })
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
 
     if values.is_empty() {
-        return Err(ParseCliValueError::EmptyList {
-            flag_name: flag_name.to_string(),
-        });
+        panic!("{} darf nicht leer sein", flag_name);
     }
 
-    Ok(values)
-}
-
-pub fn parse_usize_csv_list(text: &str, flag_name: &str) -> Vec<usize> {
-    try_parse_usize_csv_list(text, flag_name).unwrap_or_else(|err| panic!("{}", err))
+    values
 }
 
 pub fn apply_pypy_compat_arg(bereich: &mut TextBereich, arg: &str) -> bool {
@@ -92,7 +68,8 @@ pub fn print_all_oberkategorien(kategorie_map: Option<&KategorieMap>) {
         let mut set = BTreeSet::new();
 
         for haupt in &kategorie_map.hauptkategorien {
-            let ok = haupt.name.as_str().trim();
+            let ok = haupt.key.to_string();
+            let ok = ok.trim();
             if !ok.is_empty() {
                 set.insert(ok.to_string());
             }
@@ -116,9 +93,9 @@ pub fn print_passende_unterkategorien(
         let needle = oberkategorie.to_lowercase();
 
         for haupt in &kategorie_map.hauptkategorien {
-            if haupt.name.as_str().to_lowercase() == needle {
+            if haupt.key.to_string().to_lowercase() == needle {
                 for unter in &haupt.unterkategorien {
-                    let uk = unter.name.as_str().trim();
+                    let uk = unter.name.0.trim();
                     if !uk.is_empty() {
                         set.insert(uk.to_string());
                     }

@@ -1,5 +1,4 @@
-use crate::domain::categories::{KategorieMap, Oberkategorie};
-use super::normalize::normalize_key;
+use crate::domain::categories::{normalize_key, KategorieMap, Oberkategorie};
 
 pub fn finde_spaltennummern_exakt_in_maps(
     hauptkategorien: &[Oberkategorie],
@@ -11,10 +10,10 @@ pub fn finde_spaltennummern_exakt_in_maps(
     let unter_gesucht = normalize_key(unter);
 
     for haupt in hauptkategorien {
-        if normalize_key(haupt.name.as_str()) == ober_gesucht {
+        if normalize_key(&haupt.key.to_string()) == ober_gesucht {
             for unterkategorie in &haupt.unterkategorien {
                 if normalize_key(unterkategorie.name.as_str()) == unter_gesucht {
-                    gefundene.extend_from_slice(unterkategorie.spaltennummern.as_slice());
+                    gefundene.extend_from_slice(&unterkategorie.spaltennummern);
                 }
             }
         }

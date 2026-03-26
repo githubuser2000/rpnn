@@ -4,11 +4,42 @@ use std::fmt;
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnterkategorieName(pub String);
+pub struct OberkategorieName(String);
+
+impl OberkategorieName {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for OberkategorieName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl From<String> for OberkategorieName {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&str> for OberkategorieName {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UnterkategorieName(String);
 
 impl UnterkategorieName {
-    pub fn new(name: impl Into<String>) -> Self {
-        Self(name.into())
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
     }
 
     pub fn as_str(&self) -> &str {
@@ -22,155 +53,82 @@ impl fmt::Display for UnterkategorieName {
     }
 }
 
+impl From<String> for UnterkategorieName {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&str> for UnterkategorieName {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpaltenNummern(Box<[u32]>);
+
+impl SpaltenNummern {
+    pub fn new(mut values: Vec<u32>) -> Self {
+        values.sort_unstable();
+        values.dedup();
+        Self(values.into_boxed_slice())
+    }
+
+    pub fn as_slice(&self) -> &[u32] {
+        &self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn contains(&self, needle: u32) -> bool {
+        self.0.contains(&needle)
+    }
+
+    pub fn to_vec(&self) -> Vec<u32> {
+        self.0.to_vec()
+    }
+}
+
+impl Default for SpaltenNummern {
+    fn default() -> Self {
+        Self(Vec::new().into_boxed_slice())
+    }
+}
+
+impl AsRef<[u32]> for SpaltenNummern {
+    fn as_ref(&self) -> &[u32] {
+        self.as_slice()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Unterkategorie {
     pub name: UnterkategorieName,
-    pub spaltennummern: Vec<u32>,
+    pub spaltennummern: SpaltenNummern,
 }
 
 impl Unterkategorie {
-    pub fn new(name: impl Into<String>, spaltennummern: Vec<u32>) -> Self {
+    pub fn new(name: impl Into<UnterkategorieName>, spaltennummern: Vec<u32>) -> Self {
         Self {
-            name: UnterkategorieName::new(name),
-            spaltennummern,
+            name: name.into(),
+            spaltennummern: SpaltenNummern::new(spaltennummern),
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StandardOberkategorie {
-    Menschliches,
-    Universum,
-    Religion,
-    Bedeutung,
-    ProContra,
-    Grundstrukturen,
-    Planet,
-    Multiversum,
-    WichtigstesZumVerstehen,
-    Galaxie,
-    EigenschaftenN,
-    UniversumMetaKonkret,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum KombiRaum {
-    Galaxie,
-    Universum,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum BruchRaum {
-    Galaxie,
-    Universum,
-    Gefuehle,
-    Strukturgroesse,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum GeneratorOberkategorie {
-    Primvielfache,
-    Multiplikationen,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum OberkategorieKey {
-    Standard(StandardOberkategorie),
-    Kombination(KombiRaum),
-    GebrochenRational(BruchRaum),
-    Generator(GeneratorOberkategorie),
-    Sonstige(String),
-}
-
-impl OberkategorieKey {
-    pub fn from_name(name: &str) -> Self {
-        let norm = normalize_key(name);
-        match norm.as_str() {
-            "menschliches" => Self::Standard(StandardOberkategorie::Menschliches),
-            "universum" => Self::Standard(StandardOberkategorie::Universum),
-            "religion" | "religionen" => Self::Standard(StandardOberkategorie::Religion),
-            "bedeutung" => Self::Standard(StandardOberkategorie::Bedeutung),
-            "procontra" | "dagegendafuer" => Self::Standard(StandardOberkategorie::ProContra),
-            "grundstrukturen" => Self::Standard(StandardOberkategorie::Grundstrukturen),
-            "planet10undoder12" | "planet" => Self::Standard(StandardOberkategorie::Planet),
-            "multiversum" => Self::Standard(StandardOberkategorie::Multiversum),
-            "wichtigsteszumverstehen" | "wichtigsteverstehen" => {
-                Self::Standard(StandardOberkategorie::WichtigstesZumVerstehen)
-            }
-            "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise" => {
-                Self::Standard(StandardOberkategorie::Galaxie)
-            }
-            "eigenschaftenn" => Self::Standard(StandardOberkategorie::EigenschaftenN),
-            "universummetakonkret" => {
-                Self::Standard(StandardOberkategorie::UniversumMetaKonkret)
-            }
-            "kombinationgalaxie" => Self::Kombination(KombiRaum::Galaxie),
-            "kombinationuniversum" => Self::Kombination(KombiRaum::Universum),
-            "gebrochenrationalgalaxienm" => Self::GebrochenRational(BruchRaum::Galaxie),
-            "gebrochenrationaluniversumnm" => Self::GebrochenRational(BruchRaum::Universum),
-            "gebrochenrationalgefuhlenm" | "gebrochenrationalemotionnm" => {
-                Self::GebrochenRational(BruchRaum::Gefuehle)
-            }
-            "gebrochenrationalstrukturgrossenm"
-            | "gebrochenrationalstrukturgroessenm" => {
-                Self::GebrochenRational(BruchRaum::Strukturgroesse)
-            }
-            "primvielfache" => Self::Generator(GeneratorOberkategorie::Primvielfache),
-            "multiplikationen" => Self::Generator(GeneratorOberkategorie::Multiplikationen),
-            _ => Self::Sonstige(name.to_string()),
-        }
-    }
-
-    pub fn as_canonical_str(&self) -> &str {
-        match self {
-            Self::Standard(StandardOberkategorie::Menschliches) => "Menschliches",
-            Self::Standard(StandardOberkategorie::Universum) => "Universum",
-            Self::Standard(StandardOberkategorie::Religion) => "Religion",
-            Self::Standard(StandardOberkategorie::Bedeutung) => "Bedeutung",
-            Self::Standard(StandardOberkategorie::ProContra) => "Pro_Contra",
-            Self::Standard(StandardOberkategorie::Grundstrukturen) => "Grundstrukturen",
-            Self::Standard(StandardOberkategorie::Planet) => "Planet",
-            Self::Standard(StandardOberkategorie::Multiversum) => "Multiversum",
-            Self::Standard(StandardOberkategorie::WichtigstesZumVerstehen) => {
-                "Wichtigstes_zum_verstehen"
-            }
-            Self::Standard(StandardOberkategorie::Galaxie) => "Galaxie",
-            Self::Standard(StandardOberkategorie::EigenschaftenN) => "Eigenschaften_n",
-            Self::Standard(StandardOberkategorie::UniversumMetaKonkret) => {
-                "universummetakonkret"
-            }
-            Self::Kombination(KombiRaum::Galaxie) => "KombinationGalaxie",
-            Self::Kombination(KombiRaum::Universum) => "KombinationUniversum",
-            Self::GebrochenRational(BruchRaum::Galaxie) => "gebrochen-rational_Galaxie_n/m",
-            Self::GebrochenRational(BruchRaum::Universum) => "gebrochen-rational_Universum_n/m",
-            Self::GebrochenRational(BruchRaum::Gefuehle) => "gebrochen-rational_Gefühle_n/m",
-            Self::GebrochenRational(BruchRaum::Strukturgroesse) => {
-                "gebrochen-rational_Strukturgroesse_n/m"
-            }
-            Self::Generator(GeneratorOberkategorie::Primvielfache) => "primvielfache",
-            Self::Generator(GeneratorOberkategorie::Multiplikationen) => "multiplikationen",
-            Self::Sonstige(name) => name.as_str(),
-        }
-    }
-}
-
-impl fmt::Display for OberkategorieKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_canonical_str())
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Oberkategorie {
-    pub key: OberkategorieKey,
+    pub name: OberkategorieName,
     pub unterkategorien: Vec<Unterkategorie>,
 }
 
 impl Oberkategorie {
-    pub fn new(name: impl Into<String>, unterkategorien: Vec<Unterkategorie>) -> Self {
-        let name = name.into();
+    pub fn new(name: impl Into<OberkategorieName>, unterkategorien: Vec<Unterkategorie>) -> Self {
         Self {
-            key: OberkategorieKey::from_name(&name),
+            name: name.into(),
             unterkategorien,
         }
     }
@@ -187,7 +145,7 @@ pub struct GeneratedInference {
     pub direct_columns: Vec<u32>,
 }
 
-pub fn normalize_key(s: &str) -> String {
+fn normalize_key(s: &str) -> String {
     s.to_lowercase()
         .replace('_', "")
         .replace('-', "")
@@ -317,19 +275,15 @@ impl KategorieMap {
             .map(|(haupt_name, unter_map)| {
                 let mut unterkategorien: Vec<Unterkategorie> = unter_map
                     .into_iter()
-                    .map(|(unter_name, mut spaltennummern)| {
-                        spaltennummern.sort();
-                        spaltennummern.dedup();
-                        Unterkategorie::new(unter_name, spaltennummern)
-                    })
+                    .map(|(unter_name, spaltennummern)| Unterkategorie::new(unter_name, spaltennummern))
                     .collect();
 
-                unterkategorien.sort_by(|a, b| a.name.0.cmp(&b.name.0));
+                unterkategorien.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
                 Oberkategorie::new(haupt_name, unterkategorien)
             })
             .collect();
 
-        hauptkategorien.sort_by(|a, b| a.key.cmp(&b.key));
+        hauptkategorien.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
         hauptkategorien
     }
 
@@ -338,7 +292,7 @@ impl KategorieMap {
 
         for haupt in &self.hauptkategorien {
             for unter in &haupt.unterkategorien {
-                paare.push((haupt.key.to_string(), unter.name.to_string()));
+                paare.push((haupt.name.as_str().to_string(), unter.name.as_str().to_string()));
             }
         }
 
@@ -352,7 +306,7 @@ impl KategorieMap {
 
         for haupt in &self.hauptkategorien {
             for unter in &haupt.unterkategorien {
-                nummern.extend(unter.spaltennummern.iter().copied());
+                nummern.extend(unter.spaltennummern.as_slice().iter().copied());
             }
         }
 
@@ -384,121 +338,7 @@ impl KategorieMap {
         sorted_ids.sort();
         *existing_ids = sorted_ids;
     }
-
-    pub fn filtere_nach_spaltennummern(&self, nummern: &[usize]) -> Vec<(String, String, Vec<u32>)> {
-        let nummern_set: HashSet<u32> = nummern.iter().map(|&n| n as u32).collect();
-        let mut result = Vec::new();
-
-        for haupt in &self.hauptkategorien {
-            for unter in &haupt.unterkategorien {
-                let passende_spalten: Vec<u32> = unter
-                    .spaltennummern
-                    .iter()
-                    .copied()
-                    .filter(|num| nummern_set.contains(num))
-                    .collect();
-
-                if !passende_spalten.is_empty() {
-                    result.push((haupt.key.to_string(), unter.name.to_string(), passende_spalten));
-                }
-            }
-        }
-
-        result
-    }
-
-    pub fn generiere_sql_selects(
-        &self,
-        oberkategorie_name: &str,
-        unterkategorie_name: &str,
-        spalten_filter: Option<&[usize]>,
-    ) -> String {
-        let mut output = String::new();
-
-        output.push_str("-- SQL SELECTS für Kategorie-Datenbank\n");
-        output.push_str(&format!(
-            "-- Spaltennamen: {}, {}\n\n",
-            oberkategorie_name, unterkategorie_name
-        ));
-
-        output.push_str("CREATE TABLE kategorien (\n");
-        output.push_str("  id INTEGER PRIMARY KEY AUTOINCREMENT,\n");
-        output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", oberkategorie_name));
-        output.push_str(&format!("  {} VARCHAR(255) NOT NULL,\n", unterkategorie_name));
-        output.push_str("  spaltennummer INTEGER NOT NULL\n");
-        output.push_str(");\n\n");
-
-        output.push_str("INSERT INTO kategorien (");
-        output.push_str(oberkategorie_name);
-        output.push_str(", ");
-        output.push_str(unterkategorie_name);
-        output.push_str(", spaltennummer) VALUES\n");
-
-        let mut first = true;
-        for haupt in &self.hauptkategorien {
-            for unter in &haupt.unterkategorien {
-                let spalten_iter: Vec<u32> = if let Some(filter) = spalten_filter {
-                    let filter_set: HashSet<u32> = filter.iter().map(|&n| n as u32).collect();
-                    unter
-                        .spaltennummern
-                        .iter()
-                        .copied()
-                        .filter(|num| filter_set.contains(num))
-                        .collect()
-                } else {
-                    unter.spaltennummern.clone()
-                };
-
-                for spaltennummer in spalten_iter {
-                    if !first {
-                        output.push_str(",\n");
-                    }
-                    output.push_str(&format!(
-                        "  ('{}', '{}', {})",
-                        haupt.key,
-                        unter.name,
-                        spaltennummer
-                    ));
-                    first = false;
-                }
-            }
-        }
-
-        if !first {
-            output.push_str(";\n\n");
-        }
-
-        output.push_str("-- Beispiele für SELECT-Abfragen:\n\n");
-        output.push_str(&format!(
-            "-- 1. Alle eindeutigen {}s:\n",
-            oberkategorie_name
-        ));
-        output.push_str(&format!(
-            "SELECT DISTINCT {} FROM kategorien ORDER BY {};\n\n",
-            oberkategorie_name, oberkategorie_name
-        ));
-
-        output.push_str(&format!(
-            "-- 2. {}s für eine bestimmte {}:\n",
-            unterkategorie_name, oberkategorie_name
-        ));
-        output.push_str(&format!("SELECT DISTINCT {} FROM kategorien ", unterkategorie_name));
-        output.push_str(&format!(
-            "WHERE {} = 'Menschliches' ORDER BY {};\n\n",
-            oberkategorie_name, unterkategorie_name
-        ));
-
-        output.push_str("-- 3. Spaltennummern für eine Kategorie-Kombination:\n");
-        output.push_str("SELECT spaltennummer FROM kategorien ");
-        output.push_str(&format!(
-            "WHERE {} = 'Universum' AND {} = 'Transzendentalien';\n",
-            oberkategorie_name, unterkategorie_name
-        ));
-
-        output
-    }
 }
-
 pub fn lade_kategorie_map() -> KategorieMap {
-    KategorieMap::new()
-}
+        KategorieMap::new()
+    }
