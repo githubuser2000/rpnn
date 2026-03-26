@@ -36,20 +36,10 @@ pub fn finde_spaltennummern_exakt_in_maps(
     gefundene
 }
 
-pub fn finde_spaltennummern_fuer_kategorien(
-    map: &KategorieMap,
-    ober: &str,
-    unter: &str,
-) -> Vec<u32> {
-    let exakt = finde_spaltennummern_exakt_in_maps(
-        &map.hauptkategorien,
-        &map.alle_eintraege,
-        ober,
-        unter,
-    );
+pub fn finde_spaltennummern_fuer_kategorien(map: &KategorieMap, ober: &str, unter: &str) -> Vec<u32> {
+    let exakt = finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, &map.alle_eintraege, ober, unter);
     if !exakt.is_empty() {
         return exakt;
     }
-
-    finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, &map.alle_eintraege, ober, unter)
+    map.finde_spaltennummern_fuer_kategorien(ober, unter)
 }

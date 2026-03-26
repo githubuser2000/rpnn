@@ -52,12 +52,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
     }
 
     fn setze_alle_spalten(&self, bereich: &mut TextBereich) {
-        let mut alle_gefundene_spalten: Vec<u32> = self
-            .kategorie_map
-            .alle_eintraege
-            .iter()
-            .flat_map(|eintrag| eintrag.spaltennummern.iter().copied())
-            .collect();
+        let mut alle_gefundene_spalten: Vec<u32> = self.kategorie_map.alle_spaltennummern();
 
         if alle_gefundene_spalten.is_empty() {
             fallback_zu_standards(bereich);

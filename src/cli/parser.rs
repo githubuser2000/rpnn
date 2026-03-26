@@ -167,16 +167,7 @@ pub fn parse_cli_args(
                     bereich.mark_columns_requested();
 
                     if let Some(kategorie_map) = kategorie_map {
-                        let mut alle_paare = kategorie_map.alle_eintraege.clone();
-                        alle_paare.sort_by(|a, b| {
-                            a.oberkategorie
-                                .cmp(&b.oberkategorie)
-                                .then(a.unterkategorie.cmp(&b.unterkategorie))
-                        });
-                        alle_paare.dedup_by(|a, b| {
-                            a.oberkategorie == b.oberkategorie
-                                && a.unterkategorie == b.unterkategorie
-                        });
+                        let alle_paare = kategorie_map.alle_paare();
 
                         spalten_namen_liste.eintraege = alle_paare
                             .into_iter()
