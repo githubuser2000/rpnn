@@ -138,6 +138,9 @@ impl KategorieMap {
 // NEUE Funktion für exakte Suche - innerhalb des impl Blocks!
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     python_source_of_truth::exact_columns_for_pair(ober, unter)
+        .into_iter()
+        .map(|n| n + 1)
+        .collect()
 }
 
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
@@ -145,7 +148,11 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     if !exakt.is_empty() {
         return exakt;
     }
+
     python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
+        .into_iter()
+        .map(|n| n + 1)
+        .collect()
 }
 
     fn lade_kategorien(&mut self) {

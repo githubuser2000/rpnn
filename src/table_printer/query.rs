@@ -277,8 +277,9 @@ fn attach_column_ids_to_headers(headers: &[String], columns_1_based: &[usize]) -
         .iter()
         .enumerate()
         .map(|(idx, header)| {
-            let col = columns_1_based.get(idx).copied().unwrap_or(idx + 1);
-            format!("{}\u{1f}COL:{}", header, col)
+            let col_1_based = columns_1_based.get(idx).copied().unwrap_or(idx + 1);
+            let py_col_0_based = col_1_based.saturating_sub(1);
+            format!("{}\u{1f}COL:{}", header, py_col_0_based)
         })
         .collect()
 }
