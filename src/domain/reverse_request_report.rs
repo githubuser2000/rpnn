@@ -4,26 +4,10 @@ use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 use crate::domain::indices::ColumnNumber;
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::reta_ausgabe::OutputSyntax;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AnfragePair {
-    pub ober: String,
-    pub unter: String,
-}
-
-impl AnfragePair {
-    pub fn new(ober: impl Into<String>, unter: impl Into<String>) -> Self {
-        Self {
-            ober: ober.into(),
-            unter: unter.into(),
-        }
-    }
-
-    pub fn to_cli(&self) -> String {
-        format!("--spaltenname {} {}", self.ober, self.unter)
-    }
-}
+type AnfragePair = SpaltenAnfrage;
 
 fn normalize_key(s: &str) -> String {
     s.trim()
@@ -32,6 +16,13 @@ fn normalize_key(s: &str) -> String {
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
+}
+
+fn request(ober: &str, unter: &str) -> SpaltenAnfrage {
+    SpaltenAnfrage::parse(ober, unter).unwrap_or_else(|_| SpaltenAnfrage::Unknown {
+        ober: ober.to_string(),
+        unter: unter.to_string(),
+    })
 }
 
 fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
@@ -69,7 +60,7 @@ fn collect_exact_and_partial_direct_pairs(
 ) {
     for haupt in &kategorie_map.hauptkategorien {
         for unter in &haupt.unterkategorien {
-            let pair = AnfragePair::new(haupt.name.as_str().to_string(), unter.name.as_str().to_string());
+            let pair = request(haupt.name.as_str(), unter.name.as_str());
             let cols: BTreeSet<u32> = unter.spaltennummern.as_slice().iter().copied().collect();
 
             if cols.is_empty() {
@@ -87,16 +78,16 @@ fn collect_exact_and_partial_direct_pairs(
 
 fn collect_fraction_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>) {
     for n in &bereich.pypy_compat.gebrochengalaxie {
-        out.insert(AnfragePair::new("gebrochen-rational_Galaxie_n/m", n.to_string()));
+        out.insert(request("gebrochen-rational_Galaxie_n/m", &n.to_string()));
     }
     for n in &bereich.pypy_compat.gebrochenuniversum {
-        out.insert(AnfragePair::new("gebrochen-rational_Universum_n/m", n.to_string()));
+        out.insert(request("gebrochen-rational_Universum_n/m", &n.to_string()));
     }
     for n in &bereich.pypy_compat.gebrochenemotion {
-        out.insert(AnfragePair::new("gebrochen-rational_Gefühle_n/m", n.to_string()));
+        out.insert(request("gebrochen-rational_Gefühle_n/m", &n.to_string()));
     }
     for n in &bereich.pypy_compat.gebrochengroesse {
-        out.insert(AnfragePair::new("gebrochen-rational_Strukturgroesse_n/m", n.to_string()));
+        out.insert(request("gebrochen-rational_Strukturgroesse_n/m", &n.to_string()));
     }
 }
 
@@ -141,86 +132,85 @@ fn collect_kombi_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>) {
 
     for idx in &bereich.pypy_compat.kombi_galaxie {
         if let Some(name) = galaxie_name(*idx) {
-            out.insert(AnfragePair::new("KombinationGalaxie", name));
+            out.insert(request("KombinationGalaxie", name));
         }
     }
 
     for idx in &bereich.pypy_compat.kombi_universum {
         if let Some(name) = universum_name(*idx) {
-            out.insert(AnfragePair::new("KombinationUniversum", name));
+            out.insert(request("KombinationUniversum", name));
         }
     }
 }
 
 fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, out: &mut BTreeSet<AnfragePair>) {
-    let has =
-        |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
+    let has = |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
 
     if has("primzahlkreuzprocontra") {
-        out.insert(AnfragePair::new("Universum", "Primzahlkreuz"));
-        out.insert(AnfragePair::new("Bedeutung", "Primzahlkreuz"));
-        out.insert(AnfragePair::new("Pro_Contra", "Primzahlkreuz"));
+        out.insert(request("Universum", "Primzahlkreuz"));
+        out.insert(request("Bedeutung", "Primzahlkreuz"));
+        out.insert(request("Pro_Contra", "Primzahlkreuz"));
     }
 
     if has("lovepolygon") {
-        out.insert(AnfragePair::new("Menschliches", "Liebe"));
-        out.insert(AnfragePair::new("Grundstrukturen", "Liebe"));
+        out.insert(request("Menschliches", "Liebe"));
+        out.insert(request("Grundstrukturen", "Liebe"));
     }
 
     if has("gleichheitfreiheit") {
-        out.insert(AnfragePair::new("Planet", "Gleichheit"));
-        out.insert(AnfragePair::new("Menschliches", "Gleichheit"));
-        out.insert(AnfragePair::new("Grundstrukturen", "Gleichheit"));
+        out.insert(request("Planet", "Gleichheit"));
+        out.insert(request("Menschliches", "Gleichheit"));
+        out.insert(request("Grundstrukturen", "Gleichheit"));
     }
 
     if has("geistemotionenergiematerietopologie") {
-        out.insert(AnfragePair::new("Universum", "Geist"));
-        out.insert(AnfragePair::new("Multiversum", "Geist"));
-        out.insert(AnfragePair::new("Grundstrukturen", "Geist"));
+        out.insert(request("Universum", "Geist"));
+        out.insert(request("Multiversum", "Geist"));
+        out.insert(request("Grundstrukturen", "Geist"));
     }
 
     if has("primcreativitytype") || has("mondexponzierenlogarithmustyp") {
-        out.insert(AnfragePair::new("Wichtigstes_zum_verstehen", "Gestirn"));
-        out.insert(AnfragePair::new("Bedeutung", "Gestirn"));
+        out.insert(request("Wichtigstes_zum_verstehen", "Gestirn"));
+        out.insert(request("Bedeutung", "Gestirn"));
     }
 
     if has("vervielfachezeile") {
-        out.insert(AnfragePair::new("Wichtigstes_zum_verstehen", "Primzahlen"));
-        out.insert(AnfragePair::new("Bedeutung", "Primzahlen"));
-        out.insert(AnfragePair::new("Galaxie", "Primzahlen"));
+        out.insert(request("Wichtigstes_zum_verstehen", "Primzahlen"));
+        out.insert(request("Bedeutung", "Primzahlen"));
+        out.insert(request("Galaxie", "Primzahlen"));
     }
 
     if has("primmotgleichf") {
-        out.insert(AnfragePair::new("primvielfache", "motivgleichfoermig"));
-        out.insert(AnfragePair::new("multiplikationen", "motivgleichfoermig"));
+        out.insert(request("primvielfache", "motivgleichfoermig"));
+        out.insert(request("multiplikationen", "motivgleichfoermig"));
     }
     if has("primstrukgleichf") {
-        out.insert(AnfragePair::new("primvielfache", "strukturgleichfoermig"));
-        out.insert(AnfragePair::new("multiplikationen", "strukturgleichfoermig"));
+        out.insert(request("primvielfache", "strukturgleichfoermig"));
+        out.insert(request("multiplikationen", "strukturgleichfoermig"));
     }
     if has("primmotivstern") {
-        out.insert(AnfragePair::new("primvielfache", "motivstern"));
-        out.insert(AnfragePair::new("multiplikationen", "motivstern"));
+        out.insert(request("primvielfache", "motivstern"));
+        out.insert(request("multiplikationen", "motivstern"));
     }
     if has("primstrukturstern") {
-        out.insert(AnfragePair::new("primvielfache", "strukturstern"));
-        out.insert(AnfragePair::new("multiplikationen", "strukturstern"));
+        out.insert(request("primvielfache", "strukturstern"));
+        out.insert(request("multiplikationen", "strukturstern"));
     }
     if has("primmotivsterngebr") {
-        out.insert(AnfragePair::new("primvielfache", "motivgebrstern"));
-        out.insert(AnfragePair::new("multiplikationen", "motivgebrstern"));
+        out.insert(request("primvielfache", "motivgebrstern"));
+        out.insert(request("multiplikationen", "motivgebrstern"));
     }
     if has("primstruktursterngebr") {
-        out.insert(AnfragePair::new("primvielfache", "strukgebrstern"));
-        out.insert(AnfragePair::new("multiplikationen", "strukgebrstern"));
+        out.insert(request("primvielfache", "strukgebrstern"));
+        out.insert(request("multiplikationen", "strukgebrstern"));
     }
     if has("primmotgleichfgebr") {
-        out.insert(AnfragePair::new("primvielfache", "motivgebrgleichf"));
-        out.insert(AnfragePair::new("multiplikationen", "motivgebrgleichf"));
+        out.insert(request("primvielfache", "motivgebrgleichf"));
+        out.insert(request("multiplikationen", "motivgebrgleichf"));
     }
     if has("primstrukgleichfgebr") {
-        out.insert(AnfragePair::new("primvielfache", "strukgebrgleichf"));
-        out.insert(AnfragePair::new("multiplikationen", "strukgebrgleichf"));
+        out.insert(request("primvielfache", "strukgebrgleichf"));
+        out.insert(request("multiplikationen", "strukgebrgleichf"));
     }
 }
 
@@ -228,7 +218,7 @@ fn collect_exact_bridge_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfrageP
     if !bereich.exact_meta_konkret_specs.is_empty() {
         for (aliases, _pair) in META_KONKRET_MAPPINGS {
             if let Some(first) = aliases.first() {
-                out.insert(AnfragePair::new("universummetakonkret", *first));
+                out.insert(request("universummetakonkret", first));
             }
         }
     }
@@ -237,7 +227,7 @@ fn collect_exact_bridge_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfrageP
         for (aliases, _cols, maybe_pair) in EIGENSCHAFT_MAPPINGS {
             if maybe_pair.is_some() {
                 if let Some(first) = aliases.first() {
-                    out.insert(AnfragePair::new("Eigenschaften_n", *first));
+                    out.insert(request("Eigenschaften_n", first));
                 }
             }
         }
@@ -271,19 +261,14 @@ pub fn print_reverse_request_pairs(
     let mut exact_pairs = BTreeSet::<AnfragePair>::new();
     let mut non_exact_pairs = BTreeSet::<AnfragePair>::new();
 
-    collect_exact_and_partial_direct_pairs(
-        kategorie_map,
-        &visible_columns,
-        &mut exact_pairs,
-        &mut non_exact_pairs,
-    );
+    collect_exact_and_partial_direct_pairs(kategorie_map, &visible_columns, &mut exact_pairs, &mut non_exact_pairs);
     collect_fraction_pairs(bereich, &mut non_exact_pairs);
     collect_kombi_pairs(bereich, &mut non_exact_pairs);
     collect_generated_pairs(generated_befehle, &mut non_exact_pairs);
     collect_exact_bridge_pairs(bereich, &mut non_exact_pairs);
 
-    for pair in &exact_pairs {
-        non_exact_pairs.remove(pair);
+    for ex in &exact_pairs {
+        non_exact_pairs.remove(ex);
     }
 
     if exact_pairs.is_empty() && non_exact_pairs.is_empty() {
@@ -291,23 +276,24 @@ pub fn print_reverse_request_pairs(
     }
 
     println!();
-
-    if !exact_pairs.is_empty() {
-        println!("══════════════════════════════════════════════");
-        println!("Exakt äquivalente Spalten-Auswahl:");
-        println!("══════════════════════════════════════════════");
+    println!("══════════════════════════════════════════════");
+    println!("Exakt äquivalente Spalten-Auswahl:");
+    println!("══════════════════════════════════════════════");
+    if exact_pairs.is_empty() {
+        println!("  (keine)");
+    } else {
         for pair in &exact_pairs {
             println!("  {}", pair.to_cli());
         }
     }
 
-    if !non_exact_pairs.is_empty() {
-        if !exact_pairs.is_empty() {
-            println!();
-        }
-        println!("══════════════════════════════════════════════");
-        println!("Weitere passende, aber nicht exakt äquivalente Auswahl:");
-        println!("══════════════════════════════════════════════");
+    println!();
+    println!("══════════════════════════════════════════════");
+    println!("Weitere passende, aber nicht exakt äquivalente Auswahl:");
+    println!("══════════════════════════════════════════════");
+    if non_exact_pairs.is_empty() {
+        println!("  (keine)");
+    } else {
         for pair in &non_exact_pairs {
             println!("  {}", pair.to_cli());
         }

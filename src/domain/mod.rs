@@ -17,3 +17,5 @@ pub mod html_header_model;
 
 pub mod errors;
 pub mod indices;
+
+pub mod spalten_anfrage;

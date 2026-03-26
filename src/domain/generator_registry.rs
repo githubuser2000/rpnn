@@ -128,13 +128,18 @@ struct GeneratorExecutionContext<'a> {
     parameters_main: &'a ParametersMain,
 }
 
-trait GeneratedColumnRule {
+mod sealed {
+    pub trait Sealed {}
+}
+
+trait GeneratedColumnRule: sealed::Sealed {
     fn name(&self) -> &'static str;
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool;
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>);
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError>;
 }
 
 struct PrimzahlkreuzRule;
+impl sealed::Sealed for PrimzahlkreuzRule {}
 impl GeneratedColumnRule for PrimzahlkreuzRule {
     fn name(&self) -> &'static str { "primzahlkreuzprocontra" }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool {
@@ -142,8 +147,9 @@ impl GeneratedColumnRule for PrimzahlkreuzRule {
             || (contains_any_alias(&ctx.tokens, BEDEUTUNG) && contains_any_alias(&ctx.tokens, &["primzahlkreuz"]))
             || (contains_any_alias(&ctx.tokens, &["procontra"]) && contains_any_alias(&ctx.tokens, &["primzahlkreuz"]))
     }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> {
         concat1_primzahlkreuz_pro_contra(ctx.table, ctx.rows_as_numbers, ctx.tables, ctx.generated_befehle, ctx.parameters_main);
+        Ok(())
     }
 }
 
@@ -153,10 +159,11 @@ struct PairAliasRule {
     second_aliases: &'static [&'static str],
     apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
 }
+impl sealed::Sealed for PairAliasRule {}
 impl GeneratedColumnRule for PairAliasRule {
     fn name(&self) -> &'static str { self.name }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { selected_by_pair(&ctx.tokens, self.first_aliases, self.second_aliases) }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables); Ok(()) }
 }
 
 struct MultiPairAliasRule {
@@ -164,12 +171,13 @@ struct MultiPairAliasRule {
     pairs: &'static [(&'static [&'static str], &'static [&'static str])],
     apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
 }
+impl sealed::Sealed for MultiPairAliasRule {}
 impl GeneratedColumnRule for MultiPairAliasRule {
     fn name(&self) -> &'static str { self.name }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool {
         self.pairs.iter().any(|(a,b)| selected_by_pair(&ctx.tokens, a, b))
     }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables); Ok(()) }
 }
 
 struct TokenRule {
@@ -177,19 +185,22 @@ struct TokenRule {
     aliases: &'static [&'static str],
     apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
 }
+impl sealed::Sealed for TokenRule {}
 impl GeneratedColumnRule for TokenRule {
     fn name(&self) -> &'static str { self.name }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { contains_any_alias(&ctx.tokens, self.aliases) }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables); Ok(()) }
 }
 
 struct MondRule;
+impl sealed::Sealed for MondRule {}
 impl GeneratedColumnRule for MondRule {
     fn name(&self) -> &'static str { "mond64" }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { selected_by_pair(&ctx.tokens, BEDEUTUNG, MOND64_ALIASES) }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> {
         concat_prim_creativity_type(ctx.table, ctx.rows_as_numbers, ctx.tables);
         concat_mond_exponzieren_logarithmus_typ(ctx.table, ctx.rows_as_numbers, ctx.tables);
+        Ok(())
     }
 }
 
@@ -200,19 +211,22 @@ struct PrimUniverseRule {
     gleichfoermig: usize,
     struktural: usize,
 }
+impl sealed::Sealed for PrimUniverseRule {}
 impl GeneratedColumnRule for PrimUniverseRule {
     fn name(&self) -> &'static str { self.name }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { ctx.tokens.contains(self.token) }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> {
         concat_prim_universe_generated(ctx.table, ctx.rows_as_numbers, ctx.tables, self.gebrochen, self.gleichfoermig, self.struktural);
+        Ok(())
     }
 }
 
 struct ModalRule;
+impl sealed::Sealed for ModalRule {}
 impl GeneratedColumnRule for ModalRule {
     fn name(&self) -> &'static str { "modallogik" }
     fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { contains_any_alias(&ctx.tokens, MODAL_ALIASES) }
-    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) -> Result<(), crate::domain::errors::GeneratorError> {
         let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
         for pair in &ctx.bereich.exact_modal_pairs {
             modal_concepts.insert(*pair);
@@ -248,6 +262,7 @@ impl GeneratedColumnRule for ModalRule {
         }
 
         concat_modallogik(ctx.table, &modal_concepts, ctx.rows_as_numbers, ctx.tables);
+        Ok(())
     }
 }
 
@@ -277,7 +292,7 @@ pub fn apply_generated_columns(
     bereich: &TextBereich,
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), crate::domain::errors::GeneratorError> {
     let original_headers = headers.clone();
     let original_data = data.clone();
 
@@ -310,7 +325,7 @@ pub fn apply_generated_columns(
             if rule.name() == "vervielfache" {
                 want_vervielfache = true;
             }
-            rule.apply(&mut exec_ctx);
+            rule.apply(&mut exec_ctx).map_err(|err| crate::domain::errors::GeneratorError::RuleApplicationFailed { rule: rule.name(), detail: err.to_string() })?;
         }
     }
 

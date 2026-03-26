@@ -4,6 +4,7 @@ use std::fmt;
 pub enum GeneratorError {
     EmptySelection,
     InvalidVisibleColumn { column: usize },
+    InvalidParameter(String),
     RuleApplicationFailed { rule: &'static str, detail: String },
 }
 
@@ -12,6 +13,7 @@ impl fmt::Display for GeneratorError {
         match self {
             Self::EmptySelection => write!(f, "Es wurden keine sichtbaren oder generierten Spalten ausgewählt."),
             Self::InvalidVisibleColumn { column } => write!(f, "Ungültige sichtbare Spalte: {}", column),
+            Self::InvalidParameter(detail) => write!(f, "Ungültiger Generator-Parameter: {}", detail),
             Self::RuleApplicationFailed { rule, detail } => write!(f, "Generator-Regel '{}' fehlgeschlagen: {}", rule, detail),
         }
     }
