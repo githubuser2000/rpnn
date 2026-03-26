@@ -227,6 +227,7 @@ let syntax = match self.out_type {
     fn header_meta_class(global_idx: usize) -> Option<String> {
         None
     }
+
 fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
     self.cliout2("<table border=0 id=\"bigtable\">\n");
 
@@ -250,21 +251,26 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
         );
 
         for (col_idx, cell) in row.cells.iter().enumerate() {
-            let resolved = resolve_header_meta(&cell.original_content, col_idx, display_line_idx == 0);
-let visible_content = resolved.visible_text;
-let meta = resolved.class_attr;
+            let resolved = resolve_header_meta(
+                &cell.original_content,
+                col_idx,
+                display_line_idx == 0
+            );
+
             let content = if display_line_idx == 0 && (col_idx == 0 || col_idx == 1) {
                 String::new()
             } else {
-                Self::escape_html(&visible_content)
+                Self::escape_html(&resolved.visible_text)
             };
 
             if display_line_idx == 0 {
-let class_attr = if let Some(meta_str) = meta {
-    format!(" class=\"{}\"", meta_str)
-} else {
-    format!(" class=\"z_0 r_{}\"", col_idx)
-};
+                // 🔥 WICHTIG: KEIN z_0 r_{} PREFIX WENN META EXISTIERT
+                let class_attr = if let Some(meta_str) = resolved.class_attr {
+                    format!(" class=\"{}\"", meta_str)
+                } else {
+                    format!(" class=\"z_0 r_{}\"", col_idx)
+                };
+
                 if col_idx == 0 {
                     line.push_str(&format!(
                         "<td{} style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
@@ -273,15 +279,13 @@ let class_attr = if let Some(meta_str) = meta {
                 } else {
                     line.push_str(&format!("<td{}> {} </td> ", class_attr, content));
                 }
+            } else if col_idx == 0 {
+                line.push_str(&format!(
+                    "<td style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
+                    content
+                ));
             } else {
-                if col_idx == 0 {
-                    line.push_str(&format!(
-                        "<td style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
-                        content
-                    ));
-                } else {
-                    line.push_str(&format!("<td> {} </td> ", content));
-                }
+                line.push_str(&format!("<td> {} </td> ", content));
             }
         }
 
@@ -291,6 +295,7 @@ let class_attr = if let Some(meta_str) = meta {
 
     self.cliout2("</table>");
 }
+
     pub fn cli_out(
         &mut self,
         finally_display_lines: &BTreeSet<usize>,

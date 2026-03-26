@@ -201,7 +201,7 @@ let syntax = match self.out_type {
 
 fn extract_header_meta(full: &str) -> (String, Option<String>) {
     let resolved = resolve_header_meta(full, usize::MAX, true);
-    (resolved.visible_text, resolved.class_meta)
+    (resolved.visible_text, resolved.class_attr)
 }
     fn extract_id_suffix(text: &str) -> Option<usize> {
         let pos = text.rfind("(ID_")?;
@@ -303,7 +303,7 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
             };
 
             if display_line_idx == 0 {
-                let class_attr = if let Some(meta_str) = resolved.class_meta {
+                let class_attr = if let Some(meta_str) = resolved.class_attr {
                     format!(" class=\"z_0 r_{} {}\"", col_idx, meta_str)
                 } else {
                     format!(" class=\"z_0 r_{}\"", col_idx)
