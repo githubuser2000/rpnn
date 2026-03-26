@@ -286,6 +286,26 @@ fn sanitize_headers(headers: &[String]) -> Vec<String> {
         .collect()
 }
 
+fn normalize_html_class_token(s: &str) -> String {
+    let mut out = s.trim().replace(' ', "_");
+    out = out.replace(',', "");
+    out = out.replace('/', "_");
+    out = out.replace('→', "_");
+    while out.contains("__") {
+        out = out.replace("__", "_");
+    }
+    out
+}
+
+fn attach_html_meta_to_headers(
+    headers: &[String],
+    _selected_cols_1_based: &[usize],
+    _kategorie_map: &KategorieMap,
+) -> Vec<String> {
+    headers.to_vec()
+}
+
+
 pub fn query_column_by_index(
     conn: &Connection,
     mut bereich: TextBereich,
@@ -314,6 +334,25 @@ pub fn query_column_by_index(
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
+
+    let selected_cols_1_based: Vec<usize> = if is_generated_mode {
+        (1..=headers.len()).collect()
+    } else if !bereich.exact_visible_columns.is_empty() {
+        bereich
+            .exact_visible_columns
+            .iter()
+            .copied()
+            .filter(|&n| n > 0)
+            .collect()
+    } else {
+        (1..=headers.len()).collect()
+    };
+
+    let headers = if matches!(bereich.output_syntax, crate::reta_ausgabe::OutputSyntax::HTML) {
+        attach_html_meta_to_headers(&headers, &selected_cols_1_based, kategorie_map)
+    } else {
+        headers
+    };
 
     let header_lengths: Vec<usize> = headers
         .iter()

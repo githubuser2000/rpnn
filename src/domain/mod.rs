@@ -8,3 +8,5 @@ pub mod selection_state;
 pub mod tabellen_utils;
 pub mod generator_logic;
 pub mod category_map;
+
+pub mod python_html_meta;

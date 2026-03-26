@@ -36,19 +36,24 @@ pub fn print_table_chunked_with_line_numbers(
     let mut start = 0usize;
 
     while start < headers.len() {
+        let forced_end = if matches!(out_type, OutputSyntax::HTML) {
+            Some(headers.len())
+        } else {
+            None
+        };
         let all_power_buckets = build_power_bucket_strings(original_line_numbers);
         let (meta_widths_preview, meta_reserved_total) =
             build_meta_widths(&all_power_buckets, original_line_numbers, available_total);
 
         let data_available_total = available_total.saturating_sub(meta_reserved_total);
 
-        let end = determine_chunk_end(
+        let end = forced_end.unwrap_or_else(|| determine_chunk_end(
             headers,
             data,
             explizite_breiten,
             start,
             data_available_total.max(effective_min_column_width() + COLUMN_OVERHEAD + 1),
-        );
+        ));
 
         let chunk_headers: Vec<String> = (start..end)
             .map(|global_i| {

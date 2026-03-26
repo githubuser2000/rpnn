@@ -136,28 +136,25 @@ impl KategorieMap {
 // In column_categories_complete.rs:
 // NEUE Funktion für exakte Suche - innerhalb des impl Blocks!
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-    let mut gefundene = Vec::new();
-
-    let ober_gesucht = ober.to_lowercase().replace("_", "");
-    let unter_gesucht = unter.to_lowercase().replace("_", "");
+    let ober_gesucht = normalize_key(ober);
+    let unter_gesucht = normalize_key(unter);
 
     for haupt in &self.hauptkategorien {
-        let haupt_normalized = haupt.name.to_lowercase().replace("_", "");
+        if normalize_key(&haupt.name) != ober_gesucht {
+            continue;
+        }
 
-        if haupt_normalized == ober_gesucht {
-            for unterkategorie in &haupt.unterkategorien {
-                let unter_normalized = unterkategorie.name.to_lowercase().replace("_", "");
-
-                if unter_normalized == unter_gesucht {
-                    gefundene.extend_from_slice(&unterkategorie.spaltennummern);
-                }
+        for unterkategorie in &haupt.unterkategorien {
+            if normalize_key(&unterkategorie.name) == unter_gesucht {
+                let mut gefundene = unterkategorie.spaltennummern.clone();
+                gefundene.sort_unstable();
+                gefundene.dedup();
+                return gefundene;
             }
         }
     }
 
-    gefundene.sort();
-    gefundene.dedup();
-    gefundene
+    Vec::new()
 }
 // UND eine Version, die speziell für die Haupt-Datenstruktur optimiert ist:
 

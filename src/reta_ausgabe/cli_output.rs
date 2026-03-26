@@ -10,6 +10,7 @@ use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
 use crate::reta_ausgabe::utils::{unicode_pad, word_wrap};
+use crate::domain::python_html_meta::lookup_header_meta;
 
 #[derive(Debug)]
 pub struct CliOutput<'a> {
@@ -199,6 +200,7 @@ let syntax = match self.out_type {
         visible
     }
 
+
 fn extract_header_meta(full: &str) -> (String, Option<String>) {
     let without_idx = if let Some(sep) = full.find("\u{1f}IDX:") {
         &full[..sep]
@@ -206,18 +208,35 @@ fn extract_header_meta(full: &str) -> (String, Option<String>) {
         full
     };
 
-    if let Some(start) = without_idx.find("p1_") {
-        let visible = without_idx[..start].trim().to_string();
-        let meta = without_idx[start..].trim().to_string();
+    let without_meta_marker = if let Some(sep) = without_idx.find("\u{1f}META:") {
+        &without_idx[..sep]
+    } else if let Some(sep) = without_idx.find("META:") {
+        &without_idx[..sep]
+    } else {
+        without_idx
+    };
+
+    let visible = Self::strip_id_suffix(without_meta_marker.trim())
+        .trim_matches('"')
+        .trim()
+        .to_string();
+
+    if let Some(meta) = lookup_header_meta(&visible) {
+        return (visible, Some(meta.to_string()));
+    }
+
+    if let Some(start) = without_meta_marker.find("p1_") {
+        let visible = Self::strip_id_suffix(without_meta_marker[..start].trim())
+            .trim_matches('"')
+            .trim()
+            .to_string();
+        let meta = without_meta_marker[start..].trim().to_string();
         return (visible, Some(meta));
     }
 
-    let visible = without_idx.trim().to_string();
-    let abs_id = Self::extract_id_suffix(&visible);
-    let visible = Self::strip_id_suffix(&visible);
-    let meta = abs_id.and_then(Self::exact_header_meta_class_by_id);
-    (visible, meta)
+    (visible, None)
 }
+
     fn extract_id_suffix(text: &str) -> Option<usize> {
         let pos = text.rfind("(ID_")?;
         let tail = &text[pos + 4..];
@@ -229,63 +248,24 @@ fn extract_header_meta(full: &str) -> (String, Option<String>) {
         let mut out = text.trim().to_string();
         loop {
             if let Some(pos) = out.rfind("(ID_") {
-                if out.ends_with(')') {
-                    out = out[..pos].trim_end().to_string();
+                if let Some(end_rel) = out[pos..].find(')') {
+                    let end = pos + end_rel + 1;
+                    out.replace_range(pos..end, "");
+                    out = out.trim().to_string();
                     continue;
                 }
             }
             break;
         }
-        out.trim_matches('"').to_string()
+        out.trim().trim_matches('"').to_string()
     }
 
-    fn exact_header_meta_class_by_id(id: usize) -> Option<String> {
-        let s = match id {
-            11 => "p1_✗Wichtigstes_zum_verstehen,✗Grundstrukturen,✗Menschliches,, p2_p3_0_Wichtigste,p3_1_Paradigmen_sind_Absichten_(13),p3_2_Motive,p3_3_,p3_4_,p3_5_,p3_6_, p4_0,3",
-            19 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_0,3",
-            43 => "p1_✗Grundstrukturen,✗Grundstrukturen,✗Menschliches,, p2_p3_0_Reziprokes,p3_1_Paradigmen_sind_Absichten_(13),p3_2_Motive,p3_3_,p3_4_,p3_5_,p3_6_, p4_3,1",
-            150 => "p1_✗Galaxie,✗Menschliches,, p2_p3_0_Transzendentalien_innen_außen,p3_1_Motive,p3_2_,p3_3_,p3_4_,p3_5_, p4_3,4,0",
-            168 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_3,1,0",
-            169 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_3,1,0",
-            230 => "p1_✗Grundstrukturen,✗Multiversum,✗Grundstrukturen,✗Multiversum,✗Menschliches,✗Menschliches,, p2_p3_0_Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),p3_1_Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_Motive,p3_5_Bewusstsein_und_Wahrnehmung,p3_6_,p3_7_,p3_8_,p3_9_, p4_4,0",
-            231 => "p1_✗Menschliches,✗Menschliches,, p2_p3_0_Gefühle,p3_1_Motive,p3_2_,p3_3_,p3_4_,p3_5_, p4_4,0",
-            242 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Gesellschaftsschicht,p3_1_Klassen_(20),p3_2_,p3_3_,p3_4_,p3_5_,p3_6_, p4_5,0,3",
-            243 => "p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_,p3_7_,p3_8_,p3_9_,p3_10_, p4_4,0",
-            427 => "p1_✗Universum,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_Geist_(15),p3_2_Geist_(15),p3_3_,p3_4_,p3_5_,p3_6_,p3_7_,p3_8_,p3_9_, p4_4,0",
-            552 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Feudalwesen,p3_1_Gesellschaftsklassen,p3_2_Leibeigenschaft,p3_3_,p3_4_,p3_5_,p3_6_, p4_8,0",
-            556 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Klassen_(Fünfzehn_-_->_-_->_Zwanzig),p3_1_Gesellschaftsklassen,p3_2_,p3_3_,p3_4_,p3_5_,p3_6_, p4_5,0,3",
-            585 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_SithSith_andUnd_jediJedi_asAls_oneEine_socialSoziale_societyGesellschafts_classSchicht_antagonisticAntagonistisch_toZu_hierarchyHierarchie_asAls_flashBlitz_electricityElektrizitaet_shatteringErschutternde_thunderDonnernde_structureStruktur_complicatedKomplitziert_difficultSchwierig_insteadAnstelle_ofVon_complexKomplex_cristallineKristalline_(antagonisticAntagonistisch_hierarchyHierarchie)_organizationOrganisations_waysWege_pathsPfade_netNetzwerk_webNetz_ofVon_theDer_galaxyGalaxie_oneEine_yourEure_galaxyGalaxie_topSpitzen_infrastructureInfrastruktur_societyGesellschaft_organizedOrganisiert_buildungBauen_architectureArchitektur_designEntwurf_waysWege_streetsStrassen_pathsPfade_peopleVolk_humansMenschen,_galaxyGalaxie_renamingUmbenennung_designationBezeichnung_warKrieg_ofDer_socialSoziale_classesSchichten_notNicht_anymoreMehr_pentagramPentagramme_warsKriege_starKrieg_warsDer-Sterne_galaxyGalaxie_insideInnerhalb_clusterCluster_localLokale_groupGruppe_galaxiesGalaxien_(fifeFuenf_pentagramPentagramm_E_E_vsGegenueber_T_T_twentyZwanzig_icosigramIkosigramm)_socialSoziale_classesKlassen_fightKampf,p3_1_,p3_2_,p3_3_,p3_4_, p4_5,0,3",
-            698 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Gesellschaftsklassen_20_gegenüber_Hierarchie_12,p3_1_,p3_2_,p3_3_,p3_4_, p4_5,0,3",
-            _ => return None,
-        };
-        Some(s.to_string())
-    }
-
-    fn escape_html(content: &str) -> String {
+fn escape_html(content: &str) -> String {
         content
             .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
             .replace('"', "&quot;")
-    }
-
-    fn normalize_meta_label(label: &str, ober: &str) -> String {
-        let mut out = label.replace(' ', "_");
-        out = out.replace(",", "");
-        out = out.replace('/', "_");
-        out = out.replace('→', "_");
-        out = out.replace("(", "_(");
-        while out.contains("__") {
-            out = out.replace("__", "_");
-        }
-        if ober == "Universum" && (out == "Geist_(15)" || out == "Geist(15)") {
-            return "Geist__(15)".to_string();
-        }
-        out
-    }
-
-    fn header_meta_class(global_idx: usize) -> Option<String> {
-        None
     }
 fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
     self.cliout2("<table border=0 id=\"bigtable\">\n");
