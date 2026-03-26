@@ -1,17 +1,7 @@
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
-
-fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnterkategorieName(pub String);
@@ -24,138 +14,11 @@ impl UnterkategorieName {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    pub fn normalized(&self) -> String {
-        normalize_key(&self.0)
-    }
-
-    pub fn matches_str(&self, other: &str) -> bool {
-        self.normalized() == normalize_key(other)
-    }
 }
 
 impl fmt::Display for UnterkategorieName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OberkategorieKey {
-    Menschliches,
-    Universum,
-    Religion,
-    Religionen,
-    Galaxie,
-    Planet,
-    Bedeutung,
-    ProContra,
-    Grundstrukturen,
-    Multiversum,
-    WichtigstesZumVerstehen,
-    KombinationGalaxie,
-    KombinationUniversum,
-    GebrochenRationalGalaxie,
-    GebrochenRationalUniversum,
-    GebrochenRationalStrukturgroesse,
-    GebrochenRationalGefuehle,
-    EigenschaftenN,
-    UniversumMetaKonkret,
-    Primvielfache,
-    Multiplikationen,
-    Unknown(String),
-}
-
-impl OberkategorieKey {
-    pub fn from_raw(s: &str) -> Self {
-        match normalize_key(s).as_str() {
-            "menschliches" => Self::Menschliches,
-            "universum" => Self::Universum,
-            "religion" => Self::Religion,
-            "religionen" => Self::Religionen,
-            "galaxie" => Self::Galaxie,
-            "planet" | "planet1012" => Self::Planet,
-            "bedeutung" => Self::Bedeutung,
-            "procontra" => Self::ProContra,
-            "grundstrukturen" => Self::Grundstrukturen,
-            "multiversum" => Self::Multiversum,
-            "wichtigsteszumverstehen" => Self::WichtigstesZumVerstehen,
-            "kombinationgalaxie" => Self::KombinationGalaxie,
-            "kombinationuniversum" => Self::KombinationUniversum,
-            "gebrochenrationalgalaxienm" | "gebrochenrationalgalaxie" => {
-                Self::GebrochenRationalGalaxie
-            }
-            "gebrochenrationaluniversumnm" | "gebrochenrationaluniversum" => {
-                Self::GebrochenRationalUniversum
-            }
-            "gebrochenrationalstrukturgroessenm" | "gebrochenrationalstrukturgroesse" => {
-                Self::GebrochenRationalStrukturgroesse
-            }
-            "gebrochenrationalgefuhlenm"
-            | "gebrochenrationalgefuehlenm"
-            | "gebrochenrationalgefuhle"
-            | "gebrochenrationalgefuehle"
-            | "gebrochenrationalemotion"
-            | "gebrochenrationalemotionen" => Self::GebrochenRationalGefuehle,
-            "eigenschaftenn" => Self::EigenschaftenN,
-            "universummetakonkret" => Self::UniversumMetaKonkret,
-            "primvielfache" => Self::Primvielfache,
-            "multiplikationen" => Self::Multiplikationen,
-            _ => Self::Unknown(s.to_string()),
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Menschliches => "Menschliches",
-            Self::Universum => "Universum",
-            Self::Religion => "Religion",
-            Self::Religionen => "Religionen",
-            Self::Galaxie => "Galaxie",
-            Self::Planet => "Planet",
-            Self::Bedeutung => "Bedeutung",
-            Self::ProContra => "Pro_Contra",
-            Self::Grundstrukturen => "Grundstrukturen",
-            Self::Multiversum => "Multiversum",
-            Self::WichtigstesZumVerstehen => "Wichtigstes_zum_verstehen",
-            Self::KombinationGalaxie => "KombinationGalaxie",
-            Self::KombinationUniversum => "KombinationUniversum",
-            Self::GebrochenRationalGalaxie => "gebrochen-rational_Galaxie_n/m",
-            Self::GebrochenRationalUniversum => "gebrochen-rational_Universum_n/m",
-            Self::GebrochenRationalStrukturgroesse => "gebrochen-rational_Strukturgroesse_n/m",
-            Self::GebrochenRationalGefuehle => "gebrochen-rational_Gefühle_n/m",
-            Self::EigenschaftenN => "Eigenschaften_n",
-            Self::UniversumMetaKonkret => "universummetakonkret",
-            Self::Primvielfache => "primvielfache",
-            Self::Multiplikationen => "multiplikationen",
-            Self::Unknown(s) => s.as_str(),
-        }
-    }
-
-    pub fn normalized(&self) -> String {
-        normalize_key(self.as_str())
-    }
-
-    pub fn matches_str(&self, other: &str) -> bool {
-        self.normalized() == normalize_key(other)
-    }
-}
-
-impl fmt::Display for OberkategorieKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl PartialOrd for OberkategorieKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for OberkategorieKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.as_str().cmp(other.as_str())
     }
 }
 
@@ -174,26 +37,147 @@ impl Unterkategorie {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StandardOberkategorie {
+    Menschliches,
+    Universum,
+    Religion,
+    Bedeutung,
+    ProContra,
+    Grundstrukturen,
+    Planet,
+    Multiversum,
+    WichtigstesZumVerstehen,
+    Galaxie,
+    EigenschaftenN,
+    UniversumMetaKonkret,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum KombiRaum {
+    Galaxie,
+    Universum,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BruchRaum {
+    Galaxie,
+    Universum,
+    Gefuehle,
+    Strukturgroesse,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum GeneratorOberkategorie {
+    Primvielfache,
+    Multiplikationen,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum OberkategorieKey {
+    Standard(StandardOberkategorie),
+    Kombination(KombiRaum),
+    GebrochenRational(BruchRaum),
+    Generator(GeneratorOberkategorie),
+    Sonstige(String),
+}
+
+impl OberkategorieKey {
+    pub fn from_name(name: &str) -> Self {
+        let norm = normalize_key(name);
+        match norm.as_str() {
+            "menschliches" => Self::Standard(StandardOberkategorie::Menschliches),
+            "universum" => Self::Standard(StandardOberkategorie::Universum),
+            "religion" | "religionen" => Self::Standard(StandardOberkategorie::Religion),
+            "bedeutung" => Self::Standard(StandardOberkategorie::Bedeutung),
+            "procontra" | "dagegendafuer" => Self::Standard(StandardOberkategorie::ProContra),
+            "grundstrukturen" => Self::Standard(StandardOberkategorie::Grundstrukturen),
+            "planet10undoder12" | "planet" => Self::Standard(StandardOberkategorie::Planet),
+            "multiversum" => Self::Standard(StandardOberkategorie::Multiversum),
+            "wichtigsteszumverstehen" | "wichtigsteverstehen" => {
+                Self::Standard(StandardOberkategorie::WichtigstesZumVerstehen)
+            }
+            "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise" => {
+                Self::Standard(StandardOberkategorie::Galaxie)
+            }
+            "eigenschaftenn" => Self::Standard(StandardOberkategorie::EigenschaftenN),
+            "universummetakonkret" => {
+                Self::Standard(StandardOberkategorie::UniversumMetaKonkret)
+            }
+            "kombinationgalaxie" => Self::Kombination(KombiRaum::Galaxie),
+            "kombinationuniversum" => Self::Kombination(KombiRaum::Universum),
+            "gebrochenrationalgalaxienm" => Self::GebrochenRational(BruchRaum::Galaxie),
+            "gebrochenrationaluniversumnm" => Self::GebrochenRational(BruchRaum::Universum),
+            "gebrochenrationalgefuhlenm" | "gebrochenrationalemotionnm" => {
+                Self::GebrochenRational(BruchRaum::Gefuehle)
+            }
+            "gebrochenrationalstrukturgrossenm"
+            | "gebrochenrationalstrukturgroessenm" => {
+                Self::GebrochenRational(BruchRaum::Strukturgroesse)
+            }
+            "primvielfache" => Self::Generator(GeneratorOberkategorie::Primvielfache),
+            "multiplikationen" => Self::Generator(GeneratorOberkategorie::Multiplikationen),
+            _ => Self::Sonstige(name.to_string()),
+        }
+    }
+
+    pub fn as_canonical_str(&self) -> &str {
+        match self {
+            Self::Standard(StandardOberkategorie::Menschliches) => "Menschliches",
+            Self::Standard(StandardOberkategorie::Universum) => "Universum",
+            Self::Standard(StandardOberkategorie::Religion) => "Religion",
+            Self::Standard(StandardOberkategorie::Bedeutung) => "Bedeutung",
+            Self::Standard(StandardOberkategorie::ProContra) => "Pro_Contra",
+            Self::Standard(StandardOberkategorie::Grundstrukturen) => "Grundstrukturen",
+            Self::Standard(StandardOberkategorie::Planet) => "Planet",
+            Self::Standard(StandardOberkategorie::Multiversum) => "Multiversum",
+            Self::Standard(StandardOberkategorie::WichtigstesZumVerstehen) => {
+                "Wichtigstes_zum_verstehen"
+            }
+            Self::Standard(StandardOberkategorie::Galaxie) => "Galaxie",
+            Self::Standard(StandardOberkategorie::EigenschaftenN) => "Eigenschaften_n",
+            Self::Standard(StandardOberkategorie::UniversumMetaKonkret) => {
+                "universummetakonkret"
+            }
+            Self::Kombination(KombiRaum::Galaxie) => "KombinationGalaxie",
+            Self::Kombination(KombiRaum::Universum) => "KombinationUniversum",
+            Self::GebrochenRational(BruchRaum::Galaxie) => "gebrochen-rational_Galaxie_n/m",
+            Self::GebrochenRational(BruchRaum::Universum) => "gebrochen-rational_Universum_n/m",
+            Self::GebrochenRational(BruchRaum::Gefuehle) => "gebrochen-rational_Gefühle_n/m",
+            Self::GebrochenRational(BruchRaum::Strukturgroesse) => {
+                "gebrochen-rational_Strukturgroesse_n/m"
+            }
+            Self::Generator(GeneratorOberkategorie::Primvielfache) => "primvielfache",
+            Self::Generator(GeneratorOberkategorie::Multiplikationen) => "multiplikationen",
+            Self::Sonstige(name) => name.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for OberkategorieKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_canonical_str())
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct Hauptkategorie {
+pub struct Oberkategorie {
     pub key: OberkategorieKey,
     pub unterkategorien: Vec<Unterkategorie>,
 }
 
-impl Hauptkategorie {
+impl Oberkategorie {
     pub fn new(name: impl Into<String>, unterkategorien: Vec<Unterkategorie>) -> Self {
-        let raw_name: String = name.into();
+        let name = name.into();
         Self {
-            key: OberkategorieKey::from_raw(&raw_name),
+            key: OberkategorieKey::from_name(&name),
             unterkategorien,
         }
     }
 }
 
-pub type Oberkategorie = Hauptkategorie;
-
 pub struct KategorieMap {
-    pub hauptkategorien: Vec<Hauptkategorie>,
+    pub hauptkategorien: Vec<Oberkategorie>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -201,6 +185,13 @@ pub struct GeneratedInference {
     pub generated_befehle: Vec<String>,
     pub required_columns: Vec<u32>,
     pub direct_columns: Vec<u32>,
+}
+
+pub fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
 }
 
 impl KategorieMap {
@@ -320,8 +311,8 @@ impl KategorieMap {
 
     fn convert_main_to_hauptkategorien(
         main_to_sub: HashMap<String, HashMap<String, Vec<u32>>>,
-    ) -> Vec<Hauptkategorie> {
-        let mut hauptkategorien: Vec<Hauptkategorie> = main_to_sub
+    ) -> Vec<Oberkategorie> {
+        let mut hauptkategorien: Vec<Oberkategorie> = main_to_sub
             .into_iter()
             .map(|(haupt_name, unter_map)| {
                 let mut unterkategorien: Vec<Unterkategorie> = unter_map
@@ -333,8 +324,8 @@ impl KategorieMap {
                     })
                     .collect();
 
-                unterkategorien.sort_by(|a, b| a.name.cmp(&b.name));
-                Hauptkategorie::new(haupt_name, unterkategorien)
+                unterkategorien.sort_by(|a, b| a.name.0.cmp(&b.name.0));
+                Oberkategorie::new(haupt_name, unterkategorien)
             })
             .collect();
 
@@ -464,7 +455,9 @@ impl KategorieMap {
                     }
                     output.push_str(&format!(
                         "  ('{}', '{}', {})",
-                        haupt.key, unter.name, spaltennummer
+                        haupt.key,
+                        unter.name,
+                        spaltennummer
                     ));
                     first = false;
                 }
