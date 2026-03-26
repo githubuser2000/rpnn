@@ -8,6 +8,7 @@ mod column_manager;
 mod data;
 mod if_is_zeilen_angabe;
 mod input_help;
+mod lib4tables_enum;
 mod multiples_teiler;
 mod reta_ausgabe;
 mod table_printer;
