@@ -6,11 +6,11 @@ use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
 
+use crate::domain::python_source_of_truth;
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
 use crate::reta_ausgabe::utils::{unicode_pad, word_wrap};
-use crate::domain::python_html_meta::lookup_header_meta;
 
 #[derive(Debug)]
 pub struct CliOutput<'a> {
@@ -200,41 +200,32 @@ let syntax = match self.out_type {
         visible
     }
 
-
 fn extract_header_meta(full: &str) -> (String, Option<String>) {
-    let without_idx = if let Some(sep) = full.find("\u{1f}IDX:") {
+    let without_col = if let Some(sep) = full.find("\u{1f}COL:") {
         &full[..sep]
     } else {
         full
     };
-
-    let without_meta_marker = if let Some(sep) = without_idx.find("\u{1f}META:") {
-        &without_idx[..sep]
-    } else if let Some(sep) = without_idx.find("META:") {
-        &without_idx[..sep]
+    let col_id = if let Some(sep) = full.find("\u{1f}COL:") {
+        full[sep + "\u{1f}COL:".len()..].trim().parse::<u32>().ok()
     } else {
-        without_idx
+        None
+    };
+    let without_idx = if let Some(sep) = without_col.find("\u{1f}IDX:") {
+        &without_col[..sep]
+    } else {
+        without_col
     };
 
-    let visible = Self::strip_id_suffix(without_meta_marker.trim())
-        .trim_matches('"')
-        .trim()
-        .to_string();
-
-    if let Some(meta) = lookup_header_meta(&visible) {
-        return (visible, Some(meta.to_string()));
-    }
-
-    if let Some(start) = without_meta_marker.find("p1_") {
-        let visible = Self::strip_id_suffix(without_meta_marker[..start].trim())
-            .trim_matches('"')
-            .trim()
-            .to_string();
-        let meta = without_meta_marker[start..].trim().to_string();
+    if let Some(start) = without_idx.find("p1_") {
+        let visible = without_idx[..start].trim().to_string();
+        let meta = without_idx[start..].trim().to_string();
         return (visible, Some(meta));
     }
 
-    (visible, None)
+    let visible = Self::strip_id_suffix(without_idx.trim());
+    let meta = col_id.and_then(python_source_of_truth::exact_meta_for_column);
+    (visible.trim_matches('"').to_string(), meta)
 }
 
     fn extract_id_suffix(text: &str) -> Option<usize> {
@@ -248,24 +239,45 @@ fn extract_header_meta(full: &str) -> (String, Option<String>) {
         let mut out = text.trim().to_string();
         loop {
             if let Some(pos) = out.rfind("(ID_") {
-                if let Some(end_rel) = out[pos..].find(')') {
-                    let end = pos + end_rel + 1;
-                    out.replace_range(pos..end, "");
-                    out = out.trim().to_string();
+                if out.ends_with(')') {
+                    out = out[..pos].trim_end().to_string();
                     continue;
                 }
             }
             break;
         }
-        out.trim().trim_matches('"').to_string()
+        out.trim_matches('"').to_string()
     }
 
-fn escape_html(content: &str) -> String {
+    fn exact_header_meta_class_by_id(_id: usize) -> Option<String> {
+        None
+    }
+
+    fn escape_html(content: &str) -> String {
         content
             .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
             .replace('"', "&quot;")
+    }
+
+    fn normalize_meta_label(label: &str, ober: &str) -> String {
+        let mut out = label.replace(' ', "_");
+        out = out.replace(",", "");
+        out = out.replace('/', "_");
+        out = out.replace('→', "_");
+        out = out.replace("(", "_(");
+        while out.contains("__") {
+            out = out.replace("__", "_");
+        }
+        if ober == "Universum" && (out == "Geist_(15)" || out == "Geist(15)") {
+            return "Geist__(15)".to_string();
+        }
+        out
+    }
+
+    fn header_meta_class(global_idx: usize) -> Option<String> {
+        None
     }
 fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]) {
     self.cliout2("<table border=0 id=\"bigtable\">\n");

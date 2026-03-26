@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use unicode_width::UnicodeWidthStr;
 
 use crate::cli::TextBereich;
-use crate::column_manager::{build_column_query, get_column_names};
+use crate::column_manager::{build_column_query, collect_spalten_nummern, get_column_names};
 use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::multiples_teiler::teiler_utils::prime_factors;
@@ -271,6 +271,18 @@ fn build_full_table_row_query(column_names: &[String], _bereich: &TextBereich) -
     format!("SELECT {} FROM csv_data", columns)
 }
 
+
+fn attach_column_ids_to_headers(headers: &[String], columns_1_based: &[usize]) -> Vec<String> {
+    headers
+        .iter()
+        .enumerate()
+        .map(|(idx, header)| {
+            let col = columns_1_based.get(idx).copied().unwrap_or(idx + 1);
+            format!("{}\u{1f}COL:{}", header, col)
+        })
+        .collect()
+}
+
 fn sanitize_headers(headers: &[String]) -> Vec<String> {
     headers
         .iter()
@@ -285,26 +297,6 @@ fn sanitize_headers(headers: &[String]) -> Vec<String> {
         })
         .collect()
 }
-
-fn normalize_html_class_token(s: &str) -> String {
-    let mut out = s.trim().replace(' ', "_");
-    out = out.replace(',', "");
-    out = out.replace('/', "_");
-    out = out.replace('→', "_");
-    while out.contains("__") {
-        out = out.replace("__", "_");
-    }
-    out
-}
-
-fn attach_html_meta_to_headers(
-    headers: &[String],
-    _selected_cols_1_based: &[usize],
-    _kategorie_map: &KategorieMap,
-) -> Vec<String> {
-    headers.to_vec()
-}
-
 
 pub fn query_column_by_index(
     conn: &Connection,
@@ -330,29 +322,20 @@ pub fn query_column_by_index(
         (query, sanitize_headers(&headers))
     };
 
+    let mut source_columns_1_based: Vec<usize> = if is_generated_mode {
+    (1..=headers.len()).collect()
+} else if !bereich.exact_visible_columns.is_empty() {
+    bereich.exact_visible_columns.clone()
+} else {
+    let mut temp_bereich = bereich.clone();
+    collect_spalten_nummern(&mut temp_bereich)?
+};
+   source_columns_1_based.dedup();
+
     if !bereich.columns_resolved() {
         println!("❌ FEHLER: Spalten wurden nicht gefunden!");
         process::exit(1);
     }
-
-    let selected_cols_1_based: Vec<usize> = if is_generated_mode {
-        (1..=headers.len()).collect()
-    } else if !bereich.exact_visible_columns.is_empty() {
-        bereich
-            .exact_visible_columns
-            .iter()
-            .copied()
-            .filter(|&n| n > 0)
-            .collect()
-    } else {
-        (1..=headers.len()).collect()
-    };
-
-    let headers = if matches!(bereich.output_syntax, crate::reta_ausgabe::OutputSyntax::HTML) {
-        attach_html_meta_to_headers(&headers, &selected_cols_1_based, kategorie_map)
-    } else {
-        headers
-    };
 
     let header_lengths: Vec<usize> = headers
         .iter()
@@ -404,6 +387,14 @@ pub fn query_column_by_index(
             final_headers = sorted_headers;
             final_data = sorted_data;
         }
+    }
+
+    if matches!(bereich.output_syntax, crate::reta_ausgabe::OutputSyntax::HTML) {
+        if final_headers.len() > source_columns_1_based.len() {
+            let start = source_columns_1_based.len() + 1;
+            source_columns_1_based.extend(start..=final_headers.len());
+        }
+        final_headers = attach_column_ids_to_headers(&final_headers, &source_columns_1_based);
     }
 
     final_headers = sanitize_headers(&final_headers);

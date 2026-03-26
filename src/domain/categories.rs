@@ -1,5 +1,6 @@
 // file: src/domain/categories.rs
 use std::collections::{HashMap, HashSet};
+use crate::domain::python_source_of_truth;
 
 #[derive(Debug, Clone)]
 pub struct Unterkategorie {
@@ -136,56 +137,16 @@ impl KategorieMap {
 // In column_categories_complete.rs:
 // NEUE Funktion für exakte Suche - innerhalb des impl Blocks!
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-    let ober_gesucht = normalize_key(ober);
-    let unter_gesucht = normalize_key(unter);
-
-    for haupt in &self.hauptkategorien {
-        if normalize_key(&haupt.name) != ober_gesucht {
-            continue;
-        }
-
-        for unterkategorie in &haupt.unterkategorien {
-            if normalize_key(&unterkategorie.name) == unter_gesucht {
-                let mut gefundene = unterkategorie.spaltennummern.clone();
-                gefundene.sort_unstable();
-                gefundene.dedup();
-                return gefundene;
-            }
-        }
-    }
-
-    Vec::new()
+    python_source_of_truth::exact_columns_for_pair(ober, unter)
 }
-// UND eine Version, die speziell für die Haupt-Datenstruktur optimiert ist:
 
 pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
     let exakt = self.finde_spaltennummern_exakt(ober, unter);
     if !exakt.is_empty() {
         return exakt;
     }
-
-    let mut gefundene = Vec::new();
-    let ober_normalized = ober.to_lowercase().replace("_", "");
-    let unter_normalized = unter.to_lowercase().replace("_", "");
-
-    for haupt in &self.hauptkategorien {
-        if haupt.name.to_lowercase().replace("_", "") == ober_normalized {
-            for unterkategorie in &haupt.unterkategorien {
-                if unterkategorie.name.to_lowercase().replace("_", "").contains(&unter_normalized) {
-                    gefundene.extend_from_slice(&unterkategorie.spaltennummern);
-                }
-            }
-        }
-    }
-
-    gefundene.sort();
-    gefundene.dedup();
-    gefundene
+    python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
 }
-
-
-
-
 
     fn lade_kategorien(&mut self) {
         // In column_categories_complete.rs - in der lade_kategorien Funktion:

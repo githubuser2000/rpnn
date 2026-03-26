@@ -1,6 +1,7 @@
 // file: column_manager/mod.rs
 mod column_query_builder;
 mod column_selector;
+pub(crate) use column_selector::collect_spalten_nummern;
 mod row_query_builder;
 mod validation;
 
