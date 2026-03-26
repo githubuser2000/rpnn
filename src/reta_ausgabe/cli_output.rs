@@ -260,8 +260,8 @@ let meta = resolved.class_attr;
             };
 
             if display_line_idx == 0 {
-                let class_attr = if let Some(meta_str) = meta {
-    format!(" class=\"z_0 r_{} {}\"", col_idx, meta_str)
+let class_attr = if let Some(meta_str) = meta {
+    format!(" class=\"{}\"", meta_str)
 } else {
     format!(" class=\"z_0 r_{}\"", col_idx)
 };
