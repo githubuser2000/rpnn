@@ -1,23 +1,22 @@
 use std::collections::BTreeSet;
 
 use crate::cli::TextBereich;
-use crate::domain::categories::{KategorieMap, OberkategorieKey, UnterkategorieName};
+use crate::domain::categories::{KategorieMap, KategorieProvider, OberkategorieEntry, UnterkategorieEntry};
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::domain::indices::ColumnNumber;
 use crate::reta_ausgabe::OutputSyntax;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnfragePair {
-    pub ober: OberkategorieKey,
-    pub unter: UnterkategorieName,
+    pub ober: String,
+    pub unter: String,
 }
 
 impl AnfragePair {
     pub fn new(ober: impl Into<String>, unter: impl Into<String>) -> Self {
-        let ober_raw: String = ober.into();
-        let unter_raw: String = unter.into();
         Self {
-            ober: OberkategorieKey::from_raw(&ober_raw),
-            unter: UnterkategorieName::new(unter_raw),
+            ober: ober.into(),
+            unter: unter.into(),
         }
     }
 
@@ -58,6 +57,16 @@ impl ReverseRequestReport {
     }
 }
 
+pub trait CliRenderable {
+    fn to_cli(&self) -> String;
+}
+
+impl CliRenderable for AnfragePair {
+    fn to_cli(&self) -> String {
+        self.to_cli()
+    }
+}
+
 fn normalize_key(s: &str) -> String {
     s.trim()
         .to_lowercase()
@@ -67,45 +76,52 @@ fn normalize_key(s: &str) -> String {
         .replace('/', "")
 }
 
-fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
-    let mut visible = BTreeSet::<u32>::new();
+fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<ColumnNumber> {
+    let mut visible = BTreeSet::<ColumnNumber>::new();
 
     for &(a, b) in &bereich.spalten_bereiche {
         if a == 0 || b == 0 || a > b {
             continue;
         }
         for n in a..=b {
-            visible.insert(n as u32);
+            visible.insert(ColumnNumber(n as u32));
         }
     }
 
     for &n in &bereich.spaltenreihenfolgeundnurdiese {
         if n > 0 {
-            visible.insert(n as u32);
+            visible.insert(ColumnNumber(n as u32));
         }
     }
 
     for &n in &bereich.exact_visible_columns {
         if n > 0 {
-            visible.insert(n as u32);
+            visible.insert(ColumnNumber(n as u32));
         }
     }
 
     visible
 }
 
-fn collect_exact_and_partial_direct_pairs(
-    kategorie_map: &KategorieMap,
-    visible_columns: &BTreeSet<u32>,
+fn collect_exact_and_partial_direct_pairs<P>(
+    provider: &P,
+    visible_columns: &BTreeSet<ColumnNumber>,
     report: &mut ReverseRequestReport,
-) {
-    for haupt in &kategorie_map.hauptkategorien {
-        for unter in &haupt.unterkategorien {
-            let pair = AnfragePair {
-                ober: haupt.key.clone(),
-                unter: unter.name.clone(),
-            };
-            let cols: BTreeSet<u32> = unter.spaltennummern.iter().copied().collect();
+) where
+    P: KategorieProvider,
+{
+    for haupt in provider.hauptkategorien() {
+        for unter in haupt.unterkategorien() {
+            let pair = AnfragePair::new(
+                haupt.ober_name().as_str().to_string(),
+                unter.unter_name().as_str().to_string(),
+            );
+            let cols: BTreeSet<ColumnNumber> = unter
+                .spaltennummern()
+                .iter()
+                .copied()
+                .map(ColumnNumber)
+                .collect();
 
             if cols.is_empty() {
                 continue;
@@ -206,74 +222,54 @@ fn collect_kombi_pairs(bereich: &TextBereich, report: &mut ReverseRequestReport)
 }
 
 fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, report: &mut ReverseRequestReport) {
-    let has =
-        |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
+    let has = |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
+
+    let mut add = |ober: &str, unter: &str| {
+        report.insert(TrefferArt::WeiterePassende, AnfragePair::new(ober, unter));
+    };
 
     if has("primzahlkreuzprocontra") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Universum", "Primzahlkreuz"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Bedeutung", "Primzahlkreuz"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Pro_Contra", "Primzahlkreuz"));
+        add("Universum", "Primzahlkreuz");
+        add("Bedeutung", "Primzahlkreuz");
+        add("Pro_Contra", "Primzahlkreuz");
     }
-
     if has("lovepolygon") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Menschliches", "Liebe"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Grundstrukturen", "Liebe"));
+        add("Menschliches", "Liebe");
+        add("Grundstrukturen", "Liebe");
     }
-
     if has("gleichheitfreiheit") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Planet", "Gleichheit"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Menschliches", "Gleichheit"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Grundstrukturen", "Gleichheit"));
+        add("Planet", "Gleichheit");
+        add("Menschliches", "Gleichheit");
+        add("Grundstrukturen", "Gleichheit");
     }
-
     if has("geistemotionenergiematerietopologie") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Universum", "Geist"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Multiversum", "Geist"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Grundstrukturen", "Geist"));
+        add("Universum", "Geist");
+        add("Multiversum", "Geist");
+        add("Grundstrukturen", "Geist");
     }
-
     if has("primcreativitytype") || has("mondexponzierenlogarithmustyp") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Wichtigstes_zum_verstehen", "Gestirn"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Bedeutung", "Gestirn"));
+        add("Wichtigstes_zum_verstehen", "Gestirn");
+        add("Bedeutung", "Gestirn");
     }
-
     if has("vervielfachezeile") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Wichtigstes_zum_verstehen", "Primzahlen"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Bedeutung", "Primzahlen"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("Galaxie", "Primzahlen"));
+        add("Wichtigstes_zum_verstehen", "Primzahlen");
+        add("Bedeutung", "Primzahlen");
+        add("Galaxie", "Primzahlen");
     }
-
-    if has("primmotgleichf") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "motivgleichfoermig"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "motivgleichfoermig"));
-    }
-    if has("primstrukgleichf") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "strukturgleichfoermig"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "strukturgleichfoermig"));
-    }
-    if has("primmotivstern") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "motivstern"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "motivstern"));
-    }
-    if has("primstrukturstern") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "strukturstern"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "strukturstern"));
-    }
-    if has("primmotivsterngebr") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "motivgebrstern"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "motivgebrstern"));
-    }
-    if has("primstruktursterngebr") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "strukgebrstern"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "strukgebrstern"));
-    }
-    if has("primmotgleichfgebr") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "motivgebrgleichf"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "motivgebrgleichf"));
-    }
-    if has("primstrukgleichfgebr") {
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("primvielfache", "strukgebrgleichf"));
-        report.insert(TrefferArt::WeiterePassende, AnfragePair::new("multiplikationen", "strukgebrgleichf"));
+    for (needle, unter) in [
+        ("primmotgleichf", "motivgleichfoermig"),
+        ("primstrukgleichf", "strukturgleichfoermig"),
+        ("primmotivstern", "motivstern"),
+        ("primstrukturstern", "strukturstern"),
+        ("primmotivsterngebr", "motivgebrstern"),
+        ("primstruktursterngebr", "strukgebrstern"),
+        ("primmotgleichfgebr", "motivgebrgleichf"),
+        ("primstrukgleichfgebr", "strukgebrgleichf"),
+    ] {
+        if has(needle) {
+            add("primvielfache", unter);
+            add("multiplikationen", unter);
+        }
     }
 }
 
@@ -328,7 +324,6 @@ pub fn print_reverse_request_pairs(
     }
 
     let mut report = ReverseRequestReport::default();
-
     collect_exact_and_partial_direct_pairs(kategorie_map, &visible_columns, &mut report);
     collect_fraction_pairs(bereich, &mut report);
     collect_kombi_pairs(bereich, &mut report);
@@ -340,7 +335,6 @@ pub fn print_reverse_request_pairs(
     }
 
     println!();
-
     if !report.exakte_auswahl.is_empty() {
         println!("══════════════════════════════════════════════");
         println!("Exakt äquivalente Spalten-Auswahl:");
@@ -349,7 +343,6 @@ pub fn print_reverse_request_pairs(
             println!("  {}", pair.to_cli());
         }
     }
-
     if !report.weitere_passende_auswahl.is_empty() {
         if !report.exakte_auswahl.is_empty() {
             println!();
@@ -361,4 +354,12 @@ pub fn print_reverse_request_pairs(
             println!("  {}", pair.to_cli());
         }
     }
+}
+
+pub fn print_reverse_request_pairs_dual(
+    kategorie_map: &KategorieMap,
+    bereich: &TextBereich,
+    generated_befehle: &BTreeSet<String>,
+) {
+    print_reverse_request_pairs(kategorie_map, bereich, generated_befehle);
 }
