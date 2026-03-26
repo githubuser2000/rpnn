@@ -167,13 +167,12 @@ pub fn parse_cli_args(
                     bereich.mark_columns_requested();
 
                     if let Some(kategorie_map) = kategorie_map {
-                        let alle_paare = kategorie_map.alle_paare();
-
-                        spalten_namen_liste.eintraege = alle_paare
+                        spalten_namen_liste.eintraege = kategorie_map
+                            .alle_paare()
                             .into_iter()
-                            .map(|eintrag| SpaltenNamen {
-                                oberkategorie: eintrag.oberkategorie,
-                                unterkategorie: eintrag.unterkategorie,
+                            .map(|(oberkategorie, unterkategorie)| SpaltenNamen {
+                                oberkategorie,
+                                unterkategorie,
                             })
                             .collect();
 

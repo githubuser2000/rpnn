@@ -1,9 +1,8 @@
-use crate::domain::categories::{KategorieEintrag, KategorieMap, Oberkategorie};
+use crate::domain::categories::{KategorieMap, Oberkategorie};
 use super::normalize::normalize_key;
 
 pub fn finde_spaltennummern_exakt_in_maps(
     hauptkategorien: &[Oberkategorie],
-    alle_eintraege: &[KategorieEintrag],
     ober: &str,
     unter: &str,
 ) -> Vec<u32> {
@@ -21,25 +20,19 @@ pub fn finde_spaltennummern_exakt_in_maps(
         }
     }
 
-    if gefundene.is_empty() {
-        for eintrag in alle_eintraege {
-            if normalize_key(&eintrag.oberkategorie) == ober_gesucht
-                && normalize_key(&eintrag.unterkategorie) == unter_gesucht
-            {
-                gefundene.extend_from_slice(&eintrag.spaltennummern);
-            }
-        }
-    }
-
     gefundene.sort();
     gefundene.dedup();
     gefundene
 }
 
-pub fn finde_spaltennummern_fuer_kategorien(map: &KategorieMap, ober: &str, unter: &str) -> Vec<u32> {
-    let exakt = finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, &map.alle_eintraege, ober, unter);
+pub fn finde_spaltennummern_fuer_kategorien(
+    map: &KategorieMap,
+    ober: &str,
+    unter: &str,
+) -> Vec<u32> {
+    let exakt = finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, ober, unter);
     if !exakt.is_empty() {
         return exakt;
     }
-    map.finde_spaltennummern_fuer_kategorien(ober, unter)
+    finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, ober, unter)
 }

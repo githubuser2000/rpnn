@@ -1,28 +1,5 @@
 // file: src/domain/categories.rs
 use std::collections::{HashMap, HashSet};
-// Öffentliche Struktur für Kategorien
-#[derive(Debug, Clone)]
-pub struct KategorieEintrag {
-    pub oberkategorie: String,
-    pub unterkategorie: String,
-    pub spaltennummern: Vec<u32>,
-}
-
-impl KategorieEintrag {
-    pub fn new(ober: &str, unter: &str, nummern: Vec<u32>) -> Self {
-        Self {
-            oberkategorie: ober.to_string(),
-            unterkategorie: unter.to_string(),
-            spaltennummern: nummern,
-        }
-    }
-}
-// NEUE Funktion für exakte Suche
-// In der impl KategorieMap { ... } Sektion:
-
-
-
-
 
 #[derive(Debug, Clone)]
 pub struct Unterkategorie {
@@ -56,11 +33,11 @@ impl Oberkategorie {
 
 pub struct KategorieMap {
     pub hauptkategorien: Vec<Oberkategorie>,
-    pub alle_eintraege: Vec<KategorieEintrag>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct GeneratedInference {
+
     pub generated_befehle: Vec<String>,
     pub required_columns: Vec<u32>,
     pub direct_columns: Vec<u32>,
@@ -77,7 +54,6 @@ impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
             hauptkategorien: Vec::new(),
-            alle_eintraege: Vec::new(),
         };
         instanz.lade_kategorien();
         instanz
@@ -162,26 +138,19 @@ impl KategorieMap {
 pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     let mut gefundene = Vec::new();
 
-    let ober_gesucht = normalize_key(ober);
-    let unter_gesucht = normalize_key(unter);
+    let ober_gesucht = ober.to_lowercase().replace("_", "");
+    let unter_gesucht = unter.to_lowercase().replace("_", "");
 
     for haupt in &self.hauptkategorien {
-        if normalize_key(&haupt.name) == ober_gesucht {
+        let haupt_normalized = haupt.name.to_lowercase().replace("_", "");
+
+        if haupt_normalized == ober_gesucht {
             for unterkategorie in &haupt.unterkategorien {
-                if normalize_key(&unterkategorie.name) == unter_gesucht {
+                let unter_normalized = unterkategorie.name.to_lowercase().replace("_", "");
+
+                if unter_normalized == unter_gesucht {
                     gefundene.extend_from_slice(&unterkategorie.spaltennummern);
                 }
-            }
-        }
-    }
-
-    if gefundene.is_empty() {
-        for eintrag in &self.alle_eintraege {
-            let ober_normalized = normalize_key(&eintrag.oberkategorie);
-            let unter_normalized = normalize_key(&eintrag.unterkategorie);
-
-            if ober_normalized == ober_gesucht && unter_normalized == unter_gesucht {
-                gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
         }
     }
@@ -199,26 +168,15 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     }
 
     let mut gefundene = Vec::new();
-    let ober_normalized = normalize_key(ober);
-    let unter_normalized = normalize_key(unter);
+    let ober_normalized = ober.to_lowercase().replace("_", "");
+    let unter_normalized = unter.to_lowercase().replace("_", "");
 
     for haupt in &self.hauptkategorien {
-        if normalize_key(&haupt.name) == ober_normalized {
+        if haupt.name.to_lowercase().replace("_", "") == ober_normalized {
             for unterkategorie in &haupt.unterkategorien {
-                if normalize_key(&unterkategorie.name).contains(&unter_normalized) {
+                if unterkategorie.name.to_lowercase().replace("_", "").contains(&unter_normalized) {
                     gefundene.extend_from_slice(&unterkategorie.spaltennummern);
                 }
-            }
-        }
-    }
-
-    if gefundene.is_empty() {
-        for eintrag in &self.alle_eintraege {
-            let ober_name = normalize_key(&eintrag.oberkategorie);
-            let unter_name = normalize_key(&eintrag.unterkategorie);
-
-            if ober_name.contains(&ober_normalized) && unter_name.contains(&unter_normalized) {
-                gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
         }
     }
@@ -239,7 +197,6 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
    
     // ... Rest des Codes ...
         let mut main_to_sub = HashMap::new();
-        let mut alle_eintraege_temp = Vec::new();
         let data = vec![
 (vec!["Pro_Contra", "procontra", "dagegendafuer"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
 (vec!["Bedeutung", "bedeutung"], vec!["Primzahlkreuz_pro_contra", "primzahlkreuz"], vec![]),
@@ -683,18 +640,11 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
             for &sub_cat in &sub_categories {
                 Self::insert_entry(&mut main_to_sub, main_cat, sub_cat, korrigierte_ids.clone());
                 
-                // Auch in die flache Liste aufnehmen
-                alle_eintraege_temp.push(KategorieEintrag::new(
-                    main_cat,
-                    sub_cat,
-                    korrigierte_ids.clone()
-                ));
             }
         }
     }
 
     self.hauptkategorien = Self::convert_main_to_hauptkategorien(main_to_sub);
-    self.alle_eintraege = alle_eintraege_temp;
 } 
     fn convert_main_to_hauptkategorien(
         main_to_sub: HashMap<String, HashMap<String, Vec<u32>>>,
@@ -720,8 +670,37 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         hauptkategorien
     }
 
+    pub fn alle_paare(&self) -> Vec<(String, String)> {
+        let mut paare = Vec::new();
+
+        for haupt in &self.hauptkategorien {
+            for unter in &haupt.unterkategorien {
+                paare.push((haupt.name.clone(), unter.name.clone()));
+            }
+        }
+
+        paare.sort();
+        paare.dedup();
+        paare
+    }
+
+    pub fn alle_spaltennummern(&self) -> Vec<u32> {
+        let mut nummern = Vec::new();
+
+        for haupt in &self.hauptkategorien {
+            for unter in &haupt.unterkategorien {
+                nummern.extend(unter.spaltennummern.iter().copied());
+            }
+        }
+
+        nummern.sort_unstable();
+        nummern.dedup();
+        nummern
+    }
+
     fn insert_entry(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
+
         main_category: &str,
         sub_category: &str,
         new_ids: Vec<u32>
@@ -746,15 +725,26 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     
     // Methode um Kategorien nach Spaltennummer zu filtern
     // Diese Funktion wird niemals verwendet. Wahrscheinlich kommt sie in den Warnings
-    pub fn filtere_nach_spaltennummern(&self, nummern: &[usize]) -> Vec<&KategorieEintrag> {
+    pub fn filtere_nach_spaltennummern(&self, nummern: &[usize]) -> Vec<(String, String, Vec<u32>)> {
         let nummern_set: HashSet<u32> = nummern.iter().map(|&n| n as u32).collect();
-        
-        self.alle_eintraege
-            .iter()
-            .filter(|eintrag| {
-                eintrag.spaltennummern.iter().any(|num| nummern_set.contains(num))
-            })
-            .collect()
+        let mut result = Vec::new();
+
+        for haupt in &self.hauptkategorien {
+            for unter in &haupt.unterkategorien {
+                let passende_spalten: Vec<u32> = unter
+                    .spaltennummern
+                    .iter()
+                    .copied()
+                    .filter(|num| nummern_set.contains(num))
+                    .collect();
+
+                if !passende_spalten.is_empty() {
+                    result.push((haupt.name.clone(), unter.name.clone(), passende_spalten));
+                }
+            }
+        }
+
+        result
     }
    
     // In column_categories_complete.rs, innerhalb des impl KategorieMap:
@@ -787,25 +777,32 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         output.push_str(", spaltennummer) VALUES\n");
         
         let mut first = true;
-        for eintrag in &self.alle_eintraege {
-            // Filtern nach Spaltennummern falls gewünscht
-            if let Some(filter) = spalten_filter {
-                let filter_set: HashSet<u32> = filter.iter().map(|&n| n as u32).collect();
-                let hat_treffer = eintrag.spaltennummern.iter().any(|num| filter_set.contains(num));
-                if !hat_treffer {
-                    continue;
+        for haupt in &self.hauptkategorien {
+            for unter in &haupt.unterkategorien {
+                let spalten_iter: Vec<u32> = if let Some(filter) = spalten_filter {
+                    let filter_set: HashSet<u32> = filter.iter().map(|&n| n as u32).collect();
+                    unter
+                        .spaltennummern
+                        .iter()
+                        .copied()
+                        .filter(|num| filter_set.contains(num))
+                        .collect()
+                } else {
+                    unter.spaltennummern.clone()
+                };
+
+                for spaltennummer in spalten_iter {
+                    if !first {
+                        output.push_str(",\n");
+                    }
+                    output.push_str(&format!(
+                        "  ('{}', '{}', {})",
+                        haupt.name,
+                        unter.name,
+                        spaltennummer
+                    ));
+                    first = false;
                 }
-            }
-            
-            for &spaltennummer in &eintrag.spaltennummern {
-                if !first {
-                    output.push_str(",\n");
-                }
-                output.push_str(&format!("  ('{}', '{}', {})", 
-                                       eintrag.oberkategorie, 
-                                       eintrag.unterkategorie, 
-                                       spaltennummer));
-                first = false;
             }
         }
         
@@ -832,71 +829,6 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         
         output
     }
-
-    pub fn alle_paare(&self) -> Vec<KategorieEintrag> {
-        let mut out = Vec::new();
-
-        for haupt in &self.hauptkategorien {
-            for unter in &haupt.unterkategorien {
-                out.push(KategorieEintrag::new(
-                    &haupt.name,
-                    &unter.name,
-                    unter.spaltennummern.clone(),
-                ));
-            }
-        }
-
-        out.sort_by(|a, b| {
-            a.oberkategorie
-                .cmp(&b.oberkategorie)
-                .then(a.unterkategorie.cmp(&b.unterkategorie))
-        });
-        out.dedup_by(|a, b| {
-            a.oberkategorie == b.oberkategorie && a.unterkategorie == b.unterkategorie
-        });
-        out
-    }
-
-    pub fn alle_spaltennummern(&self) -> Vec<u32> {
-        let mut out = Vec::new();
-
-        for haupt in &self.hauptkategorien {
-            for unter in &haupt.unterkategorien {
-                out.extend_from_slice(&unter.spaltennummern);
-            }
-        }
-
-        out.sort_unstable();
-        out.dedup();
-        out
-    }
-
-    pub fn oberkategorien_namen(&self) -> Vec<String> {
-        self.hauptkategorien
-            .iter()
-            .map(|haupt| haupt.name.clone())
-            .collect()
-    }
-
-    pub fn unterkategorien_fuer_ober(&self, oberkategorie: &str) -> Vec<String> {
-        let needle = normalize_key(oberkategorie);
-
-        for haupt in &self.hauptkategorien {
-            if normalize_key(&haupt.name) == needle {
-                let mut out: Vec<String> = haupt
-                    .unterkategorien
-                    .iter()
-                    .map(|unter| unter.name.clone())
-                    .collect();
-                out.sort();
-                out.dedup();
-                return out;
-            }
-        }
-
-        Vec::new()
-    }
-
 }
 
 // Öffentliche Funktion um die Kategorie-Map zu erhalten
