@@ -9,4 +9,6 @@ pub mod tabellen_utils;
 pub mod generator_logic;
 pub mod category_map;
 
+pub mod python_html_meta;
 pub mod python_source_of_truth;
+pub mod html_header_model;

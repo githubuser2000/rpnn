@@ -6,7 +6,6 @@ use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
 
-use crate::domain::{python_html_meta, python_source_of_truth};
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
@@ -201,36 +200,9 @@ let syntax = match self.out_type {
     }
 
 fn extract_header_meta(full: &str) -> (String, Option<String>) {
-    let without_col = if let Some(sep) = full.find("\u{1f}COL:") {
-        &full[..sep]
-    } else {
-        full
-    };
-    let col_id = if let Some(sep) = full.find("\u{1f}COL:") {
-        full[sep + "\u{1f}COL:".len()..].trim().parse::<u32>().ok()
-    } else {
-        None
-    };
-    let without_idx = if let Some(sep) = without_col.find("\u{1f}IDX:") {
-        &without_col[..sep]
-    } else {
-        without_col
-    };
-
-    if let Some(start) = without_idx.find("p1_") {
-        let visible = Self::strip_id_suffix(without_idx[..start].trim());
-        let meta = without_idx[start..].trim().to_string();
-        return (visible.trim_matches('"').to_string(), Some(meta));
-    }
-
-    let visible = Self::strip_id_suffix(without_idx.trim());
-    let meta = col_id
-        .and_then(python_source_of_truth::exact_meta_for_column)
-        .or_else(|| python_html_meta::lookup_header_meta(visible.trim_matches('"')).map(|s| s.to_string()));
-
-    (visible.trim_matches('"').to_string(), meta)
+    let resolved = resolve_header_meta(full, usize::MAX, true);
+    (resolved.visible_text, resolved.class_meta)
 }
-
     fn extract_id_suffix(text: &str) -> Option<usize> {
         let pos = text.rfind("(ID_")?;
         let tail = &text[pos + 4..];
@@ -239,29 +211,39 @@ fn extract_header_meta(full: &str) -> (String, Option<String>) {
     }
 
     fn strip_id_suffix(text: &str) -> String {
-        let mut out = text.trim().trim_matches('"').trim().to_string();
+        let mut out = text.trim().to_string();
         loop {
             if let Some(pos) = out.rfind("(ID_") {
-                let after = &out[pos..];
-                if let Some(close_rel) = after.find(')') {
-                    let rest = after[close_rel + 1..].trim();
-                    if rest.is_empty() {
-                        out = out[..pos].trim_end().to_string();
-                        continue;
-                    }
+                if out.ends_with(')') {
+                    out = out[..pos].trim_end().to_string();
+                    continue;
                 }
             }
             break;
         }
-        out.trim_matches('"').trim().to_string()
+        out.trim_matches('"').to_string()
     }
 
     fn exact_header_meta_class_by_id(id: usize) -> Option<String> {
-        match id {
-            0 => Some("p1_✗Zählung,, p2_p3_0_, p4_".to_string()),
-            1 => Some("p1_✗Nummerierung,, p2_p3_0_, p4_".to_string()),
-            _ => None,
-        }
+        let s = match id {
+            11 => "p1_✗Wichtigstes_zum_verstehen,✗Grundstrukturen,✗Menschliches,, p2_p3_0_Wichtigste,p3_1_Paradigmen_sind_Absichten_(13),p3_2_Motive,p3_3_,p3_4_,p3_5_,p3_6_, p4_0,3",
+            19 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_0,3",
+            43 => "p1_✗Grundstrukturen,✗Grundstrukturen,✗Menschliches,, p2_p3_0_Reziprokes,p3_1_Paradigmen_sind_Absichten_(13),p3_2_Motive,p3_3_,p3_4_,p3_5_,p3_6_, p4_3,1",
+            150 => "p1_✗Galaxie,✗Menschliches,, p2_p3_0_Transzendentalien_innen_außen,p3_1_Motive,p3_2_,p3_3_,p3_4_,p3_5_, p4_3,4,0",
+            168 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_3,1,0",
+            169 => "p1_✗Menschliches,, p2_p3_0_Motive,p3_1_,p3_2_,p3_3_,p3_4_, p4_3,1,0",
+            230 => "p1_✗Grundstrukturen,✗Multiversum,✗Grundstrukturen,✗Multiversum,✗Menschliches,✗Menschliches,, p2_p3_0_Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),p3_1_Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_Motive,p3_5_Bewusstsein_und_Wahrnehmung,p3_6_,p3_7_,p3_8_,p3_9_, p4_4,0",
+            231 => "p1_✗Menschliches,✗Menschliches,, p2_p3_0_Gefühle,p3_1_Motive,p3_2_,p3_3_,p3_4_,p3_5_, p4_4,0",
+            242 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Gesellschaftsschicht,p3_1_Klassen_(20),p3_2_,p3_3_,p3_4_,p3_5_,p3_6_, p4_5,0,3",
+            243 => "p1_✗Universum,✗Grundstrukturen,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15),p3_2_Geist_(15),p3_3_Geist_(15),p3_4_,p3_5_,p3_6_,p3_7_,p3_8_,p3_9_,p3_10_, p4_4,0",
+            427 => "p1_✗Universum,✗Grundstrukturen,✗Multiversum,, p2_p3_0_Geist__(15),p3_1_Geist_(15),p3_2_Geist_(15),p3_3_,p3_4_,p3_5_,p3_6_,p3_7_,p3_8_,p3_9_, p4_4,0",
+            552 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Feudalwesen,p3_1_Gesellschaftsklassen,p3_2_Leibeigenschaft,p3_3_,p3_4_,p3_5_,p3_6_, p4_8,0",
+            556 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Klassen_(Fünfzehn_-_->_-_->_Zwanzig),p3_1_Gesellschaftsklassen,p3_2_,p3_3_,p3_4_,p3_5_,p3_6_, p4_5,0,3",
+            585 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_SithSith_andUnd_jediJedi_asAls_oneEine_socialSoziale_societyGesellschafts_classSchicht_antagonisticAntagonistisch_toZu_hierarchyHierarchie_asAls_flashBlitz_electricityElektrizitaet_shatteringErschutternde_thunderDonnernde_structureStruktur_complicatedKomplitziert_difficultSchwierig_insteadAnstelle_ofVon_complexKomplex_cristallineKristalline_(antagonisticAntagonistisch_hierarchyHierarchie)_organizationOrganisations_waysWege_pathsPfade_netNetzwerk_webNetz_ofVon_theDer_galaxyGalaxie_oneEine_yourEure_galaxyGalaxie_topSpitzen_infrastructureInfrastruktur_societyGesellschaft_organizedOrganisiert_buildungBauen_architectureArchitektur_designEntwurf_waysWege_streetsStrassen_pathsPfade_peopleVolk_humansMenschen,_galaxyGalaxie_renamingUmbenennung_designationBezeichnung_warKrieg_ofDer_socialSoziale_classesSchichten_notNicht_anymoreMehr_pentagramPentagramme_warsKriege_starKrieg_warsDer-Sterne_galaxyGalaxie_insideInnerhalb_clusterCluster_localLokale_groupGruppe_galaxiesGalaxien_(fifeFuenf_pentagramPentagramm_E_E_vsGegenueber_T_T_twentyZwanzig_icosigramIkosigramm)_socialSoziale_classesKlassen_fightKampf,p3_1_,p3_2_,p3_3_,p3_4_, p4_5,0,3",
+            698 => "p1_✗Menschliches,✗Grundstrukturen,, p2_p3_0_Gesellschaftsklassen_20_gegenüber_Hierarchie_12,p3_1_,p3_2_,p3_3_,p3_4_, p4_5,0,3",
+            _ => return None,
+        };
+        Some(s.to_string())
     }
 
     fn escape_html(content: &str) -> String {
@@ -313,19 +295,18 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
         );
 
         for (col_idx, cell) in row.cells.iter().enumerate() {
-            let (visible_content, meta) = Self::extract_header_meta(&cell.original_content);
+            let resolved = resolve_header_meta(&cell.original_content, col_idx, display_line_idx == 0);
             let content = if display_line_idx == 0 && (col_idx == 0 || col_idx == 1) {
                 String::new()
             } else {
-                Self::escape_html(&visible_content)
+                Self::escape_html(&resolved.visible_text)
             };
 
             if display_line_idx == 0 {
-                let resolved_meta = meta.or_else(|| Self::exact_header_meta_class_by_id(col_idx));
-                let class_attr = if let Some(meta_str) = resolved_meta {
-                    format!(" class="z_0 r_{} {}"", col_idx, meta_str)
+                let class_attr = if let Some(meta_str) = resolved.class_meta {
+                    format!(" class=\"z_0 r_{} {}\"", col_idx, meta_str)
                 } else {
-                    format!(" class="z_0 r_{}"", col_idx)
+                    format!(" class=\"z_0 r_{}\"", col_idx)
                 };
                 if col_idx == 0 {
                     line.push_str(&format!(
@@ -335,15 +316,13 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
                 } else {
                     line.push_str(&format!("<td{}> {} </td> ", class_attr, content));
                 }
+            } else if col_idx == 0 {
+                line.push_str(&format!(
+                    "<td style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
+                    content
+                ));
             } else {
-                if col_idx == 0 {
-                    line.push_str(&format!(
-                        "<td style=\"background-color:#ffffff;color:#000000;\"> {} </td> ",
-                        content
-                    ));
-                } else {
-                    line.push_str(&format!("<td> {} </td> ", content));
-                }
+                line.push_str(&format!("<td> {} </td> ", content));
             }
         }
 

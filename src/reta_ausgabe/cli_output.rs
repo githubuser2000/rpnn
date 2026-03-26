@@ -11,6 +11,7 @@ use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;
 use crate::reta_ausgabe::utils::{unicode_pad, word_wrap};
+use crate::domain::html_header_model::resolve_header_meta;
 
 #[derive(Debug)]
 pub struct CliOutput<'a> {
@@ -200,59 +201,6 @@ let syntax = match self.out_type {
         visible
     }
 
-fn extract_header_meta(full: &str) -> (String, Option<String>) {
-    let without_col = if let Some(sep) = full.find("\u{1f}COL:") {
-        &full[..sep]
-    } else {
-        full
-    };
-    let col_id = if let Some(sep) = full.find("\u{1f}COL:") {
-        full[sep + "\u{1f}COL:".len()..].trim().parse::<u32>().ok()
-    } else {
-        None
-    };
-    let without_idx = if let Some(sep) = without_col.find("\u{1f}IDX:") {
-        &without_col[..sep]
-    } else {
-        without_col
-    };
-
-    if let Some(start) = without_idx.find("p1_") {
-        let visible = without_idx[..start].trim().to_string();
-        let meta = without_idx[start..].trim().to_string();
-        return (visible, Some(meta));
-    }
-
-    let visible = Self::strip_id_suffix(without_idx.trim());
-    let meta = col_id.and_then(python_source_of_truth::exact_meta_for_column);
-    (visible.trim_matches('"').to_string(), meta)
-}
-
-    fn extract_id_suffix(text: &str) -> Option<usize> {
-        let pos = text.rfind("(ID_")?;
-        let tail = &text[pos + 4..];
-        let end = tail.find(')')?;
-        tail[..end].parse().ok()
-    }
-
-    fn strip_id_suffix(text: &str) -> String {
-        let mut out = text.trim().to_string();
-        loop {
-            if let Some(pos) = out.rfind("(ID_") {
-                if out.ends_with(')') {
-                    out = out[..pos].trim_end().to_string();
-                    continue;
-                }
-            }
-            break;
-        }
-        out.trim_matches('"').to_string()
-    }
-
-    fn exact_header_meta_class_by_id(_id: usize) -> Option<String> {
-        None
-    }
-
     fn escape_html(content: &str) -> String {
         content
             .replace('&', "&amp;")
@@ -302,7 +250,9 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
         );
 
         for (col_idx, cell) in row.cells.iter().enumerate() {
-            let (visible_content, meta) = Self::extract_header_meta(&cell.original_content);
+            let resolved = resolve_header_meta(&cell.original_content, col_idx, display_line_idx == 0);
+let visible_content = resolved.visible_text;
+let meta = resolved.class_meta;
             let content = if display_line_idx == 0 && (col_idx == 0 || col_idx == 1) {
                 String::new()
             } else {
