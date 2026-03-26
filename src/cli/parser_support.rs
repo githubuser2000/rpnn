@@ -68,7 +68,7 @@ pub fn print_all_oberkategorien(kategorie_map: Option<&KategorieMap>) {
         let mut set = BTreeSet::new();
 
         for haupt in &kategorie_map.hauptkategorien {
-            let ok = haupt.name.trim();
+            let ok = haupt.key.as_str().trim();
             if !ok.is_empty() {
                 set.insert(ok.to_string());
             }
@@ -89,12 +89,11 @@ pub fn print_passende_unterkategorien(
 ) {
     if let Some(kategorie_map) = kategorie_map {
         let mut set = BTreeSet::new();
-        let needle = oberkategorie.to_lowercase();
 
         for haupt in &kategorie_map.hauptkategorien {
-            if haupt.name.to_lowercase() == needle {
+            if haupt.key.matches_str(oberkategorie) {
                 for unter in &haupt.unterkategorien {
-                    let uk = unter.name.trim();
+                    let uk = unter.name.as_str().trim();
                     if !uk.is_empty() {
                         set.insert(uk.to_string());
                     }

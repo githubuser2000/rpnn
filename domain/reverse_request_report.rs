@@ -362,11 +362,3 @@ pub fn print_reverse_request_pairs(
         }
     }
 }
-
-pub fn print_reverse_request_pairs_dual(
-    kategorie_map: &KategorieMap,
-    bereich: &TextBereich,
-    generated_befehle: &BTreeSet<String>,
-) {
-    print_reverse_request_pairs(kategorie_map, bereich, generated_befehle);
-}
