@@ -37,3 +37,18 @@ impl fmt::Display for ParseSpaltenAnfrageError {
 }
 
 impl std::error::Error for ParseSpaltenAnfrageError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestPipelineError {
+    ParseSpaltenAnfrage(ParseSpaltenAnfrageError),
+}
+
+impl fmt::Display for RequestPipelineError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ParseSpaltenAnfrage(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl std::error::Error for RequestPipelineError {}

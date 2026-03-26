@@ -9,6 +9,7 @@ use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
 use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
+use crate::domain::request_pipeline::RawSelectionRequest;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -32,6 +33,15 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         generated_befehle.extend(
             verarbeite_kategorien(&kategorie_map, &mut bereich, spalten_namen)?
         );
+
+        let resolved = RawSelectionRequest::new(
+            spalten_namen.oberkategorie.clone(),
+            spalten_namen.unterkategorie.clone(),
+        )
+        .parse()?
+        .expand(&kategorie_map)
+        .resolve(&kategorie_map);
+        resolved.apply_to_bereich(&mut bereich);
     }
 
     generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
@@ -59,14 +69,13 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
 
     let conn = import_csvs_to_sqlite(&dateien)?;
     apply_pypy_compat(&conn, &mut bereich, &proj_path)?;
-    //query_column_by_index(&conn, bereich, &generated_befehle, &parameters_main)?;
     query_column_by_index(
-    &conn,
-    bereich,
-    &generated_befehle,
-    &parameters_main,
-    &kategorie_map,
-)?;
+        &conn,
+        bereich,
+        &generated_befehle,
+        &parameters_main,
+        &kategorie_map,
+    )?;
 
     Ok(())
 }
