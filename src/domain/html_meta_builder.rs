@@ -21,6 +21,28 @@ fn strip_transport_and_id(raw: &str) -> String {
     }
 }
 
+fn replace_p4_fragment(meta: &str, p4: &str) -> String {
+    if let Some(pos) = meta.rfind(" p4_") {
+        let prefix = &meta[..pos];
+        format!("{} p4_{}", prefix, p4)
+    } else {
+        format!("{} p4_{}", meta.trim_end_matches(','), p4)
+    }
+}
+
+fn apply_lib4tables_enum_p4(meta: String, raw: &str) -> String {
+    let Some(id1) = extract_id_suffix_1_based(raw) else {
+        return meta;
+    };
+
+    let Some(col0) = id1.checked_sub(1) else {
+        return meta;
+    };
+
+    let p4 = crate::domain::lib4tables_enum::p4_fragment_for_column(col0);
+    replace_p4_fragment(&meta, &p4)
+}
+
 pub fn build_python_exact_html_class(
     raw: &str,
     col_idx: usize,
@@ -42,14 +64,16 @@ pub fn build_python_exact_html_class(
 
     // 1) Bevorzugt: reichere Meta über sichtbaren Headertext
     if let Some(meta) = crate::domain::python_html_meta::lookup_header_meta(&visible) {
-        return Some(format!("z_0 r_{} {}", col_idx, meta));
+        let enriched = apply_lib4tables_enum_p4(meta.to_string(), raw);
+        return Some(format!("z_0 r_{} {}", col_idx, enriched));
     }
 
     // 2) Fallback: komprimierte Spaltenmeta über ID
     if let Some(id1) = extract_id_suffix_1_based(raw) {
         if let Some(col0) = id1.checked_sub(1) {
             if let Some(meta) = crate::domain::python_source_of_truth::exact_meta_for_column(col0) {
-                return Some(format!("z_0 r_{} {}", col_idx, meta));
+                let enriched = apply_lib4tables_enum_p4(meta, raw);
+                return Some(format!("z_0 r_{} {}", col_idx, enriched));
             }
         }
     }
