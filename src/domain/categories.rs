@@ -104,6 +104,25 @@ impl AsRef<[u32]> for SpaltenNummern {
     }
 }
 
+
+pub trait UnterkategorieEntry {
+    fn unter_name(&self) -> &str;
+    fn column_numbers(&self) -> &[u32];
+}
+
+pub trait OberkategorieEntry {
+    type Unter: UnterkategorieEntry;
+
+    fn ober_name(&self) -> &str;
+    fn unterkategorien(&self) -> &[Self::Unter];
+}
+
+pub trait KategorieProvider {
+    type Ober: OberkategorieEntry;
+
+    fn hauptkategorien(&self) -> &[Self::Ober];
+}
+
 #[derive(Debug, Clone)]
 pub struct Unterkategorie {
     pub name: UnterkategorieName,
@@ -116,6 +135,16 @@ impl Unterkategorie {
             name: name.into(),
             spaltennummern: SpaltenNummern::new(spaltennummern),
         }
+    }
+}
+
+impl UnterkategorieEntry for Unterkategorie {
+    fn unter_name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn column_numbers(&self) -> &[u32] {
+        self.spaltennummern.as_slice()
     }
 }
 
@@ -134,8 +163,28 @@ impl Oberkategorie {
     }
 }
 
+impl OberkategorieEntry for Oberkategorie {
+    type Unter = Unterkategorie;
+
+    fn ober_name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn unterkategorien(&self) -> &[Self::Unter] {
+        &self.unterkategorien
+    }
+}
+
 pub struct KategorieMap {
     pub hauptkategorien: Vec<Oberkategorie>,
+}
+
+impl KategorieProvider for KategorieMap {
+    type Ober = Oberkategorie;
+
+    fn hauptkategorien(&self) -> &[Self::Ober] {
+        &self.hauptkategorien
+    }
 }
 
 #[derive(Debug, Clone, Default)]

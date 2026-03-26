@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::cli::TextBereich;
-use crate::domain::categories::KategorieMap;
+use crate::domain::categories::{KategorieMap, KategorieProvider, OberkategorieEntry, UnterkategorieEntry};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseCliValueError {
@@ -22,6 +22,38 @@ impl fmt::Display for ParseCliValueError {
 }
 
 impl std::error::Error for ParseCliValueError {}
+
+
+fn collect_oberkategorie_names<T>(provider: &T) -> BTreeSet<String>
+where
+    T: KategorieProvider,
+{
+    provider
+        .hauptkategorien()
+        .iter()
+        .filter_map(|haupt| {
+            let ok = haupt.ober_name().trim();
+            (!ok.is_empty()).then(|| ok.to_string())
+        })
+        .collect()
+}
+
+fn collect_unterkategorie_names<T>(provider: &T, oberkategorie: &str) -> BTreeSet<String>
+where
+    T: KategorieProvider,
+{
+    let needle = oberkategorie.to_lowercase();
+    provider
+        .hauptkategorien()
+        .iter()
+        .filter(|haupt| haupt.ober_name().to_lowercase() == needle)
+        .flat_map(|haupt| haupt.unterkategorien().iter())
+        .filter_map(|unter| {
+            let uk = unter.unter_name().trim();
+            (!uk.is_empty()).then(|| uk.to_string())
+        })
+        .collect()
+}
 
 pub fn is_flag(s: &str) -> bool {
     s.starts_with('-')
@@ -89,17 +121,8 @@ pub fn apply_pypy_compat_arg(bereich: &mut TextBereich, arg: &str) -> bool {
 
 pub fn print_all_oberkategorien(kategorie_map: Option<&KategorieMap>) {
     if let Some(kategorie_map) = kategorie_map {
-        let mut set = BTreeSet::new();
-
-        for haupt in &kategorie_map.hauptkategorien {
-            let ok = haupt.name.as_str().trim();
-            if !ok.is_empty() {
-                set.insert(ok.to_string());
-            }
-        }
-
         println!("Mögliche erste Wörter nach --spaltenname:");
-        for item in set {
+        for item in collect_oberkategorie_names(kategorie_map) {
             println!("{item}");
         }
     } else {
@@ -112,19 +135,7 @@ pub fn print_passende_unterkategorien(
     oberkategorie: &str,
 ) {
     if let Some(kategorie_map) = kategorie_map {
-        let mut set = BTreeSet::new();
-        let needle = oberkategorie.to_lowercase();
-
-        for haupt in &kategorie_map.hauptkategorien {
-            if haupt.name.as_str().to_lowercase() == needle {
-                for unter in &haupt.unterkategorien {
-                    let uk = unter.name.as_str().trim();
-                    if !uk.is_empty() {
-                        set.insert(uk.to_string());
-                    }
-                }
-            }
-        }
+        let set = collect_unterkategorie_names(kategorie_map, oberkategorie);
 
         if set.is_empty() {
             println!("Keine passenden zweiten Wörter für '{oberkategorie}' gefunden.");
