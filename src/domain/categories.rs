@@ -1,6 +1,6 @@
 // file: src/domain/categories.rs
 use std::collections::{HashMap, HashSet};
-// Öffentliche Struktur für Kategorien
+
 #[derive(Debug, Clone)]
 pub struct KategorieEintrag {
     pub oberkategorie: String,
@@ -19,13 +19,28 @@ impl KategorieEintrag {
 }
 
 #[derive(Debug, Clone)]
+pub struct Unterkategorie {
+    pub name: String,
+    pub spaltennummern: Vec<u32>,
+}
+
+impl Unterkategorie {
+    pub fn new(name: impl Into<String>, spaltennummern: Vec<u32>) -> Self {
+        Self {
+            name: name.into(),
+            spaltennummern,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Oberkategorie {
     pub name: String,
-    pub unterkategorien: HashMap<String, Vec<u32>>,
+    pub unterkategorien: Vec<Unterkategorie>,
 }
 
 impl Oberkategorie {
-    pub fn new(name: impl Into<String>, unterkategorien: HashMap<String, Vec<u32>>) -> Self {
+    pub fn new(name: impl Into<String>, unterkategorien: Vec<Unterkategorie>) -> Self {
         Self {
             name: name.into(),
             unterkategorien,
@@ -40,6 +55,7 @@ pub struct KategorieMap {
 
 #[derive(Debug, Clone, Default)]
 pub struct GeneratedInference {
+
     pub generated_befehle: Vec<String>,
     pub required_columns: Vec<u32>,
     pub direct_columns: Vec<u32>,
@@ -152,16 +168,16 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
         let haupt_normalized: String = haupt.name.to_lowercase().replace("_", "");
 
         if haupt_normalized == ober_gesucht {
-            for (unter_name, spaltennummern) in &haupt.unterkategorien {
-                let unter_normalized = unter_name.to_lowercase().replace("_", "");
+            for unter in &haupt.unterkategorien {
+                let unter_normalized = unter.name.to_lowercase().replace("_", "");
 
                 if unter_normalized == unter_gesucht {
-                    gefundene.extend_from_slice(spaltennummern);
+                    gefundene.extend_from_slice(&unter.spaltennummern);
                 }
             }
         }
     }
-    
+
     // Fallback: Durchsuche alle Einträge
     if gefundene.is_empty() {
         //println!("⚠️  Exakte Suche in flachen Daten...");
@@ -205,17 +221,17 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         let ober_normalized = ober.to_lowercase().replace("_", "");
 
         if haupt_normalized == ober_normalized {
-            for (unter_name, spaltennummern) in &haupt.unterkategorien {
-                let unter_normalized = unter_name.to_lowercase().replace("_", "");
+            for unterkategorie in &haupt.unterkategorien {
+                let unter_normalized = unterkategorie.name.to_lowercase().replace("_", "");
                 let such_unter_normalized = unter.to_lowercase().replace("_", "");
 
                 if unter_normalized == such_unter_normalized {
-                    gefundene.extend_from_slice(spaltennummern);
+                    gefundene.extend_from_slice(&unterkategorie.spaltennummern);
                 }
             }
         }
     }
-    
+
     // Wenn nichts gefunden, durchsuche alle Einträge
     if gefundene.is_empty() {
         //println!("⚠️  Suche in flachen Daten...");
@@ -709,15 +725,33 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         }
     }
 
-    let mut hauptkategorien: Vec<Oberkategorie> = main_to_sub
-        .into_iter()
-        .map(|(name, unterkategorien)| Oberkategorie::new(name, unterkategorien))
-        .collect();
-    hauptkategorien.sort_by(|a, b| a.name.cmp(&b.name));
-
-    self.hauptkategorien = hauptkategorien;
+    self.hauptkategorien = Self::convert_main_to_hauptkategorien(main_to_sub);
     self.alle_eintraege = alle_eintraege_temp;
 } 
+    fn convert_main_to_hauptkategorien(
+        main_to_sub: HashMap<String, HashMap<String, Vec<u32>>>,
+    ) -> Vec<Oberkategorie> {
+        let mut hauptkategorien: Vec<Oberkategorie> = main_to_sub
+            .into_iter()
+            .map(|(haupt_name, unter_map)| {
+                let mut unterkategorien: Vec<Unterkategorie> = unter_map
+                    .into_iter()
+                    .map(|(unter_name, mut spaltennummern)| {
+                        spaltennummern.sort();
+                        spaltennummern.dedup();
+                        Unterkategorie::new(unter_name, spaltennummern)
+                    })
+                    .collect();
+
+                unterkategorien.sort_by(|a, b| a.name.cmp(&b.name));
+                Oberkategorie::new(haupt_name, unterkategorien)
+            })
+            .collect();
+
+        hauptkategorien.sort_by(|a, b| a.name.cmp(&b.name));
+        hauptkategorien
+    }
+
     fn insert_entry(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
         main_category: &str,

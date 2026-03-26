@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
@@ -30,10 +30,6 @@ fn normalize_key(s: &str) -> String {
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
-}
-
-fn canonical_first(values: &[String], fallback: &str) -> String {
-    values.first().cloned().unwrap_or_else(|| fallback.to_string())
 }
 
 fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
@@ -68,42 +64,17 @@ fn collect_direct_pairs_for_visible_columns(
     visible_columns: &BTreeSet<u32>,
     out: &mut BTreeSet<AnfragePair>,
 ) {
-    let mut grouped: BTreeMap<(String, String), BTreeSet<u32>> = BTreeMap::new();
+    for haupt in &kategorie_map.hauptkategorien {
+        for unter in &haupt.unterkategorien {
+            let has_visible = unter
+                .spaltennummern
+                .iter()
+                .any(|spaltennummer| visible_columns.contains(spaltennummer));
 
-    for eintrag in &kategorie_map.alle_eintraege {
-        let key = (
-            normalize_key(&eintrag.oberkategorie),
-            normalize_key(&eintrag.unterkategorie),
-        );
-
-        let entry = grouped.entry(key).or_default();
-        for &col in &eintrag.spaltennummern {
-            if visible_columns.contains(&col) {
-                entry.insert(col);
+            if has_visible {
+                out.insert(AnfragePair::new(haupt.name.clone(), unter.name.clone()));
             }
         }
-    }
-
-    for ((ober_n, unter_n), cols) in grouped {
-        if cols.is_empty() {
-            continue;
-        }
-
-        let mut ober_aliases = Vec::<String>::new();
-        let mut unter_aliases = Vec::<String>::new();
-
-        for eintrag in &kategorie_map.alle_eintraege {
-            if normalize_key(&eintrag.oberkategorie) == ober_n
-                && normalize_key(&eintrag.unterkategorie) == unter_n
-            {
-                ober_aliases.push(eintrag.oberkategorie.clone());
-                unter_aliases.push(eintrag.unterkategorie.clone());
-            }
-        }
-
-        let ober = canonical_first(&ober_aliases, &ober_n);
-        let unter = canonical_first(&unter_aliases, &unter_n);
-        out.insert(AnfragePair::new(ober, unter));
     }
 }
 
@@ -271,7 +242,6 @@ pub fn collect_reverse_request_pairs(
     generated_befehle: &BTreeSet<String>,
 ) -> Vec<AnfragePair> {
     let mut out = BTreeSet::<AnfragePair>::new();
-
     let visible_columns = collect_visible_columns(bereich);
 
     collect_direct_pairs_for_visible_columns(kategorie_map, &visible_columns, &mut out);

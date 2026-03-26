@@ -13,9 +13,9 @@ pub fn finde_spaltennummern_exakt_in_maps(
 
     for haupt in hauptkategorien {
         if normalize_key(&haupt.name) == ober_gesucht {
-            for (unter_name, spaltennummern) in &haupt.unterkategorien {
-                if normalize_key(unter_name) == unter_gesucht {
-                    gefundene.extend_from_slice(spaltennummern);
+            for unterkategorie in &haupt.unterkategorien {
+                if normalize_key(&unterkategorie.name) == unter_gesucht {
+                    gefundene.extend_from_slice(&unterkategorie.spaltennummern);
                 }
             }
         }
@@ -36,10 +36,20 @@ pub fn finde_spaltennummern_exakt_in_maps(
     gefundene
 }
 
-pub fn finde_spaltennummern_fuer_kategorien(map: &KategorieMap, ober: &str, unter: &str) -> Vec<u32> {
-    let exakt = finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, &map.alle_eintraege, ober, unter);
+pub fn finde_spaltennummern_fuer_kategorien(
+    map: &KategorieMap,
+    ober: &str,
+    unter: &str,
+) -> Vec<u32> {
+    let exakt = finde_spaltennummern_exakt_in_maps(
+        &map.hauptkategorien,
+        &map.alle_eintraege,
+        ober,
+        unter,
+    );
     if !exakt.is_empty() {
         return exakt;
     }
+
     finde_spaltennummern_exakt_in_maps(&map.hauptkategorien, &map.alle_eintraege, ober, unter)
 }
