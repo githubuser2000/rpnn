@@ -1,6 +1,4 @@
 use crate::domain::python_source_of_truth::PY_DECLS;
-use crate::lib4tables_enum::{table_tags2, ST};
-use std::collections::BTreeSet;
 
 fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
     let id_pos = raw.rfind("(ID_")?;
@@ -9,131 +7,95 @@ fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
     rest[..end].parse::<u32>().ok()
 }
 
-fn strip_transport_and_id(raw: &str) -> String {
-    let mut s = raw.to_string();
-
-    if let Some(pos) = s.find('\u{1f}') {
-        s.truncate(pos);
-    }
-
-    let s = s.trim().trim_matches('"').to_string();
-
-    if let Some(pos) = s.rfind("(ID_") {
-        s[..pos].trim().to_string()
-    } else {
-        s
+fn push_unique(out: &mut Vec<String>, value: &str) {
+    if !out.iter().any(|v| v == value) {
+        out.push(value.to_string());
     }
 }
 
-fn dedupe_preserve_order(items: impl IntoIterator<Item = String>) -> Vec<String> {
-    let mut seen = BTreeSet::new();
+fn p1_groups_for_column(col0: u32) -> Vec<String> {
     let mut out = Vec::new();
-    for item in items {
-        if item.is_empty() {
-            continue;
-        }
-        if seen.insert(item.clone()) {
-            out.push(item);
+
+    for decl in PY_DECLS.iter() {
+        if decl.columns.contains(&col0) {
+            if let Some(main) = decl.main_aliases.first() {
+                push_unique(&mut out, main);
+            }
         }
     }
+
     out
 }
 
-fn col0_from_raw_or_visible_index(raw: &str, col_idx: usize) -> Option<u32> {
-    if let Some(id1) = extract_id_suffix_1_based(raw) {
-        return id1.checked_sub(1);
-    }
+fn p2_slots_for_column(col0: u32) -> Vec<Option<String>> {
+    let mut concrete_slots: Vec<String> = Vec::new();
 
-    if col_idx >= 2 {
-        return Some((col_idx - 2) as u32);
-    }
-
-    None
-}
-
-fn canonical_decl_meta_for_column(col0: u32) -> Option<(Vec<String>, Vec<String>)> {
-    let mut p1_groups = Vec::new();
-    let mut p2_slots = Vec::new();
-
-    for decl in PY_DECLS {
-        if decl.columns.iter().any(|&c| c == col0) {
-            if let Some(main) = decl.main_aliases.first() {
-                p1_groups.push((*main).to_string());
-            }
+    for decl in PY_DECLS.iter() {
+        if decl.columns.contains(&col0) {
             if let Some(sub) = decl.sub_aliases.first() {
-                p2_slots.push((*sub).to_string());
+                concrete_slots.push((*sub).to_string());
             }
         }
     }
 
-    let p1_groups = dedupe_preserve_order(p1_groups);
-    let p2_slots = dedupe_preserve_order(p2_slots);
-
-    if p1_groups.is_empty() && p2_slots.is_empty() {
-        None
-    } else {
-        Some((p1_groups, p2_slots))
+    if concrete_slots.is_empty() {
+        return vec![None];
     }
+
+    // Python-Struktur:
+    // - bei 1 Hauptgruppe: p3_0..p3_24  => 25 Slots
+    // - bei 2 Hauptgruppen: p3_0..p3_25 => 26 Slots
+    // - bei 3 Hauptgruppen: p3_0..p3_26 => 27 Slots
+    //
+    // Also: 25 + (Anzahl konkreter Hierarchieeinträge - 1)
+    let total_slots = 25 + concrete_slots.len().saturating_sub(1);
+
+    let mut out: Vec<Option<String>> = concrete_slots.into_iter().map(Some).collect();
+    while out.len() < total_slots {
+        out.push(None);
+    }
+
+    out
 }
 
 fn render_p1(groups: &[String]) -> String {
     let mut out = String::from("p1_");
-    for group in groups {
+    for g in groups {
         out.push('✗');
-        out.push_str(group);
+        out.push_str(g);
         out.push(',');
     }
     out.push(',');
     out
 }
 
-fn render_p2(slots: &[String]) -> String {
-    let mut out = String::from("p2_");
-    for (idx, slot) in slots.iter().enumerate() {
-        if idx > 0 {
-            out.push(',');
-        }
-        out.push_str("p3_");
-        out.push_str(&idx.to_string());
-        out.push('_');
-        out.push_str(slot);
-    }
-    out
-}
+fn render_p2_p3(slots: &[Option<String>]) -> String {
+    let mut out = String::from("p2_p3_");
 
-fn st_value(tag: &ST) -> u8 {
-    match tag {
-        ST::SternPolygon => 0,
-        ST::GleichfoermigesPolygon => 1,
-        ST::KeinPolygon => 2,
-        ST::Galaxie => 3,
-        ST::Universum => 4,
-        ST::KeinParaOdMetaP => 5,
-        ST::GebrRat => 6,
+    for (i, slot) in slots.iter().enumerate() {
+        if i == 0 {
+            out.push('0');
+            out.push('_');
+            if let Some(value) = slot {
+                out.push_str(value);
+            }
+        } else {
+            out.push(',');
+            out.push_str("p3_");
+            out.push_str(&i.to_string());
+            out.push('_');
+            if let Some(value) = slot {
+                out.push_str(value);
+            }
+        }
     }
+
+    out
 }
 
 fn render_p4(col0: u32) -> String {
-    let tags = table_tags2();
-    let mut out = String::from("p4_");
-
-    if let Some(tagset) = tags.get(&(col0 as usize)) {
-        let mut first = true;
-        for tag in tagset {
-            if !first {
-                out.push(',');
-            }
-            first = false;
-            out.push_str(&st_value(tag).to_string());
-        }
-    }
-
-    out
-}
-
-fn render_meta_for_column(col0: u32) -> Option<String> {
-    let (p1_groups, p2_slots) = canonical_decl_meta_for_column(col0)?;
-    Some(format!("{} {} {}", render_p1(&p1_groups), render_p2(&p2_slots), render_p4(col0)))
+    let tags = crate::lib4tables_enum::p4_fragment_for_column(col0);
+    format!("p4_{}", tags)
 }
 
 pub fn build_python_exact_html_class(
@@ -153,8 +115,29 @@ pub fn build_python_exact_html_class(
         return Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string());
     }
 
-    let _visible = strip_transport_and_id(raw);
-    let col0 = col0_from_raw_or_visible_index(raw, col_idx)?;
-    let meta = render_meta_for_column(col0)?;
-    Some(format!("z_0 r_{} {}", col_idx, meta))
+    // Wichtig: ID im Header ist 1-basiert, die PY_DECLS-Spalten sind 0-basiert.
+    let col0 = if let Some(id1) = extract_id_suffix_1_based(raw) {
+        id1.checked_sub(1)?
+    } else {
+        // Fallback nur, falls mal kein (ID_xxx) im Header steht.
+        // Die ersten zwei Spalten sind Zählung/Nummerierung, daher -2.
+        col_idx.checked_sub(2)? as u32
+    };
+
+    let p1_groups = p1_groups_for_column(col0);
+    let p2_slots = p2_slots_for_column(col0);
+
+    if p1_groups.is_empty() {
+        return None;
+    }
+
+    let class_str = format!(
+        "z_0 r_{} {} {} {}",
+        col_idx,
+        render_p1(&p1_groups),
+        render_p2_p3(&p2_slots),
+        render_p4(col0),
+    );
+
+    Some(class_str)
 }

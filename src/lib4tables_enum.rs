@@ -226,3 +226,29 @@ pub fn table_tags2_kombi_table() -> BTreeMap<usize, BTreeSet<ST>> {
 pub fn table_tags2_kombi_table2() -> BTreeMap<usize, BTreeSet<ST>> {
     dict_viceversa(&table_tags_kombi_table2())
 }
+fn st_to_tag(st: ST) -> u8 {
+    match st {
+        ST::SternPolygon => 0,
+        ST::GleichfoermigesPolygon => 1,
+        ST::KeinPolygon => 2,
+        ST::Galaxie => 3,
+        ST::Universum => 4,
+        ST::KeinParaOdMetaP => 5,
+        ST::GebrRat => 6,
+    }
+}
+
+pub fn p4_fragment_for_column(col: u32) -> String {
+    let tags_map = table_tags2();
+    let Some(tags) = tags_map.get(&(col as usize)) else {
+        return String::new();
+    };
+
+    let mut nums: Vec<u8> = tags.iter().copied().map(st_to_tag).collect();
+    nums.sort_unstable();
+
+    nums.into_iter()
+        .map(|n| n.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
