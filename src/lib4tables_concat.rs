@@ -1,17 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use crate::lib4tables_enum::ST;
 
 pub type Table = Vec<Vec<String>>;
 pub type RowSet = BTreeSet<usize>;
 pub type TagsMap = HashMap<usize, BTreeSet<ST>>;
 pub type GeneratedParams = BTreeMap<usize, String>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ST {
-    SternPolygon,
-    Galaxie,
-    GleichfoermigesPolygon,
-    Universum,
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct Tables {
