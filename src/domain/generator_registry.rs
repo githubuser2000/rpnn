@@ -32,6 +32,245 @@ pub struct ParametersMain {
     pub unter0: String,
 }
 
+const MENSCHLICHES: &[&str] = &["menschliches"];
+const PLANET: &[&str] = &["planet"];
+const UNIVERSUM: &[&str] = &["universum", "multiversum", "grundstrukturen"];
+const BEDEUTUNG: &[&str] = &["bedeutung", "wichtigste"];
+const GALAXIE: &[&str] = &["galaxie"];
+
+const LOVE_ALIASES: &[&str] = &["liebe", "ethik"];
+const GLEICHHEIT_ALIASES: &[&str] = &[
+    "gleichheit",
+    "freiheit",
+    "dominieren",
+    "ordnung",
+    "ordnen",
+    "filterung",
+    "ungleichheit",
+];
+const GEIST_ALIASES: &[&str] = &[
+    "geist",
+    "bewusstsein",
+    "emotion",
+    "emotionen",
+    "gefuehl",
+    "gefuehle",
+    "gefühl",
+    "gefühle",
+    "energie",
+    "materie",
+    "topologie",
+];
+const MOND64_ALIASES: &[&str] = &[
+    "gestirn",
+    "mond",
+    "sonne",
+    "planet",
+    "evolution",
+    "intelligenz",
+    "kreativ",
+    "kreativitaet",
+    "kreativität",
+    "lernen",
+    "erwerben",
+];
+const VERVIELFACHE_ALIASES: &[&str] = &[
+    "primzahlen",
+    "vielfache",
+    "vielfacher",
+    "multis",
+    "multiplikationen",
+    "offenbarung",
+    "offenbarungjohannes",
+];
+const MODAL_ALIASES: &[&str] = &[
+    "modallogik",
+    "modal",
+    "modus",
+    "modi",
+    "sein",
+    "zustaende",
+    "zustände",
+];
+
+#[derive(Debug, Clone)]
+struct GeneratorRuleContext {
+    tokens: BTreeSet<String>,
+}
+
+impl GeneratorRuleContext {
+    fn from_inputs(generated_befehle: &BTreeSet<String>, parameters_main: &ParametersMain) -> Self {
+        let mut tokens: BTreeSet<String> = generated_befehle.iter().map(|s| normalize_token(s)).collect();
+
+        if !parameters_main.bedeutung0.is_empty() {
+            tokens.insert(normalize_token(&parameters_main.bedeutung0));
+        }
+        if !parameters_main.procontra0.is_empty() {
+            tokens.insert(normalize_token(&parameters_main.procontra0));
+        }
+        if !parameters_main.grundstrukturen0.is_empty() {
+            tokens.insert(normalize_token(&parameters_main.grundstrukturen0));
+        }
+        if !parameters_main.unter0.is_empty() {
+            tokens.insert(normalize_token(&parameters_main.unter0));
+        }
+
+        Self { tokens }
+    }
+}
+
+struct GeneratorExecutionContext<'a> {
+    table: &'a mut Table,
+    rows_as_numbers: &'a mut RowSet,
+    tables: &'a mut Tables,
+    bereich: &'a TextBereich,
+    generated_befehle: &'a BTreeSet<String>,
+    parameters_main: &'a ParametersMain,
+}
+
+trait GeneratedColumnRule {
+    fn name(&self) -> &'static str;
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool;
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>);
+}
+
+struct PrimzahlkreuzRule;
+impl GeneratedColumnRule for PrimzahlkreuzRule {
+    fn name(&self) -> &'static str { "primzahlkreuzprocontra" }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool {
+        ctx.tokens.contains("primzahlkreuzprocontra")
+            || (contains_any_alias(&ctx.tokens, BEDEUTUNG) && contains_any_alias(&ctx.tokens, &["primzahlkreuz"]))
+            || (contains_any_alias(&ctx.tokens, &["procontra"]) && contains_any_alias(&ctx.tokens, &["primzahlkreuz"]))
+    }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+        concat1_primzahlkreuz_pro_contra(ctx.table, ctx.rows_as_numbers, ctx.tables, ctx.generated_befehle, ctx.parameters_main);
+    }
+}
+
+struct PairAliasRule {
+    name: &'static str,
+    first_aliases: &'static [&'static str],
+    second_aliases: &'static [&'static str],
+    apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
+}
+impl GeneratedColumnRule for PairAliasRule {
+    fn name(&self) -> &'static str { self.name }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { selected_by_pair(&ctx.tokens, self.first_aliases, self.second_aliases) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+}
+
+struct MultiPairAliasRule {
+    name: &'static str,
+    pairs: &'static [(&'static [&'static str], &'static [&'static str])],
+    apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
+}
+impl GeneratedColumnRule for MultiPairAliasRule {
+    fn name(&self) -> &'static str { self.name }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool {
+        self.pairs.iter().any(|(a,b)| selected_by_pair(&ctx.tokens, a, b))
+    }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+}
+
+struct TokenRule {
+    name: &'static str,
+    aliases: &'static [&'static str],
+    apply_fn: fn(&mut Table, &mut RowSet, &mut Tables),
+}
+impl GeneratedColumnRule for TokenRule {
+    fn name(&self) -> &'static str { self.name }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { contains_any_alias(&ctx.tokens, self.aliases) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) { (self.apply_fn)(ctx.table, ctx.rows_as_numbers, ctx.tables) }
+}
+
+struct MondRule;
+impl GeneratedColumnRule for MondRule {
+    fn name(&self) -> &'static str { "mond64" }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { selected_by_pair(&ctx.tokens, BEDEUTUNG, MOND64_ALIASES) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+        concat_prim_creativity_type(ctx.table, ctx.rows_as_numbers, ctx.tables);
+        concat_mond_exponzieren_logarithmus_typ(ctx.table, ctx.rows_as_numbers, ctx.tables);
+    }
+}
+
+struct PrimUniverseRule {
+    name: &'static str,
+    token: &'static str,
+    gebrochen: bool,
+    gleichfoermig: usize,
+    struktural: usize,
+}
+impl GeneratedColumnRule for PrimUniverseRule {
+    fn name(&self) -> &'static str { self.name }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { ctx.tokens.contains(self.token) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+        concat_prim_universe_generated(ctx.table, ctx.rows_as_numbers, ctx.tables, self.gebrochen, self.gleichfoermig, self.struktural);
+    }
+}
+
+struct ModalRule;
+impl GeneratedColumnRule for ModalRule {
+    fn name(&self) -> &'static str { "modallogik" }
+    fn should_apply(&self, ctx: &GeneratorRuleContext) -> bool { contains_any_alias(&ctx.tokens, MODAL_ALIASES) }
+    fn apply(&self, ctx: &mut GeneratorExecutionContext<'_>) {
+        let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for pair in &ctx.bereich.exact_modal_pairs {
+            modal_concepts.insert(*pair);
+        }
+
+        if modal_concepts.is_empty() {
+            let selected_zero_based: Vec<usize> = if !ctx.bereich.spaltenreihenfolgeundnurdiese.is_empty() {
+                ctx.bereich.spaltenreihenfolgeundnurdiese.iter().filter_map(|&i| i.checked_sub(1)).collect()
+            } else if !ctx.bereich.spalten_bereiche.is_empty() {
+                let mut cols = Vec::new();
+                for &(from, to) in &ctx.bereich.spalten_bereiche {
+                    if from == 0 || to == 0 || from > to { continue; }
+                    for c in from..=to {
+                        if let Some(zero) = c.checked_sub(1) { cols.push(zero); }
+                    }
+                }
+                cols.sort_unstable();
+                cols.dedup();
+                cols
+            } else {
+                Vec::new()
+            };
+
+            if selected_zero_based.len() >= 2 {
+                for pair in selected_zero_based.chunks(2) {
+                    if pair.len() == 2 { modal_concepts.insert((pair[0], pair[1])); }
+                }
+            }
+        }
+
+        if modal_concepts.is_empty() {
+            modal_concepts.insert((121usize, 122usize));
+        }
+
+        concat_modallogik(ctx.table, &modal_concepts, ctx.rows_as_numbers, ctx.tables);
+    }
+}
+
+fn build_generator_rules() -> Vec<Box<dyn GeneratedColumnRule>> {
+    vec![
+        Box::new(PrimzahlkreuzRule),
+        Box::new(PairAliasRule { name: "love_polygon", first_aliases: MENSCHLICHES, second_aliases: LOVE_ALIASES, apply_fn: concat_love_polygon }),
+        Box::new(MultiPairAliasRule { name: "gleichheit_freiheit", pairs: &[(PLANET, GLEICHHEIT_ALIASES), (&["menschliches", "grundstrukturen"], GLEICHHEIT_ALIASES)], apply_fn: concat_gleichheit_freiheit_dominieren }),
+        Box::new(PairAliasRule { name: "geist_emotion", first_aliases: UNIVERSUM, second_aliases: GEIST_ALIASES, apply_fn: concat_geist_emotion_energie_materie_topologie }),
+        Box::new(MondRule),
+        Box::new(MultiPairAliasRule { name: "vervielfache", pairs: &[(BEDEUTUNG, VERVIELFACHE_ALIASES), (GALAXIE, VERVIELFACHE_ALIASES)], apply_fn: |t, r, tb| concat_vervielfache_zeile(t, r, tb) }),
+        Box::new(PrimUniverseRule { name: "primmotivstern", token: "primmotivstern", gebrochen: false, gleichfoermig: 0, struktural: 0 }),
+        Box::new(PrimUniverseRule { name: "primstrukstern", token: "primstrukstern", gebrochen: false, gleichfoermig: 0, struktural: 1 }),
+        Box::new(PrimUniverseRule { name: "primmotivgleichf", token: "primmotivgleichf", gebrochen: false, gleichfoermig: 1, struktural: 0 }),
+        Box::new(PrimUniverseRule { name: "primstrukgleichf", token: "primstrukgleichf", gebrochen: false, gleichfoermig: 1, struktural: 1 }),
+        Box::new(PrimUniverseRule { name: "primmotivsterngebr", token: "primmotivsterngebr", gebrochen: true, gleichfoermig: 0, struktural: 0 }),
+        Box::new(PrimUniverseRule { name: "primstruksterngebr", token: "primstruksterngebr", gebrochen: true, gleichfoermig: 0, struktural: 1 }),
+        Box::new(PrimUniverseRule { name: "primmotivgleichfgebr", token: "primmotivgleichfgebr", gebrochen: true, gleichfoermig: 1, struktural: 0 }),
+        Box::new(PrimUniverseRule { name: "primstrukgleichfgebr", token: "primstrukgleichfgebr", gebrochen: true, gleichfoermig: 1, struktural: 1 }),
+        Box::new(ModalRule),
+    ]
+}
+
 pub fn apply_generated_columns(
     headers: &mut Vec<String>,
     data: &mut Vec<Vec<String>>,
@@ -39,7 +278,6 @@ pub fn apply_generated_columns(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
     let original_headers = headers.clone();
     let original_data = data.clone();
 
@@ -54,252 +292,40 @@ pub fn apply_generated_columns(
     tables.spalten_vanilla_amount = original_header_len;
     tables.last_line_number = table.len().saturating_sub(1);
     tables.hoechste_zeile_1024 = table.len().saturating_sub(1);
-    let mut tokens: BTreeSet<String> = generated_befehle
-        .iter()
-        .map(|s| normalize_token(s))
-        .collect();
 
-    if !parameters_main.bedeutung0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.bedeutung0));
-    }
-    if !parameters_main.procontra0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.procontra0));
-    }
-    if !parameters_main.grundstrukturen0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.grundstrukturen0));
-    }
-    if !parameters_main.unter0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.unter0));
-    }
+    let rule_ctx = GeneratorRuleContext::from_inputs(generated_befehle, parameters_main);
+    let rules = build_generator_rules();
+    let mut exec_ctx = GeneratorExecutionContext {
+        table: &mut table,
+        rows_as_numbers: &mut rows_as_numbers,
+        tables: &mut tables,
+        bereich,
+        generated_befehle,
+        parameters_main,
+    };
 
-    const MENSCHLICHES: &[&str] = &["menschliches"];
-    const PLANET: &[&str] = &["planet"];
-    const UNIVERSUM: &[&str] = &["universum", "multiversum", "grundstrukturen"];
-    const BEDEUTUNG: &[&str] = &["bedeutung", "wichtigste"];
-    const GALAXIE: &[&str] = &["galaxie"];
-
-    const LOVE_ALIASES: &[&str] = &["liebe", "ethik"];
-    const GLEICHHEIT_ALIASES: &[&str] = &[
-        "gleichheit",
-        "freiheit",
-        "dominieren",
-        "ordnung",
-        "ordnen",
-        "filterung",
-        "ungleichheit",
-    ];
-    const GEIST_ALIASES: &[&str] = &[
-        "geist",
-        "bewusstsein",
-        "emotion",
-        "emotionen",
-        "gefuehl",
-        "gefuehle",
-        "gefühl",
-        "gefühle",
-        "energie",
-        "materie",
-        "topologie",
-    ];
-    const MOND64_ALIASES: &[&str] = &[
-        "gestirn",
-        "mond",
-        "sonne",
-        "planet",
-        "evolution",
-        "intelligenz",
-        "kreativ",
-        "kreativitaet",
-        "kreativität",
-        "lernen",
-        "erwerben",
-    ];
-    const VERVIELFACHE_ALIASES: &[&str] = &[
-        "primzahlen",
-        "vielfache",
-        "vielfacher",
-        "multis",
-        "multiplikationen",
-        "offenbarung",
-        "offenbarungjohannes",
-    ];
-    const MODAL_ALIASES: &[&str] = &[
-        "modallogik",
-        "modal",
-        "modus",
-        "modi",
-        "sein",
-        "zustaende",
-        "zustände",
-    ];
-
-    let want_primzahlkreuz = tokens.contains("primzahlkreuzprocontra")
-        || (contains_any_alias(&tokens, BEDEUTUNG)
-            && contains_any_alias(&tokens, &["primzahlkreuz"]))
-        || (contains_any_alias(&tokens, &["procontra"])
-            && contains_any_alias(&tokens, &["primzahlkreuz"]));
-
-    let want_love = selected_by_pair(&tokens, MENSCHLICHES, LOVE_ALIASES);
-    let want_gleichheit = selected_by_pair(&tokens, PLANET, GLEICHHEIT_ALIASES)
-        || selected_by_pair(
-            &tokens,
-            &["menschliches", "grundstrukturen"],
-            GLEICHHEIT_ALIASES,
-        );
-    let want_geist = selected_by_pair(&tokens, UNIVERSUM, GEIST_ALIASES);
-    let want_mond64 = selected_by_pair(&tokens, BEDEUTUNG, MOND64_ALIASES);
-    let want_vervielfache = selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
-        || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES);
-    let want_modal = contains_any_alias(&tokens, MODAL_ALIASES);
-
-    let want_primmotivstern = tokens.contains("primmotivstern");
-    let want_primstrukstern = tokens.contains("primstrukstern");
-    let want_primmotivgleichf = tokens.contains("primmotivgleichf");
-    let want_primstrukgleichf = tokens.contains("primstrukgleichf");
-    let want_primmotivsterngebr = tokens.contains("primmotivsterngebr");
-    let want_primstruksterngebr = tokens.contains("primstruksterngebr");
-    let want_primmotivgleichfgebr = tokens.contains("primmotivgleichfgebr");
-    let want_primstrukgleichfgebr = tokens.contains("primstrukgleichfgebr");
-
-    if want_primzahlkreuz {
-        concat1_primzahlkreuz_pro_contra(
-            &mut table,
-            &mut rows_as_numbers,
-            &mut tables,
-            generated_befehle,
-            parameters_main,
-        );
-    }
-
-    if want_love {
-        concat_love_polygon(&mut table, &mut rows_as_numbers, &mut tables);
-    }
-
-    if want_gleichheit {
-        concat_gleichheit_freiheit_dominieren(&mut table, &mut rows_as_numbers, &mut tables);
-    }
-
-    if want_geist {
-        concat_geist_emotion_energie_materie_topologie(
-            &mut table,
-            &mut rows_as_numbers,
-            &mut tables,
-        );
-    }
-
-    if want_mond64 {
-        concat_prim_creativity_type(&mut table, &mut rows_as_numbers, &mut tables);
-        concat_mond_exponzieren_logarithmus_typ(&mut table, &mut rows_as_numbers, &mut tables);
-    }
-
-    if want_vervielfache {
-        concat_vervielfache_zeile(&mut table, &mut rows_as_numbers, &mut tables);
-    }
-
-    if want_primmotivstern {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 0, 0);
-    }
-    if want_primstrukstern {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 0, 1);
-    }
-    if want_primmotivgleichf {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 1, 0);
-    }
-    if want_primstrukgleichf {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, false, 1, 1);
-    }
-    if want_primmotivsterngebr {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 0, 0);
-    }
-    if want_primstruksterngebr {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 0, 1);
-    }
-    if want_primmotivgleichfgebr {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 1, 0);
-    }
-    if want_primstrukgleichfgebr {
-        concat_prim_universe_generated(&mut table, &mut rows_as_numbers, &mut tables, true, 1, 1);
-    }
-
-    if want_modal {
-        let mut modal_concepts: BTreeSet<(usize, usize)> = BTreeSet::new();
-
-        for pair in &bereich.exact_modal_pairs {
-            modal_concepts.insert(*pair);
-        }
-
-        if modal_concepts.is_empty() {
-            let selected_zero_based: Vec<usize> = if !bereich.spaltenreihenfolgeundnurdiese.is_empty() {
-                bereich
-                    .spaltenreihenfolgeundnurdiese
-                    .iter()
-                    .filter_map(|&i| i.checked_sub(1))
-                    .collect()
-            } else if !bereich.spalten_bereiche.is_empty() {
-                let mut cols = Vec::new();
-                for &(from, to) in &bereich.spalten_bereiche {
-                    if from == 0 || to == 0 || from > to {
-                        continue;
-                    }
-                    for c in from..=to {
-                        if let Some(zero) = c.checked_sub(1) {
-                            cols.push(zero);
-                        }
-                    }
-                }
-                cols.sort_unstable();
-                cols.dedup();
-                cols
-            } else {
-                Vec::new()
-            };
-
-            if selected_zero_based.len() >= 2 {
-                for pair in selected_zero_based.chunks(2) {
-                    if pair.len() == 2 {
-                        modal_concepts.insert((pair[0], pair[1]));
-                    }
-                }
+    let mut want_vervielfache = false;
+    for rule in rules.iter() {
+        if rule.should_apply(&rule_ctx) {
+            if rule.name() == "vervielfache" {
+                want_vervielfache = true;
             }
+            rule.apply(&mut exec_ctx);
         }
-
-        if modal_concepts.is_empty() {
-            modal_concepts.insert((121usize, 122usize));
-        }
-
-        concat_modallogik(
-            &mut table,
-            &modal_concepts,
-            &mut rows_as_numbers,
-            &mut tables,
-        );
     }
 
     if !bereich.exact_meta_konkret_specs.is_empty() {
-        concat_universum_meta_konkret(
-            &mut table,
-            &bereich.exact_meta_konkret_specs,
-            &mut rows_as_numbers,
-            &mut tables,
-        );
+        concat_universum_meta_konkret(&mut table, &bereich.exact_meta_konkret_specs, &mut rows_as_numbers, &mut tables);
     }
 
     let mut keep_indices: Vec<usize> = if !bereich.exact_visible_columns.is_empty() {
-        bereich
-            .exact_visible_columns
-            .iter()
-            .filter_map(|&i| i.checked_sub(1))
-            .collect()
+        bereich.exact_visible_columns.iter().filter_map(|&i| i.checked_sub(1)).collect()
     } else if !bereich.spalten_bereiche.is_empty() {
         let mut cols = Vec::new();
         for &(from, to) in &bereich.spalten_bereiche {
-            if from == 0 || to == 0 || from > to {
-                continue;
-            }
+            if from == 0 || to == 0 || from > to { continue; }
             for c in from..=to {
-                if let Some(zero) = c.checked_sub(1) {
-                    cols.push(zero);
-                }
+                if let Some(zero) = c.checked_sub(1) { cols.push(zero); }
             }
         }
         cols.sort_unstable();
@@ -314,12 +340,8 @@ pub fn apply_generated_columns(
     }
 
     if want_vervielfache {
-        if original_header_len > 19 {
-            keep_indices.push(19);
-        }
-        if original_header_len > 90 {
-            keep_indices.push(90);
-        }
+        if original_header_len > 19 { keep_indices.push(19); }
+        if original_header_len > 90 { keep_indices.push(90); }
     }
 
     let mut seen = BTreeSet::new();
@@ -329,38 +351,16 @@ pub fn apply_generated_columns(
         return Ok(());
     }
 
-    let header_row: Vec<String> = table
-        .first()
-        .cloned()
-        .unwrap_or_else(|| original_headers.clone());
+    let header_row: Vec<String> = table.first().cloned().unwrap_or_else(|| original_headers.clone());
 
-    *headers = keep_indices
-        .iter()
-        .map(|&i| {
-            let raw: String = header_row
-                .get(i)
-                .cloned()
-                .or_else(|| original_headers.get(i).cloned())
-                .unwrap_or_default();
+    *headers = keep_indices.iter().map(|&i| {
+        let raw: String = header_row.get(i).cloned().or_else(|| original_headers.get(i).cloned()).unwrap_or_default();
+        if raw.trim().is_empty() { format!("SQL-Spalte {}", i + 1) } else { raw }
+    }).collect();
 
-            if raw.trim().is_empty() {
-                format!("SQL-Spalte {}", i + 1)
-            } else {
-                raw
-            }
-        })
-        .collect();
-
-    *data = table
-        .into_iter()
-        .skip(1)
-        .map(|row| {
-            keep_indices
-                .iter()
-                .map(|&i| row.get(i).cloned().unwrap_or_default())
-                .collect::<Vec<_>>()
-        })
-        .collect();
+    *data = table.into_iter().skip(1).map(|row| {
+        keep_indices.iter().map(|&i| row.get(i).cloned().unwrap_or_default()).collect::<Vec<_>>()
+    }).collect();
 
     Ok(())
 }
