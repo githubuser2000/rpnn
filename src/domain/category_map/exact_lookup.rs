@@ -1,8 +1,8 @@
-use crate::domain::categories::{KategorieEintrag, KategorieMap};
+use crate::domain::categories::{KategorieEintrag, KategorieMap, Oberkategorie};
 use super::normalize::normalize_key;
 
 pub fn finde_spaltennummern_exakt_in_maps(
-    hauptkategorien: &std::collections::HashMap<String, std::collections::HashMap<String, Vec<u32>>>,
+    hauptkategorien: &[Oberkategorie],
     alle_eintraege: &[KategorieEintrag],
     ober: &str,
     unter: &str,
@@ -11,9 +11,9 @@ pub fn finde_spaltennummern_exakt_in_maps(
     let ober_gesucht = normalize_key(ober);
     let unter_gesucht = normalize_key(unter);
 
-    for (haupt_name, unter_map) in hauptkategorien {
-        if normalize_key(haupt_name) == ober_gesucht {
-            for (unter_name, spaltennummern) in unter_map {
+    for haupt in hauptkategorien {
+        if normalize_key(&haupt.name) == ober_gesucht {
+            for (unter_name, spaltennummern) in &haupt.unterkategorien {
                 if normalize_key(unter_name) == unter_gesucht {
                     gefundene.extend_from_slice(spaltennummern);
                 }
@@ -24,7 +24,8 @@ pub fn finde_spaltennummern_exakt_in_maps(
     if gefundene.is_empty() {
         for eintrag in alle_eintraege {
             if normalize_key(&eintrag.oberkategorie) == ober_gesucht
-                && normalize_key(&eintrag.unterkategorie) == unter_gesucht {
+                && normalize_key(&eintrag.unterkategorie) == unter_gesucht
+            {
                 gefundene.extend_from_slice(&eintrag.spaltennummern);
             }
         }

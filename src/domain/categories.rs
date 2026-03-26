@@ -17,15 +17,24 @@ impl KategorieEintrag {
         }
     }
 }
-// NEUE Funktion für exakte Suche
-// In der impl KategorieMap { ... } Sektion:
 
+#[derive(Debug, Clone)]
+pub struct Oberkategorie {
+    pub name: String,
+    pub unterkategorien: HashMap<String, Vec<u32>>,
+}
 
-
-
+impl Oberkategorie {
+    pub fn new(name: impl Into<String>, unterkategorien: HashMap<String, Vec<u32>>) -> Self {
+        Self {
+            name: name.into(),
+            unterkategorien,
+        }
+    }
+}
 
 pub struct KategorieMap {
-    pub hauptkategorien: HashMap<String, HashMap<String, Vec<u32>>>,
+    pub hauptkategorien: Vec<Oberkategorie>,
     pub alle_eintraege: Vec<KategorieEintrag>,
 }
 
@@ -46,7 +55,7 @@ fn normalize_key(s: &str) -> String {
 impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
-            hauptkategorien: HashMap::new(),
+            hauptkategorien: Vec::new(),
             alle_eintraege: Vec::new(),
         };
         instanz.lade_kategorien();
@@ -139,20 +148,14 @@ pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
     let unter_gesucht = unter.to_lowercase().replace("_", "");
     
     // Suche in der Hauptstruktur
-    for (haupt_name, unter_map) in &self.hauptkategorien {
-        let haupt_normalized: String = haupt_name.to_lowercase().replace("_", "");
-        
-        // EXAKTER Vergleich
+    for haupt in &self.hauptkategorien {
+        let haupt_normalized: String = haupt.name.to_lowercase().replace("_", "");
+
         if haupt_normalized == ober_gesucht {
-            //println!("✅ Exakte Oberkategorie gefunden: {}", haupt_name);
-            
-            for (unter_name, spaltennummern) in unter_map {
+            for (unter_name, spaltennummern) in &haupt.unterkategorien {
                 let unter_normalized = unter_name.to_lowercase().replace("_", "");
-                
-                // EXAKTER Vergleich
+
                 if unter_normalized == unter_gesucht {
-                    /*println!("✅ Exakte Unterkategorie gefunden: {} → {} : {:?}", 
-                            haupt_name, unter_name, spaltennummern);*/
                     gefundene.extend_from_slice(spaltennummern);
                 }
             }
@@ -197,17 +200,16 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
     let mut gefundene = Vec::new();
     
     // Suche in der Hauptkategorien-Struktur
-    for (haupt_name, unter_map) in &self.hauptkategorien {
-        let haupt_normalized = haupt_name.to_lowercase().replace("_", "");
+    for haupt in &self.hauptkategorien {
+        let haupt_normalized = haupt.name.to_lowercase().replace("_", "");
         let ober_normalized = ober.to_lowercase().replace("_", "");
-        
+
         if haupt_normalized == ober_normalized {
-            for (unter_name, spaltennummern) in unter_map {
+            for (unter_name, spaltennummern) in &haupt.unterkategorien {
                 let unter_normalized = unter_name.to_lowercase().replace("_", "");
                 let such_unter_normalized = unter.to_lowercase().replace("_", "");
-                
+
                 if unter_normalized == such_unter_normalized {
-                    //println!("✅ Gefunden: {} → {} : {:?}", haupt_name, unter_name, spaltennummern);
                     gefundene.extend_from_slice(spaltennummern);
                 }
             }
@@ -707,7 +709,13 @@ pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> V
         }
     }
 
-    self.hauptkategorien = main_to_sub;
+    let mut hauptkategorien: Vec<Oberkategorie> = main_to_sub
+        .into_iter()
+        .map(|(name, unterkategorien)| Oberkategorie::new(name, unterkategorien))
+        .collect();
+    hauptkategorien.sort_by(|a, b| a.name.cmp(&b.name));
+
+    self.hauptkategorien = hauptkategorien;
     self.alle_eintraege = alle_eintraege_temp;
 } 
     fn insert_entry(
