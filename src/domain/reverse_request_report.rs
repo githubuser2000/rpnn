@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::reta_ausgabe::OutputSyntax;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AnfragePair {
@@ -59,20 +60,25 @@ fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
     visible
 }
 
-fn collect_direct_pairs_for_visible_columns(
+fn collect_exact_and_partial_direct_pairs(
     kategorie_map: &KategorieMap,
     visible_columns: &BTreeSet<u32>,
-    out: &mut BTreeSet<AnfragePair>,
+    exact_out: &mut BTreeSet<AnfragePair>,
+    partial_out: &mut BTreeSet<AnfragePair>,
 ) {
     for haupt in &kategorie_map.hauptkategorien {
         for unter in &haupt.unterkategorien {
-            let has_visible = unter
-                .spaltennummern
-                .iter()
-                .any(|spaltennummer| visible_columns.contains(spaltennummer));
+            let pair = AnfragePair::new(haupt.name.clone(), unter.name.clone());
+            let cols: BTreeSet<u32> = unter.spaltennummern.iter().copied().collect();
 
-            if has_visible {
-                out.insert(AnfragePair::new(haupt.name.clone(), unter.name.clone()));
+            if cols.is_empty() {
+                continue;
+            }
+
+            if cols == *visible_columns {
+                exact_out.insert(pair);
+            } else if cols.iter().any(|c| visible_columns.contains(c)) {
+                partial_out.insert(pair);
             }
         }
     }
@@ -146,7 +152,8 @@ fn collect_kombi_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>) {
 }
 
 fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, out: &mut BTreeSet<AnfragePair>) {
-    let has = |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
+    let has =
+        |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
 
     if has("primzahlkreuzprocontra") {
         out.insert(AnfragePair::new("Universum", "Primzahlkreuz"));
@@ -236,21 +243,74 @@ fn collect_exact_bridge_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfrageP
     }
 }
 
-pub fn collect_reverse_request_pairs(
+pub fn print_reverse_request_pairs(
     kategorie_map: &KategorieMap,
     bereich: &TextBereich,
     generated_befehle: &BTreeSet<String>,
-) -> Vec<AnfragePair> {
-    let mut out = BTreeSet::<AnfragePair>::new();
+) {
+    if matches!(bereich.output_syntax, OutputSyntax::HTML) {
+        return;
+    }
+
     let visible_columns = collect_visible_columns(bereich);
+    if visible_columns.is_empty()
+        && generated_befehle.is_empty()
+        && bereich.exact_meta_konkret_specs.is_empty()
+        && bereich.exact_modal_pairs.is_empty()
+        && bereich.pypy_compat.gebrochengalaxie.is_empty()
+        && bereich.pypy_compat.gebrochenuniversum.is_empty()
+        && bereich.pypy_compat.gebrochenemotion.is_empty()
+        && bereich.pypy_compat.gebrochengroesse.is_empty()
+        && bereich.pypy_compat.kombi_galaxie.is_empty()
+        && bereich.pypy_compat.kombi_universum.is_empty()
+    {
+        return;
+    }
 
-    collect_direct_pairs_for_visible_columns(kategorie_map, &visible_columns, &mut out);
-    collect_fraction_pairs(bereich, &mut out);
-    collect_kombi_pairs(bereich, &mut out);
-    collect_generated_pairs(generated_befehle, &mut out);
-    collect_exact_bridge_pairs(bereich, &mut out);
+    let mut exact_pairs = BTreeSet::<AnfragePair>::new();
+    let mut non_exact_pairs = BTreeSet::<AnfragePair>::new();
 
-    out.into_iter().collect()
+    collect_exact_and_partial_direct_pairs(
+        kategorie_map,
+        &visible_columns,
+        &mut exact_pairs,
+        &mut non_exact_pairs,
+    );
+    collect_fraction_pairs(bereich, &mut non_exact_pairs);
+    collect_kombi_pairs(bereich, &mut non_exact_pairs);
+    collect_generated_pairs(generated_befehle, &mut non_exact_pairs);
+    collect_exact_bridge_pairs(bereich, &mut non_exact_pairs);
+
+    for pair in &exact_pairs {
+        non_exact_pairs.remove(pair);
+    }
+
+    if exact_pairs.is_empty() && non_exact_pairs.is_empty() {
+        return;
+    }
+
+    println!();
+
+    if !exact_pairs.is_empty() {
+        println!("══════════════════════════════════════════════");
+        println!("Exakt äquivalente Spalten-Auswahl:");
+        println!("══════════════════════════════════════════════");
+        for pair in &exact_pairs {
+            println!("  {}", pair.to_cli());
+        }
+    }
+
+    if !non_exact_pairs.is_empty() {
+        if !exact_pairs.is_empty() {
+            println!();
+        }
+        println!("══════════════════════════════════════════════");
+        println!("Weitere passende, aber nicht exakt äquivalente Auswahl:");
+        println!("══════════════════════════════════════════════");
+        for pair in &non_exact_pairs {
+            println!("  {}", pair.to_cli());
+        }
+    }
 }
 
 pub fn print_reverse_request_pairs_dual(
@@ -258,34 +318,5 @@ pub fn print_reverse_request_pairs_dual(
     bereich: &TextBereich,
     generated_befehle: &BTreeSet<String>,
 ) {
-    let mut original = BTreeSet::<AnfragePair>::new();
-    let visible_columns = collect_visible_columns(bereich);
-    collect_direct_pairs_for_visible_columns(kategorie_map, &visible_columns, &mut original);
-
-    let alternatives: BTreeSet<AnfragePair> =
-        collect_reverse_request_pairs(kategorie_map, bereich, generated_befehle)
-            .into_iter()
-            .collect();
-
-    if original.is_empty() && alternatives.is_empty() {
-        return;
-    }
-
-    println!();
-    println!("══════════════════════════════════════════════");
-    println!("Aktuelle Spalten-Auswahl:");
-    println!("══════════════════════════════════════════════");
-    for pair in &original {
-        println!("  {}", pair.to_cli());
-    }
-
-    println!();
-    println!("══════════════════════════════════════════════");
-    println!("Alternative äquivalente Auswahl:");
-    println!("══════════════════════════════════════════════");
-    for pair in &alternatives {
-        if !original.contains(pair) {
-            println!("  {}", pair.to_cli());
-        }
-    }
+    print_reverse_request_pairs(kategorie_map, bereich, generated_befehle);
 }
