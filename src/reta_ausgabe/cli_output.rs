@@ -252,7 +252,7 @@ fn render_html_table(&mut self, display_lines_list: &[usize], table: &[TableRow]
         for (col_idx, cell) in row.cells.iter().enumerate() {
             let resolved = resolve_header_meta(&cell.original_content, col_idx, display_line_idx == 0);
 let visible_content = resolved.visible_text;
-let meta = resolved.class_meta;
+let meta = resolved.class_attr;
             let content = if display_line_idx == 0 && (col_idx == 0 || col_idx == 1) {
                 String::new()
             } else {
