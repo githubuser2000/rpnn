@@ -12,7 +12,7 @@ use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 
 use crate::domain::categories::KategorieMap;
-use crate::domain::reverse_request_report::print_reverse_request_pairs;
+use crate::domain::reverse_request_report::print_reverse_request_pairs_dual;
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -381,7 +381,7 @@ pub fn query_column_by_index(
         bereich.pretty_output,
     );
 
-    print_reverse_request_pairs(kategorie_map, &bereich, generated_befehle);
+    print_reverse_request_pairs_dual(kategorie_map, &bereich, generated_befehle);
 
     Ok(())
 }

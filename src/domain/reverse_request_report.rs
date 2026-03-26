@@ -36,6 +36,33 @@ fn canonical_first(values: &[String], fallback: &str) -> String {
     values.first().cloned().unwrap_or_else(|| fallback.to_string())
 }
 
+fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
+    let mut visible = BTreeSet::<u32>::new();
+
+    for &(a, b) in &bereich.spalten_bereiche {
+        if a == 0 || b == 0 || a > b {
+            continue;
+        }
+        for n in a..=b {
+            visible.insert(n as u32);
+        }
+    }
+
+    for &n in &bereich.spaltenreihenfolgeundnurdiese {
+        if n > 0 {
+            visible.insert(n as u32);
+        }
+    }
+
+    for &n in &bereich.exact_visible_columns {
+        if n > 0 {
+            visible.insert(n as u32);
+        }
+    }
+
+    visible
+}
+
 fn collect_direct_pairs_for_visible_columns(
     kategorie_map: &KategorieMap,
     visible_columns: &BTreeSet<u32>,
@@ -238,33 +265,6 @@ fn collect_exact_bridge_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfrageP
     }
 }
 
-fn collect_visible_columns(bereich: &TextBereich) -> BTreeSet<u32> {
-    let mut visible = BTreeSet::<u32>::new();
-
-    for &(a, b) in &bereich.spalten_bereiche {
-        if a == 0 || b == 0 || a > b {
-            continue;
-        }
-        for n in a..=b {
-            visible.insert(n as u32);
-        }
-    }
-
-    for &n in &bereich.spaltenreihenfolgeundnurdiese {
-        if n > 0 {
-            visible.insert(n as u32);
-        }
-    }
-
-    for &n in &bereich.exact_visible_columns {
-        if n > 0 {
-            visible.insert(n as u32);
-        }
-    }
-
-    visible
-}
-
 pub fn collect_reverse_request_pairs(
     kategorie_map: &KategorieMap,
     bereich: &TextBereich,
@@ -283,20 +283,39 @@ pub fn collect_reverse_request_pairs(
     out.into_iter().collect()
 }
 
-pub fn print_reverse_request_pairs(
+pub fn print_reverse_request_pairs_dual(
     kategorie_map: &KategorieMap,
     bereich: &TextBereich,
     generated_befehle: &BTreeSet<String>,
 ) {
-    let pairs = collect_reverse_request_pairs(kategorie_map, bereich, generated_befehle);
+    let mut original = BTreeSet::<AnfragePair>::new();
+    let visible_columns = collect_visible_columns(bereich);
+    collect_direct_pairs_for_visible_columns(kategorie_map, &visible_columns, &mut original);
 
-    if pairs.is_empty() {
+    let alternatives: BTreeSet<AnfragePair> =
+        collect_reverse_request_pairs(kategorie_map, bereich, generated_befehle)
+            .into_iter()
+            .collect();
+
+    if original.is_empty() && alternatives.is_empty() {
         return;
     }
 
     println!();
-    println!("Mögliche --spaltenname-Anfragen für diese Ausgabe:");
-    for pair in pairs {
+    println!("══════════════════════════════════════════════");
+    println!("Aktuelle Spalten-Auswahl:");
+    println!("══════════════════════════════════════════════");
+    for pair in &original {
         println!("  {}", pair.to_cli());
+    }
+
+    println!();
+    println!("══════════════════════════════════════════════");
+    println!("Alternative äquivalente Auswahl:");
+    println!("══════════════════════════════════════════════");
+    for pair in &alternatives {
+        if !original.contains(pair) {
+            println!("  {}", pair.to_cli());
+        }
     }
 }
