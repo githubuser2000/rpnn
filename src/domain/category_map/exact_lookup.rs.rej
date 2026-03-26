@@ -1,0 +1,26 @@
+--- /mnt/data/src_unz/src/domain/category_map/exact_lookup.rs	2026-03-25 10:51:35.000000000 +0000
++++ /mnt/data/src_patch/src/domain/category_map/exact_lookup.rs	2026-03-26 06:52:04.968569468 +0000
+@@ -1,8 +1,8 @@
+-use crate::domain::categories::{KategorieEintrag, KategorieMap};
++use crate::domain::categories::{KategorieEintrag, KategorieMap, OberkategorieEintrag};
+ use super::normalize::normalize_key;
+ 
+ pub fn finde_spaltennummern_exakt_in_maps(
+-    hauptkategorien: &std::collections::HashMap<String, std::collections::HashMap<String, Vec<u32>>>,
++    hauptkategorien: &[OberkategorieEintrag],
+     alle_eintraege: &[KategorieEintrag],
+     ober: &str,
+     unter: &str,
+@@ -11,9 +11,9 @@
+     let ober_gesucht = normalize_key(ober);
+     let unter_gesucht = normalize_key(unter);
+ 
+-    for (haupt_name, unter_map) in hauptkategorien {
+-        if normalize_key(haupt_name) == ober_gesucht {
+-            for (unter_name, spaltennummern) in unter_map {
++    for haupt in hauptkategorien {
++        if normalize_key(&haupt.name) == ober_gesucht {
++            for (unter_name, spaltennummern) in &haupt.unterkategorien {
+                 if normalize_key(unter_name) == unter_gesucht {
+                     gefundene.extend_from_slice(spaltennummern);
+                 }
