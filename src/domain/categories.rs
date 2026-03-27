@@ -1,4 +1,4 @@
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::spalten_anfrage::{normalize_key, SpaltenAnfrage};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
@@ -194,13 +194,6 @@ pub struct GeneratedInference {
     pub generated_befehle: Vec<String>,
     pub required_columns: Vec<u32>,
     pub direct_columns: Vec<u32>,
-}
-
-fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
 }
 
 impl KategorieMap {

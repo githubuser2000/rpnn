@@ -1,9 +1,14 @@
 use crate::domain::model::spalten_anfrage as canonical;
 use crate::domain::parser::cli_alias_parser::parse_spalten_anfrage;
+use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::spalten_anfrage as legacy;
 
 pub fn bridge_cli_selection(ober: &str, unter: &str) -> Option<canonical::SpaltenAnfrage> {
     parse_spalten_anfrage(ober, unter).ok()
+}
+
+pub fn bridge_raw_selection(request: &RawSelectionRequest) -> Option<canonical::SpaltenAnfrage> {
+    bridge_cli_selection(&request.ober, &request.unter)
 }
 
 pub fn bridge_legacy_request(request: &legacy::SpaltenAnfrage) -> Option<canonical::SpaltenAnfrage> {
