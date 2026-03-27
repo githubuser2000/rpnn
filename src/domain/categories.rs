@@ -211,6 +211,101 @@ impl KategorieMap {
         instanz
     }
 
+    pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
+        let mut paare = self.alle_paare();
+
+        fn push_pair(paare: &mut Vec<(String, String)>, ober: &str, unter: &str) {
+            paare.push((ober.to_string(), unter.to_string()));
+        }
+
+        // Kombi-Galaxie
+        for unter in [
+            "tiere",
+            "berufe",
+            "kreativität",
+            "liebe",
+            "männer",
+            "persönlichkeit",
+            "religion",
+            "motive",
+            "emotionen",
+            "personen",
+            "wirtschaftssysteme",
+            "eigentum",
+        ] {
+            push_pair(&mut paare, "KombinationGalaxie", unter);
+        }
+
+        // Kombi-Universum
+        for unter in [
+            "tiere",
+            "berufe",
+            "transzendentalien",
+            "primzahlkreuz",
+            "persönlichkeit",
+            "religion",
+            "motive",
+            "ontologie",
+            "personen",
+            "mechanismen",
+            "gegentranszendentalien",
+            "maschinen",
+            "geist",
+            "bewusstsein",
+        ] {
+            push_pair(&mut paare, "KombinationUniversum", unter);
+        }
+
+        // Rein generatorische Requests
+        for (ober, unter) in [
+            ("Universum", "Primzahlkreuz"),
+            ("Bedeutung", "Primzahlkreuz"),
+            ("Pro_Contra", "Primzahlkreuz"),
+
+            ("Menschliches", "Liebe"),
+            ("Grundstrukturen", "Liebe"),
+
+            ("Planet", "Gleichheit"),
+            ("Menschliches", "Gleichheit"),
+            ("Grundstrukturen", "Gleichheit"),
+
+            ("Universum", "Geist"),
+            ("Multiversum", "Geist"),
+            ("Grundstrukturen", "Geist"),
+
+            ("Wichtigstes_zum_verstehen", "Gestirn"),
+            ("Bedeutung", "Gestirn"),
+
+            ("Wichtigstes_zum_verstehen", "Primzahlen"),
+            ("Bedeutung", "Primzahlen"),
+            ("Galaxie", "Primzahlen"),
+
+            ("Modallogik", "Modallogik"),
+        ] {
+            push_pair(&mut paare, ober, unter);
+        }
+
+        // Prim-/Multiplikations-Generatoren
+        for ober in ["primvielfache", "multiplikationen"] {
+            for unter in [
+                "motivgleichfoermig",
+                "strukturgleichfoermig",
+                "motivstern",
+                "strukturstern",
+                "motivgebrstern",
+                "strukgebrstern",
+                "motivgebrgleichf",
+                "strukgebrgleichf",
+            ] {
+                push_pair(&mut paare, ober, unter);
+            }
+        }
+
+        paare.sort();
+        paare.dedup();
+        paare
+    }
+
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
         let ober_n = normalize_key(ober);
         let unter_n = normalize_key(unter);

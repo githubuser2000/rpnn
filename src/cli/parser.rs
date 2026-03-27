@@ -168,7 +168,7 @@ pub fn parse_cli_args(
 
                     if let Some(kategorie_map) = kategorie_map {
                         spalten_namen_liste.eintraege = kategorie_map
-                            .alle_paare()
+                            .alle_paare_fuer_cli_alles()
                             .into_iter()
                             .map(|(oberkategorie, unterkategorie)| SpaltenNamen {
                                 oberkategorie,
