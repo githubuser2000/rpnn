@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::request_bridge::to_canonical_request;
+use crate::domain::model::spalten_anfrage::ColumnTarget;
+use crate::domain::request_bridge::parse_and_bridge;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
 
@@ -21,30 +22,20 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    if let Ok(parsed) = crate::domain::spalten_anfrage::SpaltenAnfrage::parse(ober, unter) {
-        if let Some(canonical) = to_canonical_request(&parsed) {
-            if let Some(spec) = resolve_request(canonical) {
-                let mut out = LegacyResolvedSelection::default();
-                match spec.target {
-                    crate::domain::model::spalten_anfrage::ColumnTarget::DirectColumn(col) => {
-                        out.direct_columns.push(col);
-                    }
-                    crate::domain::model::spalten_anfrage::ColumnTarget::DirectColumns(cols) => {
-                        out.direct_columns.extend(cols);
-                    }
-                    crate::domain::model::spalten_anfrage::ColumnTarget::Pair(a, b) => {
-                        out.direct_columns.push(a);
-                        out.direct_columns.push(b);
-                    }
-                    crate::domain::model::spalten_anfrage::ColumnTarget::Generator(generator_spec) => {
-                        out.generated_befehle
-                            .insert(generator_spec.art.to_string().to_lowercase());
-                    }
-                    crate::domain::model::spalten_anfrage::ColumnTarget::Combination(_) => {}
+    if let Some(canonical_req) = parse_and_bridge(ober, unter) {
+        if let Some(spec) = resolve_request(canonical_req) {
+            let mut out = LegacyResolvedSelection::default();
+            match spec.target {
+                ColumnTarget::DirectColumn(id) => out.exact_direct_columns.push(id as usize),
+                ColumnTarget::DirectColumns(ids) => out.exact_direct_columns.extend(ids.into_iter().map(|x| x as usize)),
+                ColumnTarget::Pair(a, b) => out.exact_modal_pairs.push((a as usize, b as usize)),
+                ColumnTarget::Generator(generator_spec) => {
+                    out.generated_befehle.insert(generator_spec.art.to_string().to_lowercase());
                 }
-                dedup_legacy_selection(&mut out);
-                return Ok(out);
+                ColumnTarget::Combination(_) => {}
             }
+            dedup_legacy_selection(&mut out);
+            return Ok(out);
         }
     }
 

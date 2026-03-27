@@ -228,78 +228,6 @@ impl SpaltenAnfrage {
         Ok(parsed)
     }
 
-
-
-    pub fn ober_unter_cli_pair(&self) -> (String, String) {
-        match self {
-            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
-                ("Menschliches".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Universum(unter)) => {
-                ("Universum".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Religion(unter)) => {
-                ("Religion".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
-                (ober.as_cli_str().to_string(), unter.clone())
-            }
-            Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
-            Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
-            Self::GebrochenRationalGalaxie { unter } => {
-                ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalUniversum { unter } => {
-                ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalGefuehle { unter } => {
-                ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalStrukturgroesse { unter } => {
-                ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
-            }
-            Self::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
-            Self::Multiplikationen { unter } => ("multiplikationen".to_string(), unter.clone()),
-            Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
-        }
-    }
-
-    pub fn ober_normalized(&self) -> String {
-        let (ober, _) = self.ober_unter_cli_pair();
-        normalize_key(&ober)
-    }
-
-    pub fn unter_normalized(&self) -> String {
-        let (_, unter) = self.ober_unter_cli_pair();
-        normalize_key(&unter)
-    }
-
-    pub fn generated_befehle_hint(&self) -> Vec<String> {
-        match self {
-            Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => {
-                vec!["primzahlkreuz".to_string()]
-            }
-            Self::Primvielfache { unter } => vec!["primvielfache".to_string(), unter.clone()],
-            Self::Multiplikationen { unter } => vec!["multiplikationen".to_string(), unter.clone()],
-            _ => Vec::new(),
-        }
-    }
-
-    pub fn parameters_main_hint(
-        &self,
-    ) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        let ober_n = normalize_key(&ober);
-        match ober_n.as_str() {
-            "bedeutung" | "wichtigsteszumverstehen" => {
-                (Some(unter.clone()), None, None, Some(unter))
-            }
-            "grundstrukturen" => (None, None, Some(unter.clone()), Some(unter)),
-            "procontra" => (None, Some(unter.clone()), None, Some(unter)),
-            _ => (None, None, None, Some(unter)),
-        }
-    }
-
     pub fn to_cli(&self) -> String {
         match self {
             Self::Standard(StandardAnfrage::Menschliches(unter)) => {
@@ -358,4 +286,85 @@ pub fn normalize_key(s: &str) -> String {
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
+}
+
+
+impl SpaltenAnfrage {
+    pub fn ober_unter_cli_pair(&self) -> (String, String) {
+        match self {
+            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
+                ("Menschliches".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Universum(unter)) => {
+                ("Universum".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Religion(unter)) => {
+                ("Religion".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
+                (ober.as_cli_str().to_string(), unter.clone())
+            }
+            Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
+            Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
+            Self::GebrochenRationalGalaxie { unter } => {
+                ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalUniversum { unter } => {
+                ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalGefuehle { unter } => {
+                ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalStrukturgroesse { unter } => {
+                ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
+            }
+            Self::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
+            Self::Multiplikationen { unter } => ("multiplikationen".to_string(), unter.clone()),
+            Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
+        }
+    }
+
+    pub fn ober_normalized(&self) -> String {
+        normalize_key(&self.ober_unter_cli_pair().0)
+    }
+
+    pub fn unter_normalized(&self) -> String {
+        normalize_key(&self.ober_unter_cli_pair().1)
+    }
+
+    pub fn generated_befehle_hint(&self) -> Vec<String> {
+        match self {
+            Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => {
+                vec!["primzahlkreuz".to_string()]
+            }
+            Self::Primvielfache { .. } => vec!["primvielfache".to_string()],
+            Self::Multiplikationen { .. } => vec!["multiplikationen".to_string()],
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+        let (ober, unter) = self.ober_unter_cli_pair();
+        let ober_n = normalize_key(&ober);
+        let unter_n = normalize_key(&unter);
+
+        let bedeutung0 = if ober_n == "bedeutung" || ober_n == "wichtigsteszumverstehen" {
+            Some(unter_n.clone())
+        } else {
+            None
+        };
+        let procontra0 = if ober_n == "procontra" {
+            Some(unter_n.clone())
+        } else {
+            None
+        };
+        let grundstrukturen0 = if matches!(ober_n.as_str(), "menschliches" | "universum" | "religion" | "planet" | "galaxie" | "multiversum" | "grundstrukturen") {
+            Some(ober_n.clone())
+        } else {
+            None
+        };
+        let unter0 = Some(unter_n);
+
+        (bedeutung0, procontra0, grundstrukturen0, unter0)
+    }
 }
