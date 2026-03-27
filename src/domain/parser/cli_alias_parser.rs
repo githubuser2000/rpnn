@@ -15,7 +15,19 @@ pub enum ParseError {
 }
 
 fn normalize_cli_token(s: &str) -> String {
-    s.trim().to_lowercase()
+    s.trim()
+        .to_lowercase()
+        .replace('ä', "ae")
+        .replace('ö', "oe")
+        .replace('ü', "ue")
+        .replace('ß', "ss")
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
+        .replace('„', "")
+        .replace('“', "")
+        .replace('"', "")
 }
 
 fn matches_alias(input: &str, aliases: &[&str]) -> bool {

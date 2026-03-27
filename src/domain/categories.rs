@@ -4,6 +4,13 @@ use std::fmt;
 
 use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
 use crate::domain::exact_mappings::META_KONKRET_MAPPINGS;
+use crate::domain::ids::domain_id::DomainId;
+use crate::domain::model::spalten_anfrage::{
+    EigenschaftRequest as CanonicalEigenschaftRequest,
+    EigenschaftsFamilie as CanonicalEigenschaftsFamilie,
+    SpaltenAnfrage as CanonicalSpaltenAnfrage,
+    StandardUnterId as CanonicalStandardUnterId,
+};
 use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -214,13 +221,14 @@ impl KategorieMap {
     }
 
     pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
-        let mut paare = self.alle_paare();
+        use std::collections::BTreeSet;
 
-        fn push_pair(paare: &mut Vec<(String, String)>, ober: &str, unter: &str) {
-            paare.push((ober.to_string(), unter.to_string()));
+        let mut paare_set: BTreeSet<(String, String)> = self.alle_paare().into_iter().collect();
+
+        fn push_pair(paare: &mut BTreeSet<(String, String)>, ober: &str, unter: &str) {
+            paare.insert((ober.to_string(), unter.to_string()));
         }
 
-        // Kombi-Galaxie
         for unter in [
             "tiere",
             "berufe",
@@ -235,10 +243,9 @@ impl KategorieMap {
             "wirtschaftssysteme",
             "eigentum",
         ] {
-            push_pair(&mut paare, "KombinationGalaxie", unter);
+            push_pair(&mut paare_set, "KombinationGalaxie", unter);
         }
 
-        // Kombi-Universum
         for unter in [
             "tiere",
             "berufe",
@@ -255,39 +262,31 @@ impl KategorieMap {
             "geist",
             "bewusstsein",
         ] {
-            push_pair(&mut paare, "KombinationUniversum", unter);
+            push_pair(&mut paare_set, "KombinationUniversum", unter);
         }
 
-        // Rein generatorische Requests
         for (ober, unter) in [
             ("Universum", "Primzahlkreuz"),
             ("Bedeutung", "Primzahlkreuz"),
             ("Pro_Contra", "Primzahlkreuz"),
-
             ("Menschliches", "Liebe"),
             ("Grundstrukturen", "Liebe"),
-
             ("Planet", "Gleichheit"),
             ("Menschliches", "Gleichheit"),
             ("Grundstrukturen", "Gleichheit"),
-
             ("Universum", "Geist"),
             ("Multiversum", "Geist"),
             ("Grundstrukturen", "Geist"),
-
             ("Wichtigstes_zum_verstehen", "Gestirn"),
             ("Bedeutung", "Gestirn"),
-
             ("Wichtigstes_zum_verstehen", "Primzahlen"),
             ("Bedeutung", "Primzahlen"),
             ("Galaxie", "Primzahlen"),
-
             ("Modallogik", "Modallogik"),
         ] {
-            push_pair(&mut paare, ober, unter);
+            push_pair(&mut paare_set, ober, unter);
         }
 
-        // Prim-/Multiplikations-Generatoren
         for ober in ["primvielfache", "multiplikationen"] {
             for unter in [
                 "motivgleichfoermig",
@@ -299,15 +298,18 @@ impl KategorieMap {
                 "motivgebrgleichf",
                 "strukgebrgleichf",
             ] {
-                push_pair(&mut paare, ober, unter);
+                push_pair(&mut paare_set, ober, unter);
             }
         }
 
-        paare.sort();
-        paare.dedup();
-        paare
-    }
+        for request in Self::typed_eigenschaften_requests_fuer_alles() {
+            if let Some((ober, unter)) = request.to_cli_pair() {
+                paare_set.insert((ober, unter));
+            }
+        }
 
+        paare_set.into_iter().collect()
+    }
 
     pub fn infer_generated_request(&self, request: &SpaltenAnfrage) -> Option<GeneratedInference> {
         let (ober, unter) = request.ober_unter_cli_pair();
@@ -642,9 +644,39 @@ impl KategorieMap {
             }
         }
 
-        paare.sort();
-        paare.dedup();
         paare
+    }
+
+    fn typed_eigenschaften_requests_fuer_alles() -> Vec<CanonicalSpaltenAnfrage> {
+        let mut requests = Vec::new();
+
+        for key in EigenschaftKeyId::ALL.iter().copied() {
+            requests.push(CanonicalSpaltenAnfrage::Standard {
+                domain: DomainId::Eigenschaften,
+                unter: CanonicalStandardUnterId::Eigenschaft(CanonicalEigenschaftRequest {
+                    familie: CanonicalEigenschaftsFamilie::Generisch,
+                    key,
+                }),
+            });
+
+            let familie = match key.standard_familie() {
+                EigenschaftStandardFamilie::N => CanonicalEigenschaftsFamilie::N,
+                EigenschaftStandardFamilie::EinsDurchN => CanonicalEigenschaftsFamilie::EinsDurchN,
+            };
+
+            let domain = match familie {
+                CanonicalEigenschaftsFamilie::Generisch => DomainId::Eigenschaften,
+                CanonicalEigenschaftsFamilie::N => DomainId::EigenschaftenN,
+                CanonicalEigenschaftsFamilie::EinsDurchN => DomainId::Eigenschaften1ProN,
+            };
+
+            requests.push(CanonicalSpaltenAnfrage::Standard {
+                domain,
+                unter: CanonicalStandardUnterId::Eigenschaft(CanonicalEigenschaftRequest { familie, key }),
+            });
+        }
+
+        requests
     }
 
     pub fn alle_spaltennummern(&self) -> Vec<u32> {
