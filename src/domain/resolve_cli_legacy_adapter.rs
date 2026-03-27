@@ -22,6 +22,15 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
+    if let Ok(request) = SpaltenAnfrage::parse(ober, unter) {
+        if let Some(canonical) = to_canonical_request(&request).and_then(resolve_request) {
+            let out = legacy_from_canonical(&canonical);
+            if has_any_resolution(&out) {
+                return Ok(out);
+            }
+        }
+    }
+
     if let Some(exact) = resolve_exact_generator(ober, unter) {
         let mut out = LegacyResolvedSelection::default();
 
@@ -33,41 +42,6 @@ pub fn resolve_cli_selection(
 
         dedup_legacy_selection(&mut out);
         return Ok(out);
-    }
-
-    if let Ok(request) = SpaltenAnfrage::parse(ober, unter) {
-        let mut out = LegacyResolvedSelection::default();
-
-        out.direct_columns = kategorie_map
-            .finde_spaltennummern_fuer_request(&request)
-            .into_iter()
-            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-            .collect::<Result<Vec<u16>, _>>()?;
-
-        if let Some(inference) = kategorie_map.infer_generated_request(&request) {
-            out.required_columns = inference.required_columns.into_iter()
-                .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-                .collect::<Result<Vec<u16>, _>>()?;
-            out.generated_befehle.extend(inference.generated_befehle);
-        }
-
-        if let Some(canonical) = to_canonical_request(&request).and_then(resolve_request) {
-            use crate::domain::model::spalten_anfrage::ColumnTarget;
-            match canonical.target {
-                ColumnTarget::DirectColumn(c) => out.direct_columns.push(c),
-                ColumnTarget::DirectColumns(cols) => out.direct_columns.extend(cols),
-                ColumnTarget::Pair(a,b) => { out.direct_columns.push(a); out.direct_columns.push(b); }
-                ColumnTarget::Generator(spec) => {
-                    out.generated_befehle.insert(format!("{}", spec.art).to_lowercase().replace('_', ""));
-                }
-                ColumnTarget::Combination(_) => {}
-            }
-        }
-
-        if !out.direct_columns.is_empty() || !out.required_columns.is_empty() || !out.generated_befehle.is_empty() {
-            dedup_legacy_selection(&mut out);
-            return Ok(out);
-        }
     }
 
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)
@@ -125,4 +99,44 @@ fn to_boxed_request_pipeline_error(
     err: crate::domain::errors::RequestPipelineError,
 ) -> Box<dyn std::error::Error> {
     Box::<dyn std::error::Error>::from(err.to_string())
+}
+
+
+fn has_any_resolution(sel: &LegacyResolvedSelection) -> bool {
+    !(sel.direct_columns.is_empty()
+        && sel.required_columns.is_empty()
+        && sel.exact_direct_columns.is_empty()
+        && sel.exact_modal_pairs.is_empty()
+        && sel.exact_meta_konkret_specs.is_empty()
+        && sel.generated_befehle.is_empty())
+}
+
+fn legacy_from_canonical(
+    spec: &crate::domain::model::spalten_anfrage::CanonicalColumnSpec,
+) -> LegacyResolvedSelection {
+    use crate::domain::model::spalten_anfrage::ColumnTarget;
+
+    let mut out = LegacyResolvedSelection::default();
+
+    match &spec.target {
+        ColumnTarget::DirectColumn(col) => {
+            if let Ok(v) = u16::try_from(*col) {
+                out.direct_columns.push(v);
+            }
+        }
+        ColumnTarget::DirectColumns(cols) => {
+            out.direct_columns.extend(cols.iter().filter_map(|&c| u16::try_from(c).ok()));
+        }
+        ColumnTarget::Pair(a, b) => {
+            out.exact_modal_pairs.push((*a as usize, *b as usize));
+            out.generated_befehle.insert("modallogik".to_string());
+        }
+        ColumnTarget::Generator(generator) => {
+            out.generated_befehle.insert(generator.art.to_string().to_lowercase());
+        }
+        ColumnTarget::Combination(_) => {}
+    }
+
+    dedup_legacy_selection(&mut out);
+    out
 }

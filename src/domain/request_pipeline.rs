@@ -45,7 +45,8 @@ impl RawSelectionRequest {
 impl ParsedSelectionRequest {
     pub fn expand(self, kategorie_map: &KategorieMap) -> ExpandedSelectionRequest {
         let mut generated_befehle = BTreeSet::new();
-        if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
+        let (ober, unter) = self.request.ober_unter_cli_pair();
+        if let Some(inference) = kategorie_map.infer_generated_pair(&ober, &unter) {
             generated_befehle.extend(inference.generated_befehle);
         }
         ExpandedSelectionRequest { request: self.request, generated_befehle }
@@ -54,9 +55,10 @@ impl ParsedSelectionRequest {
 
 impl ExpandedSelectionRequest {
     pub fn resolve(self, kategorie_map: &KategorieMap) -> ResolvedSelectionRequest {
-        let direct_columns = kategorie_map.finde_spaltennummern_fuer_request(&self.request);
+        let (ober, unter) = self.request.ober_unter_cli_pair();
+        let direct_columns = kategorie_map.finde_spaltennummern_fuer_kategorien(&ober, &unter);
         let required_columns = kategorie_map
-            .infer_generated_request(&self.request)
+            .infer_generated_pair(&ober, &unter)
             .map(|g| g.required_columns)
             .unwrap_or_default();
 

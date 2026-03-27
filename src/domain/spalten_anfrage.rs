@@ -273,6 +273,22 @@ impl SpaltenAnfrage {
     }
 }
 
+impl fmt::Display for SpaltenAnfrage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_cli())
+    }
+}
+
+fn normalize_key(s: &str) -> String {
+    s.trim()
+        .to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
+}
+
+
 impl SpaltenAnfrage {
     pub fn ober_unter_cli_pair(&self) -> (String, String) {
         match self {
@@ -313,41 +329,52 @@ impl SpaltenAnfrage {
     pub fn generated_befehle_hint(&self) -> Vec<String> {
         let ober_n = self.ober_normalized();
         let unter_n = self.unter_normalized();
-        let mut out = Vec::new();
+        let mut out = Vec::<String>::new();
 
-        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
-            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
-        {
+        let is_bedeutung = matches!(ober_n.as_str(), "bedeutung" | "wichtigsteszumverstehen" | "wichtigsteverstehen" | "wichtigste");
+        let is_procontra = matches!(ober_n.as_str(), "procontra" | "dagegendafuer");
+        let is_universum = matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen");
+        let is_planet = matches!(ober_n.as_str(), "planet" | "planet10undoder12" | "planet10oder12");
+        let is_menschliches = ober_n == "menschliches";
+        let is_galaxie = matches!(ober_n.as_str(), "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise");
+        let is_prim_generated_group = matches!(self, Self::Primvielfache { .. } | Self::Multiplikationen { .. });
+
+        let has_any = |s: &str, vals: &[&str]| vals.iter().any(|v| s == normalize_key(v));
+
+        if (is_bedeutung || is_procontra || is_universum)
+            && matches!(unter_n.as_str(), "primzahlkreuzprocontra" | "primzahlkreuz") {
             out.push("primzahlkreuzprocontra".to_string());
         }
-
-        if matches!(unter_n.as_str(), "liebe" | "ethik") && matches!(ober_n.as_str(), "menschliches" | "grundstrukturen") {
+        if (is_menschliches || ober_n == "grundstrukturen") && has_any(&unter_n, &["liebe", "ethik"]) {
             out.push("lovepolygon".to_string());
         }
-        if matches!(unter_n.as_str(), "gleichheit" | "freiheit" | "dominieren" | "ordnung" | "ordnen" | "filterung" | "ungleichheit")
-            && matches!(ober_n.as_str(), "planet" | "menschliches" | "grundstrukturen")
-        {
+        if (is_planet || is_menschliches || ober_n == "grundstrukturen")
+            && has_any(&unter_n, &["gleichheit", "freiheit", "dominieren", "ordnung", "ordnen", "ordnenundfiltern", "filterung", "ungleichheit"]) {
             out.push("gleichheitfreiheit".to_string());
         }
-        if unter_n == "geist" && matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen") {
+        if is_universum && has_any(&unter_n, &["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
             out.push("geistemotionenergiematerietopologie".to_string());
         }
-        if matches!(unter_n.as_str(), "gestirn" | "mond" | "sonne" | "planet" | "evolution" | "intelligenz" | "kreativ" | "kreativitaet" | "lernen" | "erwerben")
-            && matches!(ober_n.as_str(), "wichtigsteszumverstehen" | "bedeutung")
-        {
+        if is_bedeutung && has_any(&unter_n, &["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
             out.push("primcreativitytype".to_string());
             out.push("mondexponzierenlogarithmustyp".to_string());
         }
-        if matches!(unter_n.as_str(), "primzahlen" | "vielfache" | "vielfacher")
-            && matches!(ober_n.as_str(), "bedeutung" | "galaxie")
-        {
+        if (is_bedeutung || is_galaxie)
+            && has_any(&unter_n, &["primzahlen", "vielfache", "vielfacher", "multis", "multiplikationen", "offenbarung", "offenbarungjohannes"]) {
             out.push("vervielfachezeile".to_string());
         }
-        if ober_n == "primvielfache" {
-            out.push(unter_n.clone());
+        if has_any(&unter_n, &["modallogik", "modal", "modus", "modi", "sein", "zustaende", "zustände"]) || has_any(&ober_n, &["modallogik", "modal", "modus", "modi", "sein", "zustaende", "zustände"]) {
+            out.push("modallogik".to_string());
         }
-        if ober_n == "multiplikationen" {
-            out.push(unter_n.clone());
+        if is_prim_generated_group {
+            if has_any(&unter_n, &["motivgleichfoermig", "motivgleichförmig", "motivegleichfoermigepolygone", "motivegleichförmige polygone"]) { out.push("primmotivgleichf".to_string()); }
+            if has_any(&unter_n, &["strukturgleichfoermig", "strukturgleichförmig", "strukturgleichfoermigepolygone", "strukturgleichförmige polygone"]) { out.push("primstrukgleichf".to_string()); }
+            if has_any(&unter_n, &["motivstern", "motivesternpolygone", "motivesternpolygon"]) { out.push("primmotivstern".to_string()); }
+            if has_any(&unter_n, &["strukturstern", "struktursternpolygone", "struktursternpolygon"]) { out.push("primstrukstern".to_string()); }
+            if has_any(&unter_n, &["motivgebrstern", "motivsternpolygongebrochenrational", "motivsternpolygongebrochen-rational"]) { out.push("primmotivsterngebr".to_string()); }
+            if has_any(&unter_n, &["strukgebrstern", "struktursternpolyongebrochenrational", "struktursternpolygongebrochen-rational"]) { out.push("primstruksterngebr".to_string()); }
+            if has_any(&unter_n, &["motivgebrgleichf", "motivgleichfoermigepolygonegebrochenrational", "motivgleichförmigepolygonegebrochen-rational"]) { out.push("primmotivgleichfgebr".to_string()); }
+            if has_any(&unter_n, &["strukgebrgleichf", "strukturgleichfoermigepolygonegebrochenrational", "strukturgleichförmigepolygonegebrochen-rational"]) { out.push("primstrukgleichfgebr".to_string()); }
         }
 
         out.sort();
@@ -360,37 +387,14 @@ impl SpaltenAnfrage {
         let ober_n = normalize_key(&ober);
         let unter_n = normalize_key(&unter);
 
-        let bedeutung0 = if ober_n == "bedeutung" || ober_n == "wichtigsteszumverstehen" {
-            Some(unter_n.clone())
-        } else {
-            None
-        };
-        let procontra0 = if ober_n == "procontra" {
-            Some(unter_n.clone())
-        } else {
-            None
-        };
-        let grundstrukturen0 = if ober_n == "grundstrukturen" {
-            Some(unter_n.clone())
-        } else {
-            None
-        };
-
-        (bedeutung0, procontra0, grundstrukturen0, Some(unter_n))
+        let bedeutung0 = if matches!(ober_n.as_str(), "bedeutung" | "wichtigsteszumverstehen" | "wichtigsteverstehen" | "wichtigste") {
+            Some(ober_n.clone())
+        } else { None };
+        let procontra0 = if ober_n == "procontra" { Some(ober_n.clone()) } else { None };
+        let grundstrukturen0 = if matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen") {
+            Some(ober_n.clone())
+        } else { None };
+        let unter0 = if unter_n.is_empty() { None } else { Some(unter) };
+        (bedeutung0, procontra0, grundstrukturen0, unter0)
     }
-}
-
-impl fmt::Display for SpaltenAnfrage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_cli())
-    }
-}
-
-fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
 }

@@ -18,9 +18,9 @@ pub mod errors;
 pub mod indices;
 pub mod spalten_anfrage;
 pub mod request_pipeline;
+pub mod request_bridge;
 pub mod python_html_meta;
 pub mod resolve_cli_legacy_adapter;
-pub mod request_bridge;
 
 pub mod ids {
     pub mod domain_id;
