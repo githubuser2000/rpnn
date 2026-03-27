@@ -2,11 +2,11 @@ use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::model::spalten_anfrage::{CanonicalColumnSpec, ColumnTarget};
-use crate::domain::request_bridge::bridge_request;
 use crate::domain::request_pipeline::RawSelectionRequest;
+use crate::domain::request_bridge::bridge_request;
+use crate::domain::spalten_anfrage::SpaltenAnfrage as LegacyRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::model::spalten_anfrage::ColumnTarget;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
@@ -23,6 +23,26 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
+    if let Ok(legacy_req) = LegacyRequest::parse(ober, unter) {
+        if let Some(canonical_req) = bridge_request(&legacy_req) {
+            if let Some(spec) = resolve_request(canonical_req) {
+                let mut out = LegacyResolvedSelection::default();
+                match spec.target {
+                    ColumnTarget::DirectColumn(col) => out.direct_columns.push(col),
+                    ColumnTarget::DirectColumns(cols) => out.direct_columns.extend(cols),
+                    ColumnTarget::Pair(a, b) => out.exact_modal_pairs.push((a as usize, b as usize)),
+                    ColumnTarget::Generator(generator_spec) => {
+                        out.generated_befehle
+                            .insert(generator_spec.art.to_string().to_lowercase());
+                    }
+                    ColumnTarget::Combination(_) => {}
+                }
+                dedup_legacy_selection(&mut out);
+                return Ok(out);
+            }
+        }
+    }
+
     if let Some(exact) = resolve_exact_generator(ober, unter) {
         let mut out = LegacyResolvedSelection::default();
 
@@ -36,50 +56,7 @@ pub fn resolve_cli_selection(
         return Ok(out);
     }
 
-    if let Ok(parsed) = SpaltenAnfrage::parse(ober, unter) {
-        if let Some(canonical) = bridge_request(&parsed) {
-            if let Some(spec) = resolve_request(canonical) {
-                let mut out = legacy_from_canonical(spec)?;
-                // ergänze generische Kategorien-Map-Inferenz für benötigte Basis-Spalten
-                if let Some(inference) = kategorie_map.infer_generated_pair(ober, unter) {
-                    out.required_columns.extend(inference.required_columns.into_iter().filter_map(|n| u16::try_from(n).ok()));
-                    out.direct_columns.extend(inference.direct_columns.into_iter().filter_map(|n| u16::try_from(n).ok()));
-                    out.generated_befehle.extend(inference.generated_befehle);
-                }
-                dedup_legacy_selection(&mut out);
-                return Ok(out);
-            }
-        }
-    }
-
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)
-}
-
-fn legacy_from_canonical(spec: CanonicalColumnSpec) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    let mut out = LegacyResolvedSelection::default();
-
-    match spec.target {
-        ColumnTarget::DirectColumn(col) => {
-            out.direct_columns.push(col);
-        }
-        ColumnTarget::DirectColumns(cols) => {
-            out.direct_columns.extend(cols);
-        }
-        ColumnTarget::Pair(a, b) => {
-            out.exact_modal_pairs.push((usize::from(a), usize::from(b)));
-            out.direct_columns.push(a.saturating_add(1));
-            out.direct_columns.push(b.saturating_add(1));
-            out.generated_befehle.insert("modallogik".to_string());
-        }
-        ColumnTarget::Generator(generator) => {
-            out.generated_befehle
-                .insert(generator.art.to_string().to_lowercase());
-        }
-        ColumnTarget::Combination(_combination) => {}
-    }
-
-    dedup_legacy_selection(&mut out);
-    Ok(out)
 }
 
 fn resolve_via_legacy_pipeline(

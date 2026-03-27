@@ -1,67 +1,66 @@
-use crate::domain::ids::domain_id::{DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt};
+use crate::domain::ids::domain_id::{DomainId, GebrochenRationalArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage as canonical;
-use crate::domain::spalten_anfrage as legacy;
-use crate::domain::spalten_anfrage::{MenschlichesUnter, ReligionUnter, SpaltenAnfrage, StandardAnfrage, StandardOberkategorie, UniversumUnter};
+use crate::domain::spalten_anfrage::{
+    MenschlichesUnter, ReligionUnter, SpaltenAnfrage as LegacyRequest, StandardAnfrage,
+    StandardOberkategorie, UniversumUnter,
+};
 
-pub fn bridge_request(req: &SpaltenAnfrage) -> Option<canonical::SpaltenAnfrage> {
+pub fn bridge_request(req: &LegacyRequest) -> Option<canonical::SpaltenAnfrage> {
     match req {
-        SpaltenAnfrage::Standard(standard) => bridge_standard(standard),
-        SpaltenAnfrage::KombinationGalaxie { unter } => Some(canonical::SpaltenAnfrage::Kombination {
-            art: KombinationsArt::Galaxie,
-            unter: map_kombi_unter(unter),
-        }),
-        SpaltenAnfrage::KombinationUniversum { unter } => Some(canonical::SpaltenAnfrage::Kombination {
-            art: KombinationsArt::Universum,
-            unter: map_kombi_unter(unter),
-        }),
-        SpaltenAnfrage::GebrochenRationalGalaxie { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
-            art: GebrochenRationalArt::Galaxie,
-            index: unter.trim().parse().ok()?,
-        }),
-        SpaltenAnfrage::GebrochenRationalUniversum { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
-            art: GebrochenRationalArt::Universum,
-            index: unter.trim().parse().ok()?,
-        }),
-        SpaltenAnfrage::GebrochenRationalGefuehle { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
-            art: GebrochenRationalArt::Gefuehle,
-            index: unter.trim().parse().ok()?,
-        }),
-        SpaltenAnfrage::GebrochenRationalStrukturgroesse { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
-            art: GebrochenRationalArt::Strukturgroesse,
-            index: unter.trim().parse().ok()?,
-        }),
-        SpaltenAnfrage::Primvielfache { unter } => Some(canonical::SpaltenAnfrage::Generator {
-            art: GeneratorArt::Primvielfache,
-            parameter: canonical::GeneratorParameter::Text(unter.clone()),
-        }),
-        SpaltenAnfrage::Multiplikationen { unter } => Some(canonical::SpaltenAnfrage::Generator {
-            art: GeneratorArt::Multiplikationen,
-            parameter: canonical::GeneratorParameter::Text(unter.clone()),
-        }),
-        SpaltenAnfrage::Unknown { .. } => None,
-    }
-}
-
-fn bridge_standard(standard: &StandardAnfrage) -> Option<canonical::SpaltenAnfrage> {
-    match standard {
-        StandardAnfrage::Menschliches(unter) => Some(canonical::SpaltenAnfrage::Standard {
+        LegacyRequest::Standard(StandardAnfrage::Menschliches(unter)) => Some(canonical::SpaltenAnfrage::Standard {
             domain: DomainId::Menschliches,
             unter: map_menschliches(unter)?,
         }),
-        StandardAnfrage::Universum(unter) => Some(canonical::SpaltenAnfrage::Standard {
+        LegacyRequest::Standard(StandardAnfrage::Universum(unter)) => Some(canonical::SpaltenAnfrage::Standard {
             domain: DomainId::Universum,
             unter: map_universum(unter)?,
         }),
-        StandardAnfrage::Religion(unter) => Some(canonical::SpaltenAnfrage::Standard {
+        LegacyRequest::Standard(StandardAnfrage::Religion(unter)) => Some(canonical::SpaltenAnfrage::Standard {
             domain: DomainId::Religion,
             unter: map_religion(unter)?,
         }),
-        StandardAnfrage::Sonstige { ober, unter } => bridge_sonstige(ober, unter),
+        LegacyRequest::Standard(StandardAnfrage::Sonstige { ober, unter }) => Some(canonical::SpaltenAnfrage::Standard {
+            domain: map_ober(ober)?,
+            unter: map_standard_unter_fallback(unter)?,
+        }),
+        LegacyRequest::KombinationGalaxie { unter } => Some(canonical::SpaltenAnfrage::Kombination {
+            art: KombinationsArt::Galaxie,
+            unter: map_kombi_unter(unter),
+        }),
+        LegacyRequest::KombinationUniversum { unter } => Some(canonical::SpaltenAnfrage::Kombination {
+            art: KombinationsArt::Universum,
+            unter: map_kombi_unter(unter),
+        }),
+        LegacyRequest::GebrochenRationalGalaxie { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Galaxie,
+            index: unter.trim().parse().ok()?,
+        }),
+        LegacyRequest::GebrochenRationalUniversum { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Universum,
+            index: unter.trim().parse().ok()?,
+        }),
+        LegacyRequest::GebrochenRationalGefuehle { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Gefuehle,
+            index: unter.trim().parse().ok()?,
+        }),
+        LegacyRequest::GebrochenRationalStrukturgroesse { unter } => Some(canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Strukturgroesse,
+            index: unter.trim().parse().ok()?,
+        }),
+        LegacyRequest::Primvielfache { unter } => Some(canonical::SpaltenAnfrage::Generator {
+            art: crate::domain::ids::domain_id::GeneratorArt::Primvielfache,
+            parameter: canonical::GeneratorParameter::Text(unter.clone()),
+        }),
+        LegacyRequest::Multiplikationen { unter } => Some(canonical::SpaltenAnfrage::Generator {
+            art: crate::domain::ids::domain_id::GeneratorArt::Multiplikationen,
+            parameter: canonical::GeneratorParameter::Text(unter.clone()),
+        }),
+        LegacyRequest::Unknown { .. } => None,
     }
 }
 
-fn bridge_sonstige(ober: &StandardOberkategorie, unter: &str) -> Option<canonical::SpaltenAnfrage> {
-    let domain = match ober {
+fn map_ober(ober: &StandardOberkategorie) -> Option<DomainId> {
+    Some(match ober {
         StandardOberkategorie::Menschliches => DomainId::Menschliches,
         StandardOberkategorie::Universum => DomainId::Universum,
         StandardOberkategorie::Religion => DomainId::Religion,
@@ -76,47 +75,58 @@ fn bridge_sonstige(ober: &StandardOberkategorie, unter: &str) -> Option<canonica
         StandardOberkategorie::Eigenschaften1ProN => DomainId::Eigenschaften1ProN,
         StandardOberkategorie::UniversumMetaKonkret => DomainId::MetaKonkret,
         StandardOberkategorie::Sonstige(_) => return None,
-    };
-
-    Some(canonical::SpaltenAnfrage::Standard {
-        domain,
-        unter: map_standard_unter_fallback(unter)?,
     })
 }
 
 fn map_menschliches(unter: &MenschlichesUnter) -> Option<canonical::StandardUnterId> {
-    match unter {
-        MenschlichesUnter::Gewalt => Some(canonical::StandardUnterId::Gewalt),
-        MenschlichesUnter::Politische => Some(canonical::StandardUnterId::Politische),
-        MenschlichesUnter::Richtungen => Some(canonical::StandardUnterId::Richtungen),
-        MenschlichesUnter::Formationen => Some(canonical::StandardUnterId::Formationen),
-        MenschlichesUnter::Klasse => Some(canonical::StandardUnterId::Klasse),
-        MenschlichesUnter::Hoelle => Some(canonical::StandardUnterId::Hoelle),
-        MenschlichesUnter::Liebe => Some(canonical::StandardUnterId::Liebe),
-        MenschlichesUnter::Gleichheit => None,
-        MenschlichesUnter::Motive => None,
-        MenschlichesUnter::Sonstige(s) => map_standard_unter_fallback(s),
-    }
+    Some(match unter {
+        MenschlichesUnter::Gewalt => canonical::StandardUnterId::Gewalt,
+        MenschlichesUnter::Politische => canonical::StandardUnterId::Politische,
+        MenschlichesUnter::Richtungen => canonical::StandardUnterId::Richtungen,
+        MenschlichesUnter::Formationen => canonical::StandardUnterId::Formationen,
+        MenschlichesUnter::Klasse => canonical::StandardUnterId::Klasse,
+        MenschlichesUnter::Hoelle => canonical::StandardUnterId::Hoelle,
+        MenschlichesUnter::Liebe => canonical::StandardUnterId::Liebe,
+        MenschlichesUnter::Gleichheit => return None,
+        MenschlichesUnter::Motive => return None,
+        MenschlichesUnter::Sonstige(_) => return None,
+    })
 }
 
 fn map_universum(unter: &UniversumUnter) -> Option<canonical::StandardUnterId> {
-    match unter {
-        UniversumUnter::Geist => Some(canonical::StandardUnterId::Geist),
-        UniversumUnter::Primzahlkreuz => Some(canonical::StandardUnterId::Primzahlkreuz),
-        UniversumUnter::Sonstige(s) => map_standard_unter_fallback(s),
-    }
+    Some(match unter {
+        UniversumUnter::Geist => canonical::StandardUnterId::Geist,
+        UniversumUnter::Primzahlkreuz => canonical::StandardUnterId::Primzahlkreuz,
+        UniversumUnter::Sonstige(_) => return None,
+    })
 }
 
 fn map_religion(unter: &ReligionUnter) -> Option<canonical::StandardUnterId> {
-    match unter {
-        ReligionUnter::Religion => Some(canonical::StandardUnterId::SymboleReligion),
-        ReligionUnter::Ethik => None,
-        ReligionUnter::Sonstige(s) => map_standard_unter_fallback(s),
+    Some(match unter {
+        ReligionUnter::Religion => canonical::StandardUnterId::SymboleReligion,
+        ReligionUnter::Ethik => return None,
+        ReligionUnter::Sonstige(_) => return None,
+    })
+}
+
+fn map_standard_unter_fallback(unter: &str) -> Option<canonical::StandardUnterId> {
+    match normalize(unter).as_str() {
+        "gewalt" => Some(canonical::StandardUnterId::Gewalt),
+        "politische" => Some(canonical::StandardUnterId::Politische),
+        "richtungen" => Some(canonical::StandardUnterId::Richtungen),
+        "formationen" => Some(canonical::StandardUnterId::Formationen),
+        "klasse" => Some(canonical::StandardUnterId::Klasse),
+        "hoelle" | "hölle" => Some(canonical::StandardUnterId::Hoelle),
+        "liebe" => Some(canonical::StandardUnterId::Liebe),
+        "geist" => Some(canonical::StandardUnterId::Geist),
+        "religion" | "symbolereligion" => Some(canonical::StandardUnterId::SymboleReligion),
+        "primzahlkreuz" => Some(canonical::StandardUnterId::Primzahlkreuz),
+        _ => None,
     }
 }
 
-fn map_kombi_unter(input: &str) -> canonical::KombiUnterId {
-    match normalize_key(input).as_str() {
+fn map_kombi_unter(unter: &str) -> canonical::KombiUnterId {
+    match normalize(unter).as_str() {
         "tiere" => canonical::KombiUnterId::Tiere,
         "berufe" => canonical::KombiUnterId::Berufe,
         "religion" => canonical::KombiUnterId::Religion,
@@ -125,40 +135,6 @@ fn map_kombi_unter(input: &str) -> canonical::KombiUnterId {
     }
 }
 
-fn map_standard_unter_fallback(input: &str) -> Option<canonical::StandardUnterId> {
-    match normalize_key(input).as_str() {
-        "gewalt" => Some(canonical::StandardUnterId::Gewalt),
-        "politische" => Some(canonical::StandardUnterId::Politische),
-        "richtungen" => Some(canonical::StandardUnterId::Richtungen),
-        "formationen" => Some(canonical::StandardUnterId::Formationen),
-        "klasse" => Some(canonical::StandardUnterId::Klasse),
-        "hoelle" => Some(canonical::StandardUnterId::Hoelle),
-        "liebe" => Some(canonical::StandardUnterId::Liebe),
-        "geist" => Some(canonical::StandardUnterId::Geist),
-        "religion" | "symbolereligion" | "symbolereligionen" => Some(canonical::StandardUnterId::SymboleReligion),
-        "primzahlkreuz" => Some(canonical::StandardUnterId::Primzahlkreuz),
-        "wuerdig" => Some(canonical::StandardUnterId::Wuerdig),
-        "regelvsausnahme" => Some(canonical::StandardUnterId::RegelVsAusnahme),
-        "filterartwidrigkeit" => Some(canonical::StandardUnterId::FilterartWidrigkeit),
-        "werte" => Some(canonical::StandardUnterId::Werte),
-        "gutartigkeitsegoismus" => Some(canonical::StandardUnterId::GutartigkeitsEgoismus),
-        "reflektierenerkenntniserkennen" => Some(canonical::StandardUnterId::ReflektierenErkenntnisErkennen),
-        "vertrauenwollen" => Some(canonical::StandardUnterId::VertrauenWollen),
-        "ausrichteneinrichten" => Some(canonical::StandardUnterId::AusrichtenEinrichten),
-        "toleranzrespektakzeptanzwillkommen" => Some(canonical::StandardUnterId::ToleranzRespektAkzeptanzWillkommen),
-        _ => None,
-    }
-}
-
-fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
+fn normalize(s: &str) -> String {
+    s.trim().to_lowercase().replace('_', "").replace('-', "").replace(' ', "")
 }

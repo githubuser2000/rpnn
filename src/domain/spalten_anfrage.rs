@@ -138,7 +138,7 @@ impl MenschlichesUnter {
             Self::Hoelle => "Hölle",
             Self::Klasse => "Klasse",
             Self::Gewalt => "Gewalt",
-            Self::Politische => "politische",
+            Self::Politische => "Politische",
             Self::Richtungen => "Richtungen",
             Self::Formationen => "Formationen",
             Self::Motive => "Motive",
@@ -228,6 +228,96 @@ impl SpaltenAnfrage {
         Ok(parsed)
     }
 
+
+    pub fn ober_unter_cli_pair(&self) -> (String, String) {
+        match self {
+            Self::Standard(StandardAnfrage::Menschliches(unter)) => (
+                "Menschliches".to_string(),
+                unter.as_cli_str().to_string(),
+            ),
+            Self::Standard(StandardAnfrage::Universum(unter)) => (
+                "Universum".to_string(),
+                unter.as_cli_str().to_string(),
+            ),
+            Self::Standard(StandardAnfrage::Religion(unter)) => (
+                "Religion".to_string(),
+                unter.as_cli_str().to_string(),
+            ),
+            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => (
+                ober.as_cli_str().to_string(),
+                unter.clone(),
+            ),
+            Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
+            Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
+            Self::GebrochenRationalGalaxie { unter } => (
+                "gebrochen-rational_Galaxie_n/m".to_string(),
+                unter.clone(),
+            ),
+            Self::GebrochenRationalUniversum { unter } => (
+                "gebrochen-rational_Universum_n/m".to_string(),
+                unter.clone(),
+            ),
+            Self::GebrochenRationalGefuehle { unter } => (
+                "gebrochen-rational_Gefuehle_n/m".to_string(),
+                unter.clone(),
+            ),
+            Self::GebrochenRationalStrukturgroesse { unter } => (
+                "gebrochen-rational_Strukturgroesse_n/m".to_string(),
+                unter.clone(),
+            ),
+            Self::Primvielfache { unter } => ("Primvielfache".to_string(), unter.clone()),
+            Self::Multiplikationen { unter } => ("Multiplikationen".to_string(), unter.clone()),
+            Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
+        }
+    }
+
+    pub fn ober_normalized(&self) -> String {
+        let (ober, _) = self.ober_unter_cli_pair();
+        normalize_key(&ober)
+    }
+
+    pub fn unter_normalized(&self) -> String {
+        let (_, unter) = self.ober_unter_cli_pair();
+        normalize_key(&unter)
+    }
+
+    pub fn generated_befehle_hint(&self) -> Vec<String> {
+        match self {
+            Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => {
+                vec!["primzahlkreuz".to_string()]
+            }
+            Self::Primvielfache { .. } => vec!["primvielfache".to_string()],
+            Self::Multiplikationen { .. } => vec!["multiplikationen".to_string()],
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn parameters_main_hint(
+        &self,
+    ) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+        match self {
+            Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => (
+                Some("universum".to_string()),
+                Some("procontra".to_string()),
+                Some("grundstrukturen".to_string()),
+                Some("primzahlkreuz".to_string()),
+            ),
+            Self::Primvielfache { unter } => (
+                Some("bedeutung".to_string()),
+                Some("procontra".to_string()),
+                Some("grundstrukturen".to_string()),
+                Some(unter.clone()),
+            ),
+            Self::Multiplikationen { unter } => (
+                Some("bedeutung".to_string()),
+                Some("procontra".to_string()),
+                Some("grundstrukturen".to_string()),
+                Some(unter.clone()),
+            ),
+            _ => (None, None, None, None),
+        }
+    }
+
     pub fn to_cli(&self) -> String {
         match self {
             Self::Standard(StandardAnfrage::Menschliches(unter)) => {
@@ -270,99 +360,6 @@ impl SpaltenAnfrage {
                 format!("--spaltenname {} {}", ober, unter)
             }
         }
-    }
-}
-
-
-impl SpaltenAnfrage {
-    pub fn ober_unter_cli_pair(&self) -> (String, String) {
-        match self {
-            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
-                ("Menschliches".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Universum(unter)) => {
-                ("Universum".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Religion(unter)) => {
-                ("Religion".to_string(), unter.as_cli_str().to_string())
-            }
-            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
-                (ober.as_cli_str().to_string(), unter.clone())
-            }
-            Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
-            Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
-            Self::GebrochenRationalGalaxie { unter } => {
-                ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalUniversum { unter } => {
-                ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalGefuehle { unter } => {
-                ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalStrukturgroesse { unter } => {
-                ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
-            }
-            Self::Primvielfache { unter } => ("Primvielfache".to_string(), unter.clone()),
-            Self::Multiplikationen { unter } => ("Multiplikationen".to_string(), unter.clone()),
-            Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
-        }
-    }
-
-    pub fn ober_normalized(&self) -> String {
-        let (ober, _) = self.ober_unter_cli_pair();
-        normalize_key(&ober)
-    }
-
-    pub fn unter_normalized(&self) -> String {
-        let (_, unter) = self.ober_unter_cli_pair();
-        normalize_key(&unter)
-    }
-
-    pub fn generated_befehle_hint(&self) -> Vec<String> {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        let ober_n = normalize_key(&ober);
-        let unter_n = normalize_key(&unter);
-        let mut out = Vec::new();
-
-        if matches!(self, Self::Multiplikationen { .. }) {
-            out.push("multiplikationen".to_string());
-        }
-        if matches!(self, Self::Primvielfache { .. }) {
-            out.push("primvielfache".to_string());
-        }
-        if unter_n == "primzahlkreuz" && matches!(ober_n.as_str(), "universum" | "bedeutung" | "procontra") {
-            out.push("primzahlkreuzprocontra".to_string());
-        }
-        if ober_n == "universummetakonkret" || ober_n == "metakonkret" {
-            out.push("universummetakonkret".to_string());
-        }
-
-        out.sort();
-        out.dedup();
-        out
-    }
-
-    pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        let ober_n = normalize_key(&ober);
-        let unter_n = normalize_key(&unter);
-
-        let bedeutung0 = match ober_n.as_str() {
-            "bedeutung" => Some(unter_n.clone()),
-            _ => None,
-        };
-        let procontra0 = match ober_n.as_str() {
-            "procontra" => Some(unter_n.clone()),
-            _ => None,
-        };
-        let grundstrukturen0 = match ober_n.as_str() {
-            "grundstrukturen" => Some(unter_n.clone()),
-            _ => None,
-        };
-        let unter0 = Some(unter_n);
-
-        (bedeutung0, procontra0, grundstrukturen0, unter0)
     }
 }
 
