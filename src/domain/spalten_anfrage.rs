@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::domain::errors::ParseSpaltenAnfrageError;
+use crate::domain::generator_registry::ParametersMain;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StandardOberkategorie {
@@ -138,7 +139,7 @@ impl MenschlichesUnter {
             Self::Hoelle => "Hölle",
             Self::Klasse => "Klasse",
             Self::Gewalt => "Gewalt",
-            Self::Politische => "Politische",
+            Self::Politische => "politische",
             Self::Richtungen => "Richtungen",
             Self::Formationen => "Formationen",
             Self::Motive => "Motive",
@@ -228,45 +229,36 @@ impl SpaltenAnfrage {
         Ok(parsed)
     }
 
-
     pub fn ober_unter_cli_pair(&self) -> (String, String) {
         match self {
-            Self::Standard(StandardAnfrage::Menschliches(unter)) => (
-                "Menschliches".to_string(),
-                unter.as_cli_str().to_string(),
-            ),
-            Self::Standard(StandardAnfrage::Universum(unter)) => (
-                "Universum".to_string(),
-                unter.as_cli_str().to_string(),
-            ),
-            Self::Standard(StandardAnfrage::Religion(unter)) => (
-                "Religion".to_string(),
-                unter.as_cli_str().to_string(),
-            ),
-            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => (
-                ober.as_cli_str().to_string(),
-                unter.clone(),
-            ),
+            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
+                ("Menschliches".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Universum(unter)) => {
+                ("Universum".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Religion(unter)) => {
+                ("Religion".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
+                (ober.as_cli_str().to_string(), unter.clone())
+            }
             Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
             Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
-            Self::GebrochenRationalGalaxie { unter } => (
-                "gebrochen-rational_Galaxie_n/m".to_string(),
-                unter.clone(),
-            ),
-            Self::GebrochenRationalUniversum { unter } => (
-                "gebrochen-rational_Universum_n/m".to_string(),
-                unter.clone(),
-            ),
-            Self::GebrochenRationalGefuehle { unter } => (
-                "gebrochen-rational_Gefuehle_n/m".to_string(),
-                unter.clone(),
-            ),
-            Self::GebrochenRationalStrukturgroesse { unter } => (
-                "gebrochen-rational_Strukturgroesse_n/m".to_string(),
-                unter.clone(),
-            ),
-            Self::Primvielfache { unter } => ("Primvielfache".to_string(), unter.clone()),
-            Self::Multiplikationen { unter } => ("Multiplikationen".to_string(), unter.clone()),
+            Self::GebrochenRationalGalaxie { unter } => {
+                ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalUniversum { unter } => {
+                ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalGefuehle { unter } => {
+                ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
+            }
+            Self::GebrochenRationalStrukturgroesse { unter } => {
+                ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
+            }
+            Self::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
+            Self::Multiplikationen { unter } => ("multiplikationen".to_string(), unter.clone()),
             Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
         }
     }
@@ -282,84 +274,57 @@ impl SpaltenAnfrage {
     }
 
     pub fn generated_befehle_hint(&self) -> Vec<String> {
+        let mut out = Vec::new();
         match self {
             Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => {
-                vec!["primzahlkreuz".to_string()]
+                out.push("primzahlkreuz".to_string());
             }
-            Self::Primvielfache { .. } => vec!["primvielfache".to_string()],
-            Self::Multiplikationen { .. } => vec!["multiplikationen".to_string()],
-            _ => Vec::new(),
+            Self::Primvielfache { unter } => {
+                out.push("primvielfache".to_string());
+                if !unter.trim().is_empty() {
+                    out.push(unter.trim().to_string());
+                }
+            }
+            Self::Multiplikationen { unter } => {
+                out.push("multiplikationen".to_string());
+                if !unter.trim().is_empty() {
+                    out.push(unter.trim().to_string());
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
+    pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+        let (ober, unter) = self.ober_unter_cli_pair();
+        match self {
+            Self::Standard(StandardAnfrage::Menschliches(_))
+            | Self::Standard(StandardAnfrage::Universum(_))
+            | Self::Standard(StandardAnfrage::Religion(_))
+            | Self::Standard(StandardAnfrage::Sonstige { .. }) => {
+                (Some(ober), None, None, Some(unter))
+            }
+            Self::Primvielfache { .. } | Self::Multiplikationen { .. } => {
+                (None, None, None, Some(unter))
+            }
+            _ => (None, None, None, Some(unter)),
         }
     }
 
-    pub fn parameters_main_hint(
-        &self,
-    ) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
-        match self {
-            Self::Standard(StandardAnfrage::Universum(UniversumUnter::Primzahlkreuz)) => (
-                Some("universum".to_string()),
-                Some("procontra".to_string()),
-                Some("grundstrukturen".to_string()),
-                Some("primzahlkreuz".to_string()),
-            ),
-            Self::Primvielfache { unter } => (
-                Some("bedeutung".to_string()),
-                Some("procontra".to_string()),
-                Some("grundstrukturen".to_string()),
-                Some(unter.clone()),
-            ),
-            Self::Multiplikationen { unter } => (
-                Some("bedeutung".to_string()),
-                Some("procontra".to_string()),
-                Some("grundstrukturen".to_string()),
-                Some(unter.clone()),
-            ),
-            _ => (None, None, None, None),
+    pub fn to_parameters_main(&self) -> ParametersMain {
+        let (bedeutung0, procontra0, grundstrukturen0, unter0) = self.parameters_main_hint();
+        ParametersMain {
+            bedeutung0: bedeutung0.unwrap_or_default(),
+            procontra0: procontra0.unwrap_or_default(),
+            grundstrukturen0: grundstrukturen0.unwrap_or_default(),
+            unter0: unter0.unwrap_or_default(),
         }
     }
 
     pub fn to_cli(&self) -> String {
-        match self {
-            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
-                format!("--spaltenname Menschliches {}", unter.as_cli_str())
-            }
-            Self::Standard(StandardAnfrage::Universum(unter)) => {
-                format!("--spaltenname Universum {}", unter.as_cli_str())
-            }
-            Self::Standard(StandardAnfrage::Religion(unter)) => {
-                format!("--spaltenname Religion {}", unter.as_cli_str())
-            }
-            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
-                format!("--spaltenname {} {}", ober.as_cli_str(), unter)
-            }
-            Self::KombinationGalaxie { unter } => {
-                format!("--spaltenname KombinationGalaxie {}", unter)
-            }
-            Self::KombinationUniversum { unter } => {
-                format!("--spaltenname KombinationUniversum {}", unter)
-            }
-            Self::GebrochenRationalGalaxie { unter } => {
-                format!("--spaltenname gebrochen-rational_Galaxie_n/m {}", unter)
-            }
-            Self::GebrochenRationalUniversum { unter } => {
-                format!("--spaltenname gebrochen-rational_Universum_n/m {}", unter)
-            }
-            Self::GebrochenRationalGefuehle { unter } => {
-                format!("--spaltenname gebrochen-rational_Gefuehle_n/m {}", unter)
-            }
-            Self::GebrochenRationalStrukturgroesse { unter } => {
-                format!("--spaltenname gebrochen-rational_Strukturgroesse_n/m {}", unter)
-            }
-            Self::Primvielfache { unter } => {
-                format!("--spaltenname primvielfache {}", unter)
-            }
-            Self::Multiplikationen { unter } => {
-                format!("--spaltenname multiplikationen {}", unter)
-            }
-            Self::Unknown { ober, unter } => {
-                format!("--spaltenname {} {}", ober, unter)
-            }
-        }
+        let (ober, unter) = self.ober_unter_cli_pair();
+        format!("--spaltenname {} {}", ober, unter)
     }
 }
 
@@ -369,9 +334,13 @@ impl fmt::Display for SpaltenAnfrage {
     }
 }
 
-fn normalize_key(s: &str) -> String {
+pub fn normalize_key(s: &str) -> String {
     s.trim()
         .to_lowercase()
+        .replace('ä', "ae")
+        .replace('ö', "oe")
+        .replace('ü', "ue")
+        .replace('ß', "ss")
         .replace('_', "")
         .replace('-', "")
         .replace(' ', "")

@@ -44,12 +44,8 @@ impl RawSelectionRequest {
 
 impl ParsedSelectionRequest {
     pub fn expand(self, kategorie_map: &KategorieMap) -> ExpandedSelectionRequest {
-        let mut generated_befehle: BTreeSet<String> = self.request
-            .generated_befehle_hint()
-            .into_iter()
-            .collect();
-        let (ober, unter) = self.request.ober_unter_cli_pair();
-        if let Some(inference) = kategorie_map.infer_generated_pair(&ober, &unter) {
+        let mut generated_befehle: BTreeSet<String> = self.request.generated_befehle_hint().into_iter().collect();
+        if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
             generated_befehle.extend(inference.generated_befehle);
         }
         ExpandedSelectionRequest { request: self.request, generated_befehle }
@@ -58,10 +54,9 @@ impl ParsedSelectionRequest {
 
 impl ExpandedSelectionRequest {
     pub fn resolve(self, kategorie_map: &KategorieMap) -> ResolvedSelectionRequest {
-        let (ober, unter) = self.request.ober_unter_cli_pair();
-        let direct_columns = kategorie_map.finde_spaltennummern_fuer_kategorien(&ober, &unter);
+        let direct_columns = kategorie_map.finde_spaltennummern_fuer_request(&self.request);
         let required_columns = kategorie_map
-            .infer_generated_pair(&ober, &unter)
+            .infer_generated_request(&self.request)
             .map(|g| g.required_columns)
             .unwrap_or_default();
 
@@ -78,10 +73,10 @@ impl ResolvedSelectionRequest {
     pub fn apply_to_bereich(&self, bereich: &mut TextBereich) {
         bereich.exact_generated_befehle.extend(self.generated_befehle.iter().cloned());
         bereich.exact_visible_columns.extend(
-    self.required_columns
-        .iter()
-        .map(|&c| usize::try_from(c).expect("u32 column index does not fit into usize")),
-);
+            self.required_columns
+                .iter()
+                .map(|&c| usize::try_from(c).expect("u32 column index does not fit into usize")),
+        );
         bereich.exact_visible_columns.extend(self.direct_columns.iter().copied().map(|n| n as usize));
     }
 }
