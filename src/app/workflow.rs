@@ -6,6 +6,7 @@ use crate::domain::categories::lade_kategorie_map;
 use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
 use crate::domain::resolve_cli_legacy_adapter::resolve_cli_selection;
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::domain::tabellen_utils::show_usage;
 use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
@@ -28,6 +29,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         crate::cli::parse_cli_args(&args, Some(&kategorie_map));
 
     let mut generated_befehle: BTreeSet<String> = BTreeSet::new();
+    let mut typed_requests: Vec<SpaltenAnfrage> = Vec::new();
 
     for spalten_namen in &spalten_namen_liste.eintraege {
         generated_befehle.extend(verarbeite_kategorien(
@@ -35,6 +37,13 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
             &mut bereich,
             spalten_namen,
         )?);
+
+        if let Ok(request) = SpaltenAnfrage::parse(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        ) {
+            typed_requests.push(request);
+        }
 
         let resolved = resolve_cli_selection(
             &kategorie_map,
@@ -117,6 +126,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         &generated_befehle,
         &parameters_main,
         &kategorie_map,
+        &typed_requests,
     )?;
 
     Ok(())

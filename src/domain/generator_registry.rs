@@ -1,3 +1,4 @@
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::cli::TextBereich;
 use crate::lib4tables_enum::ST;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -1469,4 +1470,19 @@ pub fn concat1_primzahlkreuz_pro_contra(table: &mut Table, rows_as_numbers: &mut
     tables.generated_spalten_parameter.insert(key1, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
     let key2 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
     tables.generated_spalten_parameter.insert(key2, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+}
+
+
+pub fn generated_befehle_for_request(request: &SpaltenAnfrage) -> BTreeSet<String> {
+    request.generated_befehle_hint().into_iter().collect()
+}
+
+pub fn parameters_main_for_request(request: &SpaltenAnfrage) -> ParametersMain {
+    let (bedeutung0, procontra0, grundstrukturen0, unter0) = request.parameters_main_hint();
+    ParametersMain {
+        bedeutung0: bedeutung0.unwrap_or_default(),
+        procontra0: procontra0.unwrap_or_default(),
+        grundstrukturen0: grundstrukturen0.unwrap_or_default(),
+        unter0: unter0.unwrap_or_default(),
+    }
 }

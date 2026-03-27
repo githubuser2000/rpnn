@@ -3,6 +3,7 @@ use std::fmt;
 
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -304,6 +305,16 @@ impl KategorieMap {
         paare.sort();
         paare.dedup();
         paare
+    }
+
+    pub fn infer_generated_request(&self, request: &SpaltenAnfrage) -> Option<GeneratedInference> {
+        let (ober, unter) = request.ober_unter_cli_pair();
+        self.infer_generated_pair(&ober, &unter)
+    }
+
+    pub fn finde_spaltennummern_fuer_request(&self, request: &SpaltenAnfrage) -> Vec<u32> {
+        let (ober, unter) = request.ober_unter_cli_pair();
+        self.finde_spaltennummern_fuer_kategorien(&ober, &unter)
     }
 
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {

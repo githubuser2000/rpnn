@@ -4,6 +4,7 @@ use crate::domain::categories::KategorieMap;
 use crate::processing::spalten_support::defaults::fallback_zu_standards;
 use crate::processing::spalten_support::exact_merge::merge_exact;
 use crate::processing::spalten_support::normalize::is_primzahlkreuz_pro_contra_request;
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::processing::spalten_support::selection_sync::{
     finalize_found_columns,
     setze_gefundene_spalten,
@@ -114,15 +115,16 @@ impl<'a> SpaltenVerarbeiter<'a> {
             return Ok(());
         }
 
-        if let Some(inference) = self.kategorie_map.infer_generated_pair(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        ) {
-            if !inference.required_columns.is_empty() {
-                setze_gefundene_spalten(bereich, inference.required_columns.clone());
+        if let Ok(request) =
+            SpaltenAnfrage::parse(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie)
+        {
+            if let Some(inference) = self.kategorie_map.infer_generated_request(&request) {
+                if !inference.required_columns.is_empty() {
+                    setze_gefundene_spalten(bereich, inference.required_columns.clone());
+                }
+                bereich.mark_columns_resolved();
+                return Ok(());
             }
-            bereich.mark_columns_resolved();
-            return Ok(());
         }
 
         self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
@@ -177,14 +179,18 @@ impl<'a> SpaltenVerarbeiter<'a> {
         }
 
         if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
-            if let Some(inference) = self.kategorie_map.infer_generated_pair(
+            if let Ok(request) = SpaltenAnfrage::parse(
                 &letzte_spalten_namen.oberkategorie,
                 &letzte_spalten_namen.unterkategorie,
             ) {
-                if !inference.required_columns.is_empty() {
-                    setze_gefundene_spalten(bereich, inference.required_columns.clone());
+                if let Some(inference) = self.kategorie_map.infer_generated_request(&request) {
+                    if !inference.required_columns.is_empty() {
+                        setze_gefundene_spalten(bereich, inference.required_columns.clone());
+                    }
+                    bereich.mark_columns_resolved();
+                } else {
+                    fallback_zu_standards(bereich);
                 }
-                bereich.mark_columns_resolved();
             } else {
                 fallback_zu_standards(bereich);
             }

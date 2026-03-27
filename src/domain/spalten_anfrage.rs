@@ -26,6 +26,11 @@ pub enum MenschlichesUnter {
     Gleichheit,
     Hoelle,
     Klasse,
+    Gewalt,
+    Politische,
+    Richtungen,
+    Formationen,
+    Motive,
     Sonstige(String),
 }
 
@@ -117,6 +122,11 @@ impl MenschlichesUnter {
             "gleichheit" => Self::Gleichheit,
             "hoelle" | "hölle" => Self::Hoelle,
             "klasse" => Self::Klasse,
+            "gewalt" => Self::Gewalt,
+            "politische" => Self::Politische,
+            "richtungen" => Self::Richtungen,
+            "formationen" => Self::Formationen,
+            "motive" => Self::Motive,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
@@ -127,6 +137,11 @@ impl MenschlichesUnter {
             Self::Gleichheit => "Gleichheit",
             Self::Hoelle => "Hölle",
             Self::Klasse => "Klasse",
+            Self::Gewalt => "Gewalt",
+            Self::Politische => "politische",
+            Self::Richtungen => "Richtungen",
+            Self::Formationen => "Formationen",
+            Self::Motive => "Motive",
             Self::Sonstige(s) => s.as_str(),
         }
     }
@@ -271,4 +286,115 @@ fn normalize_key(s: &str) -> String {
         .replace('-', "")
         .replace(' ', "")
         .replace('/', "")
+}
+
+
+impl SpaltenAnfrage {
+    pub fn ober_unter_cli_pair(&self) -> (String, String) {
+        match self {
+            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
+                ("Menschliches".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Universum(unter)) => {
+                ("Universum".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Religion(unter)) => {
+                ("Religion".to_string(), unter.as_cli_str().to_string())
+            }
+            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
+                (ober.as_cli_str().to_string(), unter.clone())
+            }
+            Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
+            Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
+            Self::GebrochenRationalGalaxie { unter } => ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalUniversum { unter } => ("gebrochen-rational_Universum_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalGefuehle { unter } => ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalStrukturgroesse { unter } => ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone()),
+            Self::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
+            Self::Multiplikationen { unter } => ("multiplikationen".to_string(), unter.clone()),
+            Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
+        }
+    }
+
+    pub fn ober_normalized(&self) -> String {
+        let (ober, _) = self.ober_unter_cli_pair();
+        normalize_key(&ober)
+    }
+
+    pub fn unter_normalized(&self) -> String {
+        let (_, unter) = self.ober_unter_cli_pair();
+        normalize_key(&unter)
+    }
+
+    pub fn generated_befehle_hint(&self) -> Vec<String> {
+        let ober_n = self.ober_normalized();
+        let unter_n = self.unter_normalized();
+        let mut out = Vec::<String>::new();
+
+        let is_bedeutung = matches!(ober_n.as_str(), "bedeutung" | "wichtigsteszumverstehen" | "wichtigsteverstehen" | "wichtigste");
+        let is_procontra = matches!(ober_n.as_str(), "procontra" | "dagegendafuer");
+        let is_universum = matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen");
+        let is_planet = matches!(ober_n.as_str(), "planet" | "planet10undoder12" | "planet10oder12");
+        let is_menschliches = ober_n == "menschliches";
+        let is_galaxie = matches!(ober_n.as_str(), "galaxie" | "alteschriften" | "kreis" | "galaxien" | "kreise");
+        let is_prim_generated_group = matches!(self, Self::Primvielfache { .. } | Self::Multiplikationen { .. });
+
+        let has_any = |s: &str, vals: &[&str]| vals.iter().any(|v| s == normalize_key(v));
+
+        if (is_bedeutung || is_procontra || is_universum)
+            && matches!(unter_n.as_str(), "primzahlkreuzprocontra" | "primzahlkreuz") {
+            out.push("primzahlkreuzprocontra".to_string());
+        }
+        if (is_menschliches || ober_n == "grundstrukturen") && has_any(&unter_n, &["liebe", "ethik"]) {
+            out.push("lovepolygon".to_string());
+        }
+        if (is_planet || is_menschliches || ober_n == "grundstrukturen")
+            && has_any(&unter_n, &["gleichheit", "freiheit", "dominieren", "ordnung", "ordnen", "ordnenundfiltern", "filterung", "ungleichheit"]) {
+            out.push("gleichheitfreiheit".to_string());
+        }
+        if is_universum && has_any(&unter_n, &["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
+            out.push("geistemotionenergiematerietopologie".to_string());
+        }
+        if is_bedeutung && has_any(&unter_n, &["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
+            out.push("primcreativitytype".to_string());
+            out.push("mondexponzierenlogarithmustyp".to_string());
+        }
+        if (is_bedeutung || is_galaxie)
+            && has_any(&unter_n, &["primzahlen", "vielfache", "vielfacher", "multis", "multiplikationen", "offenbarung", "offenbarungjohannes"]) {
+            out.push("vervielfachezeile".to_string());
+        }
+        if has_any(&unter_n, &["modallogik", "modal", "modus", "modi", "sein", "zustaende", "zustände"]) || has_any(&ober_n, &["modallogik", "modal", "modus", "modi", "sein", "zustaende", "zustände"]) {
+            out.push("modallogik".to_string());
+        }
+        if is_prim_generated_group {
+            if has_any(&unter_n, &["motivgleichfoermig", "motivgleichförmig", "motivegleichfoermigepolygone", "motivegleichförmige polygone"]) { out.push("primmotivgleichf".to_string()); }
+            if has_any(&unter_n, &["strukturgleichfoermig", "strukturgleichförmig", "strukturgleichfoermigepolygone", "strukturgleichförmige polygone"]) { out.push("primstrukgleichf".to_string()); }
+            if has_any(&unter_n, &["motivstern", "motivesternpolygone", "motivesternpolygon"]) { out.push("primmotivstern".to_string()); }
+            if has_any(&unter_n, &["strukturstern", "struktursternpolygone", "struktursternpolygon"]) { out.push("primstrukstern".to_string()); }
+            if has_any(&unter_n, &["motivgebrstern", "motivsternpolygongebrochenrational", "motivsternpolygongebrochen-rational"]) { out.push("primmotivsterngebr".to_string()); }
+            if has_any(&unter_n, &["strukgebrstern", "struktursternpolyongebrochenrational", "struktursternpolygongebrochen-rational"]) { out.push("primstruksterngebr".to_string()); }
+            if has_any(&unter_n, &["motivgebrgleichf", "motivgleichfoermigepolygonegebrochenrational", "motivgleichförmigepolygonegebrochen-rational"]) { out.push("primmotivgleichfgebr".to_string()); }
+            if has_any(&unter_n, &["strukgebrgleichf", "strukturgleichfoermigepolygonegebrochenrational", "strukturgleichförmigepolygonegebrochen-rational"]) { out.push("primstrukgleichfgebr".to_string()); }
+        }
+
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+        let (ober, unter) = self.ober_unter_cli_pair();
+        let ober_n = normalize_key(&ober);
+        let unter_n = normalize_key(&unter);
+
+        let bedeutung0 = if matches!(ober_n.as_str(), "bedeutung" | "wichtigsteszumverstehen" | "wichtigsteverstehen" | "wichtigste") {
+            Some(ober_n.clone())
+        } else { None };
+        let procontra0 = if ober_n == "procontra" { Some(ober_n.clone()) } else { None };
+        let grundstrukturen0 = if matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen") {
+            Some(ober_n.clone())
+        } else { None };
+        let unter0 = if unter_n.is_empty() { None } else { Some(unter) };
+        (bedeutung0, procontra0, grundstrukturen0, unter0)
+    }
 }
