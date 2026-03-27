@@ -44,7 +44,10 @@ impl RawSelectionRequest {
 
 impl ParsedSelectionRequest {
     pub fn expand(self, kategorie_map: &KategorieMap) -> ExpandedSelectionRequest {
-        let mut generated_befehle = BTreeSet::new();
+        let mut generated_befehle: BTreeSet<String> = self.request
+            .generated_befehle_hint()
+            .into_iter()
+            .collect();
         let (ober, unter) = self.request.ober_unter_cli_pair();
         if let Some(inference) = kategorie_map.infer_generated_pair(&ober, &unter) {
             generated_befehle.extend(inference.generated_befehle);
