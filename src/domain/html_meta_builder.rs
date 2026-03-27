@@ -1,4 +1,4 @@
-use crate::domain::python_source_of_truth::PY_DECLS;
+use crate::domain::python_source_of_truth::{exact_meta_for_column, PY_DECLS};
 
 fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
     let id_pos = raw.rfind("(ID_")?;
@@ -115,15 +115,19 @@ pub fn build_python_exact_html_class(
         return Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string());
     }
 
-    // Wichtig: ID im Header ist 1-basiert, die PY_DECLS-Spalten sind 0-basiert.
+    // Header-ID ist 1-basiert, Python-Meta ist 0-basiert.
     let col0 = if let Some(id1) = extract_id_suffix_1_based(raw) {
         id1.checked_sub(1)?
     } else {
-        // Fallback nur, falls mal kein (ID_xxx) im Header steht.
-        // Die ersten zwei Spalten sind Zählung/Nummerierung, daher -2.
         col_idx.checked_sub(2)? as u32
     };
 
+    // ZUERST exakte Python-Wahrheit verwenden.
+    if let Some(meta) = exact_meta_for_column(col0) {
+        return Some(format!("z_0 r_{} {}", col_idx, meta));
+    }
+
+    // Nur Fallback: heuristisch rekonstruieren.
     let p1_groups = p1_groups_for_column(col0);
     let p2_slots = p2_slots_for_column(col0);
 
