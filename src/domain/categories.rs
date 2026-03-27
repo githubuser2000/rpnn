@@ -1,9 +1,9 @@
-use crate::domain::spalten_anfrage::{normalize_key, SpaltenAnfrage};
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
-use crate::domain::python_source_of_truth::{self, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -194,6 +194,13 @@ pub struct GeneratedInference {
     pub generated_befehle: Vec<String>,
     pub required_columns: Vec<u32>,
     pub direct_columns: Vec<u32>,
+}
+
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
 }
 
 impl KategorieMap {
@@ -417,6 +424,7 @@ impl KategorieMap {
         Self::merge_exact_eigenschaften_aliases(&mut main_to_sub);
         Self::merge_meta_konkret_aliases(&mut main_to_sub);
         Self::merge_fraction_number_aliases(&mut main_to_sub);
+        Self::merge_html_meta_aliases(&mut main_to_sub);
 
         self.hauptkategorien = Self::convert_main_to_hauptkategorien(main_to_sub);
     }
@@ -424,16 +432,6 @@ impl KategorieMap {
     fn merge_exact_eigenschaften_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        let main_aliases = [
-            "Eigenschaften_1/n",
-            "konzept2",
-            "konzepte2",
-            "Eigenschaft",
-            "Eigenschaften",
-            "konzept",
-            "konzepte",
-        ];
-
         for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
             let mut ids: Vec<u32> = direct_columns
                 .iter()
@@ -449,12 +447,102 @@ impl KategorieMap {
             ids.sort_unstable();
             ids.dedup();
 
-            for &main_cat in &main_aliases {
-                for &sub_cat in *aliases {
-                    Self::insert_entry(main_to_sub, main_cat, sub_cat, ids.clone());
+            let main_aliases = Self::eigenschaft_main_aliases_for_columns(aliases, direct_columns, *maybe_pair);
+            if main_aliases.is_empty() {
+                continue;
+            }
+
+            let canonical_sub = aliases.first().copied().unwrap_or("");
+            if canonical_sub.is_empty() {
+                continue;
+            }
+
+            for main_cat in &main_aliases {
+                Self::insert_entry(main_to_sub, main_cat, canonical_sub, ids.clone());
+            }
+        }
+    }
+
+    fn eigenschaft_main_aliases_for_columns(
+        aliases: &[&str],
+        direct_columns: &[usize],
+        maybe_pair: Option<(usize, usize)>,
+    ) -> Vec<String> {
+        let mut mains = HashSet::<String>::new();
+
+        // Eigenschaften sollen grundsätzlich unter der generischen Familie auftauchen.
+        mains.insert("Eigenschaft".to_string());
+        mains.insert("Eigenschaften".to_string());
+        mains.insert("konzept".to_string());
+        mains.insert("konzepte".to_string());
+
+        let mut all_columns: Vec<u32> = direct_columns.iter().copied().map(|n| n as u32).collect();
+        if let Some((left, right)) = maybe_pair {
+            all_columns.push(left as u32);
+            all_columns.push(right as u32);
+        }
+
+        for col in &all_columns {
+            if let Some(meta) = python_source_of_truth::exact_meta_for_column(*col) {
+                for main in Self::extract_main_categories_from_meta(&meta) {
+                    let key = normalize_key(&main);
+                    match key.as_str() {
+                        "eigenschaften1n" => {
+                            mains.insert("Eigenschaften_1/n".to_string());
+                            mains.insert("konzept2".to_string());
+                            mains.insert("konzepte2".to_string());
+                        }
+                        "eigenschaftenn" | "eigenschaft" | "eigenschaften" => {
+                            mains.insert("Eigenschaften_n".to_string());
+                            mains.insert("konzept1".to_string());
+                            mains.insert("konzepte1".to_string());
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
+
+        // Fallback: wenn die HTML-Metadaten fehlen, entscheide die n-vs-1/n-Familie
+        // aus dem kanonischen Eigenschaftsschlüssel. Dadurch wird --alles vollständig,
+        // ohne jede Alias-Schreibweise als eigene Unterkategorie anzulegen.
+        if !mains.iter().any(|m| normalize_key(m) == "eigenschaften1n")
+            && !mains.iter().any(|m| normalize_key(m) == "eigenschaftenn")
+        {
+            if Self::eigenschaft_aliases_are_1_pro_n(aliases) {
+                mains.insert("Eigenschaften_1/n".to_string());
+                mains.insert("konzept2".to_string());
+                mains.insert("konzepte2".to_string());
+            } else {
+                mains.insert("Eigenschaften_n".to_string());
+                mains.insert("konzept1".to_string());
+                mains.insert("konzepte1".to_string());
+            }
+        }
+
+        let mut out: Vec<String> = mains.into_iter().collect();
+        out.sort();
+        out
+    }
+
+    fn eigenschaft_aliases_are_1_pro_n(aliases: &[&str]) -> bool {
+        let canonical = aliases
+            .first()
+            .map(|s| normalize_key(s))
+            .unwrap_or_default();
+
+        matches!(
+            canonical.as_str(),
+            "wuerdig"
+                | "regelvsausnahme"
+                | "filterartwidrigkeit"
+                | "werte"
+                | "gutartigkeitsegoismus"
+                | "reflektierenerkenntniserkennen"
+                | "vertrauenwollen"
+                | "ausrichteneinrichten"
+                | "toleranzrespektakzeptanzwillkommen"
+        )
     }
 
     fn merge_meta_konkret_aliases(
@@ -470,6 +558,72 @@ impl KategorieMap {
                 }
             }
         }
+    }
+
+    fn merge_html_meta_aliases(
+        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
+    ) {
+        for (col, meta) in EXACT_HTML_META {
+            let mains = Self::extract_main_categories_from_meta(meta);
+            let subs = Self::extract_sub_categories_from_meta(meta);
+            if mains.is_empty() || subs.is_empty() {
+                continue;
+            }
+
+            let ids = vec![*col + 1];
+            for main in &mains {
+                for sub in &subs {
+                    Self::insert_entry(main_to_sub, main, sub, ids.clone());
+                }
+            }
+        }
+    }
+
+    fn extract_main_categories_from_meta(meta: &str) -> Vec<String> {
+        let Some(start) = meta.find("p1_") else { return Vec::new(); };
+        let Some(end_rel) = meta[start..].find(", p2_p3_0_") else { return Vec::new(); };
+        let slice = &meta[start + 3 .. start + end_rel];
+
+        let mut out = Vec::new();
+        for raw in slice.split(',') {
+            let value = raw.trim().trim_start_matches('✗').trim();
+            if value.is_empty() { continue; }
+            out.push(value.to_string());
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    fn extract_sub_categories_from_meta(meta: &str) -> Vec<String> {
+        let Some(start) = meta.find("p2_p3_0_") else { return Vec::new(); };
+        let end = meta[start..].find(", p4_").map(|idx| start + idx).unwrap_or(meta.len());
+        let slice = &meta[start + 8 .. end];
+
+        let mut out = Vec::new();
+        for raw in slice.split(',') {
+            let value = raw.trim();
+            if value.is_empty() { continue; }
+
+            let candidate = if let Some(pos) = value.find('_') {
+                let (prefix, rest) = value.split_at(pos);
+                if prefix == "p3" || prefix == "p2" {
+                    rest.trim_start_matches('_').trim()
+                } else {
+                    value
+                }
+            } else {
+                value
+            };
+
+            if candidate.is_empty() { continue; }
+            if candidate.chars().all(|c| c.is_ascii_digit()) { continue; }
+            out.push(candidate.to_string());
+        }
+
+        out.sort();
+        out.dedup();
+        out
     }
 
     fn merge_fraction_number_aliases(
