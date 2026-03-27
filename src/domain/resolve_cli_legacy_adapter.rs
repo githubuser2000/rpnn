@@ -2,11 +2,9 @@ use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::model::spalten_anfrage::{CanonicalColumnSpec, ColumnTarget};
 use crate::domain::request_bridge::to_canonical_request;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
@@ -23,11 +21,27 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    if let Ok(request) = SpaltenAnfrage::parse(ober, unter) {
-        if let Some(canonical_request) = to_canonical_request(&request) {
-            if let Some(spec) = resolve_request(canonical_request) {
+    if let Ok(parsed) = crate::domain::spalten_anfrage::SpaltenAnfrage::parse(ober, unter) {
+        if let Some(canonical) = to_canonical_request(&parsed) {
+            if let Some(spec) = resolve_request(canonical) {
                 let mut out = LegacyResolvedSelection::default();
-                absorb_canonical_spec(&mut out, spec)?;
+                match spec.target {
+                    crate::domain::model::spalten_anfrage::ColumnTarget::DirectColumn(col) => {
+                        out.direct_columns.push(col);
+                    }
+                    crate::domain::model::spalten_anfrage::ColumnTarget::DirectColumns(cols) => {
+                        out.direct_columns.extend(cols);
+                    }
+                    crate::domain::model::spalten_anfrage::ColumnTarget::Pair(a, b) => {
+                        out.direct_columns.push(a);
+                        out.direct_columns.push(b);
+                    }
+                    crate::domain::model::spalten_anfrage::ColumnTarget::Generator(generator_spec) => {
+                        out.generated_befehle
+                            .insert(generator_spec.art.to_string().to_lowercase());
+                    }
+                    crate::domain::model::spalten_anfrage::ColumnTarget::Combination(_) => {}
+                }
                 dedup_legacy_selection(&mut out);
                 return Ok(out);
             }
@@ -36,39 +50,18 @@ pub fn resolve_cli_selection(
 
     if let Some(exact) = resolve_exact_generator(ober, unter) {
         let mut out = LegacyResolvedSelection::default();
+
         out.exact_direct_columns.extend(exact.direct_columns.iter().copied());
         out.exact_modal_pairs.extend(exact.modal_pairs.iter().copied());
-        out.exact_meta_konkret_specs.extend(exact.meta_konkret_specs.iter().copied());
+        out.exact_meta_konkret_specs
+            .extend(exact.meta_konkret_specs.iter().copied());
         out.generated_befehle.extend(exact.generated_befehle.iter().cloned());
+
         dedup_legacy_selection(&mut out);
         return Ok(out);
     }
 
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)
-}
-
-fn absorb_canonical_spec(
-    out: &mut LegacyResolvedSelection,
-    spec: CanonicalColumnSpec,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match spec.target {
-        ColumnTarget::DirectColumn(column) => out.direct_columns.push(column),
-        ColumnTarget::DirectColumns(columns) => out.direct_columns.extend(columns),
-        ColumnTarget::Pair(a, b) => out.exact_modal_pairs.push((a as usize, b as usize)),
-        ColumnTarget::Generator(generator_spec) => {
-            out.generated_befehle
-                .insert(format!("{:?}", generator_spec.art).to_lowercase());
-        }
-        ColumnTarget::Combination(_) => {}
-    }
-
-    out.direct_columns = out
-        .direct_columns
-        .iter()
-        .copied()
-        .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-        .collect::<Result<Vec<u16>, _>>()?;
-    Ok(())
 }
 
 fn resolve_via_legacy_pipeline(
@@ -83,17 +76,21 @@ fn resolve_via_legacy_pipeline(
         .resolve(kategorie_map);
 
     let mut out = LegacyResolvedSelection::default();
+
     out.direct_columns = resolved
         .direct_columns
         .into_iter()
         .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
         .collect::<Result<Vec<u16>, _>>()?;
+
     out.required_columns = resolved
         .required_columns
         .into_iter()
         .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
         .collect::<Result<Vec<u16>, _>>()?;
+
     out.generated_befehle = resolved.generated_befehle;
+
     dedup_legacy_selection(&mut out);
     Ok(out)
 }
@@ -101,12 +98,16 @@ fn resolve_via_legacy_pipeline(
 fn dedup_legacy_selection(sel: &mut LegacyResolvedSelection) {
     sel.direct_columns.sort_unstable();
     sel.direct_columns.dedup();
+
     sel.required_columns.sort_unstable();
     sel.required_columns.dedup();
+
     sel.exact_direct_columns.sort_unstable();
     sel.exact_direct_columns.dedup();
+
     sel.exact_modal_pairs.sort_unstable();
     sel.exact_modal_pairs.dedup();
+
     sel.exact_meta_konkret_specs.sort_unstable();
     sel.exact_meta_konkret_specs.dedup();
 }
