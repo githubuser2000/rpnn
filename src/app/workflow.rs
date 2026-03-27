@@ -1,15 +1,15 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::domain::categories::lade_kategorie_map;
 use crate::data_access::csv_importer::import_csvs_to_sqlite;
-use crate::table_printer::query_column_by_index;
-use crate::domain::tabellen_utils::show_usage;
-use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
-use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::domain::categories::lade_kategorie_map;
 use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
-use crate::domain::request_pipeline::RawSelectionRequest;
+use crate::domain::resolve_cli_legacy_adapter::resolve_cli_selection;
+use crate::domain::tabellen_utils::show_usage;
+use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
+use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
+use crate::table_printer::query_column_by_index;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -30,29 +30,71 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let mut generated_befehle: BTreeSet<String> = BTreeSet::new();
 
     for spalten_namen in &spalten_namen_liste.eintraege {
-        generated_befehle.extend(
-            verarbeite_kategorien(&kategorie_map, &mut bereich, spalten_namen)?
-        );
+        generated_befehle.extend(verarbeite_kategorien(
+            &kategorie_map,
+            &mut bereich,
+            spalten_namen,
+        )?);
 
-        let resolved = RawSelectionRequest::new(
-            spalten_namen.oberkategorie.clone(),
-            spalten_namen.unterkategorie.clone(),
-        )
-        .parse()?
-        .expand(&kategorie_map)
-        .resolve(&kategorie_map);
-        resolved.apply_to_bereich(&mut bereich);
+        let resolved = resolve_cli_selection(
+            &kategorie_map,
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        )?;
+
+        generated_befehle.extend(resolved.generated_befehle.iter().cloned());
+
+        bereich
+            .exact_visible_columns
+            .extend(resolved.direct_columns.iter().map(|&n| n as usize));
+        bereich
+            .exact_visible_columns
+            .extend(resolved.required_columns.iter().map(|&n| n as usize));
+        bereich
+            .exact_visible_columns
+            .extend(resolved.exact_direct_columns.iter().copied());
+
+        for pair in resolved.exact_modal_pairs {
+            if !bereich.exact_modal_pairs.contains(&pair) {
+                bereich.exact_modal_pairs.push(pair);
+            }
+        }
+
+        for spec in resolved.exact_meta_konkret_specs {
+            if !bereich.exact_meta_konkret_specs.contains(&spec) {
+                bereich.exact_meta_konkret_specs.push(spec);
+            }
+        }
+
+        bereich.exact_generated_befehle.extend(
+            resolved
+                .generated_befehle
+                .iter()
+                .cloned(),
+        );
     }
+
+    bereich.exact_visible_columns.sort_unstable();
+    bereich.exact_visible_columns.dedup();
 
     generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
 
-    let wants_gebr_prim_generator = generated_befehle.iter().any(|g| g.contains("gebr") && g.contains("prim"));
+    let wants_gebr_prim_generator = generated_befehle
+        .iter()
+        .any(|g| g.contains("gebr") && g.contains("prim"));
+
     if wants_gebr_prim_generator {
-        let upper = if bereich.bis_zeile > 1 { bereich.bis_zeile.min(23) } else { 23 };
+        let upper = if bereich.bis_zeile > 1 {
+            bereich.bis_zeile.min(23)
+        } else {
+            23
+        };
+
         for n in 2..=upper {
             bereich.pypy_compat.gebrochengalaxie.insert(n);
             bereich.pypy_compat.gebrochenuniversum.insert(n);
         }
+
         bereich.hide_fraction_inputs();
     }
 

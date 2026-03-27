@@ -16,12 +16,15 @@ pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
         SpaltenAnfrage::Generator { art, parameter } => {
             resolve_generator(req.clone(), *art, parameter.clone())
         }
-        SpaltenAnfrage::DirektSpalten { ids } => Some(CanonicalColumnSpec {
-            request: req,
-            target: ColumnTarget::DirectColumns(ids.clone()),
-            header_display: format!("DirektSpalten {:?}", ids),
-            aliases_for_report: vec![],
-        }),
+        SpaltenAnfrage::DirektSpalten { ids } => {
+            let ids_cloned = ids.clone();
+            Some(CanonicalColumnSpec {
+                request: req.clone(),
+                target: ColumnTarget::DirectColumns(ids_cloned.clone()),
+                header_display: format!("DirektSpalten {:?}", ids_cloned),
+                aliases_for_report: vec![],
+            })
+        },
     }
 }
 

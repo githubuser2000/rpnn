@@ -1,7 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
+use crate::domain::ids::domain_id::DomainId;
+use crate::domain::model::spalten_anfrage::{
+    CanonicalColumnSpec, ColumnTarget, SpaltenAnfrage as TypedSpaltenAnfrage, StandardUnterId,
+};
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
+use crate::domain::spalten_anfrage::{
+    MenschlichesUnter, ReligionUnter, SpaltenAnfrage as LegacySpaltenAnfrage, StandardAnfrage,
+    UniversumUnter,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -104,7 +112,6 @@ impl AsRef<[u32]> for SpaltenNummern {
     }
 }
 
-
 pub trait UnterkategorieEntry {
     fn unter_name(&self) -> &str;
     fn column_numbers(&self) -> &[u32];
@@ -175,6 +182,7 @@ impl OberkategorieEntry for Oberkategorie {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct KategorieMap {
     pub hauptkategorien: Vec<Oberkategorie>,
 }
@@ -195,10 +203,167 @@ pub struct GeneratedInference {
 }
 
 fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
+    s.trim().to_lowercase()
+}
+
+fn legacy_pair_for_request(request: &LegacySpaltenAnfrage) -> (String, String) {
+    match request {
+        LegacySpaltenAnfrage::Standard(StandardAnfrage::Menschliches(unter)) => (
+            "Menschliches".to_string(),
+            match unter {
+                MenschlichesUnter::Liebe => "Liebe".to_string(),
+                MenschlichesUnter::Gleichheit => "Gleichheit".to_string(),
+                MenschlichesUnter::Hoelle => "Hölle".to_string(),
+                MenschlichesUnter::Klasse => "Klasse".to_string(),
+                MenschlichesUnter::Sonstige(v) => v.clone(),
+            },
+        ),
+        LegacySpaltenAnfrage::Standard(StandardAnfrage::Universum(unter)) => (
+            "Universum".to_string(),
+            match unter {
+                UniversumUnter::Geist => "Geist".to_string(),
+                UniversumUnter::Primzahlkreuz => "Primzahlkreuz".to_string(),
+                UniversumUnter::Sonstige(v) => v.clone(),
+            },
+        ),
+        LegacySpaltenAnfrage::Standard(StandardAnfrage::Religion(unter)) => (
+            "Religion".to_string(),
+            match unter {
+                ReligionUnter::Religion => "Religion".to_string(),
+                ReligionUnter::Ethik => "Ethik".to_string(),
+                ReligionUnter::Sonstige(v) => v.clone(),
+            },
+        ),
+        LegacySpaltenAnfrage::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
+            (ober.as_cli_str().to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::KombinationGalaxie { unter } => {
+            ("KombinationGalaxie".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::KombinationUniversum { unter } => {
+            ("KombinationUniversum".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::GebrochenRationalGalaxie { unter } => {
+            ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::GebrochenRationalUniversum { unter } => {
+            ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::GebrochenRationalGefuehle { unter } => {
+            ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::GebrochenRationalStrukturgroesse { unter } => {
+            ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
+        LegacySpaltenAnfrage::Multiplikationen { unter } => {
+            ("multiplikationen".to_string(), unter.clone())
+        }
+        LegacySpaltenAnfrage::Unknown { ober, unter } => (ober.clone(), unter.clone()),
+    }
+}
+
+fn typed_pair_for_request(request: &TypedSpaltenAnfrage) -> Option<(String, String)> {
+    match request {
+        TypedSpaltenAnfrage::Standard { domain, unter } => {
+            let ober = match domain {
+                DomainId::Menschliches => "Menschliches",
+                DomainId::Religion => "Religion",
+                DomainId::Galaxie => "Galaxie",
+                DomainId::Universum => "Universum",
+                DomainId::Grundstrukturen => "Grundstrukturen",
+                DomainId::Kontinuum => "Kontinuum",
+                DomainId::Multiversum => "Multiversum",
+                DomainId::Planet10Oder12 => "Planet_(10_und_oder_12)",
+                DomainId::EigenschaftenN => "Eigenschaften_n",
+                DomainId::Eigenschaften1ProN => "Eigenschaften_1/n",
+                DomainId::MetaKonkret => "Universum_Metakonkret",
+                DomainId::GebrochenRational(_) | DomainId::Kombination(_) | DomainId::Generator(_) => {
+                    return None;
+                }
+                DomainId::SonstigePythonDecl => return None,
+            };
+
+            let unter = match unter {
+                StandardUnterId::Gewalt => "Gewalt",
+                StandardUnterId::Politische => "politische",
+                StandardUnterId::Richtungen => "Richtungen",
+                StandardUnterId::Formationen => "Formationen",
+                StandardUnterId::Klasse => "Klasse",
+                StandardUnterId::Hoelle => "Hölle",
+                StandardUnterId::Liebe => "Liebe",
+                StandardUnterId::Geist => "Geist",
+                StandardUnterId::SymboleReligion => "Religion",
+                StandardUnterId::Wuerdig => "Würdig",
+                StandardUnterId::RegelVsAusnahme => "Regel_vs_Ausnahme",
+                StandardUnterId::FilterartWidrigkeit => "Filterart_Widrigkeit",
+                StandardUnterId::Werte => "Werte",
+                StandardUnterId::GutartigkeitsEgoismus => "Gutartigkeits-Egoismus",
+                StandardUnterId::ReflektierenErkenntnisErkennen => {
+                    "Reflektieren_Erkenntnis-Erkennen"
+                }
+                StandardUnterId::VertrauenWollen => "Vertrauen_wollen",
+                StandardUnterId::AusrichtenEinrichten => "Ausrichten_Einrichten",
+                StandardUnterId::ToleranzRespektAkzeptanzWillkommen => {
+                    "Toleranz_Respekt_Akzeptanz_Willkommen"
+                }
+                StandardUnterId::Primzahlkreuz => "Primzahlkreuz",
+            };
+
+            Some((ober.to_string(), unter.to_string()))
+        }
+        TypedSpaltenAnfrage::Kombination { art, unter } => {
+            let ober = match art {
+                crate::domain::ids::domain_id::KombinationsArt::Galaxie => "KombinationGalaxie",
+                crate::domain::ids::domain_id::KombinationsArt::Universum => "KombinationUniversum",
+                crate::domain::ids::domain_id::KombinationsArt::Gefuehle => "KombinationGefuehle",
+                crate::domain::ids::domain_id::KombinationsArt::Strukturgroesse => {
+                    "KombinationStrukturgroesse"
+                }
+            };
+            let unter = match unter {
+                crate::domain::model::spalten_anfrage::KombiUnterId::Tiere => "tiere",
+                crate::domain::model::spalten_anfrage::KombiUnterId::Berufe => "berufe",
+                crate::domain::model::spalten_anfrage::KombiUnterId::Religion => "religion",
+                crate::domain::model::spalten_anfrage::KombiUnterId::Politik => "politik",
+                crate::domain::model::spalten_anfrage::KombiUnterId::Unbekannt => "unbekannt",
+            };
+            Some((ober.to_string(), unter.to_string()))
+        }
+        TypedSpaltenAnfrage::GebrochenRational { art, index } => {
+            let ober = match art {
+                crate::domain::ids::domain_id::GebrochenRationalArt::Galaxie => {
+                    "gebrochen-rational_Galaxie_n/m"
+                }
+                crate::domain::ids::domain_id::GebrochenRationalArt::Universum => {
+                    "gebrochen-rational_Universum_n/m"
+                }
+                crate::domain::ids::domain_id::GebrochenRationalArt::Gefuehle => {
+                    "gebrochen-rational_Gefuehle_n/m"
+                }
+                crate::domain::ids::domain_id::GebrochenRationalArt::Strukturgroesse => {
+                    "gebrochen-rational_Strukturgroesse_n/m"
+                }
+            };
+            Some((ober.to_string(), index.to_string()))
+        }
+        TypedSpaltenAnfrage::Generator { art, parameter } => {
+            let ober = match art {
+                crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "Primzahlkreuz",
+                crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => "Multiplikationen",
+                crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "Primvielfache",
+                crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "MetaKonkret",
+            };
+            let unter = match parameter {
+                crate::domain::model::spalten_anfrage::GeneratorParameter::Keine => "".to_string(),
+                crate::domain::model::spalten_anfrage::GeneratorParameter::Text(v) => v.clone(),
+                crate::domain::model::spalten_anfrage::GeneratorParameter::Zahl(v) => v.to_string(),
+                crate::domain::model::spalten_anfrage::GeneratorParameter::TextListe(xs) => xs.join(" "),
+            };
+            Some((ober.to_string(), unter))
+        }
+        TypedSpaltenAnfrage::DirektSpalten { .. } => None,
+    }
 }
 
 impl KategorieMap {
@@ -223,8 +388,8 @@ impl KategorieMap {
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
 
-        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
-            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
+        if matches!(ober_n.as_str(), "pro_contra" | "procontra" | "bedeutung" | "universum")
+            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuz pro contra")
         {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
         }
@@ -276,6 +441,14 @@ impl KategorieMap {
         }
     }
 
+    pub fn infer_generated_pair_fuer_anfrage(
+        &self,
+        request: &LegacySpaltenAnfrage,
+    ) -> Option<GeneratedInference> {
+        let (ober, unter) = legacy_pair_for_request(request);
+        self.infer_generated_pair(&ober, &unter)
+    }
+
     pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
         python_source_of_truth::exact_columns_for_pair(ober, unter)
             .into_iter()
@@ -293,6 +466,11 @@ impl KategorieMap {
             .into_iter()
             .map(|n| n + 1)
             .collect()
+    }
+
+    pub fn finde_spaltennummern_fuer_anfrage(&self, request: &LegacySpaltenAnfrage) -> Vec<u32> {
+        let (ober, unter) = legacy_pair_for_request(request);
+        self.finde_spaltennummern_fuer_kategorien(&ober, &unter)
     }
 
     fn lade_kategorien(&mut self) {
@@ -324,7 +502,9 @@ impl KategorieMap {
             .map(|(haupt_name, unter_map)| {
                 let mut unterkategorien: Vec<Unterkategorie> = unter_map
                     .into_iter()
-                    .map(|(unter_name, spaltennummern)| Unterkategorie::new(unter_name, spaltennummern))
+                    .map(|(unter_name, spaltennummern)| {
+                        Unterkategorie::new(unter_name, spaltennummern)
+                    })
                     .collect();
 
                 unterkategorien.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
@@ -378,7 +558,7 @@ impl KategorieMap {
             .entry(sub_category.to_string())
             .or_insert_with(Vec::new);
 
-        let mut all_ids: HashSet<u32> = existing_ids.iter().cloned().collect();
+        let mut all_ids: HashSet<u32> = existing_ids.iter().copied().collect();
         for &id in &new_ids {
             all_ids.insert(id);
         }
@@ -388,6 +568,43 @@ impl KategorieMap {
         *existing_ids = sorted_ids;
     }
 }
+
 pub fn lade_kategorie_map() -> KategorieMap {
-        KategorieMap::new()
+    KategorieMap::new()
+}
+
+pub fn resolve_via_categories(req: &TypedSpaltenAnfrage) -> Option<CanonicalColumnSpec> {
+    let (ober, unter) = typed_pair_for_request(req)?;
+
+    let mut ids = python_source_of_truth::exact_columns_for_pair(&ober, &unter)
+        .into_iter()
+        .map(|n| (n + 1) as u16)
+        .collect::<Vec<u16>>();
+
+    if ids.is_empty() {
+        ids = python_source_of_truth::fuzzy_columns_for_pair(&ober, &unter)
+            .into_iter()
+            .map(|n| (n + 1) as u16)
+            .collect::<Vec<u16>>();
     }
+
+    if ids.is_empty() {
+        return None;
+    }
+
+    ids.sort_unstable();
+    ids.dedup();
+
+    let target = if ids.len() == 1 {
+        ColumnTarget::DirectColumn(ids[0])
+    } else {
+        ColumnTarget::DirectColumns(ids.clone())
+    };
+
+    Some(CanonicalColumnSpec {
+        request: req.clone(),
+        target,
+        header_display: format!("{} {}", ober, unter),
+        aliases_for_report: vec![ober, unter],
+    })
+}

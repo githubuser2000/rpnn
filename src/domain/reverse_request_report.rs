@@ -7,6 +7,16 @@ use crate::domain::indices::ColumnNumber;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::reta_ausgabe::OutputSyntax;
 
+use crate::domain::model::spalten_anfrage::CanonicalColumnSpec;
+
+pub fn spec_to_report_line(spec: &CanonicalColumnSpec) -> String {
+    spec.header_display.clone()
+}
+
+pub fn request_to_report_line(req: &SpaltenAnfrage) -> String {
+    format!("{req:?}")
+}
+
 type AnfragePair = SpaltenAnfrage;
 
 fn normalize_key(s: &str) -> String {
