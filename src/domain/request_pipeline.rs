@@ -48,6 +48,7 @@ impl ParsedSelectionRequest {
         if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
             generated_befehle.extend(inference.generated_befehle);
         }
+        generated_befehle.extend(self.request.generated_befehle_hint());
         ExpandedSelectionRequest { request: self.request, generated_befehle }
     }
 }
@@ -73,10 +74,14 @@ impl ResolvedSelectionRequest {
     pub fn apply_to_bereich(&self, bereich: &mut TextBereich) {
         bereich.exact_generated_befehle.extend(self.generated_befehle.iter().cloned());
         bereich.exact_visible_columns.extend(
-    self.required_columns
-        .iter()
-        .map(|&c| usize::try_from(c).expect("u32 column index does not fit into usize")),
-);
-        bereich.exact_visible_columns.extend(self.direct_columns.iter().copied().map(|n| n as usize));
+            self.required_columns
+                .iter()
+                .map(|&c| usize::try_from(c).expect("u32 column index does not fit into usize")),
+        );
+        bereich.exact_visible_columns.extend(
+            self.direct_columns
+                .iter()
+                .map(|&c| usize::try_from(c).expect("u32 column index does not fit into usize")),
+        );
     }
 }

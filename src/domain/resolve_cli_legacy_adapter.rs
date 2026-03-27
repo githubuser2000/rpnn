@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
-use crate::domain::exact_generator_bridge::resolve_exact_generator;
+use crate::domain::exact_generator_bridge::{resolve_exact_generator, resolve_exact_generator_for_request};
 use crate::domain::request_pipeline::RawSelectionRequest;
 
 #[derive(Debug, Clone, Default)]
@@ -19,6 +19,21 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
+    if let Ok(parsed) = crate::domain::spalten_anfrage::SpaltenAnfrage::parse(ober, unter) {
+        if let Some(exact) = resolve_exact_generator_for_request(&parsed) {
+            let mut out = LegacyResolvedSelection::default();
+
+            out.exact_direct_columns.extend(exact.direct_columns.iter().copied());
+            out.exact_modal_pairs.extend(exact.modal_pairs.iter().copied());
+            out.exact_meta_konkret_specs
+                .extend(exact.meta_konkret_specs.iter().copied());
+            out.generated_befehle.extend(exact.generated_befehle.iter().cloned());
+
+            dedup_legacy_selection(&mut out);
+            return Ok(out);
+        }
+    }
+
     if let Some(exact) = resolve_exact_generator(ober, unter) {
         let mut out = LegacyResolvedSelection::default();
 

@@ -19,6 +19,21 @@ pub fn meta_for_request(request: &SpaltenAnfrage) -> Option<PythonHtmlMeta> {
         SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Gleichheit)) => {
             "p1_✗Planet_(10_und_oder_12),✗Menschliches,✗Grundstrukturen,, p2_p3_0_Gleichheit_Freiheit_Ordnung,p3_1_Gleichheit_Freiheit,p3_2_Ordnung_und_Filterung_12_und_1pro12, p4_4,5,0"
         }
+        SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Gewalt)) => {
+            "p1_✗Menschliches,, p2_p3_0_Gewalt, p4_3,0"
+        }
+        SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Politische)) => {
+            "p1_✗Menschliches,, p2_p3_0_politische, p4_3,0"
+        }
+        SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Richtungen)) => {
+            "p1_✗Menschliches,, p2_p3_0_Richtungen, p4_3,0"
+        }
+        SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Formationen)) => {
+            "p1_✗Menschliches,, p2_p3_0_Formationen, p4_3,0"
+        }
+        SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(MenschlichesUnter::Motive)) => {
+            "p1_✗Menschliches,, p2_p3_0_Motive, p4_3,0"
+        }
         SpaltenAnfrage::Standard(StandardAnfrage::Sonstige {
             ober: StandardOberkategorie::Planet,
             unter,

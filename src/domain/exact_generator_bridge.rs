@@ -1,6 +1,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
+
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 
 #[derive(Debug, Clone, Default)]
@@ -95,4 +97,10 @@ pub fn try_run_exact_generator_bridge(
     _args: &[String],
 ) -> Result<bool, Box<dyn std::error::Error>> {
     Ok(false)
+}
+
+
+pub fn resolve_exact_generator_for_request(request: &SpaltenAnfrage) -> Option<ExactResolved> {
+    let (ober, unter) = request.ober_unter_cli_pair();
+    resolve_exact_generator(&ober, &unter)
 }
