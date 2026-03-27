@@ -1,8 +1,11 @@
 use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
-use crate::domain::exact_generator_bridge::{resolve_exact_generator, resolve_exact_generator_for_request};
+use crate::domain::exact_generator_bridge::resolve_exact_generator;
+use crate::domain::request_bridge::to_canonical_request;
 use crate::domain::request_pipeline::RawSelectionRequest;
+use crate::domain::resolver::request_resolver::resolve_request;
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
@@ -19,21 +22,6 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    if let Ok(parsed) = crate::domain::spalten_anfrage::SpaltenAnfrage::parse(ober, unter) {
-        if let Some(exact) = resolve_exact_generator_for_request(&parsed) {
-            let mut out = LegacyResolvedSelection::default();
-
-            out.exact_direct_columns.extend(exact.direct_columns.iter().copied());
-            out.exact_modal_pairs.extend(exact.modal_pairs.iter().copied());
-            out.exact_meta_konkret_specs
-                .extend(exact.meta_konkret_specs.iter().copied());
-            out.generated_befehle.extend(exact.generated_befehle.iter().cloned());
-
-            dedup_legacy_selection(&mut out);
-            return Ok(out);
-        }
-    }
-
     if let Some(exact) = resolve_exact_generator(ober, unter) {
         let mut out = LegacyResolvedSelection::default();
 
@@ -45,6 +33,41 @@ pub fn resolve_cli_selection(
 
         dedup_legacy_selection(&mut out);
         return Ok(out);
+    }
+
+    if let Ok(request) = SpaltenAnfrage::parse(ober, unter) {
+        let mut out = LegacyResolvedSelection::default();
+
+        out.direct_columns = kategorie_map
+            .finde_spaltennummern_fuer_request(&request)
+            .into_iter()
+            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+            .collect::<Result<Vec<u16>, _>>()?;
+
+        if let Some(inference) = kategorie_map.infer_generated_request(&request) {
+            out.required_columns = inference.required_columns.into_iter()
+                .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+                .collect::<Result<Vec<u16>, _>>()?;
+            out.generated_befehle.extend(inference.generated_befehle);
+        }
+
+        if let Some(canonical) = to_canonical_request(&request).and_then(resolve_request) {
+            use crate::domain::model::spalten_anfrage::ColumnTarget;
+            match canonical.target {
+                ColumnTarget::DirectColumn(c) => out.direct_columns.push(c),
+                ColumnTarget::DirectColumns(cols) => out.direct_columns.extend(cols),
+                ColumnTarget::Pair(a,b) => { out.direct_columns.push(a); out.direct_columns.push(b); }
+                ColumnTarget::Generator(spec) => {
+                    out.generated_befehle.insert(format!("{}", spec.art).to_lowercase().replace('_', ""));
+                }
+                ColumnTarget::Combination(_) => {}
+            }
+        }
+
+        if !out.direct_columns.is_empty() || !out.required_columns.is_empty() || !out.generated_befehle.is_empty() {
+            dedup_legacy_selection(&mut out);
+            return Ok(out);
+        }
     }
 
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)

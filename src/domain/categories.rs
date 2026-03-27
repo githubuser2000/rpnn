@@ -307,6 +307,7 @@ impl KategorieMap {
         paare
     }
 
+
     pub fn infer_generated_request(&self, request: &SpaltenAnfrage) -> Option<GeneratedInference> {
         let (ober, unter) = request.ober_unter_cli_pair();
         self.infer_generated_pair(&ober, &unter)
