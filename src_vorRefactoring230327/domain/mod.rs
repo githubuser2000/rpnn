@@ -18,20 +18,3 @@ pub mod errors;
 pub mod indices;
 pub mod spalten_anfrage;
 pub mod request_pipeline;
-
-pub mod ids {
-    pub mod domain_id;
-}
-
-pub mod model {
-    pub mod spalten_anfrage;
-}
-
-pub mod parser {
-    pub mod cli_alias_parser;
-}
-
-pub mod resolver {
-    pub mod request_resolver;
-    pub mod resolve_cli;
-}
