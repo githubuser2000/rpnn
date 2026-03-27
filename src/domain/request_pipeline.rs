@@ -30,6 +30,13 @@ pub struct ResolvedSelectionRequest {
     pub required_columns: Vec<u32>,
 }
 
+pub fn parse_many<I>(pairs: I) -> Result<Vec<ParsedSelectionRequest>, RequestPipelineError>
+where
+    I: IntoIterator<Item = RawSelectionRequest>,
+{
+    pairs.into_iter().map(RawSelectionRequest::parse).collect()
+}
+
 impl RawSelectionRequest {
     pub fn new(ober: impl Into<String>, unter: impl Into<String>) -> Self {
         Self { ober: ober.into(), unter: unter.into() }
