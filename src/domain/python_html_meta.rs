@@ -35,7 +35,7 @@ pub fn meta_for_request(request: &SpaltenAnfrage) -> Option<PythonHtmlMeta> {
             "p1_✗Religion,, p2_p3_0_Religion, p4_3,0"
         }
         SpaltenAnfrage::Standard(StandardAnfrage::Sonstige {
-            ober: StandardOberkategorie::EigenschaftenN,
+            ober: StandardOberkategorie::Eigenschaften1ProN,
             unter,
         }) if unter == "Toleranz_Respekt_Akzeptanz_Willkommen" => {
             "p1_✗Eigenschaften_1/n,, p2_p3_0_Toleranz_Respekt_Akzeptanz_Willkommen, p4_3,0"

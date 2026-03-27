@@ -15,6 +15,7 @@ pub enum StandardOberkategorie {
     ProContra,
     WichtigstesZumVerstehen,
     EigenschaftenN,
+    Eigenschaften1ProN,
     UniversumMetaKonkret,
     Sonstige(String),
 }
@@ -73,16 +74,19 @@ impl StandardOberkategorie {
             "menschliches" => Self::Menschliches,
             "universum" => Self::Universum,
             "religion" | "religionen" => Self::Religion,
-            "planet" => Self::Planet,
+            "planet" | "planet10undoder12" | "planet10oder12" => Self::Planet,
             "galaxie" => Self::Galaxie,
             "multiversum" => Self::Multiversum,
             "grundstrukturen" => Self::Grundstrukturen,
             "bedeutung" => Self::Bedeutung,
             "procontra" => Self::ProContra,
             "wichtigsteszumverstehen" => Self::WichtigstesZumVerstehen,
-            "eigenschaftenn" => Self::EigenschaftenN,
-            "universummetakonkret" => Self::UniversumMetaKonkret,
-            other => Self::Sonstige(other.to_string()),
+            "eigenschaftenn" | "eigenschaftenn1" | "eigenschaftennn" | "konzept1" | "konzepte1" => {
+                Self::EigenschaftenN
+            }
+            "eigenschaften1n" | "konzept2" | "konzepte2" => Self::Eigenschaften1ProN,
+            "universummetakonkret" | "metakonkret" => Self::UniversumMetaKonkret,
+            _ => Self::Sonstige(input.trim().to_string()),
         }
     }
 
@@ -99,6 +103,7 @@ impl StandardOberkategorie {
             Self::ProContra => "Pro_Contra",
             Self::WichtigstesZumVerstehen => "Wichtigstes_zum_verstehen",
             Self::EigenschaftenN => "Eigenschaften_n",
+            Self::Eigenschaften1ProN => "Eigenschaften_1/n",
             Self::UniversumMetaKonkret => "universummetakonkret",
             Self::Sonstige(s) => s.as_str(),
         }
@@ -169,14 +174,18 @@ impl SpaltenAnfrage {
         if unter.is_empty() {
             return Err(ParseSpaltenAnfrageError::EmptyUnterkategorie);
         }
+
         let ober_norm = normalize_key(ober);
         let unter = unter.to_string();
+
         let parsed = match ober_norm.as_str() {
             "kombinationgalaxie" => Self::KombinationGalaxie { unter },
             "kombinationuniversum" => Self::KombinationUniversum { unter },
             "gebrochenrationalgalaxienm" => Self::GebrochenRationalGalaxie { unter },
             "gebrochenrationaluniversumnm" => Self::GebrochenRationalUniversum { unter },
-            "gebrochenrationalgefuehlenm" | "gebrochenrationalgefuhlenm" => Self::GebrochenRationalGefuehle { unter },
+            "gebrochenrationalgefuehlenm" | "gebrochenrationalgefuhlenm" => {
+                Self::GebrochenRationalGefuehle { unter }
+            }
             "gebrochenrationalstrukturgroessenm" => Self::GebrochenRationalStrukturgroesse { unter },
             "primvielfache" => Self::Primvielfache { unter },
             "multiplikationen" => Self::Multiplikationen { unter },
@@ -192,11 +201,15 @@ impl SpaltenAnfrage {
                     StandardOberkategorie::Religion => {
                         Self::Standard(StandardAnfrage::Religion(ReligionUnter::parse(&unter)))
                     }
-                    StandardOberkategorie::Sonstige(_) => Self::Unknown { ober: ober.to_string(), unter },
+                    StandardOberkategorie::Sonstige(_) => Self::Unknown {
+                        ober: ober.to_string(),
+                        unter,
+                    },
                     known => Self::Standard(StandardAnfrage::Sonstige { ober: known, unter }),
                 }
             }
         };
+
         Ok(parsed)
     }
 
@@ -214,15 +227,33 @@ impl SpaltenAnfrage {
             Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
                 format!("--spaltenname {} {}", ober.as_cli_str(), unter)
             }
-            Self::KombinationGalaxie { unter } => format!("--spaltenname KombinationGalaxie {}", unter),
-            Self::KombinationUniversum { unter } => format!("--spaltenname KombinationUniversum {}", unter),
-            Self::GebrochenRationalGalaxie { unter } => format!("--spaltenname gebrochen-rational_Galaxie_n/m {}", unter),
-            Self::GebrochenRationalUniversum { unter } => format!("--spaltenname gebrochen-rational_Universum_n/m {}", unter),
-            Self::GebrochenRationalGefuehle { unter } => format!("--spaltenname gebrochen-rational_Gefühle_n/m {}", unter),
-            Self::GebrochenRationalStrukturgroesse { unter } => format!("--spaltenname gebrochen-rational_Strukturgroesse_n/m {}", unter),
-            Self::Primvielfache { unter } => format!("--spaltenname primvielfache {}", unter),
-            Self::Multiplikationen { unter } => format!("--spaltenname multiplikationen {}", unter),
-            Self::Unknown { ober, unter } => format!("--spaltenname {} {}", ober, unter),
+            Self::KombinationGalaxie { unter } => {
+                format!("--spaltenname KombinationGalaxie {}", unter)
+            }
+            Self::KombinationUniversum { unter } => {
+                format!("--spaltenname KombinationUniversum {}", unter)
+            }
+            Self::GebrochenRationalGalaxie { unter } => {
+                format!("--spaltenname gebrochen-rational_Galaxie_n/m {}", unter)
+            }
+            Self::GebrochenRationalUniversum { unter } => {
+                format!("--spaltenname gebrochen-rational_Universum_n/m {}", unter)
+            }
+            Self::GebrochenRationalGefuehle { unter } => {
+                format!("--spaltenname gebrochen-rational_Gefuehle_n/m {}", unter)
+            }
+            Self::GebrochenRationalStrukturgroesse { unter } => {
+                format!("--spaltenname gebrochen-rational_Strukturgroesse_n/m {}", unter)
+            }
+            Self::Primvielfache { unter } => {
+                format!("--spaltenname primvielfache {}", unter)
+            }
+            Self::Multiplikationen { unter } => {
+                format!("--spaltenname multiplikationen {}", unter)
+            }
+            Self::Unknown { ober, unter } => {
+                format!("--spaltenname {} {}", ober, unter)
+            }
         }
     }
 }
