@@ -1,12 +1,12 @@
 use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage::{
-    CanonicalColumnSpec, ColumnTarget, CombinationSpec, GeneratorParameter, GeneratorSpec,
+    CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
     KombiUnterId, SpaltenAnfrage, StandardUnterId,
 };
 
 pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
     match &req {
-        SpaltenAnfrage::Standard { unter, .. } => resolve_standard(req.clone(), *unter),
+        SpaltenAnfrage::Standard { unter, .. } => resolve_standard(req.clone(), unter.clone()),
         SpaltenAnfrage::GebrochenRational { art, index } => {
             resolve_gebrochen_rational(req.clone(), *art, *index)
         }
@@ -30,31 +30,7 @@ pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
 
 fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<CanonicalColumnSpec> {
     let (target, header_display) = match unter {
-        StandardUnterId::Wuerdig => (ColumnTarget::Pair(358, 359), "Würdig".to_string()),
-        StandardUnterId::RegelVsAusnahme => {
-            (ColumnTarget::Pair(356, 357), "Regel_vs_Ausnahme".to_string())
-        }
-        StandardUnterId::FilterartWidrigkeit => {
-            (ColumnTarget::Pair(354, 355), "Filterart_Widrigkeit".to_string())
-        }
-        StandardUnterId::Werte => (ColumnTarget::Pair(352, 353), "Werte".to_string()),
-        StandardUnterId::GutartigkeitsEgoismus => {
-            (ColumnTarget::Pair(350, 351), "Gutartigkeits-Egoismus".to_string())
-        }
-        StandardUnterId::ReflektierenErkenntnisErkennen => (
-            ColumnTarget::Pair(348, 349),
-            "Reflektieren_Erkenntnis-Erkennen".to_string(),
-        ),
-        StandardUnterId::VertrauenWollen => {
-            (ColumnTarget::Pair(346, 347), "Vertrauen_wollen".to_string())
-        }
-        StandardUnterId::AusrichtenEinrichten => {
-            (ColumnTarget::Pair(344, 345), "Ausrichten_Einrichten".to_string())
-        }
-        StandardUnterId::ToleranzRespektAkzeptanzWillkommen => (
-            ColumnTarget::Pair(62, 63),
-            "Toleranz_Respekt_Akzeptanz_Willkommen".to_string(),
-        ),
+        StandardUnterId::Eigenschaft(spec) => return resolve_eigenschaft(req, spec),
 
         // Platzhalter/erste Brücke – diese IDs später gegen Python-Wahrheit austauschen
         StandardUnterId::Gewalt => (ColumnTarget::DirectColumn(496), "Gewalt".to_string()),
@@ -84,6 +60,26 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
         target,
         header_display,
         aliases_for_report: vec![],
+    })
+}
+
+fn resolve_eigenschaft(req: SpaltenAnfrage, spec: EigenschaftRequest) -> Option<CanonicalColumnSpec> {
+    let key = spec.key;
+    let target = if let Some((left, right)) = key.maybe_pair() {
+        ColumnTarget::Pair((left as u16) + 1, (right as u16) + 1)
+    } else if key.direct_columns().len() == 1 {
+        ColumnTarget::DirectColumn((key.direct_columns()[0] as u16) + 1)
+    } else if !key.direct_columns().is_empty() {
+        ColumnTarget::DirectColumns(key.direct_columns().iter().map(|n| (*n as u16) + 1).collect())
+    } else {
+        return None;
+    };
+
+    Some(CanonicalColumnSpec {
+        request: req,
+        target,
+        header_display: key.canonical_name().to_string(),
+        aliases_for_report: key.aliases().iter().map(|s| (*s).to_string()).collect(),
     })
 }
 

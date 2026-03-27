@@ -15,6 +15,7 @@ pub mod html_meta_builder;
 pub mod html_header_model;
 
 pub mod errors;
+pub mod eigenschaften;
 pub mod indices;
 pub mod spalten_anfrage;
 pub mod request_pipeline;

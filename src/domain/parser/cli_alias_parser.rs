@@ -1,8 +1,10 @@
 use crate::domain::ids::domain_id::{
     DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt,
 };
+use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::model::spalten_anfrage::{
-    GeneratorParameter, KombiUnterId, SpaltenAnfrage, StandardUnterId,
+    EigenschaftRequest, EigenschaftsFamilie, GeneratorParameter, KombiUnterId,
+    SpaltenAnfrage, StandardUnterId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +21,10 @@ fn normalize_cli_token(s: &str) -> String {
 fn matches_alias(input: &str, aliases: &[&str]) -> bool {
     let n = normalize_cli_token(input);
     aliases.iter().any(|a| normalize_cli_token(a) == n)
+}
+
+fn parse_eigenschaft_request(unter: &str, familie: EigenschaftsFamilie) -> Option<EigenschaftRequest> {
+    EigenschaftKeyId::from_alias(unter).map(|key| EigenschaftRequest { familie, key })
 }
 
 pub fn parse_oberkategorie(input: &str) -> Result<DomainId, ParseError> {
@@ -47,6 +53,9 @@ pub fn parse_oberkategorie(input: &str) -> Result<DomainId, ParseError> {
         return Ok(DomainId::Planet10Oder12);
     }
 
+    if matches_alias(input, &["Eigenschaft", "Eigenschaften", "konzept", "konzepte"]) {
+        return Ok(DomainId::Eigenschaften);
+    }
     if matches_alias(input, &["Eigenschaften_n", "konzept1", "konzepte1"]) {
         return Ok(DomainId::EigenschaftenN);
     }
@@ -118,6 +127,11 @@ pub fn parse_spalten_anfrage(ober: &str, unter: &str) -> Result<SpaltenAnfrage, 
             unter: parse_eigenschaften_n_unter(ober, unter)?,
         }),
 
+        DomainId::Eigenschaften => Ok(SpaltenAnfrage::Standard {
+            domain,
+            unter: parse_eigenschaften_generisch_unter(ober, unter)?,
+        }),
+
         DomainId::GebrochenRational(art) => Ok(SpaltenAnfrage::GebrochenRational {
             art,
             index: parse_u16_index(ober, unter)?,
@@ -181,7 +195,20 @@ fn parse_standard_unter(ober: &str, unter: &str) -> Result<StandardUnterId, Pars
     Ok(parsed)
 }
 
+fn parse_eigenschaften_generisch_unter(
+    ober: &str,
+    unter: &str,
+) -> Result<StandardUnterId, ParseError> {
+    if let Some(req) = parse_eigenschaft_request(unter, EigenschaftsFamilie::Generisch) {
+        return Ok(StandardUnterId::Eigenschaft(req));
+    }
+    parse_standard_unter(ober, unter)
+}
+
 fn parse_eigenschaften_n_unter(ober: &str, unter: &str) -> Result<StandardUnterId, ParseError> {
+    if let Some(req) = parse_eigenschaft_request(unter, EigenschaftsFamilie::N) {
+        return Ok(StandardUnterId::Eigenschaft(req));
+    }
     parse_standard_unter(ober, unter)
 }
 
@@ -189,38 +216,14 @@ fn parse_eigenschaften_1_pro_n_unter(
     ober: &str,
     unter: &str,
 ) -> Result<StandardUnterId, ParseError> {
-    let u = normalize_cli_token(unter);
+    if let Some(req) = parse_eigenschaft_request(unter, EigenschaftsFamilie::EinsDurchN) {
+        return Ok(StandardUnterId::Eigenschaft(req));
+    }
 
-    let parsed = match u.as_str() {
-        "würdig" | "wuerdig" => StandardUnterId::Wuerdig,
-        "regel_vs_ausnahme" | "regel vs ausnahme" => StandardUnterId::RegelVsAusnahme,
-        "filterart_widrigkeit" | "filterart widrigkeit" => StandardUnterId::FilterartWidrigkeit,
-        "werte" => StandardUnterId::Werte,
-        "gutartigkeits-egoismus" | "gutartigkeits egoismus" => {
-            StandardUnterId::GutartigkeitsEgoismus
-        }
-        "reflektieren_erkenntnis-erkennen"
-        | "reflektieren erkenntnis erkennen"
-        | "reflektieren_erkenntnis_erkennen" => {
-            StandardUnterId::ReflektierenErkenntnisErkennen
-        }
-        "vertrauen_wollen" | "vertrauen wollen" => StandardUnterId::VertrauenWollen,
-        "ausrichten_einrichten" | "ausrichten einrichten" => {
-            StandardUnterId::AusrichtenEinrichten
-        }
-        "toleranz_respekt_akzeptanz_willkommen"
-        | "toleranz respekt akzeptanz willkommen" => {
-            StandardUnterId::ToleranzRespektAkzeptanzWillkommen
-        }
-        _ => {
-            return Err(ParseError::UnknownUnterkategorie {
-                ober: ober.to_string(),
-                unter: unter.to_string(),
-            });
-        }
-    };
-
-    Ok(parsed)
+    Err(ParseError::UnknownUnterkategorie {
+        ober: ober.to_string(),
+        unter: unter.to_string(),
+    })
 }
 
 fn parse_kombi_unter(ober: &str, unter: &str) -> Result<KombiUnterId, ParseError> {

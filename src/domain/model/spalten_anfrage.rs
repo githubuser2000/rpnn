@@ -1,3 +1,4 @@
+use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::ids::domain_id::{
     DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt,
 };
@@ -25,7 +26,7 @@ pub enum SpaltenAnfrage {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StandardUnterId {
     Gewalt,
     Politische,
@@ -37,17 +38,22 @@ pub enum StandardUnterId {
     Geist,
     SymboleReligion,
 
-    Wuerdig,
-    RegelVsAusnahme,
-    FilterartWidrigkeit,
-    Werte,
-    GutartigkeitsEgoismus,
-    ReflektierenErkenntnisErkennen,
-    VertrauenWollen,
-    AusrichtenEinrichten,
-    ToleranzRespektAkzeptanzWillkommen,
+    Eigenschaft(EigenschaftRequest),
 
     Primzahlkreuz,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EigenschaftsFamilie {
+    Generisch,
+    N,
+    EinsDurchN,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EigenschaftRequest {
+    pub familie: EigenschaftsFamilie,
+    pub key: EigenschaftKeyId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

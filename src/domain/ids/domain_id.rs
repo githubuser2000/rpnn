@@ -11,6 +11,7 @@ pub enum DomainId {
     Multiversum,
     Planet10Oder12,
 
+    Eigenschaften,
     EigenschaftenN,
     Eigenschaften1ProN,
 

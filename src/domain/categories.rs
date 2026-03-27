@@ -2,7 +2,8 @@ use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
+use crate::domain::exact_mappings::META_KONKRET_MAPPINGS;
 use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -432,61 +433,43 @@ impl KategorieMap {
     fn merge_exact_eigenschaften_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
-            let mut ids: Vec<u32> = direct_columns
-                .iter()
-                .copied()
-                .map(|n| (n as u32) + 1)
-                .collect();
-
-            if let Some((left, right)) = maybe_pair {
-                ids.push((*left as u32) + 1);
-                ids.push((*right as u32) + 1);
-            }
-
-            ids.sort_unstable();
-            ids.dedup();
-
-            let main_aliases = Self::eigenschaft_main_aliases_for_columns(aliases, direct_columns, *maybe_pair);
-            if main_aliases.is_empty() {
+        for key in EigenschaftKeyId::ALL.iter().copied() {
+            let ids = key.all_column_ids_1_based();
+            if ids.is_empty() {
                 continue;
             }
 
-            let canonical_sub = aliases.first().copied().unwrap_or("");
-            if canonical_sub.is_empty() {
-                continue;
-            }
-
-            for main_cat in &main_aliases {
-                Self::insert_entry(main_to_sub, main_cat, canonical_sub, ids.clone());
+            for main_cat in Self::eigenschaft_main_aliases_for_key(key) {
+                Self::insert_entry(main_to_sub, &main_cat, key.canonical_name(), ids.clone());
             }
         }
     }
 
-    fn eigenschaft_main_aliases_for_columns(
-        aliases: &[&str],
-        direct_columns: &[usize],
-        maybe_pair: Option<(usize, usize)>,
-    ) -> Vec<String> {
+    fn eigenschaft_main_aliases_for_key(key: EigenschaftKeyId) -> Vec<String> {
         let mut mains = HashSet::<String>::new();
-
-        // Eigenschaften sollen grundsätzlich unter der generischen Familie auftauchen.
         mains.insert("Eigenschaft".to_string());
         mains.insert("Eigenschaften".to_string());
         mains.insert("konzept".to_string());
         mains.insert("konzepte".to_string());
 
-        let mut all_columns: Vec<u32> = direct_columns.iter().copied().map(|n| n as u32).collect();
-        if let Some((left, right)) = maybe_pair {
-            all_columns.push(left as u32);
-            all_columns.push(right as u32);
+        match key.standard_familie() {
+            EigenschaftStandardFamilie::N => {
+                mains.insert("Eigenschaften_n".to_string());
+                mains.insert("konzept1".to_string());
+                mains.insert("konzepte1".to_string());
+            }
+            EigenschaftStandardFamilie::EinsDurchN => {
+                mains.insert("Eigenschaften_1/n".to_string());
+                mains.insert("konzept2".to_string());
+                mains.insert("konzepte2".to_string());
+            }
         }
 
-        for col in &all_columns {
-            if let Some(meta) = python_source_of_truth::exact_meta_for_column(*col) {
+        for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
+            if let Some(meta) = python_source_of_truth::exact_meta_for_column(col) {
                 for main in Self::extract_main_categories_from_meta(&meta) {
-                    let key = normalize_key(&main);
-                    match key.as_str() {
+                    let normalized = normalize_key(&main);
+                    match normalized.as_str() {
                         "eigenschaften1n" => {
                             mains.insert("Eigenschaften_1/n".to_string());
                             mains.insert("konzept2".to_string());
@@ -503,49 +486,13 @@ impl KategorieMap {
             }
         }
 
-        // Fallback: wenn die HTML-Metadaten fehlen, entscheide die n-vs-1/n-Familie
-        // aus dem kanonischen Eigenschaftsschlüssel. Dadurch wird --alles vollständig,
-        // ohne jede Alias-Schreibweise als eigene Unterkategorie anzulegen.
-        if !mains.iter().any(|m| normalize_key(m) == "eigenschaften1n")
-            && !mains.iter().any(|m| normalize_key(m) == "eigenschaftenn")
-        {
-            if Self::eigenschaft_aliases_are_1_pro_n(aliases) {
-                mains.insert("Eigenschaften_1/n".to_string());
-                mains.insert("konzept2".to_string());
-                mains.insert("konzepte2".to_string());
-            } else {
-                mains.insert("Eigenschaften_n".to_string());
-                mains.insert("konzept1".to_string());
-                mains.insert("konzepte1".to_string());
-            }
-        }
-
         let mut out: Vec<String> = mains.into_iter().collect();
         out.sort();
         out
     }
 
-    fn eigenschaft_aliases_are_1_pro_n(aliases: &[&str]) -> bool {
-        let canonical = aliases
-            .first()
-            .map(|s| normalize_key(s))
-            .unwrap_or_default();
-
-        matches!(
-            canonical.as_str(),
-            "wuerdig"
-                | "regelvsausnahme"
-                | "filterartwidrigkeit"
-                | "werte"
-                | "gutartigkeitsegoismus"
-                | "reflektierenerkenntniserkennen"
-                | "vertrauenwollen"
-                | "ausrichteneinrichten"
-                | "toleranzrespektakzeptanzwillkommen"
-        )
-    }
-
     fn merge_meta_konkret_aliases(
+
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
         let main_aliases = ["Universum_Metakonkret", "MetaKonkret", "metakonkret"];
