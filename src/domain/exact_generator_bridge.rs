@@ -1,221 +1,98 @@
-use crate::domain::ids::domain_id::{DomainId, GeneratorArt};
-use crate::domain::model::spalten_anfrage::{
-    CanonicalColumnSpec, ColumnTarget, GeneratorParameter, GeneratorSpec, SpaltenAnfrage,
-    StandardUnterId,
-};
 
-/// Typisierte Brücke für exakte Generator-/Spezialfälle.
-///
-/// Wichtige Regel:
-/// - keine CLI-String-Auflösung mehr hier
-/// - keine Normalisierung mehr hier
-/// - keine Aliaslogik mehr hier
-/// - nur noch Match auf kanonische Typen
-///
-/// Der Parser muss bereits vorher aus Text -> SpaltenAnfrage gemacht haben.
-pub fn resolve_exact_generator(req: &SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
-    match req {
-        //
-        // Eigenschaften_1/n / konzept2
-        //
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::Wuerdig,
-        } => Some(spec_pair(
-            req,
-            358,
-            359,
-            "Würdig",
-            &["Eigenschaften_1/n", "konzept2", "Würdig"],
-        )),
+use std::collections::BTreeSet;
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::RegelVsAusnahme,
-        } => Some(spec_pair(
-            req,
-            356,
-            357,
-            "Regel_vs_Ausnahme",
-            &["Eigenschaften_1/n", "konzept2", "Regel_vs_Ausnahme"],
-        )),
+use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::FilterartWidrigkeit,
-        } => Some(spec_pair(
-            req,
-            354,
-            355,
-            "Filterart_Widrigkeit",
-            &["Eigenschaften_1/n", "konzept2", "Filterart_Widrigkeit"],
-        )),
+#[derive(Debug, Clone, Default)]
+pub struct ExactResolved {
+    pub direct_columns: Vec<usize>,
+    pub modal_pairs: Vec<(usize, usize)>,
+    pub meta_konkret_specs: Vec<(usize, usize)>,
+    pub generated_befehle: BTreeSet<String>,
+}
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::Werte,
-        } => Some(spec_pair(
-            req,
-            352,
-            353,
-            "Werte",
-            &["Eigenschaften_1/n", "konzept2", "Werte"],
-        )),
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
+}
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::GutartigkeitsEgoismus,
-        } => Some(spec_pair(
-            req,
-            350,
-            351,
-            "Gutartigkeits-Egoismus",
-            &["Eigenschaften_1/n", "konzept2", "Gutartigkeits-Egoismus"],
-        )),
+fn dedup_vec<T: Ord + Clone>(items: &mut Vec<T>) {
+    items.sort();
+    items.dedup();
+}
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::ReflektierenErkenntnisErkennen,
-        } => Some(spec_pair(
-            req,
-            348,
-            349,
-            "Reflektieren_Erkenntnis-Erkennen",
-            &[
-                "Eigenschaften_1/n",
-                "konzept2",
-                "Reflektieren_Erkenntnis-Erkennen",
-            ],
-        )),
+fn push_unique<T: PartialEq + Copy>(vec: &mut Vec<T>, value: T) {
+    if !vec.contains(&value) {
+        vec.push(value);
+    }
+}
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::VertrauenWollen,
-        } => Some(spec_pair(
-            req,
-            346,
-            347,
-            "Vertrauen_wollen",
-            &["Eigenschaften_1/n", "konzept2", "Vertrauen_wollen"],
-        )),
+fn resolve_meta_konkret(value: &str) -> Option<ExactResolved> {
+    let key = normalize_key(value);
+    let mut out = ExactResolved::default();
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::AusrichtenEinrichten,
-        } => Some(spec_pair(
-            req,
-            344,
-            345,
-            "Ausrichten_Einrichten",
-            &["Eigenschaften_1/n", "konzept2", "Ausrichten_Einrichten"],
-        )),
+    for (aliases, pair) in META_KONKRET_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == key) {
+            out.meta_konkret_specs.push(*pair);
+            out.generated_befehle.insert("universummetakonkret".to_string());
+            // Basis-Spalten für den Generator: Strukturalie + inverse Strukturalie.
+            out.direct_columns.push(6);   // Python 0-based 5
+            out.direct_columns.push(132); // Python 0-based 131
+            // Zusätzliche Textspalten, die der Python-Generator im Universums-Fall referenziert.
+            out.direct_columns.push(199); // Python 0-based 198
+            out.direct_columns.push(202); // Python 0-based 201
+            dedup_vec(&mut out.direct_columns);
+            return Some(out);
+        }
+    }
 
-        SpaltenAnfrage::Standard {
-            domain: DomainId::Eigenschaften1ProN,
-            unter: StandardUnterId::ToleranzRespektAkzeptanzWillkommen,
-        } => Some(spec_pair(
-            req,
-            62,
-            63,
-            "Toleranz_Respekt_Akzeptanz_Willkommen",
-            &[
-                "Eigenschaften_1/n",
-                "konzept2",
-                "Toleranz_Respekt_Akzeptanz_Willkommen",
-            ],
-        )),
+    None
+}
 
-        //
-        // Standard-Unterkategorie, die in Wahrheit auf Generatoren abbildet
-        //
-        SpaltenAnfrage::Standard {
-            unter: StandardUnterId::Primzahlkreuz,
-            ..
-        } => Some(spec_generator(
-            req,
-            GeneratorArt::Primzahlkreuz,
-            GeneratorParameter::Keine,
-            "Primzahlkreuz",
-            &["Primzahlkreuz"],
-        )),
+fn resolve_eigenschaften_like(value: &str) -> Option<ExactResolved> {
+    let key = normalize_key(value);
+    let mut out = ExactResolved::default();
 
-        //
-        // Direkte Generator-Anfragen
-        //
-        SpaltenAnfrage::Generator {
-            art: GeneratorArt::Primzahlkreuz,
-            parameter,
-        } => Some(spec_generator(
-            req,
-            GeneratorArt::Primzahlkreuz,
-            parameter.clone(),
-            "Primzahlkreuz",
-            &["Primzahlkreuz"],
-        )),
+    for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
+        if aliases.iter().any(|a| normalize_key(a) == key) {
+            for &col in *direct_columns {
+                // Rust/CLI arbeitet 1-basiert
+                push_unique(&mut out.direct_columns, col + 1);
+            }
+            if let Some((a, b)) = maybe_pair {
+                out.modal_pairs.push((*a, *b)); // hier 0-basiert lassen, concat_modallogik erwartet 0-basiert
+                out.generated_befehle.insert("modallogik".to_string());
+                push_unique(&mut out.direct_columns, *a + 1);
+                push_unique(&mut out.direct_columns, *b + 1);
+            }
+            dedup_vec(&mut out.direct_columns);
+            dedup_vec(&mut out.modal_pairs);
+            return Some(out);
+        }
+    }
 
-        SpaltenAnfrage::Generator {
-            art: GeneratorArt::Multiplikationen,
-            parameter,
-        } => Some(spec_generator(
-            req,
-            GeneratorArt::Multiplikationen,
-            parameter.clone(),
-            "Multiplikationen",
-            &["Multiplikationen"],
-        )),
+    None
+}
 
-        SpaltenAnfrage::Generator {
-            art: GeneratorArt::Primvielfache,
-            parameter,
-        } => Some(spec_generator(
-            req,
-            GeneratorArt::Primvielfache,
-            parameter.clone(),
-            "Primvielfache",
-            &["Primvielfache"],
-        )),
+pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved> {
+    let ober_n = normalize_key(ober);
 
-        SpaltenAnfrage::Generator {
-            art: GeneratorArt::MetaKonkret,
-            parameter,
-        } => Some(spec_generator(
-            req,
-            GeneratorArt::MetaKonkret,
-            parameter.clone(),
-            "MetaKonkret",
-            &["MetaKonkret", "Universum_Metakonkret"],
-        )),
-
+    match ober_n.as_str() {
+        "universummetakonkret" | "metakonkret" => resolve_meta_konkret(unter),
+        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaftenn1" | "eigenschaften1n" => {
+            resolve_eigenschaften_like(unter)
+        }
+        "konzept" | "konzepte" | "konzept2" | "konzepte2" => resolve_eigenschaften_like(unter),
         _ => None,
     }
 }
 
-fn spec_pair(
-    req: &SpaltenAnfrage,
-    left: u16,
-    right: u16,
-    header_display: &str,
-    aliases: &[&str],
-) -> CanonicalColumnSpec {
-    CanonicalColumnSpec {
-        request: req.clone(),
-        target: ColumnTarget::Pair(left, right),
-        header_display: header_display.to_string(),
-        aliases_for_report: aliases.iter().map(|s| s.to_string()).collect(),
-    }
-}
-
-fn spec_generator(
-    req: &SpaltenAnfrage,
-    art: GeneratorArt,
-    parameter: GeneratorParameter,
-    header_display: &str,
-    aliases: &[&str],
-) -> CanonicalColumnSpec {
-    CanonicalColumnSpec {
-        request: req.clone(),
-        target: ColumnTarget::Generator(GeneratorSpec { art, parameter }),
-        header_display: header_display.to_string(),
-        aliases_for_report: aliases.iter().map(|s| s.to_string()).collect(),
-    }
+// Altpfad absichtlich inert.
+pub fn try_run_exact_generator_bridge(
+    _args: &[String],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    Ok(false)
 }

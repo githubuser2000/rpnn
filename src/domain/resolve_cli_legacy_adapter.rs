@@ -1,12 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::domain::categories::{resolve_via_categories, KategorieMap};
+use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::model::spalten_anfrage::{
-    CanonicalColumnSpec, ColumnTarget, SpaltenAnfrage,
-};
-use crate::domain::parser::cli_alias_parser::{parse_spalten_anfrage, ParseError};
-use crate::domain::resolver::request_resolver::resolve_request;
+use crate::domain::request_pipeline::RawSelectionRequest;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
@@ -19,81 +15,55 @@ pub struct LegacyResolvedSelection {
 }
 
 pub fn resolve_cli_selection(
-    _kategorie_map: &KategorieMap,
+    kategorie_map: &KategorieMap,
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    let req = parse_spalten_anfrage(ober, unter).map_err(to_boxed_error)?;
+    if let Some(exact) = resolve_exact_generator(ober, unter) {
+        let mut out = LegacyResolvedSelection::default();
 
-    let spec = resolve_any(&req).ok_or_else(|| {
-        format!(
-            "Konnte Spaltenanfrage nicht auflösen: ober='{}', unter='{}'",
-            ober, unter
-        )
-    })?;
+        out.exact_direct_columns.extend(exact.direct_columns.iter().copied());
+        out.exact_modal_pairs.extend(exact.modal_pairs.iter().copied());
+        out.exact_meta_konkret_specs
+            .extend(exact.meta_konkret_specs.iter().copied());
+        out.generated_befehle.extend(exact.generated_befehle.iter().cloned());
 
-    Ok(spec_to_legacy_selection(&spec))
+        dedup_legacy_selection(&mut out);
+        return Ok(out);
+    }
+
+    resolve_via_legacy_pipeline(kategorie_map, ober, unter)
 }
 
-fn resolve_any(req: &SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
-    resolve_request(req.clone())
-        .or_else(|| resolve_via_categories(req))
-        .or_else(|| resolve_exact_generator(req))
-}
+fn resolve_via_legacy_pipeline(
+    kategorie_map: &KategorieMap,
+    ober: &str,
+    unter: &str,
+) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
+    let resolved = RawSelectionRequest::new(ober.to_string(), unter.to_string())
+        .parse()
+        .map_err(to_boxed_request_pipeline_error)?
+        .expand(kategorie_map)
+        .resolve(kategorie_map);
 
-fn spec_to_legacy_selection(spec: &CanonicalColumnSpec) -> LegacyResolvedSelection {
     let mut out = LegacyResolvedSelection::default();
 
-    match &spec.target {
-        ColumnTarget::DirectColumn(id) => {
-            out.direct_columns.push(*id);
-            out.required_columns.push(*id);
-        }
-        ColumnTarget::DirectColumns(ids) => {
-            out.direct_columns.extend(ids.iter().copied());
-            out.required_columns.extend(ids.iter().copied());
-        }
-        ColumnTarget::Pair(left, right) => {
-            out.exact_modal_pairs.push((*left as usize, *right as usize));
-        }
-        ColumnTarget::Generator(generator_spec) => {
-            out.generated_befehle.insert(generator_art_to_legacy_name(&generator_spec.art));
-            match &generator_spec.parameter {
-                crate::domain::model::spalten_anfrage::GeneratorParameter::Keine => {}
-                crate::domain::model::spalten_anfrage::GeneratorParameter::Text(s) => {
-                    if !s.trim().is_empty() {
-                        out.generated_befehle.insert(s.trim().to_string());
-                    }
-                }
-                crate::domain::model::spalten_anfrage::GeneratorParameter::Zahl(n) => {
-                    out.generated_befehle.insert(n.to_string());
-                }
-                crate::domain::model::spalten_anfrage::GeneratorParameter::TextListe(xs) => {
-                    out.generated_befehle.extend(
-                        xs.iter()
-                            .map(|s| s.trim())
-                            .filter(|s| !s.is_empty())
-                            .map(ToOwned::to_owned),
-                    );
-                }
-            }
-        }
-        ColumnTarget::Combination(_comb) => {}
-    }
+    out.direct_columns = resolved
+        .direct_columns
+        .into_iter()
+        .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+        .collect::<Result<Vec<u16>, _>>()?;
+
+    out.required_columns = resolved
+        .required_columns
+        .into_iter()
+        .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+        .collect::<Result<Vec<u16>, _>>()?;
+
+    out.generated_befehle = resolved.generated_befehle;
 
     dedup_legacy_selection(&mut out);
-    out
-}
-
-fn generator_art_to_legacy_name(art: &crate::domain::ids::domain_id::GeneratorArt) -> String {
-    match art {
-        crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "primzahlkreuz".to_string(),
-        crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => {
-            "multiplikationen".to_string()
-        }
-        crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "primvielfache".to_string(),
-        crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "metakonkret".to_string(),
-    }
+    Ok(out)
 }
 
 fn dedup_legacy_selection(sel: &mut LegacyResolvedSelection) {
@@ -113,23 +83,8 @@ fn dedup_legacy_selection(sel: &mut LegacyResolvedSelection) {
     sel.exact_meta_konkret_specs.dedup();
 }
 
-fn to_boxed_error(err: ParseError) -> Box<dyn std::error::Error> {
-    Box::<dyn std::error::Error>::from(format_parse_error(err))
-}
-
-fn format_parse_error(err: ParseError) -> String {
-    match err {
-        ParseError::UnknownOberkategorie(ober) => {
-            format!("Unbekannte Oberkategorie: {}", ober)
-        }
-        ParseError::UnknownUnterkategorie { ober, unter } => {
-            format!(
-                "Unbekannte Unterkategorie für Oberkategorie '{}': {}",
-                ober, unter
-            )
-        }
-        ParseError::InvalidGebrochenRationalIndex { ober, unter } => {
-            format!("Ungültiger n/m-Index für '{}': '{}'", ober, unter)
-        }
-    }
+fn to_boxed_request_pipeline_error(
+    err: crate::domain::errors::RequestPipelineError,
+) -> Box<dyn std::error::Error> {
+    Box::<dyn std::error::Error>::from(err.to_string())
 }
