@@ -3,7 +3,6 @@ use crate::cli::{TextBereich, parser::SpaltenNamen};
 use crate::domain::categories::KategorieMap;
 use crate::processing::category_rules::exact_columns::merge_exact_columns_into_bereich;
 use crate::processing::category_rules::generator_inference::infer_generator_only_request;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::processing::category_rules::pypy_compat::{
     map_fraction_category_to_pypy_compat,
     map_kombi_category_to_pypy_compat,
@@ -32,14 +31,14 @@ pub fn verarbeite_kategorien(
         bereich.mark_columns_resolved();
     }
 
-    if let Ok(request) = SpaltenAnfrage::parse(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
-        let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_request(&request);
+    if let Some(request) = &spalten_namen.typed_request {
+        let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_canonical_request(request);
         if !gefundene_spalten.is_empty() {
             merge_exact_columns_into_bereich(bereich, gefundene_spalten);
             return Ok(generated_befehle);
         }
 
-        if let Some(inference) = kategorie_map.infer_generated_request(&request) {
+        if let Some(inference) = kategorie_map.infer_generated_canonical_request(request) {
             generated_befehle.extend(inference.generated_befehle);
         }
     } else {

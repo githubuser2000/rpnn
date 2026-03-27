@@ -1,3 +1,4 @@
+use crate::domain::parser::cli_alias_parser::parse_spalten_anfrage;
 use crate::reta_ausgabe::OutputSyntax;
 use crate::if_is_zeilen_angabe::is_zeilen_angabe;
 
@@ -167,14 +168,34 @@ pub fn parse_cli_args(
                     bereich.mark_columns_requested();
 
                     if let Some(kategorie_map) = kategorie_map {
-                        spalten_namen_liste.eintraege = kategorie_map
-                            .alle_paare_fuer_cli_alles()
-                            .into_iter()
-                            .map(|(oberkategorie, unterkategorie)| SpaltenNamen {
+                        let mut eintraege = Vec::new();
+
+                        for typed_request in kategorie_map.alle_typed_requests_fuer_cli_alles() {
+                            let Some((oberkategorie, unterkategorie)) = typed_request.to_cli_pair() else {
+                                continue;
+                            };
+                            eintraege.push(SpaltenNamen {
                                 oberkategorie,
                                 unterkategorie,
-                            })
-                            .collect();
+                                typed_request: Some(typed_request),
+                            });
+                        }
+
+                        for (oberkategorie, unterkategorie) in kategorie_map.alle_paare_fuer_cli_alles() {
+                            let duplicate = eintraege.iter().any(|entry| {
+                                entry.oberkategorie == oberkategorie && entry.unterkategorie == unterkategorie
+                            });
+                            if duplicate {
+                                continue;
+                            }
+                            eintraege.push(SpaltenNamen {
+                                typed_request: parse_spalten_anfrage(&oberkategorie, &unterkategorie).ok(),
+                                oberkategorie,
+                                unterkategorie,
+                            });
+                        }
+
+                        spalten_namen_liste.eintraege = eintraege;
 
                         if let Some(letztes) = spalten_namen_liste.eintraege.last().cloned() {
                             spalten_namen = letztes;
@@ -214,10 +235,12 @@ pub fn parse_cli_args(
 
                     spalten_namen.oberkategorie = first.clone();
                     spalten_namen.unterkategorie = second.clone();
+                    spalten_namen.typed_request = parse_spalten_anfrage(&first, &second).ok();
 
                     spalten_namen_liste.eintraege.push(SpaltenNamen {
-                        oberkategorie: first,
-                        unterkategorie: second,
+                        oberkategorie: first.clone(),
+                        unterkategorie: second.clone(),
+                        typed_request: parse_spalten_anfrage(&first, &second).ok(),
                     });
 
                     bereich.mark_columns_requested();

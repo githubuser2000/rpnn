@@ -1,7 +1,10 @@
+use crate::domain::model::spalten_anfrage::SpaltenAnfrage as CanonicalSpaltenAnfrage;
+
 #[derive(Debug, Clone)]
 pub struct SpaltenNamen {
     pub oberkategorie: String,
     pub unterkategorie: String,
+    pub typed_request: Option<CanonicalSpaltenAnfrage>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -21,6 +24,7 @@ impl Default for SpaltenNamen {
         Self {
             oberkategorie: String::new(),
             unterkategorie: String::new(),
+            typed_request: None,
         }
     }
 }

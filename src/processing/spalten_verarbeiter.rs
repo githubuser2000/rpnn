@@ -1,7 +1,7 @@
+use crate::domain::parser::cli_alias_parser::parse_spalten_anfrage;
 use crate::cli::parser::{SpaltenAuswahlModus, SpaltenNamen, SpaltenNamenListe};
 use crate::cli::{parse_cli_args, TextBereich};
 use crate::domain::categories::KategorieMap;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::processing::spalten_support::defaults::fallback_zu_standards;
 use crate::processing::spalten_support::exact_merge::merge_exact;
 use crate::processing::spalten_support::normalize::is_primzahlkreuz_pro_contra_request;
@@ -104,8 +104,8 @@ impl<'a> SpaltenVerarbeiter<'a> {
             return Ok(());
         }
 
-        if let Ok(request) = SpaltenAnfrage::parse(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
-            let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_request(&request);
+        if let Some(request) = &spalten_namen.typed_request {
+            let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_canonical_request(request);
 
             if !direkte_spalten.is_empty() {
                 setze_gefundene_spalten(bereich, direkte_spalten);
@@ -113,7 +113,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
                 return Ok(());
             }
 
-            if let Some(inference) = self.kategorie_map.infer_generated_request(&request) {
+            if let Some(inference) = self.kategorie_map.infer_generated_canonical_request(request) {
                 if !inference.required_columns.is_empty() {
                     setze_gefundene_spalten(bereich, inference.required_columns.clone());
                 }
@@ -161,8 +161,8 @@ impl<'a> SpaltenVerarbeiter<'a> {
                 exact_hit = true;
                 continue;
             }
-            let gefundene_spalten = if let Ok(request) = SpaltenAnfrage::parse(&spalten_namen.oberkategorie, &spalten_namen.unterkategorie) {
-                self.kategorie_map.finde_spaltennummern_fuer_request(&request)
+            let gefundene_spalten = if let Some(request) = &spalten_namen.typed_request {
+                self.kategorie_map.finde_spaltennummern_fuer_canonical_request(request)
             } else {
                 self.kategorie_map.finde_spaltennummern_fuer_kategorien(
                     &spalten_namen.oberkategorie,
@@ -200,10 +200,19 @@ impl<'a> SpaltenVerarbeiter<'a> {
         }
 
         if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
-            let typed_inference = SpaltenAnfrage::parse(&letzte_spalten_namen.oberkategorie, &letzte_spalten_namen.unterkategorie)
-                .ok()
-                .and_then(|request| self.kategorie_map.infer_generated_request(&request));
-            if let Some(inference) = typed_inference.or_else(|| self.kategorie_map.infer_generated_pair(
+           let typed_inference = letzte_spalten_namen
+    .typed_request
+    .as_ref()
+    .and_then(|request| self.kategorie_map.infer_generated_canonical_request(request))
+    .or_else(|| {
+        parse_spalten_anfrage(
+            &letzte_spalten_namen.oberkategorie,
+            &letzte_spalten_namen.unterkategorie,
+        )
+        .ok()
+        .and_then(|request| self.kategorie_map.infer_generated_canonical_request(&request))
+    });
+           if let Some(inference) = typed_inference.or_else(|| self.kategorie_map.infer_generated_pair(
                 &letzte_spalten_namen.oberkategorie,
                 &letzte_spalten_namen.unterkategorie,
             )) {

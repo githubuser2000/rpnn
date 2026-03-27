@@ -1,3 +1,5 @@
+use crate::domain::model::spalten_anfrage::ColumnTarget;
+use crate::domain::resolver::request_resolver::resolve_request;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -204,6 +206,17 @@ pub struct GeneratedInference {
     pub direct_columns: Vec<u32>,
 }
 
+
+
+fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
+    match target {
+        ColumnTarget::DirectColumn(id) => vec![*id as u32],
+        ColumnTarget::DirectColumns(ids) => ids.iter().map(|id| *id as u32).collect(),
+        ColumnTarget::Pair(left, right) => vec![*left as u32, *right as u32],
+        ColumnTarget::Generator(_) | ColumnTarget::Combination(_) => Vec::new(),
+    }
+}
+
 fn normalize_key(s: &str) -> String {
     s.to_lowercase()
         .replace('_', "")
@@ -218,6 +231,13 @@ impl KategorieMap {
         };
         instanz.lade_kategorien();
         instanz
+    }
+
+    pub fn alle_typed_requests_fuer_cli_alles(&self) -> Vec<CanonicalSpaltenAnfrage> {
+        let mut requests = Self::typed_eigenschaften_requests_fuer_alles();
+        requests.sort_by_key(|req| req.to_cli_pair());
+        requests.dedup();
+        requests
     }
 
     pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
@@ -302,13 +322,38 @@ impl KategorieMap {
             }
         }
 
-        for request in Self::typed_eigenschaften_requests_fuer_alles() {
+        for request in self.alle_typed_requests_fuer_cli_alles() {
             if let Some((ober, unter)) = request.to_cli_pair() {
                 paare_set.insert((ober, unter));
             }
         }
 
         paare_set.into_iter().collect()
+    }
+
+    pub fn finde_spaltennummern_fuer_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Vec<u32> {
+        resolve_request(request.clone())
+            .map(|spec| canonical_target_to_columns(&spec.target))
+            .unwrap_or_default()
+    }
+
+    pub fn infer_generated_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Option<GeneratedInference> {
+        resolve_request(request.clone()).map(|spec| match spec.target {
+            ColumnTarget::Generator(generator) => GeneratedInference {
+                generated_befehle: vec![generator.art.to_string().to_lowercase()],
+                required_columns: Vec::new(),
+                direct_columns: Vec::new(),
+            },
+            ColumnTarget::Combination(_) => GeneratedInference::default(),
+            other => {
+                let direct_columns = canonical_target_to_columns(&other);
+                GeneratedInference {
+                    generated_befehle: Vec::new(),
+                    required_columns: direct_columns.clone(),
+                    direct_columns,
+                }
+            }
+        }).filter(|inf| !inf.generated_befehle.is_empty() || !inf.required_columns.is_empty() || !inf.direct_columns.is_empty())
     }
 
     pub fn infer_generated_request(&self, request: &SpaltenAnfrage) -> Option<GeneratedInference> {
