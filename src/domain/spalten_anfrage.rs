@@ -271,25 +271,7 @@ impl SpaltenAnfrage {
             }
         }
     }
-}
 
-impl fmt::Display for SpaltenAnfrage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_cli())
-    }
-}
-
-pub fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
-}
-
-
-impl SpaltenAnfrage {
     pub fn ober_unter_cli_pair(&self) -> (String, String) {
         match self {
             Self::Standard(StandardAnfrage::Menschliches(unter)) => {
@@ -306,30 +288,24 @@ impl SpaltenAnfrage {
             }
             Self::KombinationGalaxie { unter } => ("KombinationGalaxie".to_string(), unter.clone()),
             Self::KombinationUniversum { unter } => ("KombinationUniversum".to_string(), unter.clone()),
-            Self::GebrochenRationalGalaxie { unter } => {
-                ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalUniversum { unter } => {
-                ("gebrochen-rational_Universum_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalGefuehle { unter } => {
-                ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone())
-            }
-            Self::GebrochenRationalStrukturgroesse { unter } => {
-                ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone())
-            }
-            Self::Primvielfache { unter } => ("primvielfache".to_string(), unter.clone()),
-            Self::Multiplikationen { unter } => ("multiplikationen".to_string(), unter.clone()),
+            Self::GebrochenRationalGalaxie { unter } => ("gebrochen-rational_Galaxie_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalUniversum { unter } => ("gebrochen-rational_Universum_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalGefuehle { unter } => ("gebrochen-rational_Gefuehle_n/m".to_string(), unter.clone()),
+            Self::GebrochenRationalStrukturgroesse { unter } => ("gebrochen-rational_Strukturgroesse_n/m".to_string(), unter.clone()),
+            Self::Primvielfache { unter } => ("Primvielfache".to_string(), unter.clone()),
+            Self::Multiplikationen { unter } => ("Multiplikationen".to_string(), unter.clone()),
             Self::Unknown { ober, unter } => (ober.clone(), unter.clone()),
         }
     }
 
     pub fn ober_normalized(&self) -> String {
-        normalize_key(&self.ober_unter_cli_pair().0)
+        let (ober, _) = self.ober_unter_cli_pair();
+        normalize_key(&ober)
     }
 
     pub fn unter_normalized(&self) -> String {
-        normalize_key(&self.ober_unter_cli_pair().1)
+        let (_, unter) = self.ober_unter_cli_pair();
+        normalize_key(&unter)
     }
 
     pub fn generated_befehle_hint(&self) -> Vec<String> {
@@ -344,27 +320,24 @@ impl SpaltenAnfrage {
     }
 
     pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        let ober_n = normalize_key(&ober);
-        let unter_n = normalize_key(&unter);
-
-        let bedeutung0 = if ober_n == "bedeutung" || ober_n == "wichtigsteszumverstehen" {
-            Some(unter_n.clone())
-        } else {
-            None
-        };
-        let procontra0 = if ober_n == "procontra" {
-            Some(unter_n.clone())
-        } else {
-            None
-        };
-        let grundstrukturen0 = if matches!(ober_n.as_str(), "menschliches" | "universum" | "religion" | "planet" | "galaxie" | "multiversum" | "grundstrukturen") {
-            Some(ober_n.clone())
-        } else {
-            None
-        };
-        let unter0 = Some(unter_n);
-
-        (bedeutung0, procontra0, grundstrukturen0, unter0)
+        let ober = self.ober_normalized();
+        let unter = self.unter_normalized();
+        (Some(ober), None, None, Some(unter))
     }
+
+}
+
+impl fmt::Display for SpaltenAnfrage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_cli())
+    }
+}
+
+pub fn normalize_key(s: &str) -> String {
+    s.trim()
+        .to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
 }

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
-use crate::domain::request_bridge::parse_and_bridge;
+use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
 
@@ -22,21 +22,11 @@ pub fn resolve_cli_selection(
     ober: &str,
     unter: &str,
 ) -> Result<LegacyResolvedSelection, Box<dyn std::error::Error>> {
-    if let Some(canonical_req) = parse_and_bridge(ober, unter) {
-        if let Some(spec) = resolve_request(canonical_req) {
-            let mut out = LegacyResolvedSelection::default();
-            match spec.target {
-                ColumnTarget::DirectColumn(id) => out.exact_direct_columns.push(id as usize),
-                ColumnTarget::DirectColumns(ids) => out.exact_direct_columns.extend(ids.into_iter().map(|x| x as usize)),
-                ColumnTarget::Pair(a, b) => out.exact_modal_pairs.push((a as usize, b as usize)),
-                ColumnTarget::Generator(generator_spec) => {
-                    out.generated_befehle.insert(generator_spec.art.to_string().to_lowercase());
-                }
-                ColumnTarget::Combination(_) => {}
-            }
-            dedup_legacy_selection(&mut out);
-            return Ok(out);
-        }
+    if let Some(canonical) = bridge_cli_selection(ober, unter).and_then(resolve_request) {
+        let mut out = LegacyResolvedSelection::default();
+        apply_canonical_spec(&mut out, canonical.target);
+        dedup_legacy_selection(&mut out);
+        return Ok(out);
     }
 
     if let Some(exact) = resolve_exact_generator(ober, unter) {
@@ -107,4 +97,18 @@ fn to_boxed_request_pipeline_error(
     err: crate::domain::errors::RequestPipelineError,
 ) -> Box<dyn std::error::Error> {
     Box::<dyn std::error::Error>::from(err.to_string())
+}
+
+
+fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget) {
+    match target {
+        ColumnTarget::DirectColumn(col) => sel.direct_columns.push(col),
+        ColumnTarget::DirectColumns(cols) => sel.direct_columns.extend(cols),
+        ColumnTarget::Pair(a, b) => sel.exact_modal_pairs.push((usize::from(a), usize::from(b))),
+        ColumnTarget::Generator(generator_spec) => {
+            sel.generated_befehle
+                .insert(generator_spec.art.to_string().to_lowercase());
+        }
+        ColumnTarget::Combination(_) => {}
+    }
 }

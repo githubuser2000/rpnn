@@ -48,7 +48,6 @@ impl ParsedSelectionRequest {
         if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
             generated_befehle.extend(inference.generated_befehle);
         }
-        generated_befehle.extend(self.request.generated_befehle_hint());
         ExpandedSelectionRequest { request: self.request, generated_befehle }
     }
 }
