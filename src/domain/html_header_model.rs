@@ -1,5 +1,5 @@
 
-use crate::domain::html_meta_builder::resolve_html_header_class;
+use crate::domain::html_meta_builder::build_python_exact_html_class;
 
 pub struct ResolvedHeaderMeta {
     pub visible_text: String,
@@ -40,10 +40,10 @@ pub fn resolve_header_meta(raw: &str, col_idx: usize, is_header_row: bool) -> Re
         };
     }
 
-    if let Some(resolved_class) = resolve_html_header_class(raw, col_idx, is_header_row) {
+    if let Some(class_attr) = build_python_exact_html_class(raw, col_idx, is_header_row) {
         return ResolvedHeaderMeta {
             visible_text: strip_id_suffix(&visible_text),
-            class_attr: Some(resolved_class.class_attr.to_string()),
+            class_attr: Some(class_attr),
         };
     }
 

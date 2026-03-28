@@ -15,7 +15,6 @@ use crate::domain::model::spalten_anfrage::{
 };
 use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
-use crate::domain::parser::legacy_cli_typed::LegacyOberToken;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -219,6 +218,13 @@ fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
     }
 }
 
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+}
+
 impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
@@ -362,8 +368,8 @@ impl KategorieMap {
     }
 
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
-        let ober_token = LegacyOberToken::parse(ober);
-        let unter_trimmed = unter.trim();
+        let ober_n = normalize_key(ober);
+        let unter_n = normalize_key(unter);
 
         let mut direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
         direct_columns.sort();
@@ -374,8 +380,8 @@ impl KategorieMap {
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
 
-        if matches!(ober_token, LegacyOberToken::ProContra | LegacyOberToken::Bedeutung | LegacyOberToken::Universum)
-            && matches!(unter_trimmed, "Primzahlkreuz" | "primzahlkreuz" | "primzahlkreuzprocontra")
+        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
+            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
         {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
         }
@@ -510,13 +516,14 @@ impl KategorieMap {
         for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
             if let Some(meta) = python_source_of_truth::exact_decl_meta_for_column(col) {
                 for main in Self::extract_main_categories_from_decl_meta(&meta) {
-                    match LegacyOberToken::parse(&main) {
-                        LegacyOberToken::Eigenschaften1ProN => {
+                    let normalized = normalize_key(&main);
+                    match normalized.as_str() {
+                        "eigenschaften1n" => {
                             mains.insert("Eigenschaften_1/n".to_string());
                             mains.insert("konzept2".to_string());
                             mains.insert("konzepte2".to_string());
                         }
-                        LegacyOberToken::Eigenschaften | LegacyOberToken::EigenschaftenN => {
+                        "eigenschaftenn" | "eigenschaft" | "eigenschaften" => {
                             mains.insert("Eigenschaften_n".to_string());
                             mains.insert("konzept1".to_string());
                             mains.insert("konzepte1".to_string());
@@ -568,12 +575,7 @@ impl KategorieMap {
     }
 
     fn extract_main_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out: Vec<String> = meta
-            .main_group_names()
-            .into_iter()
-            .map(|s| s.trim().trim_start_matches('✗').trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let mut out = meta.p1_groups.clone();
         out.sort();
         out.dedup();
         out
@@ -581,11 +583,11 @@ impl KategorieMap {
 
     fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
         let mut out: Vec<String> = meta
-            .visible_slot_atoms()
-            .into_iter()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .filter(|s| !s.chars().all(|c: char| c.is_ascii_digit()))
+            .p2_slots
+            .iter()
+            .flatten()
+            .filter(|s| !s.trim().is_empty())
+            .cloned()
             .collect();
         out.sort();
         out.dedup();
@@ -593,6 +595,7 @@ impl KategorieMap {
     }
 
     fn merge_fraction_number_aliases(
+
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
         let families: &[(&[&str], std::ops::RangeInclusive<u32>)] = &[

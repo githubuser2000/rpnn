@@ -8,7 +8,6 @@ use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::reta_ausgabe::OutputSyntax;
 
 use crate::domain::model::spalten_anfrage::CanonicalColumnSpec;
-use crate::domain::parser::legacy_cli_typed::GeneratedCommandToken;
 
 pub fn spec_to_report_line(spec: &CanonicalColumnSpec) -> String {
     spec.header_display.clone()
@@ -19,6 +18,15 @@ pub fn request_to_report_line(req: &SpaltenAnfrage) -> String {
 }
 
 type AnfragePair = SpaltenAnfrage;
+
+fn normalize_key(s: &str) -> String {
+    s.trim()
+        .to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
+}
 
 fn request(ober: &str, unter: &str) -> SpaltenAnfrage {
     SpaltenAnfrage::parse(ober, unter).unwrap_or_else(|_| SpaltenAnfrage::Unknown {
@@ -146,75 +154,71 @@ fn collect_kombi_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>) {
 }
 
 fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, out: &mut BTreeSet<AnfragePair>) {
-    let parsed: BTreeSet<GeneratedCommandToken> = generated_befehle
-        .iter()
-        .filter_map(|cmd| GeneratedCommandToken::parse(cmd))
-        .collect();
-    let has = |needle: GeneratedCommandToken| parsed.contains(&needle);
+    let has = |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
 
-    if has(GeneratedCommandToken::PrimzahlkreuzProContra) {
+    if has("primzahlkreuzprocontra") {
         out.insert(request("Universum", "Primzahlkreuz"));
         out.insert(request("Bedeutung", "Primzahlkreuz"));
         out.insert(request("Pro_Contra", "Primzahlkreuz"));
     }
 
-    if has(GeneratedCommandToken::LovePolygon) {
+    if has("lovepolygon") {
         out.insert(request("Menschliches", "Liebe"));
         out.insert(request("Grundstrukturen", "Liebe"));
     }
 
-    if has(GeneratedCommandToken::GleichheitFreiheit) {
+    if has("gleichheitfreiheit") {
         out.insert(request("Planet", "Gleichheit"));
         out.insert(request("Menschliches", "Gleichheit"));
         out.insert(request("Grundstrukturen", "Gleichheit"));
     }
 
-    if has(GeneratedCommandToken::GeistEmotionEnergieMaterieTopologie) {
+    if has("geistemotionenergiematerietopologie") {
         out.insert(request("Universum", "Geist"));
         out.insert(request("Multiversum", "Geist"));
         out.insert(request("Grundstrukturen", "Geist"));
     }
 
-    if has(GeneratedCommandToken::PrimCreativityType) || has(GeneratedCommandToken::MondExponzierenLogarithmusTyp) {
+    if has("primcreativitytype") || has("mondexponzierenlogarithmustyp") {
         out.insert(request("Wichtigstes_zum_verstehen", "Gestirn"));
         out.insert(request("Bedeutung", "Gestirn"));
     }
 
-    if has(GeneratedCommandToken::VervielfacheZeile) {
+    if has("vervielfachezeile") {
         out.insert(request("Wichtigstes_zum_verstehen", "Primzahlen"));
         out.insert(request("Bedeutung", "Primzahlen"));
         out.insert(request("Galaxie", "Primzahlen"));
     }
 
-    if has(GeneratedCommandToken::PrimMotGleichf) {
+    if has("primmotgleichf") {
         out.insert(request("primvielfache", "motivgleichfoermig"));
         out.insert(request("multiplikationen", "motivgleichfoermig"));
     }
-    if has(GeneratedCommandToken::PrimStrukGleichf) {
+    if has("primstrukgleichf") {
         out.insert(request("primvielfache", "strukturgleichfoermig"));
         out.insert(request("multiplikationen", "strukturgleichfoermig"));
     }
-    if has(GeneratedCommandToken::PrimMotivStern) {
+    if has("primmotivstern") {
         out.insert(request("primvielfache", "motivstern"));
         out.insert(request("multiplikationen", "motivstern"));
     }
-    if has(GeneratedCommandToken::PrimStrukturStern) {
+    if has("primstrukturstern") {
         out.insert(request("primvielfache", "strukturstern"));
         out.insert(request("multiplikationen", "strukturstern"));
     }
-    if has(GeneratedCommandToken::PrimMotivSternGebr) {
+    if has("primmotivsterngebr") {
         out.insert(request("primvielfache", "motivgebrstern"));
         out.insert(request("multiplikationen", "motivgebrstern"));
     }
-    if has(GeneratedCommandToken::PrimStrukturSternGebr) {
+    if has("primstruktursterngebr") {
         out.insert(request("primvielfache", "strukgebrstern"));
         out.insert(request("multiplikationen", "strukgebrstern"));
     }
-    if has(GeneratedCommandToken::PrimMotGleichfGebr) {
+    if has("primmotgleichfgebr") {
         out.insert(request("primvielfache", "motivgebrgleichf"));
         out.insert(request("multiplikationen", "motivgebrgleichf"));
     }
-    if has(GeneratedCommandToken::PrimStrukGleichfGebr) {
+    if has("primstrukgleichfgebr") {
         out.insert(request("primvielfache", "strukgebrgleichf"));
         out.insert(request("multiplikationen", "strukgebrgleichf"));
     }

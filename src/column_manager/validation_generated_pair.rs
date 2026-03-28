@@ -1,23 +1,35 @@
 // file: column_manager/validation.rs
 use std::collections::BTreeSet;
 use crate::cli::TextBereich;
-use crate::domain::parser::legacy_cli_typed::matches_any_alias;
+
+fn normalize_token(input: &str) -> String {
+    input
+        .trim()
+        .to_lowercase()
+        .replace('ä', "ae")
+        .replace('ö', "oe")
+        .replace('ü', "ue")
+        .replace('ß', "ss")
+        .replace('-', "")
+        .replace('_', "")
+        .replace(' ', "")
+}
 
 /// Gleiche Pair-Logik wie in table_printer/query.rs, aber leichtgewichtig für die Validierung.
 /// So kann `--spaltenname planet ordnen` schon in der Validation als potenziell
 /// generierter Fall akzeptiert werden, statt sofort mit "keine Spalten gefunden"
 /// abzubrechen.
 pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
-    let is_ober = |aliases: &[&str]| matches_any_alias(ober, aliases);
-    let is_unter = |aliases: &[&str]| matches_any_alias(unter, aliases);
+    let ober = normalize_token(ober);
+    let unter = normalize_token(unter);
 
-    let is_prim_generated_group =
-        is_ober(&["primvielfache", "primvielfach", "primvielfaches", "multiplikationen", "multiplikation"]);
+    let is_ober = |aliases: &[&str]| aliases.iter().any(|a| ober == normalize_token(a));
+    let is_unter = |aliases: &[&str]| aliases.iter().any(|a| unter == normalize_token(a));
 
-    (is_ober(&["procontra", "pro_contra", "bedeutung", "grundstrukturen"])
+    (is_ober(&["procontra", "bedeutung", "grundstrukturen"])
         && is_unter(&["primzahlkreuz", "nachvollziehen"]))
         || (is_ober(&["menschliches"]) && is_unter(&["liebe", "ethik"]))
-        || (is_ober(&["planet", "planet_(10_und_oder_12)", "menschliches", "grundstrukturen"])
+        || (is_ober(&["planet", "menschliches", "grundstrukturen"])
             && is_unter(&[
                 "ordnen",
                 "ordnung",
@@ -38,7 +50,7 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
                 "gefühl",
                 "gefühle",
             ]))
-        || (is_ober(&["wichtigste", "wichtigstes_zum_verstehen", "bedeutung"])
+        || (is_ober(&["wichtigste", "bedeutung"])
             && is_unter(&[
                 "gestirn",
                 "mond",
@@ -52,24 +64,13 @@ pub fn is_generated_pair_alias(ober: &str, unter: &str) -> bool {
                 "kreativität",
                 "intelligenz",
             ]))
-        || (is_ober(&["bedeutung", "wichtigste", "wichtigstes_zum_verstehen", "galaxie", "multiplikationen", "primvielfache"])
+        || (is_ober(&["bedeutung", "wichtigste", "galaxie", "multiplikationen", "primvielfache"])
             && is_unter(&[
                 "primzahlen",
                 "vielfache",
                 "vielfacher",
                 "multis",
                 "multiplikationen",
-            ]))
-        || (is_prim_generated_group
-            && is_unter(&[
-                "motivgleichfoermig",
-                "strukturgleichfoermig",
-                "motivstern",
-                "strukturstern",
-                "motivgebrstern",
-                "strukgebrstern",
-                "motivgebrgleichf",
-                "strukgebrgleichf",
             ]))
 }
 
