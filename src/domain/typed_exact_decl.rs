@@ -7,9 +7,6 @@ pub fn is_typed_exact_decl_column(col: u32) -> bool {
     TYPED_EXACT_DECL_COLUMNS.contains(&col)
 }
 
-/// Übergangspfad für die Migration weg von rohen Meta-Strings.
-/// Solange die Liste oben leer ist, fällt das System noch vollständig auf
-/// den Legacy-Pfad zurück.
 pub fn typed_exact_decl_for_column(_col: u32) -> Option<HtmlDeclMeta> {
     None
 }
