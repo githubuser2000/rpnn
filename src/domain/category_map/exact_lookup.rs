@@ -1,7 +1,8 @@
 use crate::domain::categories::{
     KategorieMap, KategorieProvider, Oberkategorie, OberkategorieEntry, UnterkategorieEntry,
 };
-use super::normalize::normalize_key;
+use crate::domain::parser::cli_alias_parser::parse_spalten_anfrage;
+use super::normalize::names_equal;
 
 pub fn finde_spaltennummern_exakt_in_maps<O, U>(
     hauptkategorien: &[O],
@@ -13,15 +14,21 @@ where
     U: UnterkategorieEntry,
 {
     let mut gefundene = Vec::new();
-    let ober_gesucht = normalize_key(ober);
-    let unter_gesucht = normalize_key(unter);
+    let requested = parse_spalten_anfrage(ober, unter).ok();
 
     for haupt in hauptkategorien {
-        if normalize_key(haupt.ober_name()) == ober_gesucht {
-            for unterkategorie in haupt.unterkategorien() {
-                if normalize_key(unterkategorie.unter_name()) == unter_gesucht {
-                    gefundene.extend_from_slice(unterkategorie.column_numbers());
-                }
+        for unterkategorie in haupt.unterkategorien() {
+            let is_match = if let Some(request) = &requested {
+                parse_spalten_anfrage(haupt.ober_name(), unterkategorie.unter_name())
+                    .ok()
+                    .as_ref()
+                    == Some(request)
+            } else {
+                names_equal(haupt.ober_name(), ober) && names_equal(unterkategorie.unter_name(), unter)
+            };
+
+            if is_match {
+                gefundene.extend_from_slice(unterkategorie.column_numbers());
             }
         }
     }

@@ -1,23 +1,24 @@
-use crate::cli::{TextBereich, parse_cli_args};
 use crate::cli::parser::{SpaltenNamen, SpaltenNamenListe};
+use crate::cli::{parse_cli_args, TextBereich};
 use crate::column_categories_complete::KategorieMap;
+use crate::domain::parser::legacy_cli_typed::matches_any_alias;
 use crate::table_printer::query::try_resolve_generated_pair;
 use std::collections::BTreeSet;
 use std::error::Error;
 
-fn normalize_category_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-}
-
 fn is_primzahlkreuz_pro_contra_request(ober: &str, unter: &str) -> bool {
-    let ober = normalize_category_key(ober);
-    let unter = normalize_category_key(unter);
+    let is_ober = |aliases: &[&str]| matches_any_alias(ober, aliases);
+    let is_unter = |aliases: &[&str]| matches_any_alias(unter, aliases);
 
-    matches!(ober.as_str(), "bedeutung" | "procontra" | "universum" )
-        && matches!(unter.as_str(), "primzahlkreuzprocontra" | "primzahlkreuz")
+    matches!(
+        (),
+        _ if is_ober(&["bedeutung", "procontra", "pro_contra", "universum"])
+            && is_unter(&[
+                "primzahlkreuzprocontra",
+                "primzahlkreuz pro contra",
+                "primzahlkreuz",
+            ])
+    )
 }
 
 pub struct SpaltenVerarbeiter<'a> {
@@ -49,11 +50,7 @@ impl<'a> SpaltenVerarbeiter<'a> {
         println!("📊 Bereich nach Parser: {:?}", bereich);
         println!("📝 Spaltennamen: {:?}", spalten_namen);
 
-        self.verarbeite_automatische_spalten(
-            &mut bereich,
-            &spalten_namen,
-            &spalten_namen_liste,
-        )?;
+        self.verarbeite_automatische_spalten(&mut bereich, &spalten_namen, &spalten_namen_liste)?;
 
         Ok(VerarbeitungsErgebnis {
             bereich,
@@ -61,59 +58,59 @@ impl<'a> SpaltenVerarbeiter<'a> {
         })
     }
 
-fn verarbeite_automatische_spalten(
-    &self,
-    bereich: &mut TextBereich,
-    spalten_namen: &SpaltenNamen,
-    spalten_namen_liste: &SpaltenNamenListe
-) -> Result<(), Box<dyn Error>> {
-    let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
+    fn verarbeite_automatische_spalten(
+        &self,
+        bereich: &mut TextBereich,
+        spalten_namen: &SpaltenNamen,
+        spalten_namen_liste: &SpaltenNamenListe,
+    ) -> Result<(), Box<dyn Error>> {
+        let hat_manuelle_spalten = !bereich.spalten_bereiche.is_empty();
 
-    if !hat_manuelle_spalten &&
-       (spalten_namen.oberkategorie != "oberkategorie" ||
-        spalten_namen.unterkategorie != "unterkategorie") {
-
-        println!(
-            "\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
-            spalten_namen.oberkategorie, spalten_namen.unterkategorie
-        );
-
-        if is_primzahlkreuz_pro_contra_request(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        ) {
-            println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
-
-            bereich.mark_columns_resolved();
-
-            return Ok(());
-        }
-
-        let mut generated_befehle = BTreeSet::new();
-        let mut required_columns = BTreeSet::new();
-
-        if try_resolve_generated_pair(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-            &mut generated_befehle,
-            &mut required_columns,
-        ) {
+        if !hat_manuelle_spalten
+            && (spalten_namen.oberkategorie != "oberkategorie"
+                || spalten_namen.unterkategorie != "unterkategorie")
+        {
             println!(
-                "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
-                generated_befehle, required_columns
+                "\n🔍 Automatische Spaltensuche für: '{}' → '{}'",
+                spalten_namen.oberkategorie, spalten_namen.unterkategorie
             );
 
-            let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
-            self.setze_gefundene_spalten(bereich, required)?;
-            bereich.mark_columns_resolved();
-            return Ok(());
+            if is_primzahlkreuz_pro_contra_request(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+            ) {
+                println!("ℹ️ Spezialfall Primzahlkreuz erkannt: keine normale Spaltensuche");
+
+                bereich.mark_columns_resolved();
+
+                return Ok(());
+            }
+
+            let mut generated_befehle = BTreeSet::new();
+            let mut required_columns = BTreeSet::new();
+
+            if try_resolve_generated_pair(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+                &mut generated_befehle,
+                &mut required_columns,
+            ) {
+                println!(
+                    "ℹ️ Generierte Wortpaar-Kombination erkannt: {:?} → Basisspalten {:?}",
+                    generated_befehle, required_columns
+                );
+
+                let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
+                self.setze_gefundene_spalten(bereich, required)?;
+                bereich.mark_columns_resolved();
+                return Ok(());
+            }
+
+            self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
         }
 
-        self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
+        Ok(())
     }
-
-    Ok(())
-}
 
     fn suche_und_setze_spalten(
         &self,
@@ -123,11 +120,10 @@ fn verarbeite_automatische_spalten(
         let mut alle_gefundene_spalten: Vec<u32> = Vec::new();
 
         for spalten_namen in &spalten_namen_liste.eintraege {
-            let gefundene_spalten: Vec<u32> =
-                self.kategorie_map.finde_spaltennummern_fuer_kategorien(
-                    &spalten_namen.oberkategorie,
-                    &spalten_namen.unterkategorie,
-                );
+            let gefundene_spalten: Vec<u32> = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+            );
 
             alle_gefundene_spalten.extend(gefundene_spalten);
         }
@@ -137,31 +133,29 @@ fn verarbeite_automatische_spalten(
             alle_gefundene_spalten.dedup();
 
             self.setze_gefundene_spalten(bereich, alle_gefundene_spalten)?;
-        } else {
-            if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
-                let mut generated_befehle = BTreeSet::new();
-                let mut required_columns = BTreeSet::new();
+        } else if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
+            let mut generated_befehle = BTreeSet::new();
+            let mut required_columns = BTreeSet::new();
 
-                if try_resolve_generated_pair(
-                    &letzte_spalten_namen.oberkategorie,
-                    &letzte_spalten_namen.unterkategorie,
-                    &mut generated_befehle,
-                    &mut required_columns,
-                ) {
-                    println!(
-                        "ℹ️ Fallback auf generierte Spaltenauflösung: {:?} → Basisspalten {:?}",
-                        generated_befehle, required_columns
-                    );
+            if try_resolve_generated_pair(
+                &letzte_spalten_namen.oberkategorie,
+                &letzte_spalten_namen.unterkategorie,
+                &mut generated_befehle,
+                &mut required_columns,
+            ) {
+                println!(
+                    "ℹ️ Fallback auf generierte Spaltenauflösung: {:?} → Basisspalten {:?}",
+                    generated_befehle, required_columns
+                );
 
-                    let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
-                    self.setze_gefundene_spalten(bereich, required)?;
-                    bereich.mark_columns_resolved();
-                } else {
-                    self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
-                }
+                let required: Vec<u32> = required_columns.into_iter().map(|n| n as u32).collect();
+                self.setze_gefundene_spalten(bereich, required)?;
+                bereich.mark_columns_resolved();
             } else {
-                return Err("SpaltenNamenListe ist leer".into());
+                self.fallback_zu_standards(bereich, letzte_spalten_namen)?;
             }
+        } else {
+            return Err("SpaltenNamenListe ist leer".into());
         }
 
         Ok(())
@@ -196,33 +190,31 @@ fn verarbeite_automatische_spalten(
         Ok(())
     }
 
-fn fallback_zu_standards(
-    &self,
-    bereich: &mut TextBereich,
-    spalten_namen: &SpaltenNamen,
-) -> Result<(), Box<dyn Error>> {
-    println!(
-        "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
-        spalten_namen.oberkategorie, spalten_namen.unterkategorie
-    );
+    fn fallback_zu_standards(
+        &self,
+        bereich: &mut TextBereich,
+        spalten_namen: &SpaltenNamen,
+    ) -> Result<(), Box<dyn Error>> {
+        println!(
+            "❌ Keine Spaltennummern gefunden für: '{}' → '{}'",
+            spalten_namen.oberkategorie, spalten_namen.unterkategorie
+        );
 
-    self.zeige_alternative_kombinationen();
+        self.zeige_alternative_kombinationen();
 
-    bereich.spalten_bereiche.clear();
-    bereich.spaltenreihenfolgeundnurdiese.clear();
-    bereich.exact_visible_columns.clear();
+        bereich.spalten_bereiche.clear();
+        bereich.spaltenreihenfolgeundnurdiese.clear();
+        bereich.exact_visible_columns.clear();
 
-    bereich.von_spalte = usize::MAX;
-    bereich.bis_spalte = usize::MAX;
+        bereich.von_spalte = usize::MAX;
+        bereich.bis_spalte = usize::MAX;
 
-    bereich.reset_column_request();
+        bereich.reset_column_request();
 
-    Ok(())
-}
+        Ok(())
+    }
+
     fn zeige_alternative_kombinationen(&self) {
-        println!("ℹ️  Versuche es mit diesen Kombinationen:");
-        println!("  --spaltenname 'Menschliches' 'Motive'");
-        println!("   --spaltenname 'Universum' 'Transzendentalien --spaltenname 'Menschliches' 'Liebe'");
-        println!("  --spaltenname 'Religionen' 'Superkräfte'");
+        println!("📚 Prüfe verfügbare Ober-/Unterkategorien mit --alles oder Reverse-Report.");
     }
 }
