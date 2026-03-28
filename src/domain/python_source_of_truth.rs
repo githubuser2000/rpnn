@@ -9,7 +9,9 @@ pub struct PyDecl {
 
 use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::parser::legacy_cli_typed::{fold_cli_case, matches_any_alias, LegacyOberToken};
-use crate::domain::typed_exact_decl::{all_typed_exact_decls, typed_exact_decl_for_column};
+use crate::domain::typed_exact_decl::{
+    all_typed_exact_decls, is_typed_exact_decl_column, typed_exact_decl_for_column,
+};
 
 fn ober_alias_match(input: &str, aliases: &[&str]) -> bool {
     match LegacyOberToken::parse(input) {
@@ -2597,6 +2599,11 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     if let Some(meta) = typed_exact_decl_for_column(col) {
         return Some(meta);
     }
+
+    if is_typed_exact_decl_column(col) {
+        panic!("typed exact decl column {} has no typed implementation", col);
+    }
+
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
             return HtmlDeclMeta::parse(meta);
@@ -2608,7 +2615,7 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
     let mut out = all_typed_exact_decls();
     for (col, meta) in EXACT_HTML_META {
-        if out.iter().any(|(c, _)| c == col) {
+        if is_typed_exact_decl_column(*col) {
             continue;
         }
         if let Some(parsed) = HtmlDeclMeta::parse(meta) {

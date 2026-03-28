@@ -16,6 +16,14 @@ fn decl(
     )
 }
 
+pub const TYPED_EXACT_DECL_COLUMNS: &[u32] = &[
+    0, 1, 2, 3, 6, 7, 8, 9, 10, 19, 21, 22, 25, 29, 30, 31, 34, 35, 36, 37, 52, 53, 112, 132, 220, 221, 241, 289, 324, 394, 395, 461, 466, 479, 485, 516,
+];
+
+pub fn is_typed_exact_decl_column(col: u32) -> bool {
+    TYPED_EXACT_DECL_COLUMNS.contains(&col)
+}
+
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
         0 => Some(decl(
@@ -317,8 +325,9 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
-    [0u32, 1, 2, 3, 6, 7, 8, 9, 10, 19, 21, 22, 25, 29, 30, 31, 34, 35, 36, 37, 52, 53, 112, 132, 220, 221, 241, 289, 324, 394, 395, 461, 466, 479, 485, 516]
-        .into_iter()
+    TYPED_EXACT_DECL_COLUMNS
+        .iter()
+        .copied()
         .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
         .collect()
 }
