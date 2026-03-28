@@ -42,19 +42,30 @@ impl HtmlDeclMeta {
             render_p4_tags(&self.p4_tags)
         )
     }
-}
 
-impl HtmlDeclMeta {
     pub fn main_group_names(&self) -> Vec<String> {
-        self.p1_groups.iter().map(|g| g.render().to_string()).collect()
+        let mut out: Vec<String> = self
+            .p1_groups
+            .iter()
+            .map(|g| g.render().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        out.sort();
+        out.dedup();
+        out
     }
 
     pub fn visible_slot_atoms(&self) -> Vec<String> {
-        self.p2_slots
+        let mut out: Vec<String> = self
+            .p2_slots
             .iter()
-            .filter(|slot| !slot.is_empty())
             .map(|slot| slot.render())
-            .collect()
+            .filter(|s| !s.is_empty())
+            .filter(|s| !s.chars().all(|c| c.is_ascii_digit()))
+            .collect();
+        out.sort();
+        out.dedup();
+        out
     }
 }
 
@@ -164,6 +175,7 @@ pub enum HtmlSlotLabel {
     Geist15,
     Religion,
     Primzahlkreuz,
+    Liebe7,
 }
 
 impl HtmlSlotLabel {
@@ -181,6 +193,7 @@ impl HtmlSlotLabel {
             "Geist__(15)" => Some(Self::Geist15),
             "Religion" => Some(Self::Religion),
             "Primzahlkreuz" => Some(Self::Primzahlkreuz),
+            "Liebe_(7)" => Some(Self::Liebe7),
             _ => None,
         }
     }
@@ -199,6 +212,7 @@ impl HtmlSlotLabel {
             Self::Geist15 => "Geist__(15)",
             Self::Religion => "Religion",
             Self::Primzahlkreuz => "Primzahlkreuz",
+            Self::Liebe7 => "Liebe_(7)",
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::domain::decl_model::HtmlDeclMeta;
-use crate::domain::typed_exact_decl::{all_typed_exact_decl_meta, typed_exact_decl_for_column};
+use crate::domain::typed_exact_decl::{all_typed_exact_decl, typed_exact_decl_for_column};
 // Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
@@ -2592,6 +2592,7 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     if let Some(meta) = typed_exact_decl_for_column(col) {
         return Some(meta);
     }
+
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
             return HtmlDeclMeta::parse(meta);
@@ -2601,13 +2602,13 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
-    let mut out = all_typed_exact_decl_meta();
-    for (c, meta) in EXACT_HTML_META
-        .iter()
-        .filter_map(|(c, meta)| HtmlDeclMeta::parse(meta).map(|parsed| (*c, parsed)))
-    {
-        if !out.iter().any(|(existing, _)| *existing == c) {
-            out.push((c, meta));
+    let mut out = all_typed_exact_decl();
+    for (c, meta) in EXACT_HTML_META {
+        if out.iter().any(|(existing, _)| existing == c) {
+            continue;
+        }
+        if let Some(parsed) = HtmlDeclMeta::parse(meta) {
+            out.push((*c, parsed));
         }
     }
     out.sort_by_key(|(c, _)| *c);

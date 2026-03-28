@@ -1,4 +1,6 @@
-use crate::domain::decl_model::{HtmlDeclMeta, HtmlEigenschaftFamilie, HtmlP2Slot};
+use crate::domain::decl_model::{
+    HtmlDeclMeta, HtmlEigenschaftFamilie, HtmlP1Group, HtmlP2Slot, HtmlP4Tag,
+};
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::decl_for_visible_header;
 use crate::domain::python_source_of_truth::{exact_decl_meta_for_column, exact_meta_for_column};
