@@ -1,7 +1,7 @@
 use crate::domain::decl_model::{HtmlDeclMeta, HtmlEigenschaftFamilie};
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::css_class_for_visible_header;
-use crate::domain::python_source_of_truth::exact_meta_for_column;
+use crate::domain::python_source_of_truth::{exact_decl_meta_for_column, exact_meta_for_column};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeaderSemantic {
@@ -186,8 +186,7 @@ fn choose_variant_index(col_idx: usize, len: usize) -> usize {
 }
 
 fn parsed_meta_for_column(col0: u32) -> Option<HtmlDeclMeta> {
-    let meta = exact_meta_for_column(col0)?;
-    HtmlDeclMeta::parse(&meta)
+    exact_decl_meta_for_column(col0)
 }
 
 fn fallback_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie) -> HtmlDeclMeta {
