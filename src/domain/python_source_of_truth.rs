@@ -1,4 +1,5 @@
 use crate::domain::decl_model::HtmlDeclMeta;
+use crate::domain::typed_exact_decl::{all_typed_exact_decls, is_typed_exact_decl_column, typed_exact_decl_for_column};
 // Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
@@ -2592,13 +2593,23 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 
 
 pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    let meta = exact_meta_for_column(col)?;
-    HtmlDeclMeta::parse(&meta)
+    if let Some(meta) = typed_exact_decl_for_column(col) {
+        return Some(meta);
+    }
+
+    if is_typed_exact_decl_column(col) {
+        panic!("TYPED_EXACT_DECL_COLUMNS contains {}, but typed_exact_decl_for_column returned None", col);
+    }
+
+    legacy_exact_decl_meta_for_column(col)
 }
 
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
-    let mut out = Vec::new();
+    let mut out = all_typed_exact_decls();
     for (col, meta) in EXACT_HTML_META {
+        if is_typed_exact_decl_column(*col) {
+            continue;
+        }
         if let Some(parsed) = HtmlDeclMeta::parse(meta) {
             out.push((*col, parsed));
         }
@@ -2607,10 +2618,5 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
-    for (c, meta) in EXACT_HTML_META {
-        if *c == col {
-            return Some((*meta).to_string());
-        }
-    }
-    None
+    exact_decl_meta_for_column(col).map(|meta| meta.render())
 }
