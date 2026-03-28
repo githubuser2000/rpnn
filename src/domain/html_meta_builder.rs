@@ -1,7 +1,8 @@
-use crate::domain::decl_model::HtmlDeclMeta;
-use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
+
+use crate::domain::decl_model::{HtmlDeclMeta, HtmlEigenschaftFamilie};
+use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::css_class_for_visible_header;
-use crate::domain::python_source_of_truth::{exact_meta_for_column, PY_DECLS};
+use crate::domain::python_source_of_truth::exact_meta_for_column;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeaderSemantic {
@@ -10,9 +11,15 @@ enum HeaderSemantic {
     SourceColumn(u32),
     GeneratedEigenschaft {
         key: EigenschaftKeyId,
-        family: EigenschaftStandardFamilie,
+        family: HtmlEigenschaftFamilie,
     },
     Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct GeneratorMarker {
+    eigkey: Option<EigenschaftKeyId>,
+    family: Option<HtmlEigenschaftFamilie>,
 }
 
 fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
@@ -22,24 +29,27 @@ fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
     rest[..end].parse::<u32>().ok()
 }
 
-fn strip_visible_text(raw: &str) -> String {
-    let s = raw.trim().trim_matches('"').trim().to_string();
-    if let Some(pos) = s.rfind("(ID_") {
-        s[..pos].trim().to_string()
-    } else {
-        s
+fn split_marker(raw: &str) -> (&str, Option<&str>) {
+    if let Some(start) = raw.rfind("[[RPNN:") {
+        let head = raw[..start].trim_end();
+        let rest = &raw[start + 7..];
+        if let Some(end) = rest.find("]]") {
+            return (head, Some(&rest[..end]));
+        }
     }
+    (raw, None)
 }
 
-fn strip_generated_prefix(raw: &str) -> &str {
-    raw.trim()
-        .strip_prefix("Generiert:")
-        .map(str::trim)
-        .unwrap_or_else(|| raw.trim())
+fn strip_visible_text(raw: &str) -> String {
+    let (raw_no_marker, _) = split_marker(raw);
+    raw_no_marker.trim().trim_matches('"').trim().to_string()
 }
 
 fn normalize_key(s: &str) -> String {
     s.to_lowercase()
+        .replace('„', "")
+        .replace('“', "")
+        .replace('"', "")
         .replace('_', "")
         .replace('-', "")
         .replace(' ', "")
@@ -48,9 +58,79 @@ fn normalize_key(s: &str) -> String {
         .replace(')', "")
         .replace(',', "")
         .replace(':', "")
-        .replace('„', "")
-        .replace('“', "")
-        .replace('"', "")
+}
+
+fn parse_marker(raw: &str) -> Option<GeneratorMarker> {
+    let (_, marker_raw) = split_marker(raw);
+    let marker_raw = marker_raw?;
+    let mut marker = GeneratorMarker::default();
+
+    for part in marker_raw.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+        if let Some(value) = part.strip_prefix("EIGKEY=") {
+            marker.eigkey = EigenschaftKeyId::from_alias(value).or_else(|| {
+                EigenschaftKeyId::ALL
+                    .iter()
+                    .copied()
+                    .find(|k| normalize_key(k.canonical_name()) == normalize_key(value))
+            });
+        } else if let Some(value) = part.strip_prefix("FAMILY=") {
+            marker.family = match value {
+                "1N" => Some(HtmlEigenschaftFamilie::EinsDurchN),
+                "N" => Some(HtmlEigenschaftFamilie::N),
+                _ => None,
+            };
+        }
+    }
+
+    Some(marker)
+}
+
+fn family_from_visible_text(visible_text: &str) -> Option<HtmlEigenschaftFamilie> {
+    let n = normalize_key(visible_text);
+    if n.contains("gleichförmigenpolygonen")
+        || n.contains("gleichfoermigenpolygonen")
+        || n.contains("eigenschaften1n")
+        || n.contains("1n")
+    {
+        Some(HtmlEigenschaftFamilie::EinsDurchN)
+    } else if n.contains("sternenpolygonen") || n.contains("eigenschaftenn") {
+        Some(HtmlEigenschaftFamilie::N)
+    } else {
+        None
+    }
+}
+
+fn extract_quoted_segment(visible_text: &str) -> Option<String> {
+    let start = visible_text.find('„').or_else(|| visible_text.find('"'))?;
+    let tail = &visible_text[start + 1..];
+    let end = tail.find('“').or_else(|| tail.find('"'))?;
+    Some(tail[..end].trim().to_string())
+}
+
+fn key_from_quoted_segment(visible_text: &str) -> Option<EigenschaftKeyId> {
+    let seg = extract_quoted_segment(visible_text)?;
+    let seg_n = normalize_key(&seg);
+
+    let mut best: Option<(usize, EigenschaftKeyId)> = None;
+    for key in EigenschaftKeyId::ALL.iter().copied() {
+        let canon = normalize_key(key.canonical_name());
+        if !canon.is_empty() && seg_n.contains(&canon) {
+            let score = canon.len() + 100;
+            if best.map(|(n, _)| score > n).unwrap_or(true) {
+                best = Some((score, key));
+            }
+        }
+        for alias in key.aliases() {
+            let a = normalize_key(alias);
+            if !a.is_empty() && seg_n.contains(&a) {
+                let score = a.len();
+                if best.map(|(n, _)| score > n).unwrap_or(true) {
+                    best = Some((score, key));
+                }
+            }
+        }
+    }
+    best.map(|(_, key)| key)
 }
 
 fn semantic_from_header(raw: &str, col_idx: usize) -> HeaderSemantic {
@@ -61,11 +141,14 @@ fn semantic_from_header(raw: &str, col_idx: usize) -> HeaderSemantic {
         return HeaderSemantic::Numbering;
     }
 
-    let visible = strip_visible_text(raw);
+    if let Some(marker) = parse_marker(raw) {
+        if let (Some(key), Some(family)) = (marker.eigkey, marker.family) {
+            return HeaderSemantic::GeneratedEigenschaft { key, family };
+        }
+    }
 
-    // WICHTIG: Generator-Eigenschaften haben oft trotzdem einen ID-Suffix aus einer Quellspalte.
-    // Dieser darf die semantische Generator-Klassifikation NICHT überstimmen.
-    if let Some((key, family)) = generated_eigenschaft_from_visible_text(&visible) {
+    let visible = strip_visible_text(raw);
+    if let (Some(key), Some(family)) = (key_from_quoted_segment(&visible), family_from_visible_text(&visible)) {
         return HeaderSemantic::GeneratedEigenschaft { key, family };
     }
 
@@ -78,39 +161,8 @@ fn semantic_from_header(raw: &str, col_idx: usize) -> HeaderSemantic {
     HeaderSemantic::Unknown
 }
 
-fn generated_eigenschaft_from_visible_text(visible_text: &str) -> Option<(EigenschaftKeyId, EigenschaftStandardFamilie)> {
-    let stripped = strip_generated_prefix(visible_text);
-    let normalized = normalize_key(stripped);
-    if normalized.is_empty() {
-        return None;
-    }
-
-    let key = EigenschaftKeyId::ALL.iter().copied().find(|key| {
-        key.aliases().iter().any(|alias| {
-            let alias_n = normalize_key(alias);
-            !alias_n.is_empty()
-                && (normalized.contains(&alias_n)
-                    || alias_n.contains(&normalized))
-        })
-    })?;
-
-    let family = if normalized.contains("eigenschaften1n")
-        || normalized.contains("gleichförmigenpolygonen")
-        || normalized.contains("gleichfoermigenpolygonen")
-        || normalized.contains("1n")
-    {
-        EigenschaftStandardFamilie::EinsDurchN
-    } else if normalized.contains("eigenschaftenn") || normalized.contains("sternenpolygonen") {
-        EigenschaftStandardFamilie::N
-    } else {
-        key.standard_familie()
-    };
-
-    Some((key, family))
-}
-
-fn source_columns_for_eigenschaft(key: EigenschaftKeyId) -> Vec<u32> {
-    let mut out: Vec<u32> = key.direct_columns().iter().map(|&n| n as u32).collect();
+fn source_candidates_for_key(key: EigenschaftKeyId) -> Vec<u32> {
+    let mut out: Vec<u32> = key.direct_columns().iter().map(|&c| c as u32).collect();
     if let Some((a, b)) = key.maybe_pair() {
         out.push(a as u32);
         out.push(b as u32);
@@ -118,13 +170,6 @@ fn source_columns_for_eigenschaft(key: EigenschaftKeyId) -> Vec<u32> {
     out.sort_unstable();
     out.dedup();
     out
-}
-
-fn template_columns_for_family(family: EigenschaftStandardFamilie) -> &'static [u32] {
-    match family {
-        EigenschaftStandardFamilie::N => &[112u32],
-        EigenschaftStandardFamilie::EinsDurchN => &[331u32, 335u32],
-    }
 }
 
 fn choose_variant_index(col_idx: usize, len: usize) -> usize {
@@ -135,240 +180,89 @@ fn choose_variant_index(col_idx: usize, len: usize) -> usize {
     }
 }
 
-fn parsed_meta_for_column(col0: u32) -> Option<crate::domain::decl_model::HtmlClass> {
+fn parsed_meta_for_column(col0: u32) -> Option<HtmlDeclMeta> {
     let meta = exact_meta_for_column(col0)?;
-    let parsed = HtmlDeclMeta::parse(&meta)?;
-    Some(parsed.class)
+    HtmlDeclMeta::parse(&meta)
 }
 
-fn best_source_class_for_generated_eigenschaft(
+fn fallback_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie) -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![family.render_p1().to_string()],
+        p2_slots: vec![Some(key.canonical_name().replace(' ', "_")), None],
+        p4_tags: family.default_p4(),
+    }
+}
+
+fn build_generated_meta(
     key: EigenschaftKeyId,
-    family: EigenschaftStandardFamilie,
+    family: HtmlEigenschaftFamilie,
     col_idx: usize,
-) -> Option<crate::domain::decl_model::HtmlClass> {
-    let exact_candidates: Vec<_> = source_columns_for_eigenschaft(key)
+) -> HtmlDeclMeta {
+    let mut candidates: Vec<HtmlDeclMeta> = source_candidates_for_key(key)
         .into_iter()
         .filter_map(parsed_meta_for_column)
         .collect();
 
-    let template_candidates: Vec<_> = template_columns_for_family(family)
-        .iter()
-        .copied()
-        .filter_map(parsed_meta_for_column)
-        .collect();
+    let mut meta = if !candidates.is_empty() {
+        candidates.swap_remove(choose_variant_index(col_idx, candidates.len()))
+    } else {
+        fallback_meta(key, family)
+    };
 
-    match family {
-        EigenschaftStandardFamilie::EinsDurchN => {
-            if !template_candidates.is_empty() {
-                return template_candidates
-                    .get(choose_variant_index(col_idx, template_candidates.len()))
-                    .cloned();
-            }
-            if !exact_candidates.is_empty() {
-                return exact_candidates
-                    .get(choose_variant_index(col_idx, exact_candidates.len()))
-                    .cloned();
-            }
-        }
-        EigenschaftStandardFamilie::N => {
-            if !exact_candidates.is_empty() {
-                return exact_candidates
-                    .get(choose_variant_index(col_idx, exact_candidates.len()))
-                    .cloned();
-            }
-            if !template_candidates.is_empty() {
-                return template_candidates
-                    .get(choose_variant_index(col_idx, template_candidates.len()))
-                    .cloned();
-            }
+    // Typed override: family decides p1, concrete key decides first slot.
+    meta.p1_groups = vec![family.render_p1().to_string()];
+
+    // Ensure there is at least one additional slot, but do not collapse all existing slots.
+    if meta.p2_slots.is_empty() {
+        meta.p2_slots.push(None);
+    }
+    if meta.p2_slots.len() == 1 {
+        meta.p2_slots.push(None);
+    }
+
+    // Remove only generic E placeholders. Keep specific slots.
+    for slot in &mut meta.p2_slots {
+        if matches!(slot, Some(s) if s == "E" || s == "e") {
+            *slot = None;
         }
     }
 
-    None
+    meta.p2_slots[0] = Some(key.canonical_name().replace(' ', "_"));
+
+    if meta.p4_tags.is_empty() {
+        meta.p4_tags = family.default_p4();
+    }
+
+    meta
 }
 
-fn build_typed_generated_eigenschaft_class(
-    key: EigenschaftKeyId,
-    family: EigenschaftStandardFamilie,
+pub fn build_python_exact_html_class(
+    raw: &str,
     col_idx: usize,
+    is_header_row: bool,
 ) -> Option<String> {
-    let mut class = best_source_class_for_generated_eigenschaft(key, family, col_idx).unwrap_or_else(|| {
-        let raw = match family {
-            EigenschaftStandardFamilie::N => format!(
-                "z_0 r_{} p1_✗Eigenschaften_n,, p2_p3_0_{},p3_1_, p4_3,0",
-                col_idx,
-                key.canonical_name()
-            ),
-            EigenschaftStandardFamilie::EinsDurchN => format!(
-                "z_0 r_{} p1_✗Eigenschaften_1/n,, p2_p3_0_Gleichheit_Freiheit_Ordnung,p3_1_Gleichheit_Freiheit,p3_2_Reziprokes,p3_3_Ordnung_und_Filterung_12_und_1pro12,p3_4_{},p3_5_, p4_3,5,1,4",
-                col_idx,
-                key.canonical_name()
-            ),
-        };
-        HtmlDeclMeta::parse(&raw).expect("fallback html meta must parse").class
-    });
-
-    class.set_row(col_idx);
-    class.force_eigenschaft_family(family);
-    class.replace_or_insert_eigenschaft(key);
-    class.force_p4_for_family(family);
-    Some(class.render())
-}
-
-fn push_unique(out: &mut Vec<String>, value: &str) {
-    if !out.iter().any(|v| v == value) {
-        out.push(value.to_string());
-    }
-}
-
-fn p1_groups_for_column(col0: u32) -> Vec<String> {
-    let mut out = Vec::new();
-    for decl in PY_DECLS.iter() {
-        if decl.columns.contains(&col0) {
-            if let Some(main) = decl.main_aliases.first() {
-                push_unique(&mut out, main);
-            }
-        }
-    }
-    out
-}
-
-fn p2_slots_for_column(col0: u32) -> Vec<Option<String>> {
-    let mut concrete_slots: Vec<String> = Vec::new();
-    for decl in PY_DECLS.iter() {
-        if decl.columns.contains(&col0) {
-            if let Some(sub) = decl.sub_aliases.first() {
-                concrete_slots.push((*sub).to_string());
-            }
-        }
-    }
-    if concrete_slots.is_empty() {
-        return vec![None];
-    }
-    let total_slots = 15 + concrete_slots.len().saturating_sub(1);
-    let mut out: Vec<Option<String>> = concrete_slots.into_iter().map(Some).collect();
-    while out.len() < total_slots {
-        out.push(None);
-    }
-    out
-}
-
-fn render_p1(groups: &[String]) -> String {
-    let mut out = String::from("p1_");
-    for g in groups {
-        out.push('✗');
-        out.push_str(g);
-        out.push(',');
-    }
-    out.push(',');
-    out
-}
-
-fn render_p2_p3(slots: &[Option<String>]) -> String {
-    let mut out = String::from("p2_p3_");
-    for (i, slot) in slots.iter().enumerate() {
-        if i == 0 {
-            out.push('0');
-            out.push('_');
-            if let Some(value) = slot {
-                out.push_str(value);
-            }
-        } else {
-            out.push(',');
-            out.push_str("p3_");
-            out.push_str(&i.to_string());
-            out.push('_');
-            if let Some(value) = slot {
-                out.push_str(value);
-            }
-        }
-    }
-    out
-}
-
-fn render_p4(col0: u32) -> String {
-    let tags = crate::lib4tables_enum::p4_fragment_for_column(col0);
-    format!("p4_{}", tags)
-}
-
-fn class_from_decl_visible_text(visible_text: &str, col_idx: usize) -> Option<String> {
-    let visible_n = normalize_key(visible_text);
-    if visible_n.is_empty() {
-        return None;
-    }
-
-    for decl in PY_DECLS.iter() {
-        let matched = decl.sub_aliases.iter().any(|alias| {
-            let alias_n = normalize_key(alias);
-            !alias_n.is_empty() && (alias_n == visible_n || visible_n.starts_with(&alias_n) || alias_n.starts_with(&visible_n))
-        });
-
-        if matched {
-            if let Some(&col0) = decl.columns.first() {
-                if let Some(meta) = exact_meta_for_column(col0) {
-                    return Some(format!("z_0 r_{} {}", col_idx, meta));
-                }
-
-                let p1_groups = p1_groups_for_column(col0);
-                let p2_slots = p2_slots_for_column(col0);
-                if !p1_groups.is_empty() {
-                    return Some(format!(
-                        "z_0 r_{} {} {} {}",
-                        col_idx,
-                        render_p1(&p1_groups),
-                        render_p2_p3(&p2_slots),
-                        render_p4(col0),
-                    ));
-                }
-            }
-        }
-    }
-    None
-}
-
-pub fn build_python_exact_html_class(raw: &str, col_idx: usize, is_header_row: bool) -> Option<String> {
     if !is_header_row {
         return None;
     }
 
     match semantic_from_header(raw, col_idx) {
         HeaderSemantic::Counter => {
-            return Some("z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string());
+            Some("z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string())
         }
         HeaderSemantic::Numbering => {
-            return Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string());
-        }
-        HeaderSemantic::SourceColumn(col0) => {
-            if let Some(meta) = exact_meta_for_column(col0) {
-                return Some(format!("z_0 r_{} {}", col_idx, meta));
-            }
-            let p1_groups = p1_groups_for_column(col0);
-            let p2_slots = p2_slots_for_column(col0);
-            if !p1_groups.is_empty() {
-                return Some(format!(
-                    "z_0 r_{} {} {} {}",
-                    col_idx,
-                    render_p1(&p1_groups),
-                    render_p2_p3(&p2_slots),
-                    render_p4(col0),
-                ));
-            }
+            Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string())
         }
         HeaderSemantic::GeneratedEigenschaft { key, family } => {
-            if let Some(class_attr) = build_typed_generated_eigenschaft_class(key, family, col_idx) {
-                return Some(class_attr);
-            }
+            let meta = build_generated_meta(key, family, col_idx);
+            Some(format!("z_0 r_{} {}", col_idx, meta.render()))
         }
-        HeaderSemantic::Unknown => {}
+        HeaderSemantic::SourceColumn(col0) => {
+            exact_meta_for_column(col0).map(|meta| format!("z_0 r_{} {}", col_idx, meta))
+        }
+        HeaderSemantic::Unknown => {
+            let visible = strip_visible_text(raw);
+            css_class_for_visible_header(&visible)
+                .map(|meta| format!("z_0 r_{} {}", col_idx, meta))
+        }
     }
-
-    let visible_text = strip_visible_text(raw);
-    if let Some(class_attr) = class_from_decl_visible_text(&visible_text, col_idx) {
-        return Some(class_attr);
-    }
-    if let Some(meta) = css_class_for_visible_header(&visible_text) {
-        return Some(format!("z_0 r_{} {}", col_idx, meta));
-    }
-
-    None
 }

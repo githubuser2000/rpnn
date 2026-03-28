@@ -332,6 +332,26 @@ fn append_safe_html_meta_marker(
     if let Some(src) = source_text {
         if !src.is_empty() {
             extras.push(format!("SRCHEX={}", encode_hex_utf8(src)));
+            let src_l = src.to_lowercase();
+            let family = if src_l.contains("gleichförmigen polygonen") || src_l.contains("gleichfoermigen polygonen") || src_l.contains("(1/n)") {
+                Some("1N")
+            } else if src_l.contains("sternenpolygonen") || src_l.contains("(n)") {
+                Some("N")
+            } else {
+                None
+            };
+            if let Some(fam) = family {
+                extras.push(format!("FAMILY={}", fam));
+            }
+            if let Some(start) = src.find('„').or_else(|| src.find('"')) {
+                let tail = &src[start + 1..];
+                if let Some(end) = tail.find('“').or_else(|| tail.find('"')) {
+                    let seg = &tail[..end];
+                    if let Some(key) = crate::domain::eigenschaften::EigenschaftKeyId::from_alias(seg) {
+                        extras.push(format!("EIGKEY={}", key.canonical_name()));
+                    }
+                }
+            }
         }
     }
 
@@ -973,11 +993,10 @@ fn register_generated_column(
         .generated_spalten_parameter_tags
         .insert(new_col, tags);
 
-    let key = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    if tables.generated_spalten_parameter.contains_key(&key) {
+    if tables.generated_spalten_parameter.contains_key(&new_col) {
         panic!("generated_spalten_parameter key collision");
     }
-    tables.generated_spalten_parameter.insert(key, source_text);
+    tables.generated_spalten_parameter.insert(new_col, source_text);
 }
 
 fn get_cell(table: &Table, row: usize, col: usize) -> &str {
@@ -1564,10 +1583,8 @@ pub fn concat1_primzahlkreuz_pro_contra(table: &mut Table, rows_as_numbers: &mut
     rows_as_numbers.insert(new_col_2);
     tables.generated_spalten_parameter_tags.insert(new_col_1, tagset(&[ST::SternPolygon, ST::Universum]));
     tables.generated_spalten_parameter_tags.insert(new_col_2, tagset(&[ST::SternPolygon, ST::Universum]));
-    let key1 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    tables.generated_spalten_parameter.insert(key1, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
-    let key2 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    tables.generated_spalten_parameter.insert(key2, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+    tables.generated_spalten_parameter.insert(new_col_1, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+    tables.generated_spalten_parameter.insert(new_col_2, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
 }
 
 
