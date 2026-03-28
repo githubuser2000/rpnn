@@ -3,7 +3,7 @@ use crate::domain::decl_model::{
 };
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::css_class_for_visible_header;
-use crate::domain::python_source_of_truth::exact_meta_for_column;
+use crate::domain::python_source_of_truth::{exact_decl_meta_for_column, exact_meta_for_column};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeaderSemantic {
@@ -182,8 +182,7 @@ fn choose_variant_index(col_idx: usize, len: usize) -> usize {
 }
 
 fn parsed_meta_for_column(col0: u32) -> Option<HtmlDeclMeta> {
-    let meta = exact_meta_for_column(col0)?;
-    HtmlDeclMeta::parse(&meta)
+    exact_decl_meta_for_column(col0)
 }
 
 fn fallback_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie) -> HtmlDeclMeta {
@@ -237,7 +236,7 @@ pub fn resolve_html_header_class(raw: &str, col_idx: usize, is_header_row: bool)
         HeaderSemantic::SourceColumn(col0) => format!("z_0 r_{} {}", col_idx, exact_meta_for_column(col0)?),
         HeaderSemantic::Unknown => {
             let visible = strip_visible_text(raw);
-            format!("z_0 r_{} {}", col_idx, css_class_for_visible_header(&visible)?.to_string())
+            format!("z_0 r_{} {}", col_idx, css_class_for_visible_header(&visible)?)
         }
     };
     Some(HtmlHeaderClass { class_attr })

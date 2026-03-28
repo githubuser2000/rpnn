@@ -150,6 +150,8 @@ pub enum HtmlSlotLabel {
     Geist15,
     Religion,
     Primzahlkreuz,
+    Liebe,
+    Liebe7,
 }
 
 impl HtmlSlotLabel {
@@ -167,6 +169,8 @@ impl HtmlSlotLabel {
             "Geist__(15)" => Some(Self::Geist15),
             "Religion" => Some(Self::Religion),
             "Primzahlkreuz" => Some(Self::Primzahlkreuz),
+            "Liebe" => Some(Self::Liebe),
+            "Liebe_(7)" => Some(Self::Liebe7),
             _ => None,
         }
     }
@@ -185,6 +189,8 @@ impl HtmlSlotLabel {
             Self::Geist15 => "Geist__(15)",
             Self::Religion => "Religion",
             Self::Primzahlkreuz => "Primzahlkreuz",
+            Self::Liebe => "Liebe",
+            Self::Liebe7 => "Liebe_(7)",
         }
     }
 }

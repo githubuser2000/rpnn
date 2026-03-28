@@ -1,5 +1,7 @@
 // Auto-generated from reta.todel Python sources and runtime metadata
 
+use crate::domain::decl_model::HtmlDeclMeta;
+
 #[derive(Debug, Clone, Copy)]
 pub struct PyDecl {
     pub main_aliases: &'static [&'static str],
@@ -2585,6 +2587,10 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     cols
 }
 
+
+pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
+    exact_meta_for_column(col).and_then(|meta| HtmlDeclMeta::parse(&meta))
+}
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
     for (c, meta) in EXACT_HTML_META {
