@@ -18,6 +18,42 @@ fn decl(
 
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
+        0 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_gedanklich_einordnen"),
+                HtmlP1Group::Domain(DomainId::Religion),
+                HtmlP1Group::Domain(DomainId::Religion),
+                HtmlP1Group::Domain(DomainId::Galaxie),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::Sternpolygon),
+                HtmlP2Slot::Label(HtmlSlotLabel::DerTierkreiszeichen),
+                HtmlP2Slot::Label(HtmlSlotLabel::Thomasevangelium),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        1 | 2 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_gedanklich_einordnen"),
+                HtmlP1Group::Domain(DomainId::Galaxie),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::BabylonischeTierkreiszeichen),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        3 => Some(decl(
+            vec![HtmlP1Group::Domain(DomainId::Galaxie)],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Thomasevangelium),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
         6 => Some(decl(
             vec![HtmlP1Group::Domain(DomainId::Religion)],
             vec![HtmlP2Slot::Label(HtmlSlotLabel::Sternpolygon), HtmlP2Slot::Empty],
@@ -53,6 +89,162 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
                 HtmlP2Slot::Empty,
             ],
             &[0, 5],
+        )),
+        10 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_verstehen"),
+                HtmlP1Group::Grundstrukturen,
+                HtmlP1Group::Label("Größenordnung"),
+                HtmlP1Group::Domain(DomainId::Universum),
+                HtmlP1Group::Label("Inkrementieren"),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::ParadigmenSindAbsichten13),
+                HtmlP2Slot::Label(HtmlSlotLabel::Motive),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        19 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_verstehen"),
+                HtmlP1Group::Label("Bedeutung"),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Zweitwichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::Primzahlen),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        21 => Some(decl(
+            vec![
+                HtmlP1Group::Grundstrukturen,
+                HtmlP1Group::Label("Größenordnung"),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Strukturgroesse),
+                HtmlP2Slot::Label(HtmlSlotLabel::Strukturgroesse),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 4, 0, 5],
+        )),
+        22 => Some(decl(
+            vec![HtmlP1Group::Label("Bedeutung")],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::AnwendungDerSonnenUndMonde),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        25 => Some(decl(
+            vec![
+                HtmlP1Group::Domain(DomainId::Universum),
+                HtmlP1Group::Label("Bedeutung"),
+                HtmlP1Group::Domain(DomainId::Kontinuum),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Netzwerk),
+                HtmlP2Slot::Label(HtmlSlotLabel::Zaehlungen),
+                HtmlP2Slot::Label(HtmlSlotLabel::X),
+                HtmlP2Slot::Empty,
+            ],
+            &[4, 0],
+        )),
+        29 => Some(decl(
+            vec![HtmlP1Group::Grundstrukturen, HtmlP1Group::Domain(DomainId::Menschliches)],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Gefuehle7),
+                HtmlP2Slot::Label(HtmlSlotLabel::Anfuehrer),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        30 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_gedanklich_einordnen"),
+                HtmlP1Group::Label("Größenordnung"),
+                HtmlP1Group::Domain(DomainId::Menschliches),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Zweitwichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::Organisationen),
+                HtmlP2Slot::Label(HtmlSlotLabel::Berufe),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        31 => Some(decl(
+            vec![HtmlP1Group::Domain(DomainId::Menschliches)],
+            vec![HtmlP2Slot::Label(HtmlSlotLabel::Loesungen), HtmlP2Slot::Empty],
+            &[3, 0],
+        )),
+        34 => Some(decl(
+            vec![HtmlP1Group::Domain(DomainId::Universum), HtmlP1Group::Label("Bedeutung")],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::UniversellesRecht),
+                HtmlP2Slot::Label(HtmlSlotLabel::Jura),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        35 => Some(decl(
+            vec![HtmlP1Group::Label("Bedeutung")],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::VollkommenheitDesGeistes),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 0],
+        )),
+        36 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_gedanklich_einordnen"),
+                HtmlP1Group::Domain(DomainId::Religion),
+                HtmlP1Group::Domain(DomainId::Religion),
+                HtmlP1Group::Label("Symbole"),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::Sternpolygon),
+                HtmlP2Slot::Label(HtmlSlotLabel::DerTierkreiszeichen),
+                HtmlP2Slot::Label(HtmlSlotLabel::Religionen),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 4, 0, 5],
+        )),
+        37 => Some(decl(
+            vec![
+                HtmlP1Group::Label("Wichtigstes_zum_gedanklich_einordnen"),
+                HtmlP1Group::Domain(DomainId::Religion),
+                HtmlP1Group::Label("Symbole"),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
+                HtmlP2Slot::Label(HtmlSlotLabel::GleichfoermigesPolygon),
+                HtmlP2Slot::Label(HtmlSlotLabel::Religionen),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 5, 1, 4],
+        )),
+        42 => Some(decl(
+            vec![
+                HtmlP1Group::Grundstrukturen,
+                HtmlP1Group::Grundstrukturen,
+                HtmlP1Group::Domain(DomainId::Menschliches),
+            ],
+            vec![
+                HtmlP2Slot::Label(HtmlSlotLabel::Reziprokes),
+                HtmlP2Slot::Label(HtmlSlotLabel::ParadigmenSindAbsichten13),
+                HtmlP2Slot::Label(HtmlSlotLabel::Motive),
+                HtmlP2Slot::Empty,
+            ],
+            &[3, 1],
+        )),
+        43 => Some(decl(
+            vec![HtmlP1Group::Label("Inkrementieren")],
+            vec![HtmlP2Slot::Empty, HtmlP2Slot::Empty],
+            &[3, 0],
         )),
         52 | 53 => Some(decl(
             vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N)],
@@ -159,7 +351,7 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
-    [6u32, 7, 8, 9, 52, 53, 112, 132, 220, 221, 241, 289, 324, 394, 395, 461, 466, 479, 485, 516]
+    [0u32, 1, 2, 3, 6, 7, 8, 9, 10, 19, 21, 22, 25, 29, 30, 31, 34, 35, 36, 37, 42, 43, 52, 53, 112, 132, 220, 221, 241, 289, 324, 394, 395, 461, 466, 479, 485, 516]
         .into_iter()
         .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
         .collect()
