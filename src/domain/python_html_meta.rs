@@ -1,4 +1,3 @@
-use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::spalten_anfrage::{
     MenschlichesUnter, ReligionUnter, SpaltenAnfrage, StandardAnfrage, StandardOberkategorie,
     UniversumUnter,
@@ -77,9 +76,4 @@ pub fn css_class_for_visible_header(header: &str) -> Option<&'static str> {
         "Geist" | "Geist__(15)" => Some("p1_✗Universum,, p2_p3_0_Geist__(15), p4_3,0"),
         _ => None,
     }
-}
-
-
-pub fn decl_for_visible_header(header: &str) -> Option<HtmlDeclMeta> {
-    css_class_for_visible_header(header).and_then(HtmlDeclMeta::parse)
 }
