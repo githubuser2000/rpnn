@@ -13,7 +13,8 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
+use crate::domain::decl_model::HtmlDeclMeta;
+use crate::domain::python_source_of_truth::{self, PY_DECLS};
 use crate::domain::parser::legacy_cli_typed::LegacyOberToken;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -507,8 +508,8 @@ impl KategorieMap {
         }
 
         for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
-            if let Some(meta) = python_source_of_truth::exact_meta_for_column(col) {
-                for main in Self::extract_main_categories_from_meta(&meta) {
+            if let Some(meta) = python_source_of_truth::exact_decl_meta_for_column(col) {
+                for main in Self::extract_main_categories_from_decl_meta(&meta) {
                     match LegacyOberToken::parse(&main) {
                         LegacyOberToken::Eigenschaften1ProN => {
                             mains.insert("Eigenschaften_1/n".to_string());
@@ -550,14 +551,14 @@ impl KategorieMap {
     fn merge_html_meta_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        for (col, meta) in EXACT_HTML_META {
-            let mains = Self::extract_main_categories_from_meta(meta);
-            let subs = Self::extract_sub_categories_from_meta(meta);
+        for (col, meta) in python_source_of_truth::all_exact_decl_meta() {
+            let mains = Self::extract_main_categories_from_decl_meta(&meta);
+            let subs = Self::extract_sub_categories_from_decl_meta(&meta);
             if mains.is_empty() || subs.is_empty() {
                 continue;
             }
 
-            let ids = vec![*col + 1];
+            let ids = vec![col + 1];
             for main in &mains {
                 for sub in &subs {
                     Self::insert_entry(main_to_sub, main, sub, ids.clone());
@@ -566,48 +567,26 @@ impl KategorieMap {
         }
     }
 
-    fn extract_main_categories_from_meta(meta: &str) -> Vec<String> {
-        let Some(start) = meta.find("p1_") else { return Vec::new(); };
-        let Some(end_rel) = meta[start..].find(", p2_p3_0_") else { return Vec::new(); };
-        let slice = &meta[start + 3 .. start + end_rel];
-
-        let mut out = Vec::new();
-        for raw in slice.split(',') {
-            let value = raw.trim().trim_start_matches('✗').trim();
-            if value.is_empty() { continue; }
-            out.push(value.to_string());
-        }
+    fn extract_main_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
+        let mut out: Vec<String> = meta
+            .main_group_names()
+            .into_iter()
+            .map(|s| s.trim().trim_start_matches('✗').trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
         out.sort();
         out.dedup();
         out
     }
 
-    fn extract_sub_categories_from_meta(meta: &str) -> Vec<String> {
-        let Some(start) = meta.find("p2_p3_0_") else { return Vec::new(); };
-        let end = meta[start..].find(", p4_").map(|idx| start + idx).unwrap_or(meta.len());
-        let slice = &meta[start + 8 .. end];
-
-        let mut out = Vec::new();
-        for raw in slice.split(',') {
-            let value = raw.trim();
-            if value.is_empty() { continue; }
-
-            let candidate = if let Some(pos) = value.find('_') {
-                let (prefix, rest) = value.split_at(pos);
-                if prefix == "p3" || prefix == "p2" {
-                    rest.trim_start_matches('_').trim()
-                } else {
-                    value
-                }
-            } else {
-                value
-            };
-
-            if candidate.is_empty() { continue; }
-            if candidate.chars().all(|c| c.is_ascii_digit()) { continue; }
-            out.push(candidate.to_string());
-        }
-
+    fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
+        let mut out: Vec<String> = meta
+            .visible_slot_atoms()
+            .into_iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .filter(|s| !s.chars().all(|c: char| c.is_ascii_digit()))
+            .collect();
         out.sort();
         out.dedup();
         out

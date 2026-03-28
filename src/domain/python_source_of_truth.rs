@@ -1,6 +1,5 @@
 // Auto-generated from reta.todel Python sources and runtime metadata
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct PyDecl {
     pub main_aliases: &'static [&'static str],
@@ -2590,34 +2589,19 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
-    for (c, meta) in EXACT_HTML_META {
-        if *c == col {
-            return Some((*meta).to_string());
-        }
-    }
-    None
+    exact_decl_meta_for_column(col).map(|meta| meta.render())
 }
 
 
 pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    // 1. Typed Source (neue Wahrheit)
     if let Some(meta) = typed_exact_decl_for_column(col) {
         return Some(meta);
     }
-
-    // 2. Legacy (wird bald entfernt)
-    legacy_exact_meta_for_column(col)
-}
-
-fn legacy_exact_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    // ⚠ DAS IST DER ALTE WEG – NUR NOCH TEMPORÄR
-
-    for (stored_col, meta_str) in EXACT_HTML_META {
-        if *stored_col == col {
-            return HtmlDeclMeta::parse(meta_str);
+    for (c, meta) in EXACT_HTML_META {
+        if *c == col {
+            return HtmlDeclMeta::parse(meta);
         }
     }
-
     None
 }
 
