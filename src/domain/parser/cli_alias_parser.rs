@@ -1,11 +1,12 @@
+use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::ids::domain_id::{
     DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt,
 };
-use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::model::spalten_anfrage::{
     EigenschaftRequest, EigenschaftsFamilie, GeneratorParameter, KombiUnterId,
     SpaltenAnfrage, StandardUnterId,
 };
+use crate::domain::parser::cli_tokens::{KombiUnterToken, OberToken, StandardUnterToken};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
@@ -14,115 +15,40 @@ pub enum ParseError {
     InvalidGebrochenRationalIndex { ober: String, unter: String },
 }
 
-fn normalize_cli_token(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
-        .replace('„', "")
-        .replace('“', "")
-        .replace('"', "")
-}
-
-fn matches_alias(input: &str, aliases: &[&str]) -> bool {
-    let n = normalize_cli_token(input);
-    aliases.iter().any(|a| normalize_cli_token(a) == n)
-}
-
 fn parse_eigenschaft_request(unter: &str, familie: EigenschaftsFamilie) -> Option<EigenschaftRequest> {
     EigenschaftKeyId::from_alias(unter).map(|key| EigenschaftRequest { familie, key })
 }
 
 pub fn parse_oberkategorie(input: &str) -> Result<DomainId, ParseError> {
-    if matches_alias(input, &["Menschliches"]) {
-        return Ok(DomainId::Menschliches);
-    }
-    if matches_alias(input, &["Religion", "Religionen"]) {
-        return Ok(DomainId::Religion);
-    }
-    if matches_alias(input, &["Galaxie", "Galaxien"]) {
-        return Ok(DomainId::Galaxie);
-    }
-    if matches_alias(input, &["Universum"]) {
-        return Ok(DomainId::Universum);
-    }
-    if matches_alias(input, &["Grundstrukturen"]) {
-        return Ok(DomainId::Grundstrukturen);
-    }
-    if matches_alias(input, &["Kontinuum"]) {
-        return Ok(DomainId::Kontinuum);
-    }
-    if matches_alias(input, &["Multiversum"]) {
-        return Ok(DomainId::Multiversum);
-    }
-    if matches_alias(input, &["Planet_(10_und_oder_12)", "Planet"]) {
-        return Ok(DomainId::Planet10Oder12);
-    }
+    let token = OberToken::parse(input).ok_or_else(|| ParseError::UnknownOberkategorie(input.to_string()))?;
 
-    if matches_alias(input, &["Eigenschaft", "Eigenschaften", "konzept", "konzepte"]) {
-        return Ok(DomainId::Eigenschaften);
-    }
-    if matches_alias(input, &["Eigenschaften_n", "konzept1", "konzepte1"]) {
-        return Ok(DomainId::EigenschaftenN);
-    }
-    if matches_alias(input, &["Eigenschaften_1/n", "konzept2", "konzepte2"]) {
-        return Ok(DomainId::Eigenschaften1ProN);
-    }
-
-    if matches_alias(input, &["gebrochen-rational_Galaxie_n/m", "gebrochengalaxie"]) {
-        return Ok(DomainId::GebrochenRational(GebrochenRationalArt::Galaxie));
-    }
-    if matches_alias(input, &["gebrochen-rational_Universum_n/m", "gebrochenuniversum"]) {
-        return Ok(DomainId::GebrochenRational(GebrochenRationalArt::Universum));
-    }
-    if matches_alias(
-        input,
-        &["gebrochen-rational_Gefuehle_n/m", "gebrochenemotion", "gebrochengemotion"],
-    ) {
-        return Ok(DomainId::GebrochenRational(GebrochenRationalArt::Gefuehle));
-    }
-    if matches_alias(
-        input,
-        &["gebrochen-rational_Strukturgroesse_n/m", "gebrochengroesse"],
-    ) {
-        return Ok(DomainId::GebrochenRational(
-            GebrochenRationalArt::Strukturgroesse,
-        ));
-    }
-
-    if matches_alias(input, &["KombinationGalaxie"]) {
-        return Ok(DomainId::Kombination(KombinationsArt::Galaxie));
-    }
-    if matches_alias(input, &["KombinationUniversum"]) {
-        return Ok(DomainId::Kombination(KombinationsArt::Universum));
-    }
-    if matches_alias(input, &["KombinationGefuehle"]) {
-        return Ok(DomainId::Kombination(KombinationsArt::Gefuehle));
-    }
-    if matches_alias(input, &["KombinationStrukturgroesse"]) {
-        return Ok(DomainId::Kombination(KombinationsArt::Strukturgroesse));
-    }
-
-    if matches_alias(input, &["Primzahlkreuz"]) {
-        return Ok(DomainId::Generator(GeneratorArt::Primzahlkreuz));
-    }
-    if matches_alias(input, &["Multiplikationen"]) {
-        return Ok(DomainId::Generator(GeneratorArt::Multiplikationen));
-    }
-    if matches_alias(input, &["Primvielfache", "primvielfache"]) {
-        return Ok(DomainId::Generator(GeneratorArt::Primvielfache));
-    }
-    if matches_alias(input, &["MetaKonkret", "Universum_Metakonkret"]) {
-        return Ok(DomainId::MetaKonkret);
-    }
-
-    Err(ParseError::UnknownOberkategorie(input.to_string()))
+    Ok(match token {
+        OberToken::Menschliches => DomainId::Menschliches,
+        OberToken::Religion => DomainId::Religion,
+        OberToken::Galaxie => DomainId::Galaxie,
+        OberToken::Universum => DomainId::Universum,
+        OberToken::Grundstrukturen => DomainId::Grundstrukturen,
+        OberToken::Kontinuum => DomainId::Kontinuum,
+        OberToken::Multiversum => DomainId::Multiversum,
+        OberToken::Planet10Oder12 => DomainId::Planet10Oder12,
+        OberToken::Eigenschaften => DomainId::Eigenschaften,
+        OberToken::EigenschaftenN => DomainId::EigenschaftenN,
+        OberToken::Eigenschaften1ProN => DomainId::Eigenschaften1ProN,
+        OberToken::GebrochenRationalGalaxie => DomainId::GebrochenRational(GebrochenRationalArt::Galaxie),
+        OberToken::GebrochenRationalUniversum => DomainId::GebrochenRational(GebrochenRationalArt::Universum),
+        OberToken::GebrochenRationalGefuehle => DomainId::GebrochenRational(GebrochenRationalArt::Gefuehle),
+        OberToken::GebrochenRationalStrukturgroesse => {
+            DomainId::GebrochenRational(GebrochenRationalArt::Strukturgroesse)
+        }
+        OberToken::KombinationGalaxie => DomainId::Kombination(KombinationsArt::Galaxie),
+        OberToken::KombinationUniversum => DomainId::Kombination(KombinationsArt::Universum),
+        OberToken::KombinationGefuehle => DomainId::Kombination(KombinationsArt::Gefuehle),
+        OberToken::KombinationStrukturgroesse => DomainId::Kombination(KombinationsArt::Strukturgroesse),
+        OberToken::Primzahlkreuz => DomainId::Generator(GeneratorArt::Primzahlkreuz),
+        OberToken::Multiplikationen => DomainId::Generator(GeneratorArt::Multiplikationen),
+        OberToken::Primvielfache => DomainId::Generator(GeneratorArt::Primvielfache),
+        OberToken::MetaKonkret => DomainId::MetaKonkret,
+    })
 }
 
 pub fn parse_spalten_anfrage(ober: &str, unter: &str) -> Result<SpaltenAnfrage, ParseError> {
@@ -183,28 +109,23 @@ fn parse_u16_index(ober: &str, unter: &str) -> Result<u16, ParseError> {
 }
 
 fn parse_standard_unter(ober: &str, unter: &str) -> Result<StandardUnterId, ParseError> {
-    let u = normalize_cli_token(unter);
+    let token = StandardUnterToken::parse(unter).ok_or_else(|| ParseError::UnknownUnterkategorie {
+        ober: ober.to_string(),
+        unter: unter.to_string(),
+    })?;
 
-    let parsed = match u.as_str() {
-        "gewalt" => StandardUnterId::Gewalt,
-        "politische" => StandardUnterId::Politische,
-        "richtungen" => StandardUnterId::Richtungen,
-        "formationen" => StandardUnterId::Formationen,
-        "klasse" => StandardUnterId::Klasse,
-        "hölle" | "hoelle" => StandardUnterId::Hoelle,
-        "liebe" => StandardUnterId::Liebe,
-        "geist" => StandardUnterId::Geist,
-        "religion" | "symbole religion" | "symbolereligion" => StandardUnterId::SymboleReligion,
-        "primzahlkreuz" => StandardUnterId::Primzahlkreuz,
-        _ => {
-            return Err(ParseError::UnknownUnterkategorie {
-                ober: ober.to_string(),
-                unter: unter.to_string(),
-            });
-        }
-    };
-
-    Ok(parsed)
+    Ok(match token {
+        StandardUnterToken::Gewalt => StandardUnterId::Gewalt,
+        StandardUnterToken::Politische => StandardUnterId::Politische,
+        StandardUnterToken::Richtungen => StandardUnterId::Richtungen,
+        StandardUnterToken::Formationen => StandardUnterId::Formationen,
+        StandardUnterToken::Klasse => StandardUnterId::Klasse,
+        StandardUnterToken::Hoelle => StandardUnterId::Hoelle,
+        StandardUnterToken::Liebe => StandardUnterId::Liebe,
+        StandardUnterToken::Geist => StandardUnterId::Geist,
+        StandardUnterToken::Religion => StandardUnterId::SymboleReligion,
+        StandardUnterToken::Primzahlkreuz => StandardUnterId::Primzahlkreuz,
+    })
 }
 
 fn parse_eigenschaften_generisch_unter(
@@ -239,20 +160,15 @@ fn parse_eigenschaften_1_pro_n_unter(
 }
 
 fn parse_kombi_unter(ober: &str, unter: &str) -> Result<KombiUnterId, ParseError> {
-    let u = normalize_cli_token(unter);
+    let token = KombiUnterToken::parse(unter).ok_or_else(|| ParseError::UnknownUnterkategorie {
+        ober: ober.to_string(),
+        unter: unter.to_string(),
+    })?;
 
-    let parsed = match u.as_str() {
-        "tiere" => KombiUnterId::Tiere,
-        "berufe" => KombiUnterId::Berufe,
-        "religion" => KombiUnterId::Religion,
-        "politik" => KombiUnterId::Politik,
-        _ => {
-            return Err(ParseError::UnknownUnterkategorie {
-                ober: ober.to_string(),
-                unter: unter.to_string(),
-            });
-        }
-    };
-
-    Ok(parsed)
+    Ok(match token {
+        KombiUnterToken::Tiere => KombiUnterId::Tiere,
+        KombiUnterToken::Berufe => KombiUnterId::Berufe,
+        KombiUnterToken::Religion => KombiUnterId::Religion,
+        KombiUnterToken::Politik => KombiUnterId::Politik,
+    })
 }

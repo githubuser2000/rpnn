@@ -14,6 +14,7 @@ use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 use crate::domain::categories::KategorieMap;
 use crate::domain::reverse_request_report::print_reverse_request_pairs_dual;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::parser::legacy_cli_typed::{matches_any_alias, GeneratedCommandToken, LegacyOberToken};
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -130,136 +131,131 @@ fn expand_bereich_rows(
     Ok(())
 }
 
-fn normalize_token(s: &str) -> String {
-    s.trim().to_lowercase()
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum QueryHintToken {
+    Liebe,
+    GleichheitFreiheitOrdnung,
+    Geist,
+    Mond64,
+    Vervielfache,
+    PrimMotOrStruk,
 }
 
-fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
-    aliases
-        .iter()
-        .any(|alias| tokens.contains(&normalize_token(alias)))
-}
-
-fn selected_by_pair(
-    tokens: &BTreeSet<String>,
-    first_aliases: &[&str],
-    second_aliases: &[&str],
-) -> bool {
-    contains_any_alias(tokens, first_aliases) && contains_any_alias(tokens, second_aliases)
+fn parse_query_hint(input: &str) -> Option<QueryHintToken> {
+    if matches_any_alias(input, &["Liebe", "ethik", "Liebe_(7)"]) {
+        Some(QueryHintToken::Liebe)
+    } else if matches_any_alias(
+        input,
+        &[
+            "Gleichheit_Freiheit_Ordnung",
+            "Gleichheit_Freiheit",
+            "ungleichheit",
+            "dominieren",
+            "gleichheit",
+            "freiheit",
+            "Ordnung_und_Filterung_12_und_1pro12",
+            "ordnen",
+            "ordnenundfiltern",
+            "filtern",
+        ],
+    ) {
+        Some(QueryHintToken::GleichheitFreiheitOrdnung)
+    } else if matches_any_alias(input, &["Geist__(15)", "Geist_(15)", "geist", "bewusstsein"]) {
+        Some(QueryHintToken::Geist)
+    } else if matches_any_alias(
+        input,
+        &["Drittwichtigste", "Gestirn", "gestirn", "mond", "sonne", "planet"],
+    ) {
+        Some(QueryHintToken::Mond64)
+    } else if matches_any_alias(
+        input,
+        &[
+            "Zweitwichtigste",
+            "Primzahlen",
+            "primzahlen",
+            "vielfache",
+            "vielfacher",
+            "Offenbarung_des_Johannes",
+            "offenbarung",
+            "offenbarungdesjohannes",
+            "johannes",
+            "bibel",
+            "offenbarungjohannes",
+        ],
+    ) {
+        Some(QueryHintToken::Vervielfache)
+    } else {
+        let lower = input.trim().to_lowercase();
+        if lower.starts_with("primmotiv") || lower.starts_with("primstruk") {
+            Some(QueryHintToken::PrimMotOrStruk)
+        } else {
+            None
+        }
+    }
 }
 
 fn should_use_full_table_for_generated(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
 ) -> bool {
-    let mut tokens: BTreeSet<String> =
-        generated_befehle.iter().map(|s| normalize_token(s)).collect();
+    let mut ober_tokens: BTreeSet<LegacyOberToken> = BTreeSet::new();
+    let mut generated_tokens: BTreeSet<GeneratedCommandToken> = BTreeSet::new();
+    let mut hints: BTreeSet<QueryHintToken> = BTreeSet::new();
 
-    if !parameters_main.bedeutung0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.bedeutung0));
-    }
-    if !parameters_main.procontra0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.procontra0));
-    }
-    if !parameters_main.grundstrukturen0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.grundstrukturen0));
-    }
-    if !parameters_main.unter0.is_empty() {
-        tokens.insert(normalize_token(&parameters_main.unter0));
+    for token in generated_befehle {
+        if let Some(g) = GeneratedCommandToken::parse(token) {
+            generated_tokens.insert(g);
+        }
+        if let Some(h) = parse_query_hint(token) {
+            hints.insert(h);
+        }
     }
 
-    const BEDEUTUNG: &[&str] = &["Bedeutung", "bedeutung"];
-    const PROCONTRA: &[&str] = &["Pro_Contra", "procontra", "dagegendafuer"];
-    const GRUNDSTRUKTUREN: &[&str] = &["Grundstrukturen", "grundstrukturen"];
-    const MENSCHLICHES: &[&str] = &["Menschliches", "menschliches"];
-    const UNIVERSUM: &[&str] = &[
-        "Universum",
-        "universum",
-        "transzendentalien",
-        "strukturalien",
-        "kugel",
-        "kugeln",
-        "ball",
-        "baelle",
-        "bälle",
-    ];
-    const MULTIVERSUM: &[&str] = &["Multiversum", "multiversum"];
-    const PLANET: &[&str] = &["Planet_(10_und_oder_12)", "planet"];
-    const WICHTIGSTE: &[&str] = &["Wichtigstes_zum_verstehen", "wichtigsteverstehen"];
-    const GALAXIE: &[&str] = &[
-        "Galaxie",
-        "galaxie",
-        "alteschriften",
-        "kreis",
-        "galaxien",
-        "kreise",
-    ];
+    for raw in [
+        parameters_main.bedeutung0.as_str(),
+        parameters_main.procontra0.as_str(),
+        parameters_main.grundstrukturen0.as_str(),
+        parameters_main.unter0.as_str(),
+    ] {
+        if raw.is_empty() {
+            continue;
+        }
+        let ober = LegacyOberToken::parse(raw);
+        if !matches!(ober, LegacyOberToken::Unknown(_)) {
+            ober_tokens.insert(ober);
+        }
+        if let Some(g) = GeneratedCommandToken::parse(raw) {
+            generated_tokens.insert(g);
+        }
+        if let Some(h) = parse_query_hint(raw) {
+            hints.insert(h);
+        }
+    }
 
-    const PK_PROCONTRA_ALIASES: &[&str] = &[
-        "Primzahlkreuz pro contra",
-        "nachvollziehen emotional oder geistig durch Primzahl-Kreuz-Algorithmus",
-        "primzahlkreuz",
-        "nachvollziehen",
-        "primzahlkreuzprocontra",
-    ];
-    const LOVE_ALIASES: &[&str] = &["Liebe", "liebe", "ethik", "Liebe_(7)"];
-    const GLEICHHEIT_ALIASES: &[&str] = &[
-        "Gleichheit_Freiheit_Ordnung",
-        "Gleichheit_Freiheit",
-        "gleichheitfreiheit",
-        "ungleichheit",
-        "dominieren",
-        "gleichheit",
-        "freiheit",
-        "Ordnung_und_Filterung_12_und_1pro12",
-        "ordnen",
-        "ordnenundfiltern",
-        "filtern",
-    ];
-    const GEIST_ALIASES: &[&str] = &["Geist__(15)", "Geist_(15)", "geist", "bewusstsein"];
-    const MOND64_ALIASES: &[&str] = &[
-        "Drittwichtigste",
-        "drittwichtigste",
-        "Gestirn",
-        "gestirn",
-        "mond",
-        "sonne",
-        "planet",
-    ];
-    const VERVIELFACHE_ALIASES: &[&str] = &[
-        "Zweitwichtigste",
-        "zweitwichtigste",
-        "Primzahlen",
-        "primzahlen",
-        "vielfache",
-        "vielfacher",
-        "Offenbarung_des_Johannes",
-        "offenbarung",
-        "offenbarungdesjohannes",
-        "johannes",
-        "bibel",
-        "offenbarungjohannes",
-    ];
-
-    tokens.contains("primzahlkreuzprocontra")
-        || tokens.iter().any(|t| t.starts_with("primmotiv") || t.starts_with("primstruk"))
-        || selected_by_pair(&tokens, PROCONTRA, PK_PROCONTRA_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, PK_PROCONTRA_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, PK_PROCONTRA_ALIASES)
-        || selected_by_pair(&tokens, MENSCHLICHES, LOVE_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, LOVE_ALIASES)
-        || selected_by_pair(&tokens, PLANET, GLEICHHEIT_ALIASES)
-        || selected_by_pair(&tokens, MENSCHLICHES, GLEICHHEIT_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GLEICHHEIT_ALIASES)
-        || selected_by_pair(&tokens, UNIVERSUM, GEIST_ALIASES)
-        || selected_by_pair(&tokens, MULTIVERSUM, GEIST_ALIASES)
-        || selected_by_pair(&tokens, GRUNDSTRUKTUREN, GEIST_ALIASES)
-        || selected_by_pair(&tokens, WICHTIGSTE, MOND64_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, MOND64_ALIASES)
-        || selected_by_pair(&tokens, WICHTIGSTE, VERVIELFACHE_ALIASES)
-        || selected_by_pair(&tokens, BEDEUTUNG, VERVIELFACHE_ALIASES)
-        || selected_by_pair(&tokens, GALAXIE, VERVIELFACHE_ALIASES)
-        || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
+    generated_tokens.contains(&GeneratedCommandToken::PrimzahlkreuzProContra)
+        || hints.contains(&QueryHintToken::PrimMotOrStruk)
+        || ((ober_tokens.contains(&LegacyOberToken::ProContra)
+            || ober_tokens.contains(&LegacyOberToken::Bedeutung)
+            || ober_tokens.contains(&LegacyOberToken::Grundstrukturen))
+            && generated_tokens.contains(&GeneratedCommandToken::PrimzahlkreuzProContra))
+        || ((ober_tokens.contains(&LegacyOberToken::Menschliches)
+            || ober_tokens.contains(&LegacyOberToken::Grundstrukturen))
+            && hints.contains(&QueryHintToken::Liebe))
+        || ((ober_tokens.contains(&LegacyOberToken::Planet)
+            || ober_tokens.contains(&LegacyOberToken::Menschliches)
+            || ober_tokens.contains(&LegacyOberToken::Grundstrukturen))
+            && hints.contains(&QueryHintToken::GleichheitFreiheitOrdnung))
+        || ((ober_tokens.contains(&LegacyOberToken::Universum)
+            || ober_tokens.contains(&LegacyOberToken::Multiversum)
+            || ober_tokens.contains(&LegacyOberToken::Grundstrukturen))
+            && hints.contains(&QueryHintToken::Geist))
+        || ((ober_tokens.contains(&LegacyOberToken::WichtigstesZumVerstehen)
+            || ober_tokens.contains(&LegacyOberToken::Bedeutung))
+            && hints.contains(&QueryHintToken::Mond64))
+        || ((ober_tokens.contains(&LegacyOberToken::WichtigstesZumVerstehen)
+            || ober_tokens.contains(&LegacyOberToken::Bedeutung)
+            || ober_tokens.contains(&LegacyOberToken::Galaxie))
+            && hints.contains(&QueryHintToken::Vervielfache))
 }
 
 fn should_use_full_table_for_requests(

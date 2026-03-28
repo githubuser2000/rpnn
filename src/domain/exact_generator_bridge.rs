@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
 
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::domain::parser::legacy_cli_typed::{matches_any_alias, LegacyOberToken};
 
 #[derive(Debug, Clone, Default)]
 pub struct ExactResolved {
@@ -11,14 +12,6 @@ pub struct ExactResolved {
     pub modal_pairs: Vec<(usize, usize)>,
     pub meta_konkret_specs: Vec<(usize, usize)>,
     pub generated_befehle: BTreeSet<String>,
-}
-
-fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
 }
 
 fn dedup_vec<T: Ord + Clone>(items: &mut Vec<T>) {
@@ -33,19 +26,16 @@ fn push_unique<T: PartialEq + Copy>(vec: &mut Vec<T>, value: T) {
 }
 
 fn resolve_meta_konkret(value: &str) -> Option<ExactResolved> {
-    let key = normalize_key(value);
     let mut out = ExactResolved::default();
 
     for (aliases, pair) in META_KONKRET_MAPPINGS {
-        if aliases.iter().any(|a| normalize_key(a) == key) {
+        if matches_any_alias(value, aliases) {
             out.meta_konkret_specs.push(*pair);
             out.generated_befehle.insert("universummetakonkret".to_string());
-            // Basis-Spalten für den Generator: Strukturalie + inverse Strukturalie.
-            out.direct_columns.push(6);   // Python 0-based 5
-            out.direct_columns.push(132); // Python 0-based 131
-            // Zusätzliche Textspalten, die der Python-Generator im Universums-Fall referenziert.
-            out.direct_columns.push(199); // Python 0-based 198
-            out.direct_columns.push(202); // Python 0-based 201
+            out.direct_columns.push(6);
+            out.direct_columns.push(132);
+            out.direct_columns.push(199);
+            out.direct_columns.push(202);
             dedup_vec(&mut out.direct_columns);
             return Some(out);
         }
@@ -55,17 +45,15 @@ fn resolve_meta_konkret(value: &str) -> Option<ExactResolved> {
 }
 
 fn resolve_eigenschaften_like(value: &str) -> Option<ExactResolved> {
-    let key = normalize_key(value);
     let mut out = ExactResolved::default();
 
     for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
-        if aliases.iter().any(|a| normalize_key(a) == key) {
+        if matches_any_alias(value, aliases) {
             for &col in *direct_columns {
-                // Rust/CLI arbeitet 1-basiert
                 push_unique(&mut out.direct_columns, col + 1);
             }
             if let Some((a, b)) = maybe_pair {
-                out.modal_pairs.push((*a, *b)); // hier 0-basiert lassen, concat_modallogik erwartet 0-basiert
+                out.modal_pairs.push((*a, *b));
                 out.generated_befehle.insert("modallogik".to_string());
                 push_unique(&mut out.direct_columns, *a + 1);
                 push_unique(&mut out.direct_columns, *b + 1);
@@ -80,25 +68,20 @@ fn resolve_eigenschaften_like(value: &str) -> Option<ExactResolved> {
 }
 
 pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved> {
-    let ober_n = normalize_key(ober);
-
-    match ober_n.as_str() {
-        "universummetakonkret" | "metakonkret" => resolve_meta_konkret(unter),
-        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaftenn1" | "eigenschaften1n" => {
-            resolve_eigenschaften_like(unter)
-        }
-        "konzept" | "konzepte" | "konzept2" | "konzepte2" => resolve_eigenschaften_like(unter),
+    match LegacyOberToken::parse(ober) {
+        LegacyOberToken::UniversumMetaKonkret => resolve_meta_konkret(unter),
+        LegacyOberToken::Eigenschaften
+        | LegacyOberToken::EigenschaftenN
+        | LegacyOberToken::Eigenschaften1ProN => resolve_eigenschaften_like(unter),
         _ => None,
     }
 }
 
-// Altpfad absichtlich inert.
 pub fn try_run_exact_generator_bridge(
     _args: &[String],
 ) -> Result<bool, Box<dyn std::error::Error>> {
     Ok(false)
 }
-
 
 pub fn resolve_exact_generator_for_request(request: &SpaltenAnfrage) -> Option<ExactResolved> {
     let (ober, unter) = request.ober_unter_cli_pair();

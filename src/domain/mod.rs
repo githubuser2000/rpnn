@@ -10,10 +10,10 @@ pub mod generator_logic;
 pub mod category_map;
 
 pub mod python_source_of_truth;
-pub mod typed_exact_decl;
 pub mod decl_model;
 pub mod html_meta_builder;
 pub mod html_header_model;
+pub mod typed_exact_decl;
 
 pub mod errors;
 pub mod eigenschaften;
@@ -34,6 +34,8 @@ pub mod model {
 
 pub mod parser {
     pub mod cli_alias_parser;
+    pub mod cli_tokens;
+    pub mod legacy_cli_typed;
 }
 
 pub mod resolver {
