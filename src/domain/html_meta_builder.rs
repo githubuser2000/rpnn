@@ -49,19 +49,13 @@ fn strip_visible_text(raw: &str) -> String {
     raw_no_marker.trim().trim_matches('"').trim().to_string()
 }
 
-fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('„', "")
-        .replace('“', "")
-        .replace('"', "")
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
-        .replace('(', "")
-        .replace(')', "")
-        .replace(',', "")
-        .replace(':', "")
+fn fold_visible_text(s: &str) -> String {
+    s.trim()
+        .trim_matches('„')
+        .trim_matches('“')
+        .trim_matches('"')
+        .trim()
+        .to_lowercase()
 }
 
 fn parse_marker(raw: &str) -> Option<GeneratorMarker> {
@@ -75,7 +69,7 @@ fn parse_marker(raw: &str) -> Option<GeneratorMarker> {
                 EigenschaftKeyId::ALL
                     .iter()
                     .copied()
-                    .find(|k| normalize_key(k.canonical_name()) == normalize_key(value))
+                    .find(|k| fold_visible_text(k.canonical_name()) == fold_visible_text(value))
             });
         } else if let Some(value) = part.strip_prefix("FAMILY=") {
             marker.family = match value {
@@ -90,7 +84,7 @@ fn parse_marker(raw: &str) -> Option<GeneratorMarker> {
 }
 
 fn family_from_visible_text(visible_text: &str) -> Option<HtmlEigenschaftFamilie> {
-    let n = normalize_key(visible_text);
+    let n = fold_visible_text(visible_text);
     if n.contains("gleichförmigenpolygonen")
         || n.contains("gleichfoermigenpolygonen")
         || n.contains("eigenschaften1n")
@@ -114,10 +108,10 @@ fn between_quotes(text: &str) -> Option<String> {
 }
 
 fn key_from_text(text: &str) -> Option<EigenschaftKeyId> {
-    let seg_n = normalize_key(text);
+    let seg_n = fold_visible_text(text);
     let mut best: Option<(usize, EigenschaftKeyId)> = None;
     for key in EigenschaftKeyId::ALL.iter().copied() {
-        let canon = normalize_key(key.canonical_name());
+        let canon = fold_visible_text(key.canonical_name());
         if !canon.is_empty() && seg_n.contains(&canon) {
             let score = canon.len() + 100;
             if best.map(|(n, _)| score > n).unwrap_or(true) {
@@ -125,7 +119,7 @@ fn key_from_text(text: &str) -> Option<EigenschaftKeyId> {
             }
         }
         for alias in key.aliases() {
-            let a = normalize_key(alias);
+            let a = fold_visible_text(alias);
             if !a.is_empty() && seg_n.contains(&a) {
                 let score = a.len();
                 if best.map(|(n, _)| score > n).unwrap_or(true) {
