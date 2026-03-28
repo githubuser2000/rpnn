@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LegacyOberToken {
     Menschliches,
     Universum,
@@ -28,7 +28,7 @@ pub enum LegacyOberToken {
     Unknown(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum GeneratedCommandToken {
     PrimzahlkreuzProContra,
     LovePolygon,

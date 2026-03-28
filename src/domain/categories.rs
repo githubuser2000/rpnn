@@ -13,8 +13,8 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::decl_model::HtmlDeclMeta;
-use crate::domain::python_source_of_truth::{self, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
+use crate::domain::parser::legacy_cli_typed::LegacyOberToken;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -218,13 +218,6 @@ fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
     }
 }
 
-fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-}
-
 impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
@@ -368,8 +361,8 @@ impl KategorieMap {
     }
 
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
-        let ober_n = normalize_key(ober);
-        let unter_n = normalize_key(unter);
+        let ober_token = LegacyOberToken::parse(ober);
+        let unter_trimmed = unter.trim();
 
         let mut direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
         direct_columns.sort();
@@ -380,8 +373,8 @@ impl KategorieMap {
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
 
-        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
-            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
+        if matches!(ober_token, LegacyOberToken::ProContra | LegacyOberToken::Bedeutung | LegacyOberToken::Universum)
+            && matches!(unter_trimmed, "Primzahlkreuz" | "primzahlkreuz" | "primzahlkreuzprocontra")
         {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
         }
@@ -514,16 +507,15 @@ impl KategorieMap {
         }
 
         for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
-            if let Some(meta) = python_source_of_truth::exact_decl_meta_for_column(col) {
-                for main in Self::extract_main_categories_from_decl_meta(&meta) {
-                    let normalized = normalize_key(&main);
-                    match normalized.as_str() {
-                        "eigenschaften1n" => {
+            if let Some(meta) = python_source_of_truth::exact_meta_for_column(col) {
+                for main in Self::extract_main_categories_from_meta(&meta) {
+                    match LegacyOberToken::parse(&main) {
+                        LegacyOberToken::Eigenschaften1ProN => {
                             mains.insert("Eigenschaften_1/n".to_string());
                             mains.insert("konzept2".to_string());
                             mains.insert("konzepte2".to_string());
                         }
-                        "eigenschaftenn" | "eigenschaft" | "eigenschaften" => {
+                        LegacyOberToken::Eigenschaften | LegacyOberToken::EigenschaftenN => {
                             mains.insert("Eigenschaften_n".to_string());
                             mains.insert("konzept1".to_string());
                             mains.insert("konzepte1".to_string());
@@ -558,39 +550,20 @@ impl KategorieMap {
     fn merge_html_meta_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        for (col, meta) in python_source_of_truth::all_exact_decl_meta() {
-            let mains = Self::extract_main_categories_from_decl_meta(&meta);
-            let subs = Self::extract_sub_categories_from_decl_meta(&meta);
+        for (col, meta) in EXACT_HTML_META {
+            let mains = Self::extract_main_categories_from_meta(meta);
+            let subs = Self::extract_sub_categories_from_meta(meta);
             if mains.is_empty() || subs.is_empty() {
                 continue;
             }
 
-            let ids = vec![col + 1];
+            let ids = vec![*col + 1];
             for main in &mains {
                 for sub in &subs {
                     Self::insert_entry(main_to_sub, main, sub, ids.clone());
                 }
             }
         }
-    }
-
-    fn extract_main_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out = meta.p1_groups.clone();
-        out.sort();
-        out.dedup();
-        out
-    }
-
-    fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out: Vec<String> = meta.p2_slots
-            .iter()
-            .filter_map(|slot| slot.clone())
-            .filter(|value| !value.is_empty())
-            .filter(|value| !value.chars().all(|c| c.is_ascii_digit()))
-            .collect();
-        out.sort();
-        out.dedup();
-        out
     }
 
     fn extract_main_categories_from_meta(meta: &str) -> Vec<String> {

@@ -231,8 +231,7 @@ pub fn build_python_exact_html_class(raw: &str, col_idx: usize, is_header_row: b
             let meta = build_generated_meta(key, family, col_idx);
             Some(format!("z_0 r_{} {}", col_idx, meta.render()))
         }
-        HeaderSemantic::SourceColumn(col0) => exact_decl_meta_for_column(col0)
-            .map(|meta| format!("z_0 r_{} {}", col_idx, meta.render())),
+        HeaderSemantic::SourceColumn(col0) => exact_decl_meta_for_column(col0).map(|meta| format!("z_0 r_{} {}", col_idx, meta.render())),
         HeaderSemantic::Unknown => {
             let visible = strip_visible_text(raw);
             decl_for_visible_header(&visible).map(|meta| format!("z_0 r_{} {}", col_idx, meta.render()))
