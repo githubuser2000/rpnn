@@ -559,17 +559,14 @@ impl KategorieMap {
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
         for (col, meta) in python_source_of_truth::all_exact_decl_meta() {
-            let mains = Self::extract_main_categories_from_decl_meta(&meta);
-            let subs = Self::extract_sub_categories_from_decl_meta(&meta);
-            if mains.is_empty() || subs.is_empty() {
+            let pairs = Self::extract_main_sub_pairs_from_decl_meta(&meta);
+            if pairs.is_empty() {
                 continue;
             }
 
             let ids = vec![col + 1];
-            for main in &mains {
-                for sub in &subs {
-                    Self::insert_entry(main_to_sub, main, sub, ids.clone());
-                }
+            for (main, sub) in pairs {
+                Self::insert_entry(main_to_sub, &main, &sub, ids.clone());
             }
         }
     }
@@ -595,6 +592,48 @@ impl KategorieMap {
             .filter(|s| !s.is_empty())
             .filter(|s| !s.chars().all(|c| c.is_ascii_digit()))
             .collect();
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    fn extract_main_sub_pairs_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<(String, String)> {
+        let mains: Vec<String> = meta
+            .p1_groups
+            .iter()
+            .map(|s| s.trim().trim_start_matches('✗').trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let subs: Vec<String> = meta
+            .p2_slots
+            .iter()
+            .filter_map(|opt| opt.as_ref())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .filter(|s| !s.chars().all(|c| c.is_ascii_digit()))
+            .collect();
+
+        let mut out = Vec::<(String, String)>::new();
+
+        if mains.is_empty() || subs.is_empty() {
+            return out;
+        }
+
+        if mains.len() == 1 {
+            for sub in subs {
+                out.push((mains[0].clone(), sub));
+            }
+        } else if subs.len() == 1 {
+            for main in mains {
+                out.push((main, subs[0].clone()));
+            }
+        } else {
+            for (main, sub) in mains.into_iter().zip(subs.into_iter()) {
+                out.push((main, sub));
+            }
+        }
+
         out.sort();
         out.dedup();
         out
