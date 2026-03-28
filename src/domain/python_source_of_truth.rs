@@ -2595,7 +2595,7 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
     let mut out = all_typed_exact_decls();
     for (c, meta) in EXACT_HTML_META {
-        if out.iter().any(|(known, _)| known == c) {
+        if out.iter().any(|(existing, _)| existing == c) {
             continue;
         }
         if let Some(parsed) = HtmlDeclMeta::parse(meta) {
@@ -2606,5 +2606,5 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
-    exact_decl_meta_for_column(col).map(|meta| meta.render())
+    exact_decl_meta_for_column(col).map(|meta: HtmlDeclMeta| meta.render())
 }

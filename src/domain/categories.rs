@@ -13,7 +13,8 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
+use crate::domain::decl_model::HtmlDeclMeta;
+use crate::domain::python_source_of_truth::{self, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -513,8 +514,8 @@ impl KategorieMap {
         }
 
         for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
-            if let Some(meta) = python_source_of_truth::exact_meta_for_column(col) {
-                for main in Self::extract_main_categories_from_meta(&meta) {
+            if let Some(meta) = python_source_of_truth::exact_decl_meta_for_column(col) {
+                for main in Self::extract_main_categories_from_decl_meta(&meta) {
                     let normalized = normalize_key(&main);
                     match normalized.as_str() {
                         "eigenschaften1n" => {
@@ -557,20 +558,39 @@ impl KategorieMap {
     fn merge_html_meta_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        for (col, meta) in EXACT_HTML_META {
-            let mains = Self::extract_main_categories_from_meta(meta);
-            let subs = Self::extract_sub_categories_from_meta(meta);
+        for (col, meta) in python_source_of_truth::all_exact_decl_meta() {
+            let mains = Self::extract_main_categories_from_decl_meta(&meta);
+            let subs = Self::extract_sub_categories_from_decl_meta(&meta);
             if mains.is_empty() || subs.is_empty() {
                 continue;
             }
 
-            let ids = vec![*col + 1];
+            let ids = vec![col + 1];
             for main in &mains {
                 for sub in &subs {
                     Self::insert_entry(main_to_sub, main, sub, ids.clone());
                 }
             }
         }
+    }
+
+    fn extract_main_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
+        let mut out = meta.p1_groups.clone();
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
+        let mut out: Vec<String> = meta.p2_slots
+            .iter()
+            .filter_map(|slot| slot.clone())
+            .filter(|value| !value.is_empty())
+            .filter(|value| !value.chars().all(|c| c.is_ascii_digit()))
+            .collect();
+        out.sort();
+        out.dedup();
+        out
     }
 
     fn extract_main_categories_from_meta(meta: &str) -> Vec<String> {

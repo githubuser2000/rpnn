@@ -42,21 +42,6 @@ impl HtmlDeclMeta {
     }
 }
 
-
-impl HtmlDeclMeta {
-    pub fn new(p1_groups: Vec<String>, p2_slots: Vec<Option<String>>, p4_tags: Vec<u8>) -> Self {
-        Self { p1_groups, p2_slots, p4_tags }
-    }
-
-    pub fn from_slices(p1_groups: &[&str], p2_slots: &[Option<&str>], p4_tags: &[u8]) -> Self {
-        Self {
-            p1_groups: p1_groups.iter().map(|s| (*s).to_string()).collect(),
-            p2_slots: p2_slots.iter().map(|s| s.map(|v| v.to_string())).collect(),
-            p4_tags: p4_tags.to_vec(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HtmlEigenschaftFamilie {
     N,
