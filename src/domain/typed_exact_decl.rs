@@ -10,69 +10,6 @@ fn decl(p1: &[&str], p2: &[Option<&str>], p4: &[u8]) -> HtmlDeclMeta {
 
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
-        0 => Some(decl(
-            &["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Religionen", "Galaxie"],
-            &[Some("Wichtigste"), Some("Sternpolygon"), Some("der_Tierkreiszeichen"), Some("Thomasevangelium"), None],
-            &[3, 0],
-        )),
-        1 => Some(decl(
-            &["Wichtigstes_zum_gedanklich_einordnen", "Galaxie"],
-            &[Some("Wichtigste"), Some("babylonische_Tierkreiszeichen"), None],
-            &[3, 0],
-        )),
-        2 => Some(decl(
-            &["Wichtigstes_zum_gedanklich_einordnen", "Galaxie"],
-            &[Some("Wichtigste"), Some("babylonische_Tierkreiszeichen"), None],
-            &[3, 0],
-        )),
-        3 => Some(decl(
-            &["Galaxie"],
-            &[Some("Thomasevangelium"), None],
-            &[3, 0],
-        )),
-        4 => Some(decl(
-            &["Wichtigstes_zum_verstehen", "Grundstrukturen", "Größenordnung", "Universum", "Inkrementieren"],
-            &[
-                Some("Wichtigste"),
-                Some("Strukturgrösse"),
-                Some("Strukturgrösse"),
-                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
-                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
-                None,
-            ],
-            &[3, 4, 0, 5],
-        )),
-        5 => Some(decl(
-            &[
-                "Wichtigstes_zum_verstehen",
-                "Universum",
-                "Universum",
-                "Universum",
-                "Grundstrukturen",
-                "Multiversum",
-                "Inkrementieren",
-                "Inkrementieren",
-                "Kontinuum",
-            ],
-            &[
-                Some("Wichtigste"),
-                Some("Transzendentalien"),
-                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
-                Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"),
-                Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
-                Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
-                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
-                Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"),
-                Some("O"),
-                None,
-            ],
-            &[4, 0],
-        )),
-        6 => Some(decl(
-            &["Religionen"],
-            &[Some("Sternpolygon"), None],
-            &[3, 0],
-        )),
         7 => Some(decl(
             &["Religionen"],
             &[Some("Messias"), None],
@@ -88,109 +25,94 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
             &[Some("Liebe"), Some("Liebe_(7)"), None],
             &[0, 5],
         )),
-        10 => Some(decl(
-            &["Wichtigstes_zum_verstehen", "Grundstrukturen", "Menschliches"],
-            &[Some("Wichtigste"), Some("Paradigmen_sind_Absichten_(13)"), Some("Motive"), None],
-            &[3, 0],
-        )),
-        11 => Some(decl(
-            &["Menschliches"],
-            &[Some("Errungenschaften"), None],
-            &[3, 0],
-        )),
-        12 => Some(decl(
-            &["Menschliches"],
-            &[Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None],
-            &[3, 0],
-        )),
-        13 => Some(decl(
-            &["Menschliches", "Menschliches"],
-            &[Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), Some("brauchen"), None],
-            &[3, 0],
-        )),
-        14 => Some(decl(
-            &["Menschliches"],
-            &[Some("brauchen"), None],
-            &[3, 0],
-        )),
-        15 => Some(decl(
-            &["Pro_Contra"],
-            &[Some("contra"), None],
-            &[3, 4, 0, 5],
-        )),
-        16 => Some(decl(
-            &["Religionen"],
-            &[Some("gleichförmiges_Polygon"), None],
-            &[3, 1],
-        )),
-        17 => Some(decl(
-            &["Pro_Contra"],
-            &[Some("Pro"), None],
-            &[3, 4, 0, 5],
-        )),
-        18 => Some(decl(
-            &["Menschliches"],
-            &[Some("Motive"), None],
-            &[3, 0],
-        )),
-        19 => Some(decl(
-            &["Wichtigstes_zum_verstehen", "Bedeutung"],
-            &[Some("Zweitwichtigste"), Some("Primzahlen"), None],
-            &[3, 0],
-        )),
-        20 => Some(decl(
-            &["Größenordnung", "Licht"],
-            &[Some("Licht"), None, None],
-            &[3, 4, 0, 5],
-        )),
-        21 => Some(decl(
-            &["Grundstrukturen", "Größenordnung"],
-            &[Some("Strukturgrösse"), Some("Strukturgrösse"), None],
-            &[3, 4, 0, 5],
-        )),
-        22 => Some(decl(
-            &["Bedeutung"],
-            &[Some("Anwendung_der_Sonnen_und_Monde"), None],
-            &[3, 0],
-        )),
-        23 => Some(decl(
-            &["Religionen"],
-            &[Some("Vertreter_höherer_Konzepte"), None],
-            &[3, 0],
-        )),
-        24 => Some(decl(
-            &["Grundstrukturen", "Menschliches"],
-            &[Some("gegen_5"), Some("Krankheit"), None],
-            &[3, 0],
-        )),
-        25 => Some(decl(
-            &["Universum", "Bedeutung", "Kontinuum"],
-            &[Some("Netzwerk"), Some("Zählungen"), Some("X"), None],
-            &[4, 0],
-        )),
-        26 => Some(decl(
-            &["Pro_Contra"],
-            &[Some("contra"), None],
-            &[3, 4, 0, 5],
-        )),
-        27 => Some(decl(
-            &["Größenordnung", "Menschliches", "Licht"],
-            &[Some("Licht"), Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None, None],
-            &[4, 0],
-        )),
         28 => Some(decl(
             &["Menschliches", "Grundstrukturen"],
             &[Some("Liebe"), Some("Liebe_(7)"), None],
             &[0, 5],
         )),
-        29 => Some(decl(
-            &["Grundstrukturen", "Menschliches"],
-            &[Some("Gefühle_(7)"), Some("Anführer"), None],
+        31 => Some(decl(&["Menschliches"], &[Some("Lösungen"), None], &[3, 0])),
+        32 => Some(decl(
+            &["Menschliches"],
+            &[Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None],
             &[3, 0],
         )),
-        30 => Some(decl(
-            &["Wichtigstes_zum_gedanklich_einordnen", "Größenordnung", "Menschliches"],
-            &[Some("Zweitwichtigste"), Some("Organisationen"), Some("Berufe"), None],
+        33 => Some(decl(
+            &["Grundstrukturen", "Menschliches"],
+            &[Some("Stimmungen_Kombinationen_(14)"), Some("Musik"), None],
+            &[3, 0],
+        )),
+        34 => Some(decl(
+            &["Universum", "Bedeutung"],
+            &[Some("universelles_Recht"), Some("Jura"), None],
+            &[3, 0],
+        )),
+        35 => Some(decl(
+            &["Bedeutung"],
+            &[Some("Vollkommenheit_des_Geistes"), None],
+            &[3, 0],
+        )),
+        36 => Some(decl(
+            &["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Religionen", "Symbole"],
+            &[Some("Wichtigste"), Some("Sternpolygon"), Some("der_Tierkreiszeichen"), Some("Religionen"), None],
+            &[3, 4, 0, 5],
+        )),
+        37 => Some(decl(
+            &["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Symbole"],
+            &[Some("Wichtigste"), Some("gleichförmiges_Polygon"), Some("Religionen"), None],
+            &[3, 5, 1, 4],
+        )),
+        42 => Some(decl(
+            &["Grundstrukturen", "Grundstrukturen", "Menschliches"],
+            &[Some("Reziprokes"), Some("Paradigmen_sind_Absichten_(13)"), Some("Motive"), None],
+            &[3, 1],
+        )),
+        43 => Some(decl(&["Inkrementieren"], &[None, None], &[3, 0])),
+        45 => Some(decl(&["Bedeutung"], &[Some("Zählungen"), None], &[3, 0])),
+        46 => Some(decl(&["Menschliches"], &[Some("alpha_beta"), None], &[3, 0])),
+        47 => Some(decl(
+            &["Menschliches"],
+            &[Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None],
+            &[3, 0],
+        )),
+        48 => Some(decl(&["Pro_Contra"], &[Some("Pro"), None], &[3, 4, 0, 5])),
+        51 => Some(decl(
+            &["Menschliches"],
+            &[Some("dominierendes_Geschlecht"), None],
+            &[3, 0],
+        )),
+        52 => Some(decl(
+            &["Eigenschaften_n"],
+            &[Some("gut_böse_lieb_schlecht"), None],
+            &[3, 1, 0],
+        )),
+        53 => Some(decl(
+            &["Eigenschaften_n"],
+            &[Some("gut_böse_lieb_schlecht"), None],
+            &[3, 1, 0],
+        )),
+        54 => Some(decl(
+            &["Grundstrukturen", "Größenordnung", "Universum", "Universum", "Inkrementieren", "Inkrementieren"],
+            &[
+                Some("Strukturgrösse"),
+                Some("Strukturgrösse"),
+                Some("Transzendentalien"),
+                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
+                None,
+                Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"),
+                None,
+            ],
+            &[3, 4, 0],
+        )),
+        55 => Some(decl(
+            &["Universum", "Universum", "Kontinuum"],
+            &[Some("Transzendentalien"), Some("Netzwerk"), Some("X"), None],
+            &[4, 0],
+        )),
+        57 => Some(decl(&["Menschliches"], &[Some("Angreifbarkeit"), None], &[3, 0])),
+        58 => Some(decl(&["Menschliches"], &[Some("Angreifbarkeit"), None], &[3, 1])),
+        59 => Some(decl(
+            &["Menschliches"],
+            &[Some("Glaube_Erkenntnis"), None],
             &[3, 0],
         )),
         466 => Some(decl(
@@ -203,14 +125,11 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
-    let cols: &[u32] = &[
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-        11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-        21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-        466,
-    ];
-    cols.iter()
-        .copied()
-        .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
-        .collect()
+    [
+        7u32, 8, 9, 28, 31, 32, 33, 34, 35, 36, 37, 42, 43, 45, 46, 47, 48, 51, 52, 53, 54,
+        55, 57, 58, 59, 466,
+    ]
+    .into_iter()
+    .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
+    .collect()
 }
