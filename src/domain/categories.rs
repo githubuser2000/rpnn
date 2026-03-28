@@ -13,7 +13,7 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, EXACT_HTML_META, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, all_exact_decl_meta, PY_DECLS};
 use crate::domain::parser::legacy_cli_typed::LegacyOberToken;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -507,8 +507,8 @@ impl KategorieMap {
         }
 
         for col in key.all_column_ids_1_based().iter().map(|n| *n - 1) {
-            if let Some(meta) = python_source_of_truth::exact_meta_for_column(col) {
-                for main in Self::extract_main_categories_from_meta(&meta) {
+            if let Some(meta) = python_source_of_truth::exact_decl_meta_for_column(col) {
+                for main in Self::extract_main_categories_from_meta(&meta.render()) {
                     match LegacyOberToken::parse(&main) {
                         LegacyOberToken::Eigenschaften1ProN => {
                             mains.insert("Eigenschaften_1/n".to_string());
@@ -550,14 +550,14 @@ impl KategorieMap {
     fn merge_html_meta_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        for (col, meta) in EXACT_HTML_META {
-            let mains = Self::extract_main_categories_from_meta(meta);
-            let subs = Self::extract_sub_categories_from_meta(meta);
+        for (col, meta) in all_exact_decl_meta() {
+            let mains = meta.main_group_names();
+            let subs = meta.visible_slot_atoms();
             if mains.is_empty() || subs.is_empty() {
                 continue;
             }
 
-            let ids = vec![*col + 1];
+            let ids = vec![col + 1];
             for main in &mains {
                 for sub in &subs {
                     Self::insert_entry(main_to_sub, main, sub, ids.clone());

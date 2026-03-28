@@ -7,199 +7,149 @@ use crate::domain::model::spalten_anfrage::{
     EigenschaftsFamilie, SpaltenAnfrage, StandardUnterId,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PythonHtmlMeta {
-    pub decl: HtmlDeclMeta,
-}
-
-fn p4(values: &[u8]) -> Vec<HtmlP4Tag> {
-    values.iter().copied().map(HtmlP4Tag::new).collect()
-}
-
-fn decl(
-    p1_groups: Vec<HtmlP1Group>,
-    p2_slots: Vec<HtmlP2Slot>,
-    p4_tags: &[u8],
-) -> PythonHtmlMeta {
-    PythonHtmlMeta {
-        decl: HtmlDeclMeta {
-            p1_groups,
-            p2_slots,
-            p4_tags: p4(p4_tags),
-        },
+fn counter_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Zaehlung],
+        p2_slots: vec![HtmlP2Slot::Empty],
+        p4_tags: vec![],
     }
 }
 
-pub fn meta_for_request(request: &SpaltenAnfrage) -> Option<PythonHtmlMeta> {
-    let meta = match request {
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Klasse } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches), HtmlP1Group::Grundstrukturen],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::Gesellschaftsschicht),
-                    HtmlP2Slot::Label(HtmlSlotLabel::Klassen20),
-                ],
-                &[3, 5, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Liebe } => {
-            decl(
-                vec![
-                    HtmlP1Group::Domain(DomainId::Menschliches),
-                    HtmlP1Group::Grundstrukturen,
-                    HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N),
-                ],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::Liebe),
-                    HtmlP2Slot::Label(HtmlSlotLabel::Liebe7),
-                ],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Gewalt } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Gewalt)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Politische } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Politische)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Richtungen } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Richtungen)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Formationen } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Formationen)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Planet10Oder12, unter: StandardUnterId::Eigenschaft(req) }
-            if req.key == EigenschaftKeyId::Gleichheit => {
-            decl(
-                vec![
-                    HtmlP1Group::Domain(DomainId::Planet10Oder12),
-                    HtmlP1Group::Domain(DomainId::Menschliches),
-                    HtmlP1Group::Grundstrukturen,
-                ],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheit),
-                    HtmlP2Slot::Label(HtmlSlotLabel::OrdnungUndFilterung12Und1pro12),
-                ],
-                &[4, 5, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Eigenschaft(req) }
-            if req.key == EigenschaftKeyId::Gleichheit => {
-            decl(
-                vec![
-                    HtmlP1Group::Domain(DomainId::Planet10Oder12),
-                    HtmlP1Group::Domain(DomainId::Menschliches),
-                    HtmlP1Group::Grundstrukturen,
-                ],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheit),
-                    HtmlP2Slot::Label(HtmlSlotLabel::OrdnungUndFilterung12Und1pro12),
-                ],
-                &[4, 5, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Universum, unter: StandardUnterId::Geist } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Universum)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Geist15)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Universum, unter: StandardUnterId::Primzahlkreuz } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Universum)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Primzahlkreuz)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Religion, unter: StandardUnterId::SymboleReligion } => {
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Religion)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Religion)],
-                &[3, 0],
-            )
-        }
-        SpaltenAnfrage::Standard { domain: DomainId::Eigenschaften1ProN, unter: StandardUnterId::Eigenschaft(req) }
-            if req.key == EigenschaftKeyId::ToleranzRespektAkzeptanzWillkommen
-                && req.familie == EigenschaftsFamilie::EinsDurchN => {
-            decl(
-                vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::EinsDurchN)],
-                vec![HtmlP2Slot::Eigenschaft(EigenschaftKeyId::ToleranzRespektAkzeptanzWillkommen)],
-                &[3, 0],
-            )
-        }
-        _ => return None,
-    };
+fn numbering_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Nummerierung],
+        p2_slots: vec![HtmlP2Slot::Empty],
+        p4_tags: vec![],
+    }
+}
 
-    Some(meta)
+fn klasse_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![
+            HtmlP1Group::Domain(DomainId::Menschliches),
+            HtmlP1Group::Grundstrukturen,
+        ],
+        p2_slots: vec![
+            HtmlP2Slot::Label(HtmlSlotLabel::Gesellschaftsschicht),
+            HtmlP2Slot::Label(HtmlSlotLabel::Klassen20),
+        ],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(5), HtmlP4Tag::new(0)],
+    }
+}
+
+fn liebe_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![
+            HtmlP1Group::Domain(DomainId::Menschliches),
+            HtmlP1Group::Grundstrukturen,
+            HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N),
+        ],
+        p2_slots: vec![HtmlP2Slot::Eigenschaft(EigenschaftKeyId::LiebeUsw), HtmlP2Slot::Empty],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn gewalt_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Domain(DomainId::Menschliches)],
+        p2_slots: vec![HtmlP2Slot::Label(HtmlSlotLabel::Gewalt)],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn richtungen_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Domain(DomainId::Menschliches)],
+        p2_slots: vec![
+            HtmlP2Slot::Label(HtmlSlotLabel::Politische),
+            HtmlP2Slot::Label(HtmlSlotLabel::Richtungen),
+        ],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn formationen_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Domain(DomainId::Menschliches)],
+        p2_slots: vec![HtmlP2Slot::Label(HtmlSlotLabel::Formationen), HtmlP2Slot::Empty],
+        p4_tags: vec![HtmlP4Tag::new(0), HtmlP4Tag::new(5)],
+    }
+}
+
+fn geist_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Domain(DomainId::Universum)],
+        p2_slots: vec![HtmlP2Slot::Label(HtmlSlotLabel::Geist15)],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn symbole_religion_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::Domain(DomainId::Religion)],
+        p2_slots: vec![HtmlP2Slot::Label(HtmlSlotLabel::Religion)],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn toleranz_1n_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::EinsDurchN)],
+        p2_slots: vec![
+            HtmlP2Slot::Eigenschaft(EigenschaftKeyId::ToleranzRespektAkzeptanzWillkommen),
+            HtmlP2Slot::Empty,
+        ],
+        p4_tags: vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+    }
+}
+
+fn planet_gleichheit_decl() -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: vec![
+            HtmlP1Group::Domain(DomainId::Planet10Oder12),
+            HtmlP1Group::Domain(DomainId::Menschliches),
+            HtmlP1Group::Grundstrukturen,
+        ],
+        p2_slots: vec![
+            HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
+            HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheit),
+            HtmlP2Slot::Label(HtmlSlotLabel::OrdnungUndFilterung12Und1pro12),
+        ],
+        p4_tags: vec![HtmlP4Tag::new(4), HtmlP4Tag::new(5), HtmlP4Tag::new(0)],
+    }
 }
 
 pub fn decl_for_request(request: &SpaltenAnfrage) -> Option<HtmlDeclMeta> {
-    meta_for_request(request).map(|m| m.decl)
+    match request {
+        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Klasse } => Some(klasse_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Liebe } => Some(liebe_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Gewalt } => Some(gewalt_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Richtungen } => Some(richtungen_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Menschliches, unter: StandardUnterId::Formationen } => Some(formationen_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Universum, unter: StandardUnterId::Geist } => Some(geist_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Religion, unter: StandardUnterId::SymboleReligion } => Some(symbole_religion_decl()),
+        SpaltenAnfrage::Standard { domain: DomainId::Eigenschaften1ProN, unter: StandardUnterId::Eigenschaft(req) }
+            if req.key == EigenschaftKeyId::ToleranzRespektAkzeptanzWillkommen
+                && req.familie == EigenschaftsFamilie::EinsDurchN => Some(toleranz_1n_decl()),
+        _ => None,
+    }
 }
 
 pub fn css_class_for_request(request: &SpaltenAnfrage) -> Option<String> {
-    decl_for_request(request).map(|decl| decl.render())
+    decl_for_request(request).map(|m| m.render())
+}
+
+pub fn decl_for_visible_header(header: &str) -> Option<HtmlDeclMeta> {
+    match header.trim() {
+        "" => Some(counter_decl()),
+        "P" | "Z" => Some(numbering_decl()),
+        "Gesellschaftsklassen (20), welche aus den Paradigmen (13) hervorgehen" => Some(klasse_decl()),
+        "Gleichheit oder Ungleichheit als Ordnung und Freiheit oder nicht als Unordnung (12)" => Some(planet_gleichheit_decl()),
+        "Geist" | "Geist__(15)" => Some(geist_decl()),
+        _ => None,
+    }
 }
 
 pub fn css_class_for_visible_header(header: &str) -> Option<String> {
-    match header.trim() {
-        "Gesellschaftsklassen (20), welche aus den Paradigmen (13) hervorgehen" => Some(
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Menschliches), HtmlP1Group::Grundstrukturen],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::Gesellschaftsschicht),
-                    HtmlP2Slot::Label(HtmlSlotLabel::Klassen20),
-                ],
-                &[3, 5, 0],
-            )
-            .decl
-            .render(),
-        ),
-        "Gleichheit oder Ungleichheit als Ordnung und Freiheit oder nicht als Unordnung (12)" => Some(
-            decl(
-                vec![
-                    HtmlP1Group::Domain(DomainId::Planet10Oder12),
-                    HtmlP1Group::Domain(DomainId::Menschliches),
-                    HtmlP1Group::Grundstrukturen,
-                ],
-                vec![
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
-                    HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheit),
-                    HtmlP2Slot::Label(HtmlSlotLabel::OrdnungUndFilterung12Und1pro12),
-                ],
-                &[4, 5, 0],
-            )
-            .decl
-            .render(),
-        ),
-        "Geist" | "Geist__(15)" => Some(
-            decl(
-                vec![HtmlP1Group::Domain(DomainId::Universum)],
-                vec![HtmlP2Slot::Label(HtmlSlotLabel::Geist15)],
-                &[3, 0],
-            )
-            .decl
-            .render(),
-        ),
-        _ => None,
-    }
+    decl_for_visible_header(header).map(|m| m.render())
 }

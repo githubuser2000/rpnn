@@ -2,7 +2,7 @@ use crate::domain::decl_model::{
     HtmlDeclMeta, HtmlEigenschaftFamilie, HtmlP1Group, HtmlP2Slot, HtmlP4Tag,
 };
 use crate::domain::eigenschaften::EigenschaftKeyId;
-use crate::domain::python_html_meta::css_class_for_visible_header;
+use crate::domain::python_html_meta::decl_for_visible_header;
 use crate::domain::python_source_of_truth::{exact_decl_meta_for_column, exact_meta_for_column};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,7 +236,7 @@ pub fn resolve_html_header_class(raw: &str, col_idx: usize, is_header_row: bool)
         HeaderSemantic::SourceColumn(col0) => format!("z_0 r_{} {}", col_idx, exact_meta_for_column(col0)?),
         HeaderSemantic::Unknown => {
             let visible = strip_visible_text(raw);
-            format!("z_0 r_{} {}", col_idx, css_class_for_visible_header(&visible)?)
+            format!("z_0 r_{} {}", col_idx, decl_for_visible_header(&visible)?.render())
         }
     };
     Some(HtmlHeaderClass { class_attr })

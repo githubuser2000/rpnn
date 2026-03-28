@@ -1,6 +1,5 @@
-// Auto-generated from reta.todel Python sources and runtime metadata
-
 use crate::domain::decl_model::HtmlDeclMeta;
+// Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
 pub struct PyDecl {
@@ -2589,14 +2588,21 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 
 
 pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    exact_meta_for_column(col).and_then(|meta| HtmlDeclMeta::parse(&meta))
-}
-
-pub fn exact_meta_for_column(col: u32) -> Option<String> {
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
-            return Some((*meta).to_string());
+            return HtmlDeclMeta::parse(meta);
         }
     }
     None
+}
+
+pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
+    EXACT_HTML_META
+        .iter()
+        .filter_map(|(c, meta)| HtmlDeclMeta::parse(meta).map(|parsed| (*c, parsed)))
+        .collect()
+}
+
+pub fn exact_meta_for_column(col: u32) -> Option<String> {
+    exact_decl_meta_for_column(col).map(|meta| meta.render())
 }
