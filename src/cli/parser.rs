@@ -188,8 +188,27 @@ pub fn parse_cli_args(
                             if duplicate {
                                 continue;
                             }
+
+                            let typed_request = parse_spalten_anfrage(&oberkategorie, &unterkategorie).ok();
+
+                            let is_resolvable_without_legacy = typed_request.is_some()
+                                || !kategorie_map
+                                    .finde_spaltennummern_fuer_kategorien(&oberkategorie, &unterkategorie)
+                                    .is_empty()
+                                || !crate::domain::python_source_of_truth::exact_columns_for_pair(&oberkategorie, &unterkategorie)
+                                    .is_empty()
+                                || !crate::domain::python_source_of_truth::fuzzy_columns_for_pair(&oberkategorie, &unterkategorie)
+                                    .is_empty()
+                                || kategorie_map
+                                    .infer_generated_pair(&oberkategorie, &unterkategorie)
+                                    .is_some();
+
+                            if !is_resolvable_without_legacy {
+                                continue;
+                            }
+
                             eintraege.push(SpaltenNamen {
-                                typed_request: parse_spalten_anfrage(&oberkategorie, &unterkategorie).ok(),
+                                typed_request,
                                 oberkategorie,
                                 unterkategorie,
                             });
