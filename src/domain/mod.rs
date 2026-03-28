@@ -21,6 +21,7 @@ pub mod spalten_anfrage;
 pub mod request_pipeline;
 pub mod request_bridge;
 pub mod python_html_meta;
+pub mod typed_exact_decl;
 pub mod resolve_cli_legacy_adapter;
 
 pub mod ids {
