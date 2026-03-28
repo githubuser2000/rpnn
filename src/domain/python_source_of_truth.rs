@@ -7,8 +7,13 @@ pub struct PyDecl {
     pub columns: &'static [u32],
 }
 
-fn normalize_key(s: &str) -> String {
-    s.to_lowercase().replace("_", "").replace("-", "").replace(" ", "")
+use crate::domain::parser::legacy_cli_typed::{fold_cli_case, matches_any_alias, LegacyOberToken};
+
+fn ober_alias_match(input: &str, aliases: &[&str]) -> bool {
+    match LegacyOberToken::parse(input) {
+        LegacyOberToken::Unknown(_) => matches_any_alias(input, aliases),
+        wanted => aliases.iter().any(|alias| LegacyOberToken::parse(alias) == wanted),
+    }
 }
 
 pub static DECL_0: PyDecl = PyDecl {
@@ -2545,37 +2550,41 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 
 
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-    let mut found: Option<Vec<u32>> = None;
+    let mut cols = Vec::new();
+
     for decl in PY_DECLS {
-        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
+        let main_match = ober_alias_match(ober, decl.main_aliases);
+        let sub_match = matches_any_alias(unter, decl.sub_aliases);
         if main_match && sub_match {
-            found = Some(decl.columns.to_vec());
+            cols.extend_from_slice(decl.columns);
         }
     }
-    let mut out = found.unwrap_or_default();
-    out.sort_unstable();
-    out.dedup();
-    out
+
+    cols.sort_unstable();
+    cols.dedup();
+    cols
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-    let mut out = Vec::new();
+    let mut cols = Vec::new();
+    let unter_n = fold_cli_case(unter);
+
     for decl in PY_DECLS {
-        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a).contains(&unter_n));
+        let main_match = ober_alias_match(ober, decl.main_aliases);
+        let sub_match = decl
+            .sub_aliases
+            .iter()
+            .any(|alias| fold_cli_case(alias).contains(&unter_n));
         if main_match && sub_match {
-            out.extend_from_slice(decl.columns);
+            cols.extend_from_slice(decl.columns);
         }
     }
-    out.sort_unstable();
-    out.dedup();
-    out
+
+    cols.sort_unstable();
+    cols.dedup();
+    cols
 }
+
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
     for (c, meta) in EXACT_HTML_META {
