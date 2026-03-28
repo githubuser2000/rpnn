@@ -1,34 +1,70 @@
 use crate::domain::decl_model::HtmlDeclMeta;
 
 fn decl(p1: &[&str], p2: &[Option<&str>], p4: &[u8]) -> HtmlDeclMeta {
-    HtmlDeclMeta {
-        p1_groups: p1.iter().map(|s| (*s).to_string()).collect(),
-        p2_slots: p2.iter().map(|s| s.map(|v| v.to_string())).collect(),
-        p4_tags: p4.to_vec(),
-    }
+    HtmlDeclMeta::from_slices(p1, p2, p4)
 }
 
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
+        0 => Some(decl(
+            &["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Religionen", "Galaxie"],
+            &[Some("Wichtigste"), Some("Sternpolygon"), Some("der_Tierkreiszeichen"), Some("Thomasevangelium"), None],
+            &[3, 0],
+        )),
+        1 => Some(decl(
+            &["Wichtigstes_zum_gedanklich_einordnen", "Galaxie"],
+            &[Some("Wichtigste"), Some("babylonische_Tierkreiszeichen"), None],
+            &[3, 0],
+        )),
+        2 => Some(decl(
+            &["Wichtigstes_zum_gedanklich_einordnen", "Galaxie"],
+            &[Some("Wichtigste"), Some("babylonische_Tierkreiszeichen"), None],
+            &[3, 0],
+        )),
+        3 => Some(decl(
+            &["Galaxie"],
+            &[Some("Thomasevangelium"), None],
+            &[3, 0],
+        )),
+        4 => Some(decl(
+            &["Wichtigstes_zum_verstehen", "Grundstrukturen", "Größenordnung", "Universum", "Inkrementieren"],
+            &[Some("Wichtigste"), Some("Strukturgrösse"), Some("Strukturgrösse"), Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"), Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"), None],
+            &[3, 4, 0, 5],
+        )),
+        5 => Some(decl(
+            &["Wichtigstes_zum_verstehen", "Universum", "Universum", "Universum", "Grundstrukturen", "Multiversum", "Inkrementieren", "Inkrementieren", "Kontinuum"],
+            &[Some("Wichtigste"), Some("Transzendentalien"), Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"), Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"), Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"), Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"), Some("warum_Transzendentalie_=_Strukturgroesse_=_Charakter"), Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"), Some("O"), None],
+            &[4, 0],
+        )),
+        6 => Some(decl(
+            &["Religionen"],
+            &[Some("Sternpolygon"), None],
+            &[3, 0],
+        )),
         7 => Some(decl(
             &["Religionen"],
-            &[Some("Religion"), Some("Religions-Gründer-Typ"), None],
+            &[Some("Messias"), None],
             &[3, 0],
         )),
         8 => Some(decl(
-            &["Menschliches", "Grundstrukturen"],
-            &[Some("Gesellschaftsschicht"), Some("Klassen_(20)"), None],
-            &[3, 5, 0],
+            &["Wichtigstes_zum_verstehen", "Menschliches", "Grundstrukturen"],
+            &[Some("Wichtigste"), Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
         )),
         9 => Some(decl(
-            &["Menschliches", "Grundstrukturen", "Eigenschaften_n"],
+            &["Menschliches", "Grundstrukturen"],
             &[Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
+        )),
+        10 => Some(decl(
+            &["Wichtigstes_zum_verstehen", "Grundstrukturen", "Menschliches"],
+            &[Some("Wichtigste"), Some("Paradigmen_sind_Absichten_(13)"), Some("Motive"), None],
             &[3, 0],
         )),
         28 => Some(decl(
-            &["Universum"],
-            &[Some("Geist__(15)"), Some("Geist_(15)"), None],
-            &[4, 0],
+            &["Menschliches", "Grundstrukturen"],
+            &[Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
         )),
         466 => Some(decl(
             &["Menschliches", "Grundstrukturen"],
@@ -40,7 +76,7 @@ pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
-    [7u32, 8, 9, 28, 466]
+    [0u32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 28, 466]
         .into_iter()
         .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
         .collect()
