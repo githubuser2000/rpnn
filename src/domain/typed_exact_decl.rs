@@ -1,175 +1,137 @@
-use crate::domain::decl_model::{
-    HtmlDeclMeta, HtmlEigenschaftFamilie, HtmlP1Group, HtmlP2Slot, HtmlP4Tag, HtmlSlotLabel,
-};
-use crate::domain::eigenschaften::EigenschaftKeyId;
-use crate::domain::ids::domain_id::DomainId;
+use crate::domain::decl_model::HtmlDeclMeta;
+
+fn decl(p1: &[&str], p2: &[Option<&str>], p4: &[u8]) -> HtmlDeclMeta {
+    HtmlDeclMeta {
+        p1_groups: p1.iter().map(|s| (*s).to_string()).collect(),
+        p2_slots: p2.iter().map(|opt| opt.map(|s| s.to_string())).collect(),
+        p4_tags: p4.to_vec(),
+    }
+}
 
 pub const TYPED_EXACT_DECL_COLUMNS: &[u32] = &[
-    6, 7, 8, 9, 52, 53, 112, 132, 220, 221, 241, 289, 324, 394, 395, 461, 466, 479, 485, 516,
+    6, 7, 8, 9,
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+    31, 32, 33, 34, 35, 36, 37,
+    64, 65, 68, 69, 70, 71, 72, 73, 74, 75,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 86,
+    87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
+    99, 100,
+    101, 102, 103, 104, 105, 106, 107, 108, 109,
+    112, 113, 114, 115, 116, 117, 118, 119, 120,
+    123, 124, 125, 126, 127, 128, 129, 130, 131, 132,
+    135, 136, 137, 138, 139, 140,
+    241, 242, 243, 249, 303, 314, 324,
+    466,
 ];
 
 pub fn is_typed_exact_decl_column(col: u32) -> bool {
     TYPED_EXACT_DECL_COLUMNS.contains(&col)
 }
 
-fn decl(
-    p1_groups: Vec<HtmlP1Group>,
-    p2_slots: Vec<HtmlP2Slot>,
-    p4_tags: &[u8],
-) -> HtmlDeclMeta {
-    HtmlDeclMeta::new(
-        p1_groups,
-        p2_slots,
-        p4_tags.iter().copied().map(HtmlP4Tag::new).collect(),
-    )
-}
-
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    match col {
-        6 => Some(decl(
-            vec![HtmlP1Group::Domain(DomainId::Religion)],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Sternpolygon), HtmlP2Slot::Empty],
-            &[3, 0],
-        )),
-        7 => Some(decl(
-            vec![HtmlP1Group::Domain(DomainId::Religion)],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Messias), HtmlP2Slot::Empty],
-            &[3, 0],
-        )),
-        8 => Some(decl(
-            vec![
-                HtmlP1Group::Label("Wichtigstes_zum_verstehen"),
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Label(HtmlSlotLabel::Wichtigste),
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::LiebeUsw),
-                HtmlP2Slot::Label(HtmlSlotLabel::Liebe7),
-                HtmlP2Slot::Empty,
-            ],
-            &[0, 5],
-        )),
-        9 => Some(decl(
-            vec![
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::LiebeUsw),
-                HtmlP2Slot::Label(HtmlSlotLabel::Liebe7),
-                HtmlP2Slot::Empty,
-            ],
-            &[0, 5],
-        )),
-        52 | 53 => Some(decl(
-            vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N)],
-            vec![
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::GutBoeseLiebSchlecht),
-                HtmlP2Slot::Empty,
-            ],
-            &[3, 1, 0],
-        )),
-        112 => Some(decl(
-            vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N)],
-            vec![
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::WeisheitEtc),
-                HtmlP2Slot::Empty,
-            ],
-            &[3, 0],
-        )),
-        132 => Some(decl(
-            vec![
-                HtmlP1Group::Domain(DomainId::Planet10Oder12),
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
-                HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheit),
-                HtmlP2Slot::Label(HtmlSlotLabel::OrdnungUndFilterung12Und1pro12),
-                HtmlP2Slot::Empty,
-            ],
-            &[4, 0, 5],
-        )),
-        220 => Some(decl(
-            vec![HtmlP1Group::EigenschaftFamilie(HtmlEigenschaftFamilie::N)],
-            vec![
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::Aehnlich),
-                HtmlP2Slot::Empty,
-            ],
-            &[3, 4, 0],
-        )),
-        221 => Some(decl(
-            vec![HtmlP1Group::Grundstrukturen],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Liebe7), HtmlP2Slot::Empty],
-            &[],
-        )),
-        241 => Some(decl(
-            vec![
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Label(HtmlSlotLabel::Gesellschaftsschicht),
-                HtmlP2Slot::Label(HtmlSlotLabel::Klassen20),
-                HtmlP2Slot::Empty,
-            ],
-            &[3, 0, 5],
-        )),
-        289 => Some(decl(
-            vec![HtmlP1Group::Grundstrukturen],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Klassen20), HtmlP2Slot::Empty],
-            &[0, 5],
-        )),
-        324 => Some(decl(
-            vec![HtmlP1Group::Domain(DomainId::Planet10Oder12)],
-            vec![
-                HtmlP2Slot::Label(HtmlSlotLabel::GleichheitFreiheitOrdnung),
-                HtmlP2Slot::Empty,
-            ],
-            &[0, 5],
-        )),
-        394 | 395 => Some(decl(
-            vec![HtmlP1Group::Grundstrukturen],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Klassen20), HtmlP2Slot::Empty],
-            &[3, 0, 5],
-        )),
-        461 => Some(decl(
-            vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Formationen), HtmlP2Slot::Empty],
-            &[0, 5],
-        )),
-        466 => Some(decl(
-            vec![
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Label(HtmlSlotLabel::Gewalt),
-                HtmlP2Slot::Label(HtmlSlotLabel::Gewalt),
-                HtmlP2Slot::Empty,
-            ],
-            &[3, 4, 0],
-        )),
-        479 => Some(decl(
-            vec![HtmlP1Group::Grundstrukturen],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Gewalt), HtmlP2Slot::Empty],
-            &[4, 0],
-        )),
-        485 | 516 => Some(decl(
-            vec![HtmlP1Group::Grundstrukturen],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Klassen20), HtmlP2Slot::Empty],
-            &[0, 5],
-        )),
-        _ => None,
-    }
+    Some(match col {
+        6 => decl(&["Wichtigstes_zum_verstehen"], &[Some("Wichtigste")], &[0]),
+        7 => decl(&["Menschliches", "Grundstrukturen"], &[Some("Gesellschaftsschicht"), Some("Klassen_(20)")], &[3, 5, 0]),
+        8 => decl(&["Menschliches", "Grundstrukturen", "Eigenschaften_n"], &[Some("Liebe"), Some("Liebe_(7)")], &[3, 0]),
+        9 => decl(&["Planet_(10_und_oder_12)", "Menschliches", "Grundstrukturen"], &[Some("Gleichheit_Freiheit_Ordnung"), Some("Gleichheit_Freiheit"), Some("Ordnung_und_Filterung_12_und_1pro12")], &[4, 5, 0]),
+        21 => decl(&["Grundstrukturen", "Größenordnung"], &[Some("Strukturgrösse"), Some("Strukturgrösse"), None], &[3, 4, 0, 5]),
+        22 => decl(&["Bedeutung"], &[Some("Anwendung_der_Sonnen_und_Monde"), None], &[3, 0]),
+        23 => decl(&["Religionen"], &[Some("Vertreter_höherer_Konzepte"), None], &[3, 0]),
+        24 => decl(&["Grundstrukturen", "Menschliches"], &[Some("gegen_5"), Some("Krankheit"), None], &[3, 0]),
+        25 => decl(&["Universum", "Bedeutung", "Kontinuum"], &[Some("Netzwerk"), Some("Zählungen"), Some("X"), None], &[4, 0]),
+        26 => decl(&["Pro_Contra"], &[Some("contra"), None], &[3, 4, 0, 5]),
+        27 => decl(&["Größenordnung", "Menschliches", "Licht"], &[Some("Licht"), Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None, None], &[4, 0]),
+        28 => decl(&["Religion"], &[Some("Religion")], &[3, 0]),
+        29 => decl(&["Grundstrukturen", "Menschliches"], &[Some("Gefühle_(7)"), Some("Anführer"), None], &[3, 0]),
+        30 => decl(&["Wichtigstes_zum_gedanklich_einordnen", "Größenordnung", "Menschliches"], &[Some("Zweitwichtigste"), Some("Organisationen"), Some("Berufe"), None], &[3, 0]),
+        31 => decl(&["Menschliches"], &[Some("Lösungen"), None], &[3, 0]),
+        32 => decl(&["Menschliches"], &[Some("evolutionär_erwerben_und_Intelligenz_Kreativität"), None], &[3, 0]),
+        33 => decl(&["Grundstrukturen", "Menschliches"], &[Some("Stimmungen_Kombinationen_(14)"), Some("Musik"), None], &[3, 0]),
+        34 => decl(&["Universum", "Bedeutung"], &[Some("universelles_Recht"), Some("Jura"), None], &[3, 0]),
+        35 => decl(&["Bedeutung"], &[Some("Vollkommenheit_des_Geistes"), None], &[3, 0]),
+        36 => decl(&["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Religionen", "Symbole"], &[Some("Wichtigste"), Some("Sternpolygon"), Some("der_Tierkreiszeichen"), Some("Religionen"), None], &[3, 4, 0, 5]),
+        37 => decl(&["Wichtigstes_zum_gedanklich_einordnen", "Religionen", "Symbole"], &[Some("Wichtigste"), Some("gleichförmiges_Polygon"), Some("Religionen"), None], &[3, 5, 1, 4]),
+        64 => decl(&["Wichtigstes_zum_verstehen", "Bedeutung"], &[Some("Drittwichtigste"), Some("Gestirn"), None], &[3, 0]),
+        65 => decl(&["Wichtigstes_zum_verstehen", "Universum", "Universum", "Grundstrukturen", "Universum", "Multiversum", "Inkrementieren"], &[Some("Zweitwichtigste"), Some("universelles_Recht"), Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"), Some("Model_of_Hierarchical_Complexity"), Some("Model_of_Hierarchical_Complexity"), Some("Model_of_Hierarchical_Complexity"), Some("warum_Transzendentalie_=_Komplexität_von_Michael_Commons"), None], &[4, 0]),
+        68 => decl(&["Menschliches"], &[Some("INCELs"), None], &[3, 0]),
+        69 => decl(&["Grundstrukturen", "Wirtschaft"], &[Some("System"), Some("System"), None], &[4, 0]),
+        70 => decl(&["Grundstrukturen", "Wirtschaft"], &[Some("System"), Some("System"), None], &[4, 0]),
+        71 => decl(&["Wirtschaft"], &[Some("Erklärung"), None], &[3, 0]),
+        72 => decl(&["Religionen"], &[Some("Religions-Gründer-Typ"), None], &[3, 0]),
+        73 => decl(&["Menschliches"], &[Some("irrationale_Zahlen_durch_Wurzelbildung"), None], &[3, 0]),
+        74 => decl(&["Inkrementieren"], &[None, None], &[3, 0]),
+        75 => decl(&["Grundstrukturen", "Universum", "Multiversum"], &[Some("Model_of_Hierarchical_Complexity"), Some("Model_of_Hierarchical_Complexity"), Some("Model_of_Hierarchical_Complexity"), None], &[3, 4, 0]),
+        76 => decl(&["Operationen"], &[Some("4"), None], &[3, 4, 0]),
+        77 => decl(&["Universum", "Galaxie", "Operationen"], &[Some("Kugeln_Kreise"), Some("Kugeln_Kreise"), Some("4"), None], &[4, 0]),
+        78 => decl(&["Operationen"], &[Some("2"), None], &[3, 0]),
+        79 => decl(&["Planet_(10_und_oder_12)", "Planet_(10_und_oder_12)", "Operationen", "Grundstrukturen"], &[Some("Meta-Systeme_(12)"), Some("Gleichheit_Freiheit_Ordnung"), Some("2"), Some("Meta-Systeme_(12)"), None], &[3, 0]),
+        80 => decl(&["Planet_(10_und_oder_12)", "Planet_(10_und_oder_12)", "Operationen", "Grundstrukturen"], &[Some("Meta-Systeme_(12)"), Some("Gleichheit_Freiheit_Ordnung"), Some("2"), Some("Meta-Systeme_(12)"), None], &[4, 0]),
+        81 => decl(&["Operationen"], &[Some("4"), None], &[4, 0]),
+        82 => decl(&["Größenordnung"], &[Some("Organisationen"), None], &[3, 0]),
+        83 => decl(&["Größenordnung"], &[Some("politische_Systeme"), None], &[3, 0]),
+        84 => decl(&["Grundstrukturen", "Galaxie", "Universum"], &[Some("analytische_Ontologie"), Some("analytische_Ontologie"), Some("analytische_Ontologie"), None], &[4, 0]),
+        86 => decl(&["Operationen"], &[Some("Halbierung"), None], &[3, 0]),
+        87 => decl(&["Religionen"], &[Some("Sternpolygon_vs_gleichförmiges"), None], &[3, 1, 0]),
+        88 => decl(&["Menschliches", "Eigenschaften_n"], &[Some("Sinn_des_Lebens"), Some("Sinn_und_Zweck_des_Lebens"), None], &[3, 0]),
+        89 => decl(&["Wirtschaft"], &[Some("Maschinen"), None], &[3, 0]),
+        90 => decl(&["Galaxie"], &[Some("Offenbarung_des_Johannes"), None], &[3, 0]),
+        91 => decl(&["Galaxie"], &[Some("chinesisches_Horoskop"), None], &[3, 0]),
+        92 => decl(&["Operationen"], &[Some("3"), None], &[3, 0]),
+        93 => decl(&["Operationen"], &[Some("3"), None], &[4, 0]),
+        94 => decl(&["Operationen"], &[Some("9"), None], &[4, 0]),
+        95 => decl(&["Inkrementieren"], &[None, None], &[3, 0]),
+        96 => decl(&["Operationen"], &[Some("5"), None], &[3, 0]),
+        99 => decl(&["Wirtschaft"], &[Some("Organisationsform"), None], &[3, 0]),
+        100 => decl(&["Pro_Contra"], &[Some("Gegenteil"), None], &[3, 4, 0, 5]),
+        101 => decl(&["Pro_Contra"], &[Some("Gegenteil"), None], &[3, 4, 0, 5]),
+        102 => decl(&["Pro_Contra"], &[Some("Harmonie"), None], &[3, 4, 0, 5]),
+        103 => decl(&["Pro_Contra"], &[Some("Harmonie"), None], &[3, 4, 0, 5]),
+        104 => decl(&["Operationen"], &[Some("4"), None], &[4, 0]),
+        105 => decl(&["Menschliches"], &[Some("Gefühle"), None], &[3, 0]),
+        106 => decl(&["Bedeutung"], &[Some("Konjunktiv_Wurzelbildung"), None], &[3, 0]),
+        107 => decl(&["Planet_(10_und_oder_12)", "Bedeutung"], &[Some("Mechanismen"), Some("Mechanismen_der_Züchtung"), None], &[4, 0, 5]),
+        108 => decl(&["Bedeutung"], &[Some("Mechanismen_der_Züchtung"), None], &[3, 0]),
+        109 => decl(&["Wirtschaft", "Bedeutung"], &[Some("BWL"), Some("Mechanismen_der_Züchtung"), None], &[3, 0]),
+        112 => decl(&["Eigenschaften_n"], &[Some("Weisheit_etc"), None], &[3, 0]),
+        113 => decl(&["Wirtschaft"], &[Some("Pflanzen"), None], &[3, 0]),
+        114 => decl(&["Pro_Contra"], &[Some("Hilfe_erhalten"), None], &[3, 4, 0, 5]),
+        115 => decl(&["Pro_Contra"], &[Some("Helfen"), None], &[3, 4, 0, 5]),
+        116 => decl(&["Pro_Contra"], &[Some("Gegenposition"), None], &[3, 4, 0, 5]),
+        117 => decl(&["Pro_Contra"], &[Some("pro_nutzen"), None], &[3, 4, 0, 5]),
+        118 => decl(&["Bedeutung"], &[Some("Vorzeichen"), None], &[3, 0]),
+        119 => decl(&["Bedeutung"], &[Some("Vorzeichen"), None], &[3, 0]),
+        120 => decl(&["Pro_Contra"], &[Some("nervig"), None], &[3, 4, 0, 5]),
+        123 => decl(&["Pro_Contra"], &[Some("nicht_miteinander_auskommen"), None], &[3, 4, 0, 5]),
+        124 => decl(&["Pro_Contra"], &[Some("nicht_dagegen"), None], &[3, 4, 0, 5]),
+        125 => decl(&["Pro_Contra"], &[Some("kein_Gegenteil"), None], &[3, 4, 0, 5]),
+        126 => decl(&["Pro_Contra"], &[Some("nicht_dafür"), None], &[3, 4, 0, 5]),
+        127 => decl(&["Pro_Contra"], &[Some("Hilfe_nicht_gebrauchen"), None], &[3, 4, 0, 5]),
+        128 => decl(&["Pro_Contra"], &[Some("nicht_helfen_können"), None], &[3, 4, 0, 5]),
+        129 => decl(&["Pro_Contra"], &[Some("nicht_abgeneigt"), None], &[3, 4, 0, 5]),
+        130 => decl(&["Pro_Contra"], &[Some("unmotivierbar"), None], &[3, 4, 0, 5]),
+        131 => decl(&["Universum", "Grundstrukturen", "Multiversum", "Grundstrukturen"], &[Some("Reziproke_von_Transzendentalien"), Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"), Some("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"), Some("Reziprokes"), None], &[4, 1]),
+        132 => decl(&["Planet_(10_und_oder_12)", "Menschliches", "Grundstrukturen"], &[Some("Gleichheit_Freiheit_Ordnung"), Some("Gleichheit_Freiheit"), Some("Ordnung_und_Filterung_12_und_1pro12"), None], &[4, 0, 5]),
+        135 => decl(&["Menschliches"], &[Some("Wirkung"), None], &[3, 4, 0]),
+        136 => decl(&["Menschliches", "Eigenschaften_n"], &[Some("Egoismus"), Some("Egoismus_vs_Altruismus"), None], &[3, 0]),
+        137 => decl(&["Pro_Contra"], &[Some("Gegenspieler"), None], &[3, 4, 0, 5]),
+        138 => decl(&["Universum", "Menschliches"], &[Some("Gegentranszendentalien"), Some("Gegentranszendentalien"), None], &[4, 0]),
+        139 => decl(&["Menschliches"], &[Some("Gegentranszendentalien"), None], &[3, 0]),
+        140 => decl(&["Pro_Contra"], &[Some("ergibt_Sinn"), None], &[3, 4, 0, 5]),
+        241 => decl(&["Menschliches", "Grundstrukturen"], &[Some("Gesellschaftsschicht"), Some("Klassen_(20)"), None], &[3, 0, 5]),
+        242 => decl(&["Universum", "Grundstrukturen", "Grundstrukturen", "Multiversum"], &[Some("Geist__(15)"), Some("nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)"), Some("Geist_(15)"), Some("Geist_(15)"), None], &[4, 0]),
+        243 => decl(&["Menschliches", "Grundstrukturen"], &[Some("Gefühle"), Some("Gefühle_(7)"), None], &[0, 5]),
+        249 => decl(&["Grundstrukturen", "Menschliches"], &[Some("Gedanken_sind_Positionen_(17)"), Some("Gedanken_sind_Positionen_(17)"), None], &[0, 5]),
+        303 => decl(&["Galaxie"], &[Some("Thomasevangelium"), None], &[3, 0]),
+        314 => decl(&["Menschliches"], &[Some("Mensch-zu-Tier"), None], &[4, 0, 5]),
+        324 => decl(&["Planet_(10_und_oder_12)"], &[Some("Gleichheit_Freiheit_Ordnung"), None], &[0, 5]),
+        466 => decl(&["Universum"], &[Some("Geist__(15)")], &[3, 0]),
+        _ => return None,
+    })
 }
 
 pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
     TYPED_EXACT_DECL_COLUMNS
         .iter()
-        .copied()
-        .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
+        .filter_map(|&col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
         .collect()
 }

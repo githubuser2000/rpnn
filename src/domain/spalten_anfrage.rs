@@ -2,7 +2,6 @@ use std::fmt;
 
 use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
 use crate::domain::errors::ParseSpaltenAnfrageError;
-use crate::domain::parser::legacy_cli_typed::{matches_any_alias, LegacyOberToken};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StandardOberkategorie {
@@ -16,7 +15,6 @@ pub enum StandardOberkategorie {
     Bedeutung,
     ProContra,
     WichtigstesZumVerstehen,
-    Eigenschaften,
     EigenschaftenN,
     Eigenschaften1ProN,
     UniversumMetaKonkret,
@@ -78,22 +76,22 @@ pub enum SpaltenAnfrage {
 
 impl StandardOberkategorie {
     pub fn parse(input: &str) -> Self {
-        match LegacyOberToken::parse(input) {
-            LegacyOberToken::Menschliches => Self::Menschliches,
-            LegacyOberToken::Universum => Self::Universum,
-            LegacyOberToken::Religion => Self::Religion,
-            LegacyOberToken::Planet => Self::Planet,
-            LegacyOberToken::Galaxie => Self::Galaxie,
-            LegacyOberToken::Multiversum => Self::Multiversum,
-            LegacyOberToken::Grundstrukturen => Self::Grundstrukturen,
-            LegacyOberToken::Bedeutung => Self::Bedeutung,
-            LegacyOberToken::ProContra => Self::ProContra,
-            LegacyOberToken::WichtigstesZumVerstehen => Self::WichtigstesZumVerstehen,
-            LegacyOberToken::Eigenschaften => Self::Eigenschaften,
-            LegacyOberToken::EigenschaftenN => Self::EigenschaftenN,
-            LegacyOberToken::Eigenschaften1ProN => Self::Eigenschaften1ProN,
-            LegacyOberToken::UniversumMetaKonkret => Self::UniversumMetaKonkret,
-            LegacyOberToken::Unknown(value) => Self::Sonstige(value),
+        match normalize_key(input).as_str() {
+            "menschliches" => Self::Menschliches,
+            "universum" => Self::Universum,
+            "religion" | "religionen" => Self::Religion,
+            "planet" | "planet10undoder12" | "planet10oder12" => Self::Planet,
+            "galaxie" => Self::Galaxie,
+            "multiversum" => Self::Multiversum,
+            "grundstrukturen" => Self::Grundstrukturen,
+            "bedeutung" => Self::Bedeutung,
+            "procontra" => Self::ProContra,
+            "wichtigsteszumverstehen" => Self::WichtigstesZumVerstehen,
+            "eigenschaftenn" | "eigenschaftenn1" | "eigenschaftennn" | "konzept1" | "konzepte1" => {
+                Self::EigenschaftenN
+            }
+            "eigenschaften1n" | "konzept2" | "konzepte2" => Self::Eigenschaften1ProN,
+            "universummetakonkret" | "metakonkret" => Self::UniversumMetaKonkret,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
@@ -110,7 +108,6 @@ impl StandardOberkategorie {
             Self::Bedeutung => "Bedeutung",
             Self::ProContra => "Pro_Contra",
             Self::WichtigstesZumVerstehen => "Wichtigstes_zum_verstehen",
-            Self::Eigenschaften => "Eigenschaften",
             Self::EigenschaftenN => "Eigenschaften_n",
             Self::Eigenschaften1ProN => "Eigenschaften_1/n",
             Self::UniversumMetaKonkret => "universummetakonkret",
@@ -121,26 +118,17 @@ impl StandardOberkategorie {
 
 impl MenschlichesUnter {
     pub fn parse(input: &str) -> Self {
-        if matches_any_alias(input, &["Liebe", "Ethik"]) {
-            Self::Liebe
-        } else if matches_any_alias(input, &["Gleichheit"]) {
-            Self::Gleichheit
-        } else if matches_any_alias(input, &["Hölle", "Hoelle"]) {
-            Self::Hoelle
-        } else if matches_any_alias(input, &["Klasse"]) {
-            Self::Klasse
-        } else if matches_any_alias(input, &["Gewalt"]) {
-            Self::Gewalt
-        } else if matches_any_alias(input, &["politische"]) {
-            Self::Politische
-        } else if matches_any_alias(input, &["Richtungen"]) {
-            Self::Richtungen
-        } else if matches_any_alias(input, &["Formationen"]) {
-            Self::Formationen
-        } else if matches_any_alias(input, &["Motive"]) {
-            Self::Motive
-        } else {
-            Self::Sonstige(input.trim().to_string())
+        match normalize_key(input).as_str() {
+            "liebe" | "ethik" => Self::Liebe,
+            "gleichheit" => Self::Gleichheit,
+            "hoelle" | "hölle" => Self::Hoelle,
+            "klasse" => Self::Klasse,
+            "gewalt" => Self::Gewalt,
+            "politische" => Self::Politische,
+            "richtungen" => Self::Richtungen,
+            "formationen" => Self::Formationen,
+            "motive" => Self::Motive,
+            _ => Self::Sonstige(input.trim().to_string()),
         }
     }
 
@@ -162,12 +150,10 @@ impl MenschlichesUnter {
 
 impl UniversumUnter {
     pub fn parse(input: &str) -> Self {
-        if matches_any_alias(input, &["Geist"]) {
-            Self::Geist
-        } else if matches_any_alias(input, &["Primzahlkreuz", "Primzahlkreuz pro contra"]) {
-            Self::Primzahlkreuz
-        } else {
-            Self::Sonstige(input.trim().to_string())
+        match normalize_key(input).as_str() {
+            "geist" => Self::Geist,
+            "primzahlkreuz" | "primzahlkreuzprocontra" => Self::Primzahlkreuz,
+            _ => Self::Sonstige(input.trim().to_string()),
         }
     }
 
@@ -182,12 +168,10 @@ impl UniversumUnter {
 
 impl ReligionUnter {
     pub fn parse(input: &str) -> Self {
-        if matches_any_alias(input, &["Religion", "Religionen"]) {
-            Self::Religion
-        } else if matches_any_alias(input, &["Ethik"]) {
-            Self::Ethik
-        } else {
-            Self::Sonstige(input.trim().to_string())
+        match normalize_key(input).as_str() {
+            "religion" | "religionen" => Self::Religion,
+            "ethik" => Self::Ethik,
+            _ => Self::Sonstige(input.trim().to_string()),
         }
     }
 
@@ -199,6 +183,7 @@ impl ReligionUnter {
         }
     }
 }
+
 
 fn ober_erlaubt_eigenschaft(ober: &StandardOberkategorie, key: EigenschaftKeyId) -> bool {
     match ober {
@@ -219,22 +204,20 @@ impl SpaltenAnfrage {
             return Err(ParseSpaltenAnfrageError::EmptyUnterkategorie);
         }
 
+        let ober_norm = normalize_key(ober);
         let unter = unter.to_string();
-        let ober_token = LegacyOberToken::parse(ober);
 
-        let parsed = match ober_token {
-            LegacyOberToken::KombinationGalaxie => Self::KombinationGalaxie { unter },
-            LegacyOberToken::KombinationUniversum => Self::KombinationUniversum { unter },
-            LegacyOberToken::GebrochenRationalGalaxie => Self::GebrochenRationalGalaxie { unter },
-            LegacyOberToken::GebrochenRationalUniversum => Self::GebrochenRationalUniversum { unter },
-            LegacyOberToken::GebrochenRationalGefuehle => Self::GebrochenRationalGefuehle { unter },
-            LegacyOberToken::GebrochenRationalStrukturgroesse => Self::GebrochenRationalStrukturgroesse { unter },
-            LegacyOberToken::Primvielfache => Self::Primvielfache { unter },
-            LegacyOberToken::Multiplikationen => Self::Multiplikationen { unter },
-            LegacyOberToken::Unknown(_) => Self::Unknown {
-                ober: ober.to_string(),
-                unter,
-            },
+        let parsed = match ober_norm.as_str() {
+            "kombinationgalaxie" => Self::KombinationGalaxie { unter },
+            "kombinationuniversum" => Self::KombinationUniversum { unter },
+            "gebrochenrationalgalaxienm" => Self::GebrochenRationalGalaxie { unter },
+            "gebrochenrationaluniversumnm" => Self::GebrochenRationalUniversum { unter },
+            "gebrochenrationalgefuehlenm" | "gebrochenrationalgefuhlenm" => {
+                Self::GebrochenRationalGefuehle { unter }
+            }
+            "gebrochenrationalstrukturgroessenm" => Self::GebrochenRationalStrukturgroesse { unter },
+            "primvielfache" => Self::Primvielfache { unter },
+            "multiplikationen" => Self::Multiplikationen { unter },
             _ => {
                 let standard = StandardOberkategorie::parse(ober);
                 match standard {
@@ -252,7 +235,7 @@ impl SpaltenAnfrage {
                         unter,
                     },
                     known => {
-                        if matches!(known, StandardOberkategorie::Eigenschaften | StandardOberkategorie::EigenschaftenN | StandardOberkategorie::Eigenschaften1ProN) {
+                        if matches!(known, StandardOberkategorie::EigenschaftenN | StandardOberkategorie::Eigenschaften1ProN) {
                             if let Some(key) = EigenschaftKeyId::from_alias(&unter) {
                                 if !ober_erlaubt_eigenschaft(&known, key) {
                                     return Err(ParseSpaltenAnfrageError::InvalidUnterkategorieForOberkategorie {
@@ -272,8 +255,47 @@ impl SpaltenAnfrage {
     }
 
     pub fn to_cli(&self) -> String {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        format!("--spaltenname {} {}", ober, unter)
+        match self {
+            Self::Standard(StandardAnfrage::Menschliches(unter)) => {
+                format!("--spaltenname Menschliches {}", unter.as_cli_str())
+            }
+            Self::Standard(StandardAnfrage::Universum(unter)) => {
+                format!("--spaltenname Universum {}", unter.as_cli_str())
+            }
+            Self::Standard(StandardAnfrage::Religion(unter)) => {
+                format!("--spaltenname Religion {}", unter.as_cli_str())
+            }
+            Self::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
+                format!("--spaltenname {} {}", ober.as_cli_str(), unter)
+            }
+            Self::KombinationGalaxie { unter } => {
+                format!("--spaltenname KombinationGalaxie {}", unter)
+            }
+            Self::KombinationUniversum { unter } => {
+                format!("--spaltenname KombinationUniversum {}", unter)
+            }
+            Self::GebrochenRationalGalaxie { unter } => {
+                format!("--spaltenname gebrochen-rational_Galaxie_n/m {}", unter)
+            }
+            Self::GebrochenRationalUniversum { unter } => {
+                format!("--spaltenname gebrochen-rational_Universum_n/m {}", unter)
+            }
+            Self::GebrochenRationalGefuehle { unter } => {
+                format!("--spaltenname gebrochen-rational_Gefuehle_n/m {}", unter)
+            }
+            Self::GebrochenRationalStrukturgroesse { unter } => {
+                format!("--spaltenname gebrochen-rational_Strukturgroesse_n/m {}", unter)
+            }
+            Self::Primvielfache { unter } => {
+                format!("--spaltenname primvielfache {}", unter)
+            }
+            Self::Multiplikationen { unter } => {
+                format!("--spaltenname multiplikationen {}", unter)
+            }
+            Self::Unknown { ober, unter } => {
+                format!("--spaltenname {} {}", ober, unter)
+            }
+        }
     }
 
     pub fn ober_unter_cli_pair(&self) -> (String, String) {
@@ -304,12 +326,12 @@ impl SpaltenAnfrage {
 
     pub fn ober_normalized(&self) -> String {
         let (ober, _) = self.ober_unter_cli_pair();
-        ober.to_lowercase()
+        normalize_key(&ober)
     }
 
     pub fn unter_normalized(&self) -> String {
         let (_, unter) = self.ober_unter_cli_pair();
-        unter.to_lowercase()
+        normalize_key(&unter)
     }
 
     pub fn generated_befehle_hint(&self) -> Vec<String> {
@@ -324,13 +346,24 @@ impl SpaltenAnfrage {
     }
 
     pub fn parameters_main_hint(&self) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
-        let (ober, unter) = self.ober_unter_cli_pair();
-        (Some(ober.to_lowercase()), None, None, Some(unter.to_lowercase()))
+        let ober = self.ober_normalized();
+        let unter = self.unter_normalized();
+        (Some(ober), None, None, Some(unter))
     }
+
 }
 
 impl fmt::Display for SpaltenAnfrage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_cli())
     }
+}
+
+pub fn normalize_key(s: &str) -> String {
+    s.trim()
+        .to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
 }

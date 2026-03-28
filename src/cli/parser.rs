@@ -188,20 +188,8 @@ pub fn parse_cli_args(
                             if duplicate {
                                 continue;
                             }
-
-                            let typed_request = parse_spalten_anfrage(&oberkategorie, &unterkategorie).ok();
-                            let exact_supported = crate::domain::exact_generator_bridge::resolve_exact_generator(
-                                &oberkategorie,
-                                &unterkategorie,
-                            )
-                            .is_some();
-
-                            if typed_request.is_none() && !exact_supported {
-                                continue;
-                            }
-
                             eintraege.push(SpaltenNamen {
-                                typed_request,
+                                typed_request: parse_spalten_anfrage(&oberkategorie, &unterkategorie).ok(),
                                 oberkategorie,
                                 unterkategorie,
                             });
