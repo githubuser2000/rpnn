@@ -60,7 +60,7 @@ pub fn print_table_chunked_with_line_numbers(
                 let structured = !matches!(out_type, OutputSyntax::Plain);
                 let base = sanitize_header_for_output(&headers[global_i], global_i, structured);
                 if structured {
-                    format!("{}\u{1f}IDX:{}", base, global_i + 1)
+                    format!("{} [[IDX:{}]]", base, global_i + 1)
                 } else {
                     sanitize_header_preserve_id(&headers[global_i], global_i)
                 }

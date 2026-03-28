@@ -114,6 +114,23 @@ impl EigenschaftKeyId {
             .find(|key| key.aliases().iter().any(|alias| normalize_cli_token(alias) == wanted))
     }
 
+    pub fn from_modal_pair(left: usize, right: usize) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|key| key.maybe_pair() == Some((left, right)))
+    }
+
+    pub fn from_any_column(col: usize) -> Option<Self> {
+        Self::ALL.iter().copied().find(|key| {
+            key.direct_columns().contains(&col)
+                || key
+                    .maybe_pair()
+                    .map(|(a, b)| a == col || b == col)
+                    .unwrap_or(false)
+        })
+    }
+
     pub fn canonical_name(self) -> &'static str {
         match self {
             Self::WeisheitEtc => "Weisheit_etc",
