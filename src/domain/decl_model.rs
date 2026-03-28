@@ -7,10 +7,6 @@ pub struct HtmlDeclMeta {
 }
 
 impl HtmlDeclMeta {
-    pub fn new(p1_groups: Vec<String>, p2_slots: Vec<Option<String>>, p4_tags: Vec<u8>) -> Self {
-        Self { p1_groups, p2_slots, p4_tags }
-    }
-
     pub fn parse(raw: &str) -> Option<Self> {
         let raw = raw.trim();
         if raw.is_empty() {
@@ -29,11 +25,11 @@ impl HtmlDeclMeta {
         let p2_slots = parse_p2_slots(p2_raw);
         let p4_tags = parse_p4_tags(p4_raw);
 
-        Some(Self::new(
+        Some(Self {
             p1_groups,
             p2_slots,
             p4_tags,
-        ))
+        })
     }
 
     pub fn render(&self) -> String {

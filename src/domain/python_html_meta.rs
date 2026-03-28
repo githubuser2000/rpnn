@@ -80,12 +80,6 @@ pub fn css_class_for_visible_header(header: &str) -> Option<&'static str> {
 }
 
 
-pub fn decl_for_request(request: &SpaltenAnfrage) -> Option<HtmlDeclMeta> {
-    let css = css_class_for_request(request)?;
-    HtmlDeclMeta::parse(css)
-}
-
 pub fn decl_for_visible_header(header: &str) -> Option<HtmlDeclMeta> {
-    let css = css_class_for_visible_header(header)?;
-    HtmlDeclMeta::parse(css)
+    css_class_for_visible_header(header).and_then(HtmlDeclMeta::parse)
 }
