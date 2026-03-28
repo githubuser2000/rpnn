@@ -302,7 +302,6 @@ impl KategorieMap {
             ("Bedeutung", "Gestirn"),
             ("Wichtigstes_zum_verstehen", "Primzahlen"),
             ("Bedeutung", "Primzahlen"),
-            ("Galaxie", "Primzahlen"),
             ("Modallogik", "Modallogik"),
         ] {
             push_pair(&mut paare_set, ober, unter);

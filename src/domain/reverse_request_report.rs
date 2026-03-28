@@ -187,7 +187,6 @@ fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, out: &mut BTree
     if has("vervielfachezeile") {
         out.insert(request("Wichtigstes_zum_verstehen", "Primzahlen"));
         out.insert(request("Bedeutung", "Primzahlen"));
-        out.insert(request("Galaxie", "Primzahlen"));
     }
 
     if has("primmotgleichf") {
