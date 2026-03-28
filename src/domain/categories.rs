@@ -1,3 +1,4 @@
+use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
 use crate::domain::resolver::request_resolver::resolve_request;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
@@ -13,7 +14,6 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::python_source_of_truth::{self, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -575,18 +575,25 @@ impl KategorieMap {
     }
 
     fn extract_main_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out = meta.p1_groups.clone();
+        let mut out: Vec<String> = meta
+            .p1_groups
+            .iter()
+            .map(|s| s.trim().trim_start_matches('✗').trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
         out.sort();
         out.dedup();
         out
     }
 
     fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out: Vec<String> = meta.p2_slots
+        let mut out: Vec<String> = meta
+            .p2_slots
             .iter()
-            .filter_map(|slot| slot.clone())
-            .filter(|value| !value.is_empty())
-            .filter(|value| !value.chars().all(|c| c.is_ascii_digit()))
+            .filter_map(|opt| opt.as_ref())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .filter(|s| !s.chars().all(|c| c.is_ascii_digit()))
             .collect();
         out.sort();
         out.dedup();
