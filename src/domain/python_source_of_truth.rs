@@ -2579,17 +2579,25 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     out
 }
 
-pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    if let Some(meta) = typed_exact_decl_for_column(col) {
-        return Some(meta);
-    }
-
+fn legacy_exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
             return HtmlDeclMeta::parse(meta);
         }
     }
     None
+}
+
+pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
+    if let Some(meta) = typed_exact_decl_for_column(col) {
+        return Some(meta);
+    }
+
+    if is_typed_exact_decl_column(col) {
+        panic!("typed exact decl column without typed declaration: {}", col);
+    }
+
+    legacy_exact_decl_meta_for_column(col)
 }
 
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
