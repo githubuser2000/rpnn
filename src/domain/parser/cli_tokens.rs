@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use crate::domain::eigenschaften::EigenschaftKeyId;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum OberToken {
     Menschliches,
     Religion,
@@ -8,24 +10,29 @@ pub enum OberToken {
     Kontinuum,
     Multiversum,
     Planet10Oder12,
+
     Eigenschaften,
     EigenschaftenN,
     Eigenschaften1ProN,
+
     GebrochenRationalGalaxie,
     GebrochenRationalUniversum,
     GebrochenRationalGefuehle,
     GebrochenRationalStrukturgroesse,
+
     KombinationGalaxie,
     KombinationUniversum,
     KombinationGefuehle,
     KombinationStrukturgroesse,
+
     Primzahlkreuz,
     Multiplikationen,
     Primvielfache,
+
     MetaKonkret,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StandardUnterToken {
     Gewalt,
     Politische,
@@ -35,124 +42,97 @@ pub enum StandardUnterToken {
     Hoelle,
     Liebe,
     Geist,
-    Religion,
+    SymboleReligion,
     Primzahlkreuz,
+    Eigenschaft(EigenschaftKeyId),
+    Text(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum KombiUnterToken {
     Tiere,
     Berufe,
     Religion,
     Politik,
+    Unbekannt,
+    Text(String),
 }
 
-fn normalize_case_and_spaces(input: &str) -> String {
-    input
-        .trim()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
-fn matches_any(input: &str, aliases: &[&str]) -> bool {
-    let normalized = normalize_case_and_spaces(input);
-    aliases
-        .iter()
-        .any(|alias| normalize_case_and_spaces(alias) == normalized)
+fn fold(s: &str) -> String {
+    s.trim().to_lowercase()
 }
 
 impl OberToken {
     pub fn parse(input: &str) -> Option<Self> {
-        let table: &[(OberToken, &[&str])] = &[
-            (Self::Menschliches, &["Menschliches"]),
-            (Self::Religion, &["Religion", "Religionen"]),
-            (Self::Galaxie, &["Galaxie", "Galaxien"]),
-            (Self::Universum, &["Universum"]),
-            (Self::Grundstrukturen, &["Grundstrukturen"]),
-            (Self::Kontinuum, &["Kontinuum"]),
-            (Self::Multiversum, &["Multiversum"]),
-            (Self::Planet10Oder12, &["Planet_(10_und_oder_12)", "Planet"]),
-            (Self::Eigenschaften, &["Eigenschaft", "Eigenschaften", "konzept", "konzepte"]),
-            (Self::EigenschaftenN, &["Eigenschaften_n", "Eigenschaften n", "konzept1", "konzepte1"]),
-            (Self::Eigenschaften1ProN, &[
-                "Eigenschaften_1/n",
-                "Eigenschaften 1/n",
-                "Eigenschaften_1pro_n",
-                "Eigenschaften 1pro n",
-                "konzept2",
-                "konzepte2",
-            ]),
-            (Self::GebrochenRationalGalaxie, &[
-                "gebrochen-rational_Galaxie_n/m",
-                "gebrochen-rational Galaxie n/m",
-                "gebrochengalaxie",
-            ]),
-            (Self::GebrochenRationalUniversum, &[
-                "gebrochen-rational_Universum_n/m",
-                "gebrochen-rational Universum n/m",
-                "gebrochenuniversum",
-            ]),
-            (Self::GebrochenRationalGefuehle, &[
-                "gebrochen-rational_Gefuehle_n/m",
-                "gebrochen-rational Gefühle n/m",
-                "gebrochenemotion",
-                "gebrochengemotion",
-            ]),
-            (Self::GebrochenRationalStrukturgroesse, &[
-                "gebrochen-rational_Strukturgroesse_n/m",
-                "gebrochen-rational Strukturgroesse n/m",
-                "gebrochengroesse",
-            ]),
-            (Self::KombinationGalaxie, &["KombinationGalaxie", "Kombination Galaxie"]),
-            (Self::KombinationUniversum, &["KombinationUniversum", "Kombination Universum"]),
-            (Self::KombinationGefuehle, &["KombinationGefuehle", "Kombination Gefühle"]),
-            (Self::KombinationStrukturgroesse, &["KombinationStrukturgroesse", "Kombination Strukturgroesse"]),
-            (Self::Primzahlkreuz, &["Primzahlkreuz"]),
-            (Self::Multiplikationen, &["Multiplikationen"]),
-            (Self::Primvielfache, &["Primvielfache", "primvielfache"]),
-            (Self::MetaKonkret, &["MetaKonkret", "Universum_Metakonkret", "Universum Metakonkret"]),
-        ];
+        let s = fold(input);
+        Some(match s.as_str() {
+            "menschliches" => Self::Menschliches,
+            "religion" | "religionen" => Self::Religion,
+            "galaxie" | "galaxien" | "alteschriften" | "kreis" | "kreise" => Self::Galaxie,
+            "universum" => Self::Universum,
+            "grundstrukturen" => Self::Grundstrukturen,
+            "kontinuum" => Self::Kontinuum,
+            "multiversum" => Self::Multiversum,
+            "planet" | "planet_(10_und_oder_12)" => Self::Planet10Oder12,
 
-        table
-            .iter()
-            .find_map(|(token, aliases)| matches_any(input, aliases).then_some(*token))
+            "eigenschaften" => Self::Eigenschaften,
+            "eigenschaften_n" => Self::EigenschaftenN,
+            "eigenschaften_1/n" => Self::Eigenschaften1ProN,
+
+            "gebrochen-rational_galaxie_n/m" => Self::GebrochenRationalGalaxie,
+            "gebrochen-rational_universum_n/m" => Self::GebrochenRationalUniversum,
+            "gebrochen-rational_gefuehle_n/m" => Self::GebrochenRationalGefuehle,
+            "gebrochen-rational_strukturgroesse_n/m" => Self::GebrochenRationalStrukturgroesse,
+
+            "kombinationgalaxie" => Self::KombinationGalaxie,
+            "kombinationuniversum" => Self::KombinationUniversum,
+            "kombinationgefuehle" => Self::KombinationGefuehle,
+            "kombinationstrukturgroesse" => Self::KombinationStrukturgroesse,
+
+            "primzahlkreuz" => Self::Primzahlkreuz,
+            "multiplikationen" => Self::Multiplikationen,
+            "primvielfache" => Self::Primvielfache,
+
+            "metakonkret" => Self::MetaKonkret,
+            _ => return None,
+        })
     }
 }
 
 impl StandardUnterToken {
-    pub fn parse(input: &str) -> Option<Self> {
-        let table: &[(StandardUnterToken, &[&str])] = &[
-            (Self::Gewalt, &["Gewalt"]),
-            (Self::Politische, &["politische"]),
-            (Self::Richtungen, &["Richtungen"]),
-            (Self::Formationen, &["Formationen"]),
-            (Self::Klasse, &["Klasse"]),
-            (Self::Hoelle, &["Hölle", "Hoelle"]),
-            (Self::Liebe, &["Liebe"]),
-            (Self::Geist, &["Geist"]),
-            (Self::Religion, &["Religion", "Symbole Religion", "Symbole_Religion"]),
-            (Self::Primzahlkreuz, &["Primzahlkreuz"]),
-        ];
+    pub fn parse(input: &str) -> Self {
+        let s = input.trim();
 
-        table
-            .iter()
-            .find_map(|(token, aliases)| matches_any(input, aliases).then_some(*token))
+        if let Some(key) = EigenschaftKeyId::from_alias(s) {
+            return Self::Eigenschaft(key);
+        }
+
+        match fold(s).as_str() {
+            "gewalt" => Self::Gewalt,
+            "politische" => Self::Politische,
+            "richtungen" => Self::Richtungen,
+            "formationen" => Self::Formationen,
+            "klasse" => Self::Klasse,
+            "hölle" | "hoelle" => Self::Hoelle,
+            "liebe" => Self::Liebe,
+            "geist" => Self::Geist,
+            "religion" => Self::SymboleReligion,
+            "primzahlkreuz" => Self::Primzahlkreuz,
+            _ => Self::Text(s.to_string()),
+        }
     }
 }
 
 impl KombiUnterToken {
-    pub fn parse(input: &str) -> Option<Self> {
-        let table: &[(KombiUnterToken, &[&str])] = &[
-            (Self::Tiere, &["tiere"]),
-            (Self::Berufe, &["berufe"]),
-            (Self::Religion, &["religion"]),
-            (Self::Politik, &["politik"]),
-        ];
-
-        table
-            .iter()
-            .find_map(|(token, aliases)| matches_any(input, aliases).then_some(*token))
+    pub fn parse(input: &str) -> Self {
+        let s = input.trim();
+        match fold(s).as_str() {
+            "tiere" => Self::Tiere,
+            "berufe" => Self::Berufe,
+            "religion" => Self::Religion,
+            "politik" => Self::Politik,
+            "unbekannt" => Self::Unbekannt,
+            _ => Self::Text(s.to_string()),
+        }
     }
 }
