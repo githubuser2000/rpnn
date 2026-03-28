@@ -2580,13 +2580,10 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 }
 
 fn legacy_exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
-    for (c, meta) in EXACT_HTML_META {
-        if *c == col {
-            return HtmlDeclMeta::parse(meta);
-        }
-    }
-    None
+    panic!("LEGACY USED – missing typed decl for column {}", col);
 }
+
+
 
 pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     if let Some(meta) = typed_exact_decl_for_column(col) {
