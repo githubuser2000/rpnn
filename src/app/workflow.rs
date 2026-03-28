@@ -6,7 +6,7 @@ use crate::domain::categories::lade_kategorie_map;
 use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
 use crate::domain::resolve_cli_legacy_adapter::resolve_cli_selection;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::model::spalten_anfrage::SpaltenAnfrage;
 use crate::domain::tabellen_utils::show_usage;
 use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
@@ -38,10 +38,7 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
             spalten_namen,
         )?);
 
-        if let Ok(request) = SpaltenAnfrage::parse(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        ) {
+        if let Some(request) = spalten_namen.typed_request.clone() {
             typed_requests.push(request);
         }
 

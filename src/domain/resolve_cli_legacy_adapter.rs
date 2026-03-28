@@ -42,7 +42,58 @@ pub fn resolve_cli_selection(
         return Ok(out);
     }
 
+    if let Some(non_legacy) = resolve_via_non_legacy_exact_and_fuzzy(kategorie_map, ober, unter)? {
+        return Ok(non_legacy);
+    }
+
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)
+}
+
+fn resolve_via_non_legacy_exact_and_fuzzy(
+    kategorie_map: &KategorieMap,
+    ober: &str,
+    unter: &str,
+) -> Result<Option<LegacyResolvedSelection>, Box<dyn std::error::Error>> {
+    let mut out = LegacyResolvedSelection::default();
+
+    let mut direct_columns: Vec<u16> = kategorie_map
+        .finde_spaltennummern_fuer_kategorien(ober, unter)
+        .into_iter()
+        .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+        .collect::<Result<Vec<u16>, _>>()?;
+    direct_columns.sort_unstable();
+    direct_columns.dedup();
+    out.direct_columns = direct_columns;
+
+    if let Some(inference) = kategorie_map.infer_generated_pair(ober, unter) {
+        out.generated_befehle.extend(inference.generated_befehle);
+        out.required_columns = inference
+            .required_columns
+            .into_iter()
+            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+            .collect::<Result<Vec<u16>, _>>()?;
+
+        let inferred_direct_columns = inference
+            .direct_columns
+            .into_iter()
+            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+            .collect::<Result<Vec<u16>, _>>()?;
+        out.direct_columns.extend(inferred_direct_columns);
+    }
+
+    dedup_legacy_selection(&mut out);
+
+    if out.direct_columns.is_empty()
+        && out.required_columns.is_empty()
+        && out.exact_direct_columns.is_empty()
+        && out.exact_modal_pairs.is_empty()
+        && out.exact_meta_konkret_specs.is_empty()
+        && out.generated_befehle.is_empty()
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(out))
 }
 
 fn resolve_via_legacy_pipeline(

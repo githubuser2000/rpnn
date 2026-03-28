@@ -13,7 +13,7 @@ use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::reverse_request_report::print_reverse_request_pairs_dual;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::model::spalten_anfrage::SpaltenAnfrage;
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -275,11 +275,13 @@ fn should_use_full_table_for_requests(
 
     for request in typed_requests {
         let generated_for_request = kategorie_map
-            .infer_generated_request(request)
+            .infer_generated_canonical_request(request)
             .map(|inf| inf.generated_befehle.into_iter().collect::<BTreeSet<String>>())
             .unwrap_or_default();
 
-        let (ober, unter) = request.ober_unter_cli_pair();
+        let Some((ober, unter)) = request.to_cli_pair() else {
+            continue;
+        };
         let typed_parameters = ParametersMain {
             bedeutung0: ober.clone(),
             procontra0: ober.clone(),
