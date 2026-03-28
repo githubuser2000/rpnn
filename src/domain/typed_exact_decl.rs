@@ -1,41 +1,39 @@
-use crate::domain::decl_model::{HtmlDeclMeta, HtmlP1Group, HtmlP2Slot, HtmlP4Tag, HtmlSlotLabel};
-use crate::domain::eigenschaften::EigenschaftKeyId;
-use crate::domain::ids::domain_id::DomainId;
-
-fn mk(
-    p1_groups: Vec<HtmlP1Group>,
-    p2_slots: Vec<HtmlP2Slot>,
-    p4_tags: Vec<HtmlP4Tag>,
-) -> HtmlDeclMeta {
-    HtmlDeclMeta { p1_groups, p2_slots, p4_tags }
-}
+use crate::domain::decl_model::HtmlDeclMeta;
 
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
-        8 | 9 | 28 => Some(mk(
-            vec![
-                HtmlP1Group::Domain(DomainId::Menschliches),
-                HtmlP1Group::Grundstrukturen,
-            ],
-            vec![
-                HtmlP2Slot::Eigenschaft(EigenschaftKeyId::LiebeUsw),
-                HtmlP2Slot::Label(HtmlSlotLabel::Liebe7),
-                HtmlP2Slot::Empty,
-            ],
-            vec![HtmlP4Tag::new(0), HtmlP4Tag::new(5)],
+        7 => Some(HtmlDeclMeta::from_slices(
+            &["Religionen"],
+            &[Some("Messias"), None],
+            &[3, 0],
         )),
-        466 => Some(mk(
-            vec![HtmlP1Group::Domain(DomainId::Menschliches)],
-            vec![HtmlP2Slot::Label(HtmlSlotLabel::Gewalt)],
-            vec![HtmlP4Tag::new(3), HtmlP4Tag::new(0)],
+        8 => Some(HtmlDeclMeta::from_slices(
+            &["Wichtigstes_zum_verstehen", "Menschliches", "Grundstrukturen"],
+            &[Some("Wichtigste"), Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
+        )),
+        9 => Some(HtmlDeclMeta::from_slices(
+            &["Menschliches", "Grundstrukturen"],
+            &[Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
+        )),
+        28 => Some(HtmlDeclMeta::from_slices(
+            &["Menschliches", "Grundstrukturen"],
+            &[Some("Liebe"), Some("Liebe_(7)"), None],
+            &[0, 5],
+        )),
+        466 => Some(HtmlDeclMeta::from_slices(
+            &["Menschliches", "Grundstrukturen"],
+            &[Some("Gewalt"), Some("Gewalt"), None],
+            &[3, 4, 0],
         )),
         _ => None,
     }
 }
 
-pub fn all_typed_exact_decl() -> Vec<(u32, HtmlDeclMeta)> {
-    let keys = [8u32, 9u32, 28u32, 466u32];
-    keys.into_iter()
+pub fn all_typed_exact_decls() -> Vec<(u32, HtmlDeclMeta)> {
+    [7u32, 8, 9, 28, 466]
+        .into_iter()
         .filter_map(|col| typed_exact_decl_for_column(col).map(|meta| (col, meta)))
         .collect()
 }

@@ -1,5 +1,6 @@
 use crate::domain::decl_model::HtmlDeclMeta;
-use crate::domain::typed_exact_decl::{all_typed_exact_decl, typed_exact_decl_for_column};
+use crate::domain::typed_exact_decl::{all_typed_exact_decls, typed_exact_decl_for_column};
+
 // Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
@@ -9,13 +10,8 @@ pub struct PyDecl {
     pub columns: &'static [u32],
 }
 
-use crate::domain::parser::legacy_cli_typed::{fold_cli_case, matches_any_alias, LegacyOberToken};
-
-fn ober_alias_match(input: &str, aliases: &[&str]) -> bool {
-    match LegacyOberToken::parse(input) {
-        LegacyOberToken::Unknown(_) => matches_any_alias(input, aliases),
-        wanted => aliases.iter().any(|alias| LegacyOberToken::parse(alias) == wanted),
-    }
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase().replace("_", "").replace("-", "").replace(" ", "")
 }
 
 pub static DECL_0: PyDecl = PyDecl {
@@ -2552,47 +2548,42 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 
 
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let mut cols = Vec::new();
-
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+    let mut found: Option<Vec<u32>> = None;
     for decl in PY_DECLS {
-        let main_match = ober_alias_match(ober, decl.main_aliases);
-        let sub_match = matches_any_alias(unter, decl.sub_aliases);
+        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
+        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
         if main_match && sub_match {
-            cols.extend_from_slice(decl.columns);
+            found = Some(decl.columns.to_vec());
         }
     }
-
-    cols.sort_unstable();
-    cols.dedup();
-    cols
+    let mut out = found.unwrap_or_default();
+    out.sort_unstable();
+    out.dedup();
+    out
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let mut cols = Vec::new();
-    let unter_n = fold_cli_case(unter);
-
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+    let mut out = Vec::new();
     for decl in PY_DECLS {
-        let main_match = ober_alias_match(ober, decl.main_aliases);
-        let sub_match = decl
-            .sub_aliases
-            .iter()
-            .any(|alias| fold_cli_case(alias).contains(&unter_n));
+        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
+        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a).contains(&unter_n));
         if main_match && sub_match {
-            cols.extend_from_slice(decl.columns);
+            out.extend_from_slice(decl.columns);
         }
     }
-
-    cols.sort_unstable();
-    cols.dedup();
-    cols
+    out.sort_unstable();
+    out.dedup();
+    out
 }
-
 
 pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     if let Some(meta) = typed_exact_decl_for_column(col) {
         return Some(meta);
     }
-
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
             return HtmlDeclMeta::parse(meta);
@@ -2602,16 +2593,15 @@ pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
 }
 
 pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
-    let mut out = all_typed_exact_decl();
+    let mut out = all_typed_exact_decls();
     for (c, meta) in EXACT_HTML_META {
-        if out.iter().any(|(existing, _)| existing == c) {
+        if out.iter().any(|(known, _)| known == c) {
             continue;
         }
         if let Some(parsed) = HtmlDeclMeta::parse(meta) {
             out.push((*c, parsed));
         }
     }
-    out.sort_by_key(|(c, _)| *c);
     out
 }
 

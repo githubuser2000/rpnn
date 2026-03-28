@@ -10,7 +10,6 @@ pub mod generator_logic;
 pub mod category_map;
 
 pub mod python_source_of_truth;
-pub mod typed_exact_decl;
 pub mod decl_model;
 pub mod html_meta_builder;
 pub mod html_header_model;
@@ -22,6 +21,7 @@ pub mod spalten_anfrage;
 pub mod request_pipeline;
 pub mod request_bridge;
 pub mod python_html_meta;
+pub mod typed_exact_decl;
 pub mod resolve_cli_legacy_adapter;
 
 pub mod ids {
@@ -34,8 +34,6 @@ pub mod model {
 
 pub mod parser {
     pub mod cli_alias_parser;
-    pub mod cli_tokens;
-    pub mod legacy_cli_typed;
 }
 
 pub mod resolver {

@@ -1,13 +1,16 @@
-use crate::domain::parser::legacy_cli_typed::{fold_cli_case, matches_any_alias};
-
 pub fn normalize_category_key(s: &str) -> String {
-    fold_cli_case(s)
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+        .replace('/', "")
 }
 
 pub fn contains_any_alias(token: &str, aliases: &[&str]) -> bool {
-    matches_any_alias(token, aliases)
+    let t = normalize_category_key(token);
+    aliases.iter().any(|a| normalize_category_key(a) == t)
 }
 
 pub fn match_any_alias(token: &str, aliases: &[&str]) -> bool {
-    matches_any_alias(token, aliases)
+    aliases.iter().any(|a| normalize_category_key(a) == token)
 }
