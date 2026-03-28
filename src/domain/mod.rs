@@ -33,6 +33,7 @@ pub mod model {
 
 pub mod parser {
     pub mod cli_alias_parser;
+    pub mod cli_tokens;
 }
 
 pub mod resolver {
