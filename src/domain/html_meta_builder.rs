@@ -1,4 +1,3 @@
-
 use crate::domain::decl_model::{HtmlDeclMeta, HtmlEigenschaftFamilie};
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::css_class_for_visible_header;
@@ -31,12 +30,17 @@ fn extract_id_suffix_1_based(raw: &str) -> Option<u32> {
 
 fn split_marker(raw: &str) -> (&str, Option<&str>) {
     if let Some(start) = raw.rfind("[[RPNN:") {
-        let head = raw[..start].trim_end();
-        let rest = &raw[start + 7..];
-        if let Some(end) = rest.find("]]") {
-            return (head, Some(&rest[..end]));
+        let marker_start = start + "[[RPNN:".len();
+
+        if let Some(rest) = raw.get(marker_start..) {
+            if let Some(end_rel) = rest.find("]]") {
+                let head = raw[..start].trim_end();
+                let marker = &rest[..end_rel];
+                return (head, Some(marker));
+            }
         }
     }
+
     (raw, None)
 }
 
@@ -100,17 +104,17 @@ fn family_from_visible_text(visible_text: &str) -> Option<HtmlEigenschaftFamilie
     }
 }
 
-fn extract_quoted_segment(visible_text: &str) -> Option<String> {
-    let start = visible_text.find('„').or_else(|| visible_text.find('"'))?;
-    let tail = &visible_text[start + 1..];
-    let end = tail.find('“').or_else(|| tail.find('"'))?;
-    Some(tail[..end].trim().to_string())
+fn between_quotes(text: &str) -> Option<String> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let start_byte = chars.iter().find_map(|(i, ch)| if *ch == '„' || *ch == '"' { Some(*i) } else { None })?;
+    let after_start = start_byte + text[start_byte..].chars().next()?.len_utf8();
+    let tail = text.get(after_start..)?;
+    let end_rel = tail.char_indices().find_map(|(i, ch)| if ch == '“' || ch == '"' { Some(i) } else { None })?;
+    Some(tail[..end_rel].trim().to_string())
 }
 
-fn key_from_quoted_segment(visible_text: &str) -> Option<EigenschaftKeyId> {
-    let seg = extract_quoted_segment(visible_text)?;
-    let seg_n = normalize_key(&seg);
-
+fn key_from_text(text: &str) -> Option<EigenschaftKeyId> {
+    let seg_n = normalize_key(text);
     let mut best: Option<(usize, EigenschaftKeyId)> = None;
     for key in EigenschaftKeyId::ALL.iter().copied() {
         let canon = normalize_key(key.canonical_name());
@@ -133,6 +137,11 @@ fn key_from_quoted_segment(visible_text: &str) -> Option<EigenschaftKeyId> {
     best.map(|(_, key)| key)
 }
 
+fn key_from_quoted_segment(visible_text: &str) -> Option<EigenschaftKeyId> {
+    let seg = between_quotes(visible_text)?;
+    key_from_text(&seg)
+}
+
 fn semantic_from_header(raw: &str, col_idx: usize) -> HeaderSemantic {
     if col_idx == 0 {
         return HeaderSemantic::Counter;
@@ -152,7 +161,7 @@ fn semantic_from_header(raw: &str, col_idx: usize) -> HeaderSemantic {
         return HeaderSemantic::GeneratedEigenschaft { key, family };
     }
 
-    if let Some(id1) = extract_id_suffix_1_based(raw) {
+    if let Some(id1) = extract_id_suffix_1_based(&visible) {
         if let Some(col0) = id1.checked_sub(1) {
             return HeaderSemantic::SourceColumn(col0);
         }
@@ -173,11 +182,7 @@ fn source_candidates_for_key(key: EigenschaftKeyId) -> Vec<u32> {
 }
 
 fn choose_variant_index(col_idx: usize, len: usize) -> usize {
-    if len == 0 {
-        0
-    } else {
-        col_idx.saturating_sub(2) % len
-    }
+    if len == 0 { 0 } else { col_idx.saturating_sub(2) % len }
 }
 
 fn parsed_meta_for_column(col0: u32) -> Option<HtmlDeclMeta> {
@@ -193,11 +198,7 @@ fn fallback_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie) -> HtmlD
     }
 }
 
-fn build_generated_meta(
-    key: EigenschaftKeyId,
-    family: HtmlEigenschaftFamilie,
-    col_idx: usize,
-) -> HtmlDeclMeta {
+fn build_generated_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie, col_idx: usize) -> HtmlDeclMeta {
     let mut candidates: Vec<HtmlDeclMeta> = source_candidates_for_key(key)
         .into_iter()
         .filter_map(parsed_meta_for_column)
@@ -209,60 +210,32 @@ fn build_generated_meta(
         fallback_meta(key, family)
     };
 
-    // Typed override: family decides p1, concrete key decides first slot.
     meta.p1_groups = vec![family.render_p1().to_string()];
-
-    // Ensure there is at least one additional slot, but do not collapse all existing slots.
-    if meta.p2_slots.is_empty() {
-        meta.p2_slots.push(None);
-    }
-    if meta.p2_slots.len() == 1 {
-        meta.p2_slots.push(None);
-    }
-
-    // Remove only generic E placeholders. Keep specific slots.
+    if meta.p2_slots.is_empty() { meta.p2_slots.push(None); }
+    if meta.p2_slots.len() == 1 { meta.p2_slots.push(None); }
     for slot in &mut meta.p2_slots {
         if matches!(slot, Some(s) if s == "E" || s == "e") {
             *slot = None;
         }
     }
-
     meta.p2_slots[0] = Some(key.canonical_name().replace(' ', "_"));
-
-    if meta.p4_tags.is_empty() {
-        meta.p4_tags = family.default_p4();
-    }
-
+    if meta.p4_tags.is_empty() { meta.p4_tags = family.default_p4(); }
     meta
 }
 
-pub fn build_python_exact_html_class(
-    raw: &str,
-    col_idx: usize,
-    is_header_row: bool,
-) -> Option<String> {
-    if !is_header_row {
-        return None;
-    }
-
+pub fn build_python_exact_html_class(raw: &str, col_idx: usize, is_header_row: bool) -> Option<String> {
+    if !is_header_row { return None; }
     match semantic_from_header(raw, col_idx) {
-        HeaderSemantic::Counter => {
-            Some("z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string())
-        }
-        HeaderSemantic::Numbering => {
-            Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string())
-        }
+        HeaderSemantic::Counter => Some("z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string()),
+        HeaderSemantic::Numbering => Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string()),
         HeaderSemantic::GeneratedEigenschaft { key, family } => {
             let meta = build_generated_meta(key, family, col_idx);
             Some(format!("z_0 r_{} {}", col_idx, meta.render()))
         }
-        HeaderSemantic::SourceColumn(col0) => {
-            exact_meta_for_column(col0).map(|meta| format!("z_0 r_{} {}", col_idx, meta))
-        }
+        HeaderSemantic::SourceColumn(col0) => exact_meta_for_column(col0).map(|meta| format!("z_0 r_{} {}", col_idx, meta)),
         HeaderSemantic::Unknown => {
             let visible = strip_visible_text(raw);
-            css_class_for_visible_header(&visible)
-                .map(|meta| format!("z_0 r_{} {}", col_idx, meta))
+            css_class_for_visible_header(&visible).map(|meta| format!("z_0 r_{} {}", col_idx, meta))
         }
     }
 }

@@ -13,17 +13,23 @@ pub struct RawSelectionRequest {
 
 #[derive(Debug, Clone)]
 pub struct ParsedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExpandedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
     pub generated_befehle: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ResolvedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
     pub generated_befehle: BTreeSet<String>,
     pub direct_columns: Vec<u32>,
@@ -45,7 +51,7 @@ impl RawSelectionRequest {
     pub fn parse(self) -> Result<ParsedSelectionRequest, RequestPipelineError> {
         let request = SpaltenAnfrage::parse(&self.ober, &self.unter)
             .map_err(RequestPipelineError::ParseSpaltenAnfrage)?;
-        Ok(ParsedSelectionRequest { request })
+        Ok(ParsedSelectionRequest { ober: self.ober, unter: self.unter, request })
     }
 }
 
@@ -55,24 +61,33 @@ impl ParsedSelectionRequest {
         if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
             generated_befehle.extend(inference.generated_befehle);
         }
-        ExpandedSelectionRequest { request: self.request, generated_befehle }
+        ExpandedSelectionRequest { ober: self.ober, unter: self.unter, request: self.request, generated_befehle }
     }
 }
 
 impl ExpandedSelectionRequest {
-    pub fn resolve(self, kategorie_map: &KategorieMap) -> ResolvedSelectionRequest {
+    pub fn resolve(self, kategorie_map: &KategorieMap) -> Result<ResolvedSelectionRequest, RequestPipelineError> {
         let direct_columns = kategorie_map.finde_spaltennummern_fuer_request(&self.request);
         let required_columns = kategorie_map
             .infer_generated_request(&self.request)
             .map(|g| g.required_columns)
             .unwrap_or_default();
 
-        ResolvedSelectionRequest {
+        if direct_columns.is_empty() && required_columns.is_empty() && self.generated_befehle.is_empty() {
+            return Err(RequestPipelineError::NoColumnsForRequest {
+                ober: self.ober,
+                unter: self.unter,
+            });
+        }
+
+        Ok(ResolvedSelectionRequest {
+            ober: self.ober,
+            unter: self.unter,
             request: self.request,
             generated_befehle: self.generated_befehle,
             direct_columns,
             required_columns,
-        }
+        })
     }
 }
 

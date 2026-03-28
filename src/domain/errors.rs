@@ -25,6 +25,7 @@ impl std::error::Error for GeneratorError {}
 pub enum ParseSpaltenAnfrageError {
     UnknownOberkategorie(String),
     EmptyUnterkategorie,
+    InvalidUnterkategorieForOberkategorie { ober: String, unter: String },
 }
 
 impl fmt::Display for ParseSpaltenAnfrageError {
@@ -32,6 +33,11 @@ impl fmt::Display for ParseSpaltenAnfrageError {
         match self {
             Self::UnknownOberkategorie(v) => write!(f, "Unbekannte Oberkategorie: {}", v),
             Self::EmptyUnterkategorie => write!(f, "Unterkategorie darf nicht leer sein."),
+            Self::InvalidUnterkategorieForOberkategorie { ober, unter } => write!(
+                f,
+                "Unterkategorie '{}' existiert nicht für Oberkategorie '{}'",
+                unter, ober
+            ),
         }
     }
 }
@@ -41,12 +47,18 @@ impl std::error::Error for ParseSpaltenAnfrageError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RequestPipelineError {
     ParseSpaltenAnfrage(ParseSpaltenAnfrageError),
+    NoColumnsForRequest { ober: String, unter: String },
 }
 
 impl fmt::Display for RequestPipelineError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ParseSpaltenAnfrage(err) => write!(f, "{}", err),
+            Self::NoColumnsForRequest { ober, unter } => write!(
+                f,
+                "Unterkategorie '{}' existiert nicht für Oberkategorie '{}'",
+                unter, ober
+            ),
         }
     }
 }

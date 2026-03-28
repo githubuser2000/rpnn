@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
 use crate::domain::errors::ParseSpaltenAnfrageError;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -183,6 +184,19 @@ impl ReligionUnter {
     }
 }
 
+
+fn ober_erlaubt_eigenschaft(ober: &StandardOberkategorie, key: EigenschaftKeyId) -> bool {
+    match ober {
+        StandardOberkategorie::EigenschaftenN => {
+            matches!(key.standard_familie(), EigenschaftStandardFamilie::N)
+        }
+        StandardOberkategorie::Eigenschaften1ProN => {
+            matches!(key.standard_familie(), EigenschaftStandardFamilie::EinsDurchN)
+        }
+        _ => true,
+    }
+}
+
 impl SpaltenAnfrage {
     pub fn parse(ober: &str, unter: &str) -> Result<Self, ParseSpaltenAnfrageError> {
         let unter = unter.trim();
@@ -220,7 +234,19 @@ impl SpaltenAnfrage {
                         ober: ober.to_string(),
                         unter,
                     },
-                    known => Self::Standard(StandardAnfrage::Sonstige { ober: known, unter }),
+                    known => {
+                        if matches!(known, StandardOberkategorie::EigenschaftenN | StandardOberkategorie::Eigenschaften1ProN) {
+                            if let Some(key) = EigenschaftKeyId::from_alias(&unter) {
+                                if !ober_erlaubt_eigenschaft(&known, key) {
+                                    return Err(ParseSpaltenAnfrageError::InvalidUnterkategorieForOberkategorie {
+                                        ober: known.as_cli_str().to_string(),
+                                        unter,
+                                    });
+                                }
+                            }
+                        }
+                        Self::Standard(StandardAnfrage::Sonstige { ober: known, unter })
+                    },
                 }
             }
         };

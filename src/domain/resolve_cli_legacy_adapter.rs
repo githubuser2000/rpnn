@@ -54,7 +54,7 @@ fn resolve_via_legacy_pipeline(
         .parse()
         .map_err(to_boxed_request_pipeline_error)?
         .expand(kategorie_map)
-        .resolve(kategorie_map);
+        .resolve(kategorie_map).map_err(to_boxed_request_pipeline_error)?;
 
     let mut out = LegacyResolvedSelection::default();
 

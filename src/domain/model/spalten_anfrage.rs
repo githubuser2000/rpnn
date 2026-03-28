@@ -73,6 +73,69 @@ pub enum GeneratorParameter {
     TextListe(Vec<String>),
 }
 
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Col1(pub u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Col0(pub usize);
+
+impl Col1 {
+    pub fn new(value: u16) -> Self {
+        Self(value)
+    }
+
+    pub fn try_from_usize(value: usize) -> Result<Self, &'static str> {
+        if value == 0 || value > u16::MAX as usize {
+            return Err("column index must be >= 1");
+        }
+        Ok(Self(value as u16))
+    }
+
+    pub fn get(self) -> u16 {
+        self.0
+    }
+
+    pub fn to_zero_based(self) -> Col0 {
+        debug_assert!(self.0 >= 1);
+        Col0((self.0 - 1) as usize)
+    }
+}
+
+impl Col0 {
+    pub fn get(self) -> usize {
+        self.0
+    }
+
+    pub fn to_one_based(self) -> Result<Col1, &'static str> {
+        let value = self.0.checked_add(1).ok_or("column index overflow")?;
+        Col1::try_from_usize(value)
+    }
+}
+
+impl TryFrom<usize> for Col1 {
+    type Error = &'static str;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Self::try_from_usize(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolvedTarget {
+    SourceColumns(Vec<Col1>),
+    GeneratedEigenschaft {
+        familie: EigenschaftsFamilie,
+        key: EigenschaftKeyId,
+        required_sources: Vec<Col1>,
+    },
+    Generator {
+        befehle: Vec<String>,
+        required_sources: Vec<Col1>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnTarget {
     DirectColumn(u16),

@@ -343,13 +343,40 @@ fn append_safe_html_meta_marker(
             if let Some(fam) = family {
                 extras.push(format!("FAMILY={}", fam));
             }
-            if let Some(start) = src.find('„').or_else(|| src.find('"')) {
-                let tail = &src[start + 1..];
-                if let Some(end) = tail.find('“').or_else(|| tail.find('"')) {
-                    let seg = &tail[..end];
-                    if let Some(key) = crate::domain::eigenschaften::EigenschaftKeyId::from_alias(seg) {
-                        extras.push(format!("EIGKEY={}", key.canonical_name()));
+            let quoted_segment = {
+                let chars: Vec<(usize, char)> = src.char_indices().collect();
+                chars.iter().find_map(|(i, ch)| {
+                    if *ch == '„' || *ch == '"' {
+                        let after = *i + src[*i..].chars().next()?.len_utf8();
+                        let tail = src.get(after..)?;
+                        let end_rel = tail.char_indices().find_map(|(j, ch2)| {
+                            if ch2 == '“' || ch2 == '"' { Some(j) } else { None }
+                        })?;
+                        Some(tail[..end_rel].to_string())
+                    } else {
+                        None
                     }
+                })
+            };
+            if let Some(seg) = quoted_segment {
+                let seg_n = normalize_token(&seg);
+                let mut best: Option<(usize, crate::domain::eigenschaften::EigenschaftKeyId)> = None;
+                for key in crate::domain::eigenschaften::EigenschaftKeyId::ALL.iter().copied() {
+                    let canon = normalize_token(key.canonical_name());
+                    if !canon.is_empty() && seg_n.contains(&canon) {
+                        let score = canon.len() + 100;
+                        if best.map(|(n, _)| score > n).unwrap_or(true) { best = Some((score, key)); }
+                    }
+                    for alias in key.aliases() {
+                        let a = normalize_token(alias);
+                        if !a.is_empty() && seg_n.contains(&a) {
+                            let score = a.len();
+                            if best.map(|(n, _)| score > n).unwrap_or(true) { best = Some((score, key)); }
+                        }
+                    }
+                }
+                if let Some((_, key)) = best {
+                    extras.push(format!("EIGKEY={}", key.canonical_name()));
                 }
             }
         }
