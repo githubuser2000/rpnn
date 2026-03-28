@@ -582,20 +582,65 @@ impl KategorieMap {
     }
 
     fn extract_sub_categories_from_decl_meta(meta: &HtmlDeclMeta) -> Vec<String> {
-        let mut out: Vec<String> = meta
-            .p2_slots
+        let mut out: Vec<String> = meta.p2_slots
             .iter()
-            .flatten()
-            .filter(|s| !s.trim().is_empty())
-            .cloned()
+            .filter_map(|slot| slot.clone())
+            .filter(|value| !value.is_empty())
+            .filter(|value| !value.chars().all(|c| c.is_ascii_digit()))
             .collect();
         out.sort();
         out.dedup();
         out
     }
 
-    fn merge_fraction_number_aliases(
+    fn extract_main_categories_from_meta(meta: &str) -> Vec<String> {
+        let Some(start) = meta.find("p1_") else { return Vec::new(); };
+        let Some(end_rel) = meta[start..].find(", p2_p3_0_") else { return Vec::new(); };
+        let slice = &meta[start + 3 .. start + end_rel];
 
+        let mut out = Vec::new();
+        for raw in slice.split(',') {
+            let value = raw.trim().trim_start_matches('✗').trim();
+            if value.is_empty() { continue; }
+            out.push(value.to_string());
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    fn extract_sub_categories_from_meta(meta: &str) -> Vec<String> {
+        let Some(start) = meta.find("p2_p3_0_") else { return Vec::new(); };
+        let end = meta[start..].find(", p4_").map(|idx| start + idx).unwrap_or(meta.len());
+        let slice = &meta[start + 8 .. end];
+
+        let mut out = Vec::new();
+        for raw in slice.split(',') {
+            let value = raw.trim();
+            if value.is_empty() { continue; }
+
+            let candidate = if let Some(pos) = value.find('_') {
+                let (prefix, rest) = value.split_at(pos);
+                if prefix == "p3" || prefix == "p2" {
+                    rest.trim_start_matches('_').trim()
+                } else {
+                    value
+                }
+            } else {
+                value
+            };
+
+            if candidate.is_empty() { continue; }
+            if candidate.chars().all(|c| c.is_ascii_digit()) { continue; }
+            out.push(candidate.to_string());
+        }
+
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    fn merge_fraction_number_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
         let families: &[(&[&str], std::ops::RangeInclusive<u32>)] = &[
