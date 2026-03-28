@@ -1,4 +1,6 @@
-use crate::domain::decl_model::{HtmlDeclMeta, HtmlEigenschaftFamilie};
+use crate::domain::decl_model::{
+    HtmlDeclMeta, HtmlEigenschaftFamilie, HtmlP1Group, HtmlP2Slot, HtmlP4Tag,
+};
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::python_html_meta::css_class_for_visible_header;
 use crate::domain::python_source_of_truth::exact_meta_for_column;
@@ -186,8 +188,8 @@ fn parsed_meta_for_column(col0: u32) -> Option<HtmlDeclMeta> {
 
 fn fallback_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie) -> HtmlDeclMeta {
     HtmlDeclMeta {
-        p1_groups: vec![family.render_p1().to_string()],
-        p2_slots: vec![Some(key.canonical_name().replace(' ', "_")), None],
+        p1_groups: vec![family.render_p1()],
+        p2_slots: vec![HtmlP2Slot::Eigenschaft(key), HtmlP2Slot::Empty],
         p4_tags: family.default_p4(),
     }
 }
@@ -204,32 +206,43 @@ fn build_generated_meta(key: EigenschaftKeyId, family: HtmlEigenschaftFamilie, c
         fallback_meta(key, family)
     };
 
-    meta.p1_groups = vec![family.render_p1().to_string()];
-    if meta.p2_slots.is_empty() { meta.p2_slots.push(None); }
-    if meta.p2_slots.len() == 1 { meta.p2_slots.push(None); }
+    meta.p1_groups = vec![family.render_p1()];
+    if meta.p2_slots.is_empty() { meta.p2_slots.push(HtmlP2Slot::Empty); }
+    if meta.p2_slots.len() == 1 { meta.p2_slots.push(HtmlP2Slot::Empty); }
     for slot in &mut meta.p2_slots {
-        if matches!(slot, Some(s) if s == "E" || s == "e") {
-            *slot = None;
+        if slot.is_empty() {
+            *slot = HtmlP2Slot::Empty;
         }
     }
-    meta.p2_slots[0] = Some(key.canonical_name().replace(' ', "_"));
+    meta.p2_slots[0] = HtmlP2Slot::Eigenschaft(key);
     if meta.p4_tags.is_empty() { meta.p4_tags = family.default_p4(); }
     meta
 }
 
-pub fn build_python_exact_html_class(raw: &str, col_idx: usize, is_header_row: bool) -> Option<String> {
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HtmlHeaderClass {
+    pub class_attr: String,
+}
+
+pub fn resolve_html_header_class(raw: &str, col_idx: usize, is_header_row: bool) -> Option<HtmlHeaderClass> {
     if !is_header_row { return None; }
-    match semantic_from_header(raw, col_idx) {
-        HeaderSemantic::Counter => Some("z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string()),
-        HeaderSemantic::Numbering => Some("z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string()),
+    let class_attr = match semantic_from_header(raw, col_idx) {
+        HeaderSemantic::Counter => "z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_".to_string(),
+        HeaderSemantic::Numbering => "z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_".to_string(),
         HeaderSemantic::GeneratedEigenschaft { key, family } => {
             let meta = build_generated_meta(key, family, col_idx);
-            Some(format!("z_0 r_{} {}", col_idx, meta.render()))
+            format!("z_0 r_{} {}", col_idx, meta.render())
         }
-        HeaderSemantic::SourceColumn(col0) => exact_meta_for_column(col0).map(|meta| format!("z_0 r_{} {}", col_idx, meta)),
+        HeaderSemantic::SourceColumn(col0) => format!("z_0 r_{} {}", col_idx, exact_meta_for_column(col0)?),
         HeaderSemantic::Unknown => {
             let visible = strip_visible_text(raw);
-            css_class_for_visible_header(&visible).map(|meta| format!("z_0 r_{} {}", col_idx, meta))
+            format!("z_0 r_{} {}", col_idx, css_class_for_visible_header(&visible)?.to_string())
         }
-    }
+    };
+    Some(HtmlHeaderClass { class_attr })
+}
+
+pub fn build_python_exact_html_class(raw: &str, col_idx: usize, is_header_row: bool) -> Option<String> {
+    resolve_html_header_class(raw, col_idx, is_header_row).map(|resolved| resolved.class_attr)
 }
