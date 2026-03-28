@@ -1,36 +1,36 @@
 use crate::domain::decl_model::HtmlDeclMeta;
 
-fn meta(p1: &[&str], p2: &[Option<&str>], p4: &[u8]) -> HtmlDeclMeta {
+fn decl(p1: &[&str], p2: &[Option<&str>], p4: &[u8]) -> HtmlDeclMeta {
     HtmlDeclMeta {
         p1_groups: p1.iter().map(|s| (*s).to_string()).collect(),
-        p2_slots: p2.iter().map(|slot| slot.map(|s| s.to_string())).collect(),
+        p2_slots: p2.iter().map(|s| s.map(|v| v.to_string())).collect(),
         p4_tags: p4.to_vec(),
     }
 }
 
 pub fn typed_exact_decl_for_column(col: u32) -> Option<HtmlDeclMeta> {
     match col {
-        7 => Some(meta(
+        7 => Some(decl(
             &["Religionen"],
-            &[Some("Messias"), None],
+            &[Some("Religion"), Some("Religions-Gründer-Typ"), None],
             &[3, 0],
         )),
-        8 => Some(meta(
-            &["Wichtigstes_zum_verstehen", "Menschliches", "Grundstrukturen"],
-            &[Some("Wichtigste"), Some("Liebe"), Some("Liebe_(7)"), None],
-            &[0, 5],
-        )),
-        9 => Some(meta(
+        8 => Some(decl(
             &["Menschliches", "Grundstrukturen"],
-            &[Some("Liebe"), Some("Liebe_(7)"), None],
-            &[0, 5],
+            &[Some("Gesellschaftsschicht"), Some("Klassen_(20)"), None],
+            &[3, 5, 0],
         )),
-        28 => Some(meta(
-            &["Menschliches", "Grundstrukturen"],
+        9 => Some(decl(
+            &["Menschliches", "Grundstrukturen", "Eigenschaften_n"],
             &[Some("Liebe"), Some("Liebe_(7)"), None],
-            &[0, 5],
+            &[3, 0],
         )),
-        466 => Some(meta(
+        28 => Some(decl(
+            &["Universum"],
+            &[Some("Geist__(15)"), Some("Geist_(15)"), None],
+            &[4, 0],
+        )),
+        466 => Some(decl(
             &["Menschliches", "Grundstrukturen"],
             &[Some("Gewalt"), Some("Gewalt"), None],
             &[3, 4, 0],
