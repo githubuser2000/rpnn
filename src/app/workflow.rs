@@ -48,6 +48,24 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
             &spalten_namen.unterkategorie,
         )?;
 
+        if spalten_namen.typed_request.is_none() {
+            let mut synthetic_ids: Vec<u16> = Vec::new();
+            synthetic_ids.extend(resolved.direct_columns.iter().copied());
+            synthetic_ids.extend(resolved.required_columns.iter().copied());
+            synthetic_ids.extend(
+                resolved
+                    .exact_direct_columns
+                    .iter()
+                    .filter_map(|&n| u16::try_from(n).ok()),
+            );
+            synthetic_ids.sort_unstable();
+            synthetic_ids.dedup();
+
+            if !synthetic_ids.is_empty() {
+                typed_requests.push(SpaltenAnfrage::DirektSpalten { ids: synthetic_ids });
+            }
+        }
+
         generated_befehle.extend(resolved.generated_befehle.iter().cloned());
 
         bereich

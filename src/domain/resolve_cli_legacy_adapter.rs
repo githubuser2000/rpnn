@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
+use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
@@ -56,11 +57,32 @@ fn resolve_via_non_legacy_exact_and_fuzzy(
 ) -> Result<Option<LegacyResolvedSelection>, Box<dyn std::error::Error>> {
     let mut out = LegacyResolvedSelection::default();
 
-    let mut direct_columns: Vec<u16> = kategorie_map
-        .finde_spaltennummern_fuer_kategorien(ober, unter)
-        .into_iter()
-        .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-        .collect::<Result<Vec<u16>, _>>()?;
+    let mut direct_columns: Vec<u16> = Vec::new();
+
+    direct_columns.extend(
+        kategorie_map
+            .finde_spaltennummern_fuer_kategorien(ober, unter)
+            .into_iter()
+            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+            .collect::<Result<Vec<u16>, _>>()?,
+    );
+
+    direct_columns.extend(
+        exact_columns_for_pair(ober, unter)
+            .into_iter()
+            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+            .collect::<Result<Vec<u16>, _>>()?,
+    );
+
+    if direct_columns.is_empty() {
+        direct_columns.extend(
+            fuzzy_columns_for_pair(ober, unter)
+                .into_iter()
+                .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+                .collect::<Result<Vec<u16>, _>>()?,
+        );
+    }
+
     direct_columns.sort_unstable();
     direct_columns.dedup();
     out.direct_columns = direct_columns;
