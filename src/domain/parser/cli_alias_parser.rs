@@ -196,7 +196,12 @@ fn parse_standard_unter(ober: &str, unter: &str) -> Result<StandardUnterId, Pars
         "geist" => StandardUnterId::Geist,
         "religion" | "symbole religion" | "symbolereligion" => StandardUnterId::SymboleReligion,
         "primzahlkreuz" => StandardUnterId::Primzahlkreuz,
-        _ => StandardUnterId::PythonSubcategory(unter.trim().to_string()),
+        _ => {
+            return Err(ParseError::UnknownUnterkategorie {
+                ober: ober.to_string(),
+                unter: unter.to_string(),
+            });
+        }
     };
 
     Ok(parsed)

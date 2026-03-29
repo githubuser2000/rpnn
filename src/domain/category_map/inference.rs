@@ -1,5 +1,5 @@
+use crate::domain::python_source_of_truth::source_generated_inference_for_pair;
 use crate::domain::categories::GeneratedInference;
-use crate::processing::category_rules::generator_inference::infer_generator_only_request;
 
 pub fn infer_generated_pair_from_direct_columns<F>(
     ober: &str,
@@ -13,19 +13,9 @@ where
     direct_columns.sort();
     direct_columns.dedup();
 
-    let mut generated_befehle: Vec<String> = infer_generator_only_request(ober, unter).into_iter().collect();
-    let mut required_columns = Vec::<u32>::new();
-
-    for generator in &generated_befehle {
-        match generator.as_str() {
-            "lovepolygon" => required_columns.push(9),
-            "gleichheitfreiheit" => required_columns.push(132),
-            "geistemotionenergiematerietopologie" => required_columns.push(242),
-            "primcreativitytype" | "mondexponzierenlogarithmustyp" => required_columns.push(64),
-            "vervielfachezeile" => { required_columns.push(19); required_columns.push(90); }
-            _ => {}
-        }
-    }
+    let source = source_generated_inference_for_pair(ober, unter);
+    let mut generated_befehle = source.generated_befehle;
+    let mut required_columns = source.required_columns;
 
     generated_befehle.sort();
     generated_befehle.dedup();

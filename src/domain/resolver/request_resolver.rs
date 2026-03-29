@@ -1,6 +1,5 @@
-use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
-use crate::processing::category_rules::generator_inference::infer_generator_only_request;
+use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage::{
     CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
     KombiUnterId, SpaltenAnfrage, StandardUnterId,
@@ -35,42 +34,48 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
         return resolve_eigenschaft(req, spec);
     }
 
-    let (ober, unter_cli) = req.to_cli_pair()?;
-    let mut exact = exact_columns_for_pair(&ober, &unter_cli);
-    if exact.is_empty() {
-        exact = fuzzy_columns_for_pair(&ober, &unter_cli);
-    }
-
-    if !exact.is_empty() {
-        let target = if exact.len() == 1 {
-            ColumnTarget::DirectColumn(exact[0] as u16)
-        } else {
-            ColumnTarget::DirectColumns(exact.into_iter().map(|n| n as u16).collect())
-        };
+    if let StandardUnterId::Primzahlkreuz = unter {
         return Some(CanonicalColumnSpec {
             request: req,
-            target,
-            header_display: unter_cli,
+            target: ColumnTarget::Generator(GeneratorSpec {
+                art: GeneratorArt::Primzahlkreuz,
+                parameter: GeneratorParameter::Keine,
+            }),
+            header_display: "Primzahlkreuz".to_string(),
             aliases_for_report: vec![],
         });
     }
 
-    let generated = infer_generator_only_request(&ober, &unter_cli);
-    if !generated.is_empty() {
-        let mut befehle: Vec<String> = generated.into_iter().collect();
-        befehle.sort();
-        return Some(CanonicalColumnSpec {
-            request: req,
-            target: ColumnTarget::Generator(GeneratorSpec {
-                art: GeneratorArt::MetaKonkret,
-                parameter: GeneratorParameter::TextListe(befehle.clone()),
-            }),
-            header_display: unter_cli,
-            aliases_for_report: befehle,
-        });
+    let (ober, cli_unter) = req.to_cli_pair()?;
+    let mut cols: Vec<u16> = exact_columns_for_pair(&ober, &cli_unter)
+        .into_iter()
+        .map(|n| (n as u16) + 1)
+        .collect();
+    if cols.is_empty() {
+        cols = fuzzy_columns_for_pair(&ober, &cli_unter)
+            .into_iter()
+            .map(|n| (n as u16) + 1)
+            .collect();
+    }
+    cols.sort_unstable();
+    cols.dedup();
+
+    if cols.is_empty() {
+        return None;
     }
 
-    None
+    let target = if cols.len() == 1 {
+        ColumnTarget::DirectColumn(cols[0])
+    } else {
+        ColumnTarget::DirectColumns(cols.clone())
+    };
+
+    Some(CanonicalColumnSpec {
+        request: req,
+        target,
+        header_display: cli_unter,
+        aliases_for_report: vec![],
+    })
 }
 
 fn resolve_eigenschaft(req: SpaltenAnfrage, spec: EigenschaftRequest) -> Option<CanonicalColumnSpec> {

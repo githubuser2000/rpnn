@@ -69,7 +69,7 @@ pub fn try_resolve_generated_pair(
 
     // words.py:
     // ParametersMain.menschliches + ("Liebe", "liebe", "ethik") -> {8, 9, 28, ...}
-    if is_ober(&["menschliches"]) && is_unter(&["liebe", "ethik"]) {
+    if is_ober(&["menschliches", "grundstrukturen"]) && is_unter(&["liebe", "ethik"]) {
         generated_befehle.insert("lovepolygon".to_string());
         required_columns.insert(9);
         return true;
@@ -95,7 +95,7 @@ pub fn try_resolve_generated_pair(
     }
 
     // Geist/Emotion/etc.
-    if is_ober(&["universum", "multiversum", "grundstrukturen", "menschliches"])
+    if is_ober(&["universum", "multiversum", "grundstrukturen"])
         && is_unter(&[
             "geist",
             "bewusstsein",
@@ -112,7 +112,7 @@ pub fn try_resolve_generated_pair(
     }
 
     // 64-getriebene Generatoren
-    if is_ober(&["wichtigste", "bedeutung"])
+    if is_ober(&["wichtigste", "wichtigsteverstehen", "bedeutung"])
         && is_unter(&[
             "gestirn",
             "mond",
