@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
+use crate::domain::ids::domain_id::GeneratorArt;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
 use crate::domain::python_source_of_truth::{exact_columns_for_pair, is_strict_generated_pair};
 use crate::domain::request_bridge::bridge_cli_selection;
@@ -166,19 +167,24 @@ fn to_boxed_request_pipeline_error(
 }
 
 
+
+fn canonical_generator_command(art: GeneratorArt) -> &'static str {
+    match art {
+        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+        GeneratorArt::Multiplikationen => "multiplikationen",
+        GeneratorArt::Primvielfache => "primvielfache",
+        GeneratorArt::MetaKonkret => "metakonkret",
+    }
+}
+
 fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget) {
     match target {
         ColumnTarget::DirectColumn(col) => sel.direct_columns.push(col),
         ColumnTarget::DirectColumns(cols) => sel.direct_columns.extend(cols),
         ColumnTarget::Pair(a, b) => sel.exact_modal_pairs.push((usize::from(a), usize::from(b))),
         ColumnTarget::Generator(generator_spec) => {
-            let generated_name = match generator_spec.art {
-                crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
-                crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => "multiplikationen",
-                crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "primvielfache",
-                crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "metakonkret",
-            };
-            sel.generated_befehle.insert(generated_name.to_string());
+            sel.generated_befehle
+                .insert(canonical_generator_command(generator_spec.art).to_string());
         }
         ColumnTarget::Combination(_) => {}
     }

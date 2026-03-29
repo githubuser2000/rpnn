@@ -7,7 +7,7 @@ use std::fmt;
 
 use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
 use crate::domain::exact_mappings::META_KONKRET_MAPPINGS;
-use crate::domain::ids::domain_id::DomainId;
+use crate::domain::ids::domain_id::{DomainId, GeneratorArt};
 use crate::domain::model::spalten_anfrage::{
     EigenschaftRequest as CanonicalEigenschaftRequest,
     EigenschaftsFamilie as CanonicalEigenschaftsFamilie,
@@ -218,6 +218,15 @@ fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
     }
 }
 
+fn canonical_generator_command(art: GeneratorArt) -> &'static str {
+    match art {
+        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+        GeneratorArt::Multiplikationen => "multiplikationen",
+        GeneratorArt::Primvielfache => "primvielfache",
+        GeneratorArt::MetaKonkret => "metakonkret",
+    }
+}
+
 fn normalize_key(s: &str) -> String {
     s.to_lowercase()
         .replace('_', "")
@@ -279,18 +288,10 @@ impl KategorieMap {
 
     pub fn infer_generated_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Option<GeneratedInference> {
         resolve_request(request.clone()).map(|spec| match spec.target {
-            ColumnTarget::Generator(generator) => {
-                let generated_name = match generator.art {
-                    crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
-                    crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => "multiplikationen",
-                    crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "primvielfache",
-                    crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "metakonkret",
-                };
-                GeneratedInference {
-                    generated_befehle: vec![generated_name.to_string()],
-                    required_columns: Vec::new(),
-                    direct_columns: Vec::new(),
-                }
+            ColumnTarget::Generator(generator) => GeneratedInference {
+                generated_befehle: vec![canonical_generator_command(generator.art).to_string()],
+                required_columns: Vec::new(),
+                direct_columns: Vec::new(),
             },
             ColumnTarget::Combination(_) => GeneratedInference::default(),
             other => {
