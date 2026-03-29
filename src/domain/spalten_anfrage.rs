@@ -127,7 +127,7 @@ impl MenschlichesUnter {
             "politische" => Self::Politische,
             "richtungen" => Self::Richtungen,
             "formationen" => Self::Formationen,
-            "motive" => Self::Motive,
+            "motive" | "motiv" | "motivation" | "absicht" | "absichten" => Self::Motive,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
