@@ -2776,6 +2776,7 @@ pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
     let mut found: Option<Vec<u32>> = None;
+
     for decl in PY_DECLS {
         let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
         let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
@@ -2783,6 +2784,7 @@ pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
             found = Some(decl.columns.to_vec());
         }
     }
+
     stable_dedup_columns(found.unwrap_or_default())
 }
 
@@ -2855,6 +2857,13 @@ pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<cr
     let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
 
     let mut generated_befehle = Vec::<String>::new();
+    let mut required_columns = Vec::<u32>::new();
+    let mut direct_columns = exact_columns_for_pair(ober, unter)
+        .into_iter()
+        .map(|n| n + 1)
+        .collect::<Vec<u32>>();
+
+    let has = |n: u32, cols: &[u32]| cols.contains(&n);
 
     if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
         && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
@@ -2862,86 +2871,118 @@ pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<cr
         generated_befehle.push("primzahlkreuzprocontra".to_string());
     }
 
-    if ober_has(&["menschliches", "grundstrukturen"])
-        && sub_has(&["liebe", "ethik"])
+    if has(9, &direct_columns)
+        || (ober_has(&["menschliches", "grundstrukturen"]) && sub_has(&["liebe", "ethik"]))
     {
         generated_befehle.push("lovepolygon".to_string());
+        if has(9, &direct_columns) {
+            required_columns.push(9);
+        }
     }
 
-    if ober_has(&["planet", "menschliches", "grundstrukturen"])
-        && sub_has(&[
-            "gleichheit",
-            "freiheit",
-            "ordnung",
-            "ordnen",
-            "filterung",
-            "dominieren",
-            "ungleichheit",
-            "gleichheitfreiheit",
-        ])
+    if has(132, &direct_columns)
+        || (ober_has(&["planet", "menschliches", "grundstrukturen"])
+            && sub_has(&[
+                "gleichheit",
+                "freiheit",
+                "ordnung",
+                "ordnen",
+                "filterung",
+                "dominieren",
+                "ungleichheit",
+                "gleichheitfreiheit",
+            ]))
     {
         generated_befehle.push("gleichheitfreiheit".to_string());
+        if has(132, &direct_columns) {
+            required_columns.push(132);
+        }
     }
 
-    if ober_has(&["universum", "multiversum", "grundstrukturen"])
-        && sub_has(&[
-            "geist",
-            "bewusstsein",
-            "emotion",
-            "emotionen",
-            "gefuehl",
-            "gefuehle",
-            "gefühl",
-            "gefühle",
-            "energie",
-            "materie",
-            "topologie",
-        ])
+    if has(242, &direct_columns)
+        || (ober_has(&["universum", "multiversum", "grundstrukturen"])
+            && sub_has(&[
+                "geist",
+                "bewusstsein",
+                "emotion",
+                "emotionen",
+                "gefuehl",
+                "gefuehle",
+                "gefühl",
+                "gefühle",
+                "energie",
+                "materie",
+                "topologie",
+            ]))
     {
         generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+        if has(242, &direct_columns) {
+            required_columns.push(242);
+        }
     }
 
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&[
-            "gestirn",
-            "sonne",
-            "planet",
-            "evolution",
-            "intelligenz",
-            "kreativ",
-            "kreativitaet",
-            "kreativität",
-            "lernen",
-            "erwerben",
-        ])
+    if has(64, &direct_columns)
+        || (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+            && sub_has(&[
+                "gestirn",
+                "sonne",
+                "planet",
+                "evolution",
+                "intelligenz",
+                "kreativ",
+                "kreativitaet",
+                "kreativität",
+                "lernen",
+                "erwerben",
+                "mond",
+                "logarithmus",
+                "exponieren",
+                "exponential",
+                "exponentiell",
+            ]))
     {
         generated_befehle.push("primcreativitytype".to_string());
-    }
-
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"])
-    {
         generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+        if has(64, &direct_columns) {
+            required_columns.push(64);
+        }
     }
 
-    if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
-        || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
-            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"]))
+    if has(19, &direct_columns)
+        || has(90, &direct_columns)
+        || ((ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+            && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
+            || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+                && sub_has(&[
+                    "offenbarung",
+                    "offenbarungdesjohannes",
+                    "johannes",
+                    "bibel",
+                ])))
     {
         generated_befehle.push("vervielfachezeile".to_string());
+        if has(19, &direct_columns) {
+            required_columns.push(19);
+        }
+        if has(90, &direct_columns) {
+            required_columns.push(90);
+        }
     }
 
     generated_befehle.sort();
     generated_befehle.dedup();
+    required_columns.sort();
+    required_columns.dedup();
+    direct_columns.sort();
+    direct_columns.dedup();
 
-    if generated_befehle.is_empty() {
+    if generated_befehle.is_empty() && direct_columns.is_empty() {
         None
     } else {
         Some(crate::domain::categories::GeneratedInference {
             generated_befehle,
-            required_columns: Vec::new(),
-            direct_columns: Vec::new(),
+            required_columns,
+            direct_columns,
         })
     }
 }
