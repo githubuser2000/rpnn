@@ -2551,15 +2551,14 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
-    let mut found: Option<Vec<u32>> = None;
+    let mut out = Vec::new();
     for decl in PY_DECLS {
         let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
         let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
         if main_match && sub_match {
-            found = Some(decl.columns.to_vec());
+            out.extend_from_slice(decl.columns);
         }
     }
-    let mut out = found.unwrap_or_default();
     out.sort_unstable();
     out.dedup();
     out
