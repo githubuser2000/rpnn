@@ -182,7 +182,7 @@ fn parse_u16_index(ober: &str, unter: &str) -> Result<u16, ParseError> {
     })
 }
 
-fn parse_standard_unter(ober: &str, unter: &str) -> Result<StandardUnterId, ParseError> {
+fn parse_standard_unter(_ober: &str, unter: &str) -> Result<StandardUnterId, ParseError> {
     let u = normalize_cli_token(unter);
 
     let parsed = match u.as_str() {
@@ -196,7 +196,7 @@ fn parse_standard_unter(ober: &str, unter: &str) -> Result<StandardUnterId, Pars
         "geist" => StandardUnterId::Geist,
         "religion" | "symbole religion" | "symbolereligion" => StandardUnterId::SymboleReligion,
         "primzahlkreuz" => StandardUnterId::Primzahlkreuz,
-        _ => return Ok(StandardUnterId::PythonSubcategory(unter.trim().to_string()))
+        _ => StandardUnterId::PythonSubcategory(unter.trim().to_string()),
     };
 
     Ok(parsed)

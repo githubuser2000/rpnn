@@ -14,7 +14,7 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, source_generated_inference_for_pair, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, generated_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -286,40 +286,8 @@ impl KategorieMap {
             push_pair(&mut paare_set, "KombinationUniversum", unter);
         }
 
-        for (ober, unter) in [
-            ("Universum", "Primzahlkreuz"),
-            ("Bedeutung", "Primzahlkreuz"),
-            ("Pro_Contra", "Primzahlkreuz"),
-            ("Menschliches", "Liebe"),
-            ("Grundstrukturen", "Liebe"),
-            ("Planet", "Gleichheit"),
-            ("Menschliches", "Gleichheit"),
-            ("Grundstrukturen", "Gleichheit"),
-            ("Universum", "Geist"),
-            ("Multiversum", "Geist"),
-            ("Grundstrukturen", "Geist"),
-            ("Wichtigstes_zum_verstehen", "Gestirn"),
-            ("Bedeutung", "Gestirn"),
-            ("Wichtigstes_zum_verstehen", "Primzahlen"),
-            ("Bedeutung", "Primzahlen"),
-            ("Modallogik", "Modallogik"),
-        ] {
-            push_pair(&mut paare_set, ober, unter);
-        }
-
-        for ober in ["primvielfache", "multiplikationen"] {
-            for unter in [
-                "motivgleichfoermig",
-                "strukturgleichfoermig",
-                "motivstern",
-                "strukturstern",
-                "motivgebrstern",
-                "strukgebrstern",
-                "motivgebrgleichf",
-                "strukgebrgleichf",
-            ] {
-                push_pair(&mut paare_set, ober, unter);
-            }
+        for (ober, unter) in generated_seed_pairs() {
+            push_pair(&mut paare_set, &ober, &unter);
         }
 
         for request in self.alle_typed_requests_fuer_cli_alles() {
@@ -372,15 +340,11 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-        for col in &direct_columns {
-            if !source.direct_columns.contains(col) {
-                source.direct_columns.push(*col);
-            }
-        }
+        source.direct_columns.extend(direct_columns.iter().copied());
         source.direct_columns.sort();
         source.direct_columns.dedup();
 
-        if source.generated_befehle.is_empty() && source.direct_columns.is_empty() && source.required_columns.is_empty() {
+        if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
         } else {
             Some(source)

@@ -1,5 +1,5 @@
+use crate::domain::ids::domain_id::{DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::python_source_of_truth;
-use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage::{
     CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
     KombiUnterId, SpaltenAnfrage, StandardUnterId,
@@ -30,30 +30,46 @@ pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
 }
 
 fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<CanonicalColumnSpec> {
+    let domain = match &req {
+        SpaltenAnfrage::Standard { domain, .. } => *domain,
+        _ => return None,
+    };
+
     let (target, header_display) = match unter {
         StandardUnterId::Eigenschaft(spec) => return resolve_eigenschaft(req, spec),
         StandardUnterId::PythonSubcategory(sub) => {
-            let ober = match &req {
-                SpaltenAnfrage::Standard { domain, .. } => domain_cli_name(*domain)?,
-                _ => return None,
+            let ober = match domain {
+                DomainId::Menschliches => "Menschliches",
+                DomainId::Religion => "Religion",
+                DomainId::Galaxie => "Galaxie",
+                DomainId::Universum => "Universum",
+                DomainId::Grundstrukturen => "Grundstrukturen",
+                DomainId::Kontinuum => "Kontinuum",
+                DomainId::Multiversum => "Multiversum",
+                DomainId::Planet10Oder12 => "Planet",
+                DomainId::Eigenschaften => "Eigenschaften",
+                DomainId::EigenschaftenN => "Eigenschaften_n",
+                DomainId::Eigenschaften1ProN => "Eigenschaften_1/n",
+                DomainId::MetaKonkret => "MetaKonkret",
+                DomainId::GebrochenRational(_) | DomainId::Kombination(_) | DomainId::Generator(_) | DomainId::SonstigePythonDecl => return None,
             };
-            let mut cols: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, &sub)
-                .into_iter()
-                .map(|n| n as u16 + 1)
-                .collect();
-            if cols.is_empty() {
-                cols = python_source_of_truth::fuzzy_columns_for_pair(ober, &sub)
-                    .into_iter()
-                    .map(|n| n as u16 + 1)
-                    .collect();
+            let mut exact: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, &sub)
+                .into_iter().map(|n| (n as u16) + 1).collect();
+            if exact.is_empty() {
+                exact = python_source_of_truth::fuzzy_columns_for_pair(ober, &sub)
+                    .into_iter().map(|n| (n as u16) + 1).collect();
             }
-            let target = match cols.len() {
+            exact.sort();
+            exact.dedup();
+            let target = match exact.len() {
                 0 => return None,
-                1 => ColumnTarget::DirectColumn(cols[0]),
-                _ => ColumnTarget::DirectColumns(cols),
+                1 => ColumnTarget::DirectColumn(exact[0]),
+                _ => ColumnTarget::DirectColumns(exact),
             };
             (target, sub)
         }
+
+        // Platzhalter/erste Brücke – diese IDs später gegen Python-Wahrheit austauschen
         StandardUnterId::Gewalt => (ColumnTarget::DirectColumn(496), "Gewalt".to_string()),
         StandardUnterId::Politische => (ColumnTarget::DirectColumn(497), "politische".to_string()),
         StandardUnterId::Richtungen => (ColumnTarget::DirectColumn(498), "Richtungen".to_string()),
@@ -158,20 +174,4 @@ fn resolve_generator(
         header_display,
         aliases_for_report: vec![],
     })
-}
-
-fn domain_cli_name(domain: crate::domain::ids::domain_id::DomainId) -> Option<&'static str> {
-    use crate::domain::ids::domain_id::DomainId;
-    match domain {
-        DomainId::Menschliches => Some("Menschliches"),
-        DomainId::Religion => Some("Religion"),
-        DomainId::Galaxie => Some("Galaxie"),
-        DomainId::Universum => Some("Universum"),
-        DomainId::Grundstrukturen => Some("Grundstrukturen"),
-        DomainId::Kontinuum => Some("Kontinuum"),
-        DomainId::Multiversum => Some("Multiversum"),
-        DomainId::Planet10Oder12 => Some("Planet"),
-        DomainId::MetaKonkret => Some("MetaKonkret"),
-        _ => None,
-    }
 }

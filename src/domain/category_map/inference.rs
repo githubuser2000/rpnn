@@ -1,4 +1,3 @@
-use super::normalize::normalize_key;
 use crate::domain::categories::GeneratedInference;
 use crate::domain::python_source_of_truth::source_generated_inference_for_pair;
 
@@ -15,15 +14,11 @@ where
     direct_columns.dedup();
 
     let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-    for col in &direct_columns {
-        if !source.direct_columns.contains(col) {
-            source.direct_columns.push(*col);
-        }
-    }
+    source.direct_columns.extend(direct_columns.iter().copied());
     source.direct_columns.sort();
     source.direct_columns.dedup();
 
-    if source.generated_befehle.is_empty() && source.required_columns.is_empty() && source.direct_columns.is_empty() {
+    if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
         None
     } else {
         Some(source)

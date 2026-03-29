@@ -37,11 +37,11 @@ pub enum StandardUnterId {
     Liebe,
     Geist,
     SymboleReligion,
+    PythonSubcategory(String),
 
     Eigenschaft(EigenschaftRequest),
 
     Primzahlkreuz,
-    PythonSubcategory(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -189,9 +189,9 @@ impl StandardUnterId {
             Self::Liebe => "Liebe".to_string(),
             Self::Geist => "Geist".to_string(),
             Self::SymboleReligion => "Religion".to_string(),
+            Self::PythonSubcategory(name) => name.clone(),
             Self::Eigenschaft(req) => req.key.canonical_name().to_string(),
             Self::Primzahlkreuz => "Primzahlkreuz".to_string(),
-            Self::PythonSubcategory(name) => name.clone(),
         }
     }
 }
