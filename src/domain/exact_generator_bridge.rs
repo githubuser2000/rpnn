@@ -12,11 +12,7 @@ pub struct ExactResolved {
 }
 
 fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
+    s.trim().to_string()
 }
 
 fn dedup_vec<T: Ord + Clone>(items: &mut Vec<T>) {
@@ -81,15 +77,20 @@ pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved>
     let ober_n = normalize_key(ober);
 
     match ober_n.as_str() {
-        "universummetakonkret" | "metakonkret" => resolve_meta_konkret(unter),
+        "universummetakonkret" | "UniversumMetaKonkret" | "metakonkret" | "MetaKonkret" => resolve_meta_konkret(unter),
 
         // Python-kompatible Aliasfamilie für ParametersMain.konzept2 / Eigenschaften_1/n
-        "eigenschaft"
+        "Eigenschaft"
+        | "eigenschaft"
+        | "Eigenschaften"
         | "eigenschaften"
+        | "Eigenschaften_n"
         | "eigenschaftenn"
         | "eigenschaftenn1"
         | "eigenschaften1n"
+        | "Konzept"
         | "konzept"
+        | "Konzepte"
         | "konzepte"
         | "konzept2"
         | "konzepte2" => resolve_eigenschaften_like(unter),

@@ -3,16 +3,7 @@ use std::collections::BTreeSet;
 use crate::cli::TextBereich;
 
 fn normalize_token(input: &str) -> String {
-    input
-        .trim()
-        .to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
-        .replace('-', "")
-        .replace('_', "")
-        .replace(' ', "")
+    input.trim().to_string()
 }
 
 /// Gleiche Pair-Logik wie in table_printer/query.rs, aber leichtgewichtig für die Validierung.

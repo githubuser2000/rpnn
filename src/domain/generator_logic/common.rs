@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
-pub fn normalize_token(s: &str) -> String { s.trim().to_lowercase() }
+pub fn normalize_token(s: &str) -> String {
+    s.trim().to_string()
+}
 
 pub fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {
     aliases.iter().any(|alias| tokens.contains(&normalize_token(alias)))

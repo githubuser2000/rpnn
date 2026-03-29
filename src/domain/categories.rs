@@ -195,10 +195,7 @@ pub struct GeneratedInference {
 }
 
 fn normalize_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
+    s.trim().to_string()
 }
 
 impl KategorieMap {
@@ -223,8 +220,8 @@ impl KategorieMap {
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
 
-        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
-            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
+        if matches!(ober_n.as_str(), "Pro_Contra" | "ProContra" | "procontra" | "Bedeutung" | "bedeutung" | "Universum" | "universum")
+            && matches!(unter_n.as_str(), "Primzahlkreuz" | "primzahlkreuz" | "Primzahlkreuzprocontra" | "primzahlkreuzprocontra")
         {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
         }

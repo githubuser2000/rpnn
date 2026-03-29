@@ -69,19 +69,20 @@ pub enum SpaltenAnfrage {
 
 impl StandardOberkategorie {
     pub fn parse(input: &str) -> Self {
-        match normalize_key(input).as_str() {
-            "menschliches" => Self::Menschliches,
-            "universum" => Self::Universum,
-            "religion" | "religionen" => Self::Religion,
-            "planet" => Self::Planet,
-            "galaxie" => Self::Galaxie,
-            "multiversum" => Self::Multiversum,
-            "grundstrukturen" => Self::Grundstrukturen,
-            "bedeutung" => Self::Bedeutung,
-            "procontra" => Self::ProContra,
-            "wichtigsteszumverstehen" => Self::WichtigstesZumVerstehen,
-            "eigenschaftenn" => Self::EigenschaftenN,
-            "universummetakonkret" => Self::UniversumMetaKonkret,
+        let input = input.trim();
+        match input {
+            "Menschliches" | "menschliches" => Self::Menschliches,
+            "Universum" | "universum" => Self::Universum,
+            "Religion" | "religion" | "Religionen" | "religionen" => Self::Religion,
+            "Planet" | "planet" => Self::Planet,
+            "Galaxie" | "galaxie" => Self::Galaxie,
+            "Multiversum" | "multiversum" => Self::Multiversum,
+            "Grundstrukturen" | "grundstrukturen" => Self::Grundstrukturen,
+            "Bedeutung" | "bedeutung" => Self::Bedeutung,
+            "Pro_Contra" | "ProContra" | "procontra" => Self::ProContra,
+            "Wichtigstes_zum_verstehen" | "wichtigstes_zum_verstehen" | "wichtigsteverstehen" => Self::WichtigstesZumVerstehen,
+            "Eigenschaften_n" | "eigenschaften_n" | "Eigenschaften_n_1" | "eigenschaftenn" => Self::EigenschaftenN,
+            "universummetakonkret" | "UniversumMetaKonkret" => Self::UniversumMetaKonkret,
             other => Self::Sonstige(other.to_string()),
         }
     }
@@ -107,11 +108,11 @@ impl StandardOberkategorie {
 
 impl MenschlichesUnter {
     pub fn parse(input: &str) -> Self {
-        match normalize_key(input).as_str() {
-            "liebe" | "ethik" => Self::Liebe,
-            "gleichheit" => Self::Gleichheit,
-            "hoelle" | "hölle" => Self::Hoelle,
-            "klasse" => Self::Klasse,
+        match input.trim() {
+            "Liebe" | "liebe" | "Ethik" | "ethik" => Self::Liebe,
+            "Gleichheit" | "gleichheit" => Self::Gleichheit,
+            "Hoelle" | "hoelle" | "Hölle" | "hölle" => Self::Hoelle,
+            "Klasse" | "klasse" => Self::Klasse,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
@@ -129,9 +130,9 @@ impl MenschlichesUnter {
 
 impl UniversumUnter {
     pub fn parse(input: &str) -> Self {
-        match normalize_key(input).as_str() {
-            "geist" => Self::Geist,
-            "primzahlkreuz" | "primzahlkreuzprocontra" => Self::Primzahlkreuz,
+        match input.trim() {
+            "Geist" | "geist" => Self::Geist,
+            "Primzahlkreuz" | "primzahlkreuz" | "Primzahlkreuzprocontra" | "primzahlkreuzprocontra" => Self::Primzahlkreuz,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
@@ -147,9 +148,9 @@ impl UniversumUnter {
 
 impl ReligionUnter {
     pub fn parse(input: &str) -> Self {
-        match normalize_key(input).as_str() {
-            "religion" | "religionen" => Self::Religion,
-            "ethik" => Self::Ethik,
+        match input.trim() {
+            "Religion" | "religion" | "Religionen" | "religionen" => Self::Religion,
+            "Ethik" | "ethik" => Self::Ethik,
             _ => Self::Sonstige(input.trim().to_string()),
         }
     }
@@ -169,17 +170,17 @@ impl SpaltenAnfrage {
         if unter.is_empty() {
             return Err(ParseSpaltenAnfrageError::EmptyUnterkategorie);
         }
-        let ober_norm = normalize_key(ober);
+        let ober = ober.trim();
         let unter = unter.to_string();
-        let parsed = match ober_norm.as_str() {
-            "kombinationgalaxie" => Self::KombinationGalaxie { unter },
-            "kombinationuniversum" => Self::KombinationUniversum { unter },
-            "gebrochenrationalgalaxienm" => Self::GebrochenRationalGalaxie { unter },
-            "gebrochenrationaluniversumnm" => Self::GebrochenRationalUniversum { unter },
-            "gebrochenrationalgefuehlenm" | "gebrochenrationalgefuhlenm" => Self::GebrochenRationalGefuehle { unter },
-            "gebrochenrationalstrukturgroessenm" => Self::GebrochenRationalStrukturgroesse { unter },
-            "primvielfache" => Self::Primvielfache { unter },
-            "multiplikationen" => Self::Multiplikationen { unter },
+        let parsed = match ober {
+            "KombinationGalaxie" | "kombinationgalaxie" => Self::KombinationGalaxie { unter },
+            "KombinationUniversum" | "kombinationuniversum" => Self::KombinationUniversum { unter },
+            "gebrochen-rational_Galaxie_n/m" | "gebrochen-rational-galaxie-n/m" | "gebrochenrationalgalaxienm" => Self::GebrochenRationalGalaxie { unter },
+            "gebrochen-rational_Universum_n/m" | "gebrochen-rational-universum-n/m" | "gebrochenrationaluniversumnm" => Self::GebrochenRationalUniversum { unter },
+            "gebrochen-rational_Gefühle_n/m" | "gebrochen-rational_Gefuehle_n/m" | "gebrochen-rational-gefuehle-n/m" | "gebrochenrationalgefuehlenm" | "gebrochenrationalgefuhlenm" => Self::GebrochenRationalGefuehle { unter },
+            "gebrochen-rational_Strukturgroesse_n/m" | "gebrochen-rational-strukturgroesse-n/m" | "gebrochenrationalstrukturgroessenm" => Self::GebrochenRationalStrukturgroesse { unter },
+            "Primvielfache" | "primvielfache" => Self::Primvielfache { unter },
+            "Multiplikationen" | "multiplikationen" => Self::Multiplikationen { unter },
             _ => {
                 let standard = StandardOberkategorie::parse(ober);
                 match standard {
@@ -234,10 +235,5 @@ impl fmt::Display for SpaltenAnfrage {
 }
 
 fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
+    s.trim().to_string()
 }

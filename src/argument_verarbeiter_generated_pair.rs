@@ -6,10 +6,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 fn normalize_category_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
+    s.trim().to_string()
 }
 
 fn is_primzahlkreuz_pro_contra_request(ober: &str, unter: &str) -> bool {

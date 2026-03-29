@@ -8,7 +8,7 @@ pub struct PyDecl {
 }
 
 fn normalize_key(s: &str) -> String {
-    s.to_lowercase().replace("_", "").replace("-", "").replace(" ", "")
+    s.trim().to_string()
 }
 
 pub static DECL_0: PyDecl = PyDecl {

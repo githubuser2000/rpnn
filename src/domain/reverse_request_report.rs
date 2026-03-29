@@ -10,12 +10,7 @@ use crate::reta_ausgabe::OutputSyntax;
 type AnfragePair = SpaltenAnfrage;
 
 fn normalize_key(s: &str) -> String {
-    s.trim()
-        .to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
+    s.trim().to_string()
 }
 
 fn request(ober: &str, unter: &str) -> SpaltenAnfrage {

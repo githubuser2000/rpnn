@@ -1,9 +1,5 @@
 pub fn normalize_category_key(s: &str) -> String {
-    s.to_lowercase()
-        .replace('_', "")
-        .replace('-', "")
-        .replace(' ', "")
-        .replace('/', "")
+    s.trim().to_string()
 }
 
 pub fn contains_any_alias(token: &str, aliases: &[&str]) -> bool {

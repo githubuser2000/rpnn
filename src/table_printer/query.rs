@@ -130,7 +130,7 @@ fn expand_bereich_rows(
 }
 
 fn normalize_token(s: &str) -> String {
-    s.trim().to_lowercase()
+    s.trim().to_string()
 }
 
 fn contains_any_alias(tokens: &BTreeSet<String>, aliases: &[&str]) -> bool {

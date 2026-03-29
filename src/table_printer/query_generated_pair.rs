@@ -10,16 +10,7 @@ use crate::generated_columns::{apply_generated_columns, ParametersMain};
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
 
 fn normalize_token(input: &str) -> String {
-    input
-        .trim()
-        .to_lowercase()
-        .replace('ä', "ae")
-        .replace('ö', "oe")
-        .replace('ü', "ue")
-        .replace('ß', "ss")
-        .replace('-', "")
-        .replace('_', "")
-        .replace(' ', "")
+    input.trim().to_string()
 }
 
 fn token_is(token: &str, aliases: &[&str]) -> bool {
