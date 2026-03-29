@@ -1,5 +1,5 @@
-use super::normalize::normalize_key;
 use crate::domain::categories::GeneratedInference;
+use crate::processing::category_rules::generator_inference::infer_generator_only_request;
 
 pub fn infer_generated_pair_from_direct_columns<F>(
     ober: &str,
@@ -9,52 +9,28 @@ pub fn infer_generated_pair_from_direct_columns<F>(
 where
     F: FnMut(&str, &str) -> Vec<u32>,
 {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-
     let mut direct_columns = find_direct(ober, unter);
     direct_columns.sort();
     direct_columns.dedup();
 
-    let has = |n: u32| direct_columns.contains(&n);
-    let is_pair = |ober_aliases: &[&str], unter_aliases: &[&str]| {
-        ober_aliases.iter().any(|alias| normalize_key(alias) == ober_n)
-            && unter_aliases.iter().any(|alias| normalize_key(alias) == unter_n)
-    };
-
-    let mut generated_befehle = Vec::<String>::new();
+    let mut generated_befehle: Vec<String> = infer_generator_only_request(ober, unter).into_iter().collect();
     let mut required_columns = Vec::<u32>::new();
 
-    if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
-        && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
-    {
-        generated_befehle.push("primzahlkreuzprocontra".to_string());
-    }
-    if is_pair(&["Menschliches", "Grundstrukturen"], &["Liebe", "Liebe_(7)"]) && has(9) {
-        generated_befehle.push("lovepolygon".to_string());
-        required_columns.push(9);
-    }
-    if is_pair(&["Planet", "Menschliches", "Grundstrukturen"], &["Gleichheit", "Freiheit"]) && has(132) {
-        generated_befehle.push("gleichheitfreiheit".to_string());
-        required_columns.push(132);
-    }
-    if is_pair(&["Universum", "Multiversum", "Grundstrukturen"], &["Geist", "Geist_(15)"]) && has(242) {
-        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
-        required_columns.push(242);
-    }
-    if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Gestirn", "Mond"]) && has(64) {
-        generated_befehle.push("primcreativitytype".to_string());
-        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
-        required_columns.push(64);
-    }
-    if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Primzahlen", "Wichtigste"]) && (has(19) || has(90)) {
-        generated_befehle.push("vervielfachezeile".to_string());
-        if has(19) { required_columns.push(19); }
-        if has(90) { required_columns.push(90); }
+    for generator in &generated_befehle {
+        match generator.as_str() {
+            "lovepolygon" => required_columns.push(9),
+            "gleichheitfreiheit" => required_columns.push(132),
+            "geistemotionenergiematerietopologie" => required_columns.push(242),
+            "primcreativitytype" | "mondexponzierenlogarithmustyp" => required_columns.push(64),
+            "vervielfachezeile" => { required_columns.push(19); required_columns.push(90); }
+            _ => {}
+        }
     }
 
-    generated_befehle.sort(); generated_befehle.dedup();
-    required_columns.sort(); required_columns.dedup();
+    generated_befehle.sort();
+    generated_befehle.dedup();
+    required_columns.sort();
+    required_columns.dedup();
 
     if generated_befehle.is_empty() && direct_columns.is_empty() {
         None

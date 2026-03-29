@@ -1,4 +1,6 @@
 use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
+use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
+use crate::processing::category_rules::generator_inference::infer_generator_only_request;
 use crate::domain::model::spalten_anfrage::{
     CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
     KombiUnterId, SpaltenAnfrage, StandardUnterId,
@@ -29,38 +31,46 @@ pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
 }
 
 fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<CanonicalColumnSpec> {
-    let (target, header_display) = match unter {
-        StandardUnterId::Eigenschaft(spec) => return resolve_eigenschaft(req, spec),
+    if let StandardUnterId::Eigenschaft(spec) = unter.clone() {
+        return resolve_eigenschaft(req, spec);
+    }
 
-        // Platzhalter/erste Brücke – diese IDs später gegen Python-Wahrheit austauschen
-        StandardUnterId::Gewalt => (ColumnTarget::DirectColumn(496), "Gewalt".to_string()),
-        StandardUnterId::Politische => (ColumnTarget::DirectColumn(497), "politische".to_string()),
-        StandardUnterId::Richtungen => (ColumnTarget::DirectColumn(498), "Richtungen".to_string()),
-        StandardUnterId::Formationen => {
-            (ColumnTarget::DirectColumn(499), "Formationen".to_string())
-        }
-        StandardUnterId::Klasse => (ColumnTarget::DirectColumn(242), "Klasse".to_string()),
-        StandardUnterId::Hoelle => (ColumnTarget::DirectColumn(496), "Hölle".to_string()),
-        StandardUnterId::Liebe => (ColumnTarget::DirectColumn(14), "Liebe".to_string()),
-        StandardUnterId::Geist => (ColumnTarget::DirectColumn(15), "Geist".to_string()),
-        StandardUnterId::SymboleReligion => {
-            (ColumnTarget::DirectColumn(700), "Symbole Religion".to_string())
-        }
-        StandardUnterId::Primzahlkreuz => (
-            ColumnTarget::Generator(GeneratorSpec {
-                art: GeneratorArt::Primzahlkreuz,
-                parameter: GeneratorParameter::Keine,
+    let (ober, unter_cli) = req.to_cli_pair()?;
+    let mut exact = exact_columns_for_pair(&ober, &unter_cli);
+    if exact.is_empty() {
+        exact = fuzzy_columns_for_pair(&ober, &unter_cli);
+    }
+
+    if !exact.is_empty() {
+        let target = if exact.len() == 1 {
+            ColumnTarget::DirectColumn(exact[0] as u16)
+        } else {
+            ColumnTarget::DirectColumns(exact.into_iter().map(|n| n as u16).collect())
+        };
+        return Some(CanonicalColumnSpec {
+            request: req,
+            target,
+            header_display: unter_cli,
+            aliases_for_report: vec![],
+        });
+    }
+
+    let generated = infer_generator_only_request(&ober, &unter_cli);
+    if !generated.is_empty() {
+        let mut befehle: Vec<String> = generated.into_iter().collect();
+        befehle.sort();
+        return Some(CanonicalColumnSpec {
+            request: req,
+            target: ColumnTarget::Generator(GeneratorSpec {
+                art: GeneratorArt::MetaKonkret,
+                parameter: GeneratorParameter::TextListe(befehle.clone()),
             }),
-            "Primzahlkreuz".to_string(),
-        ),
-    };
+            header_display: unter_cli,
+            aliases_for_report: befehle,
+        });
+    }
 
-    Some(CanonicalColumnSpec {
-        request: req,
-        target,
-        header_display,
-        aliases_for_report: vec![],
-    })
+    None
 }
 
 fn resolve_eigenschaft(req: SpaltenAnfrage, spec: EigenschaftRequest) -> Option<CanonicalColumnSpec> {

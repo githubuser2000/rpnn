@@ -4,6 +4,7 @@ use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
 use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
+use crate::processing::category_rules::generator_inference::infer_generator_only_request;
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
@@ -26,6 +27,34 @@ pub fn resolve_cli_selection(
     if let Some(canonical) = bridge_cli_selection(ober, unter).and_then(resolve_request) {
         let mut out = LegacyResolvedSelection::default();
         apply_canonical_spec(&mut out, canonical.target);
+
+        out.direct_columns.extend(
+            exact_columns_for_pair(ober, unter)
+                .into_iter()
+                .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+                .collect::<Result<Vec<u16>, _>>()?,
+        );
+        if out.direct_columns.is_empty() {
+            out.direct_columns.extend(
+                fuzzy_columns_for_pair(ober, unter)
+                    .into_iter()
+                    .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
+                    .collect::<Result<Vec<u16>, _>>()?,
+            );
+        }
+
+        out.generated_befehle.extend(infer_generator_only_request(ober, unter));
+
+        if let Some(inference) = kategorie_map.infer_generated_pair(ober, unter) {
+            out.generated_befehle.extend(inference.generated_befehle);
+            out.required_columns.extend(
+                inference.required_columns.into_iter().map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n))).collect::<Result<Vec<u16>, _>>()?
+            );
+            out.direct_columns.extend(
+                inference.direct_columns.into_iter().map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n))).collect::<Result<Vec<u16>, _>>()?
+            );
+        }
+
         dedup_legacy_selection(&mut out);
         return Ok(out);
     }
@@ -179,8 +208,15 @@ fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget)
         ColumnTarget::DirectColumns(cols) => sel.direct_columns.extend(cols),
         ColumnTarget::Pair(a, b) => sel.exact_modal_pairs.push((usize::from(a), usize::from(b))),
         ColumnTarget::Generator(generator_spec) => {
-            sel.generated_befehle
-                .insert(generator_spec.art.to_string().to_lowercase());
+            match generator_spec.parameter {
+                crate::domain::model::spalten_anfrage::GeneratorParameter::TextListe(items) => {
+                    sel.generated_befehle.extend(items);
+                }
+                _ => {
+                    sel.generated_befehle
+                        .insert(generator_spec.art.to_string().to_lowercase());
+                }
+            }
         }
         ColumnTarget::Combination(_) => {}
     }
