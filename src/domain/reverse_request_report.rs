@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::domain::python_source_of_truth::{generated_pairs_for_command, kombination_name_for_index, multiplication_pairs_for_command};
 use crate::domain::indices::ColumnNumber;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::reta_ausgabe::OutputSyntax;
@@ -102,124 +103,27 @@ fn collect_fraction_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>
 }
 
 fn collect_kombi_pairs(bereich: &TextBereich, out: &mut BTreeSet<AnfragePair>) {
-    fn galaxie_name(idx: usize) -> Option<&'static str> {
-        match idx {
-            1 => Some("tiere"),
-            2 => Some("berufe"),
-            3 => Some("kreativität"),
-            4 => Some("liebe"),
-            7 => Some("männer"),
-            8 => Some("persönlichkeit"),
-            9 => Some("religion"),
-            10 => Some("motive"),
-            12 => Some("emotionen"),
-            13 => Some("personen"),
-            16 => Some("wirtschaftssysteme"),
-            17 => Some("eigentum"),
-            _ => None,
-        }
-    }
-
-    fn universum_name(idx: usize) -> Option<&'static str> {
-        match idx {
-            1 => Some("tiere"),
-            2 => Some("berufe"),
-            5 => Some("transzendentalien"),
-            6 => Some("primzahlkreuz"),
-            8 => Some("persönlichkeit"),
-            9 => Some("religion"),
-            10 => Some("motive"),
-            11 => Some("ontologie"),
-            13 => Some("personen"),
-            14 => Some("mechanismen"),
-            15 => Some("gegentranszendentalien"),
-            17 => Some("maschinen"),
-            18 => Some("geist"),
-            19 => Some("bewusstsein"),
-            _ => None,
-        }
-    }
-
     for idx in &bereich.pypy_compat.kombi_galaxie {
-        if let Some(name) = galaxie_name(*idx) {
+        if let Some(name) = kombination_name_for_index("KombinationGalaxie", *idx) {
             out.insert(request("KombinationGalaxie", name));
         }
     }
 
     for idx in &bereich.pypy_compat.kombi_universum {
-        if let Some(name) = universum_name(*idx) {
+        if let Some(name) = kombination_name_for_index("KombinationUniversum", *idx) {
             out.insert(request("KombinationUniversum", name));
         }
     }
 }
 
 fn collect_generated_pairs(generated_befehle: &BTreeSet<String>, out: &mut BTreeSet<AnfragePair>) {
-    let has = |needle: &str| generated_befehle.iter().any(|g| normalize_key(g) == normalize_key(needle));
-
-    if has("primzahlkreuzprocontra") {
-        out.insert(request("Universum", "Primzahlkreuz"));
-        out.insert(request("Bedeutung", "Primzahlkreuz"));
-        out.insert(request("Pro_Contra", "Primzahlkreuz"));
-    }
-
-    if has("lovepolygon") {
-        out.insert(request("Menschliches", "Liebe"));
-        out.insert(request("Grundstrukturen", "Liebe"));
-    }
-
-    if has("gleichheitfreiheit") {
-        out.insert(request("Planet", "Gleichheit"));
-        out.insert(request("Menschliches", "Gleichheit"));
-        out.insert(request("Grundstrukturen", "Gleichheit"));
-    }
-
-    if has("geistemotionenergiematerietopologie") {
-        out.insert(request("Universum", "Geist"));
-        out.insert(request("Multiversum", "Geist"));
-        out.insert(request("Grundstrukturen", "Geist"));
-    }
-
-    if has("primcreativitytype") || has("mondexponzierenlogarithmustyp") {
-        out.insert(request("Wichtigstes_zum_verstehen", "Gestirn"));
-        out.insert(request("Bedeutung", "Gestirn"));
-    }
-
-    if has("vervielfachezeile") {
-        out.insert(request("Wichtigstes_zum_verstehen", "Primzahlen"));
-        out.insert(request("Bedeutung", "Primzahlen"));
-    }
-
-    if has("primmotgleichf") {
-        out.insert(request("primvielfache", "motivgleichfoermig"));
-        out.insert(request("multiplikationen", "motivgleichfoermig"));
-    }
-    if has("primstrukgleichf") {
-        out.insert(request("primvielfache", "strukturgleichfoermig"));
-        out.insert(request("multiplikationen", "strukturgleichfoermig"));
-    }
-    if has("primmotivstern") {
-        out.insert(request("primvielfache", "motivstern"));
-        out.insert(request("multiplikationen", "motivstern"));
-    }
-    if has("primstrukturstern") {
-        out.insert(request("primvielfache", "strukturstern"));
-        out.insert(request("multiplikationen", "strukturstern"));
-    }
-    if has("primmotivsterngebr") {
-        out.insert(request("primvielfache", "motivgebrstern"));
-        out.insert(request("multiplikationen", "motivgebrstern"));
-    }
-    if has("primstruktursterngebr") {
-        out.insert(request("primvielfache", "strukgebrstern"));
-        out.insert(request("multiplikationen", "strukgebrstern"));
-    }
-    if has("primmotgleichfgebr") {
-        out.insert(request("primvielfache", "motivgebrgleichf"));
-        out.insert(request("multiplikationen", "motivgebrgleichf"));
-    }
-    if has("primstrukgleichfgebr") {
-        out.insert(request("primvielfache", "strukgebrgleichf"));
-        out.insert(request("multiplikationen", "strukgebrgleichf"));
+    for generated in generated_befehle {
+        for (ober, unter) in generated_pairs_for_command(generated) {
+            out.insert(request(&ober, &unter));
+        }
+        for (ober, unter) in multiplication_pairs_for_command(generated) {
+            out.insert(request(&ober, &unter));
+        }
     }
 }
 

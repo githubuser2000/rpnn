@@ -2550,92 +2550,18 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 
 
 
-#[derive(Clone, Copy)]
-struct GeneratedFamily {
-    command: &'static str,
-    seed_pairs: &'static [(&'static str, &'static str)],
-    ober_aliases: &'static [&'static str],
-    unter_aliases: &'static [&'static str],
-}
-
-const GENERATED_FAMILIES: &[GeneratedFamily] = &[
-    GeneratedFamily {
-        command: "primzahlkreuzprocontra",
-        seed_pairs: &[
-            ("Universum", "Primzahlkreuz"),
-            ("Bedeutung", "Primzahlkreuz"),
-            ("Pro_Contra", "Primzahlkreuz"),
-            ("Grundstrukturen", "Primzahlkreuz"),
-        ],
-        ober_aliases: &["procontra", "bedeutung", "universum", "grundstrukturen"],
-        unter_aliases: &["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"],
-    },
-    GeneratedFamily {
-        command: "lovepolygon",
-        seed_pairs: &[("Menschliches", "Liebe"), ("Grundstrukturen", "Liebe")],
-        ober_aliases: &["menschliches", "grundstrukturen"],
-        unter_aliases: &["liebe", "ethik"],
-    },
-    GeneratedFamily {
-        command: "gleichheitfreiheit",
-        seed_pairs: &[
-            ("Planet", "Gleichheit"),
-            ("Menschliches", "Gleichheit"),
-            ("Grundstrukturen", "Gleichheit"),
-        ],
-        ober_aliases: &["planet", "menschliches", "grundstrukturen"],
-        unter_aliases: &["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"],
-    },
-    GeneratedFamily {
-        command: "geistemotionenergiematerietopologie",
-        seed_pairs: &[
-            ("Universum", "Geist"),
-            ("Multiversum", "Geist"),
-            ("Grundstrukturen", "Geist"),
-        ],
-        ober_aliases: &["universum", "multiversum", "grundstrukturen"],
-        unter_aliases: &["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"],
-    },
-    GeneratedFamily {
-        command: "primcreativitytype",
-        seed_pairs: &[
-            ("Wichtigstes_zum_verstehen", "Gestirn"),
-            ("Bedeutung", "Gestirn"),
-        ],
-        ober_aliases: &["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"],
-        unter_aliases: &["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"],
-    },
-    GeneratedFamily {
-        command: "mondexponzierenlogarithmustyp",
-        seed_pairs: &[("Wichtigstes_zum_verstehen", "Mond"), ("Bedeutung", "Mond")],
-        ober_aliases: &["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"],
-        unter_aliases: &["mond", "logarithmus", "exponieren", "exponential", "exponentiell"],
-    },
-    GeneratedFamily {
-        command: "vervielfachezeile",
-        seed_pairs: &[
-            ("Wichtigstes_zum_verstehen", "Primzahlen"),
-            ("Bedeutung", "Primzahlen"),
-            ("Galaxie", "Offenbarung_des_Johannes"),
-        ],
-        ober_aliases: &["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"],
-        unter_aliases: &["primzahlen", "vielfache", "multis", "multiplikationen", "offenbarung", "offenbarungdesjohannes", "johannes", "bibel"],
-    },
-];
-
-fn matches_generated_family(family: &GeneratedFamily, ober: &str, unter: &str) -> bool {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-    family.ober_aliases.iter().any(|a| normalize_key(a) == ober_n)
-        && family.unter_aliases.iter().any(|a| normalize_key(a) == unter_n)
-}
-
 pub fn generated_seed_pairs() -> Vec<(String, String)> {
     let mut out = Vec::new();
-    for family in GENERATED_FAMILIES {
-        for (ober, unter) in family.seed_pairs {
-            out.push(((*ober).to_string(), (*unter).to_string()));
-        }
+    for command in [
+        "primzahlkreuzprocontra",
+        "lovepolygon",
+        "gleichheitfreiheit",
+        "geistemotionenergiematerietopologie",
+        "primcreativitytype",
+        "mondexponzierenlogarithmustyp",
+        "vervielfachezeile",
+    ] {
+        out.extend(generated_pairs_for_command(command));
     }
     out.push(("Modallogik".to_string(), "Modallogik".to_string()));
     out.sort();
@@ -2703,6 +2629,112 @@ pub fn multiplication_seed_pairs() -> Vec<(String, String)> {
     out.sort();
     out.dedup();
     out
+}
+
+pub fn generated_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let mut push = |ober: &str, unter: &str| {
+        out.push((ober.to_string(), unter.to_string()));
+    };
+
+    match key.as_str() {
+        "primzahlkreuzprocontra" => {
+            push("Universum", "Primzahlkreuz");
+            push("Bedeutung", "Primzahlkreuz");
+            push("Pro_Contra", "Primzahlkreuz");
+        }
+        "lovepolygon" => {
+            push("Menschliches", "Liebe");
+            push("Grundstrukturen", "Liebe");
+        }
+        "gleichheitfreiheit" => {
+            push("Planet", "Gleichheit");
+            push("Menschliches", "Gleichheit");
+            push("Grundstrukturen", "Gleichheit");
+        }
+        "geistemotionenergiematerietopologie" => {
+            push("Universum", "Geist");
+            push("Multiversum", "Geist");
+            push("Grundstrukturen", "Geist");
+        }
+        "primcreativitytype" | "mondexponzierenlogarithmustyp" => {
+            push("Wichtigstes_zum_verstehen", "Gestirn");
+            push("Bedeutung", "Gestirn");
+        }
+        "vervielfachezeile" => {
+            push("Wichtigstes_zum_verstehen", "Primzahlen");
+            push("Bedeutung", "Primzahlen");
+        }
+        _ => {}
+    }
+
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let unter = match key.as_str() {
+        "primmotgleichf" => Some("motivgleichfoermig"),
+        "primstrukgleichf" => Some("strukturgleichfoermig"),
+        "primmotivstern" => Some("motivstern"),
+        "primstrukturstern" => Some("strukturstern"),
+        "primmotivsterngebr" => Some("motivgebrstern"),
+        "primstruktursterngebr" => Some("strukgebrstern"),
+        "primmotgleichfgebr" => Some("motivgebrgleichf"),
+        "primstrukgleichfgebr" => Some("strukgebrgleichf"),
+        _ => None,
+    };
+
+    if let Some(unter) = unter {
+        out.push(("primvielfache".to_string(), unter.to_string()));
+        out.push(("multiplikationen".to_string(), unter.to_string()));
+    }
+
+    out
+}
+
+pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str> {
+    match normalize_key(ober).as_str() {
+        "kombinationgalaxie" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            3 => Some("kreativität"),
+            4 => Some("liebe"),
+            7 => Some("männer"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            12 => Some("emotionen"),
+            13 => Some("personen"),
+            16 => Some("wirtschaftssysteme"),
+            17 => Some("eigentum"),
+            _ => None,
+        },
+        "kombinationuniversum" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            5 => Some("transzendentalien"),
+            6 => Some("primzahlkreuz"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            11 => Some("ontologie"),
+            13 => Some("personen"),
+            14 => Some("mechanismen"),
+            15 => Some("gegentranszendentalien"),
+            17 => Some("maschinen"),
+            18 => Some("geist"),
+            19 => Some("bewusstsein"),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
@@ -2775,11 +2807,48 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 
 
 pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<crate::domain::categories::GeneratedInference> {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+    let ober_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == ober_n);
+    let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
+
     let mut generated_befehle = Vec::<String>::new();
-    for family in GENERATED_FAMILIES {
-        if matches_generated_family(family, ober, unter) {
-            generated_befehle.push(family.command.to_string());
-        }
+
+    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]) {
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
+    }
+
+    if ober_has(&["menschliches", "grundstrukturen"])
+        && sub_has(&["liebe", "ethik"]) {
+        generated_befehle.push("lovepolygon".to_string());
+    }
+
+    if ober_has(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"]) {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+    }
+
+    if ober_has(&["universum", "multiversum", "grundstrukturen"])
+        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
+        generated_befehle.push("primcreativitytype".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"]) {
+        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+    }
+
+    if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
+        || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])) {
+        generated_befehle.push("vervielfachezeile".to_string());
     }
 
     generated_befehle.sort();
