@@ -172,8 +172,13 @@ fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget)
         ColumnTarget::DirectColumns(cols) => sel.direct_columns.extend(cols),
         ColumnTarget::Pair(a, b) => sel.exact_modal_pairs.push((usize::from(a), usize::from(b))),
         ColumnTarget::Generator(generator_spec) => {
-            sel.generated_befehle
-                .insert(generator_spec.art.to_string().to_lowercase());
+            let generated_name = match generator_spec.art {
+                crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+                crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => "multiplikationen",
+                crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "primvielfache",
+                crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "metakonkret",
+            };
+            sel.generated_befehle.insert(generated_name.to_string());
         }
         ColumnTarget::Combination(_) => {}
     }

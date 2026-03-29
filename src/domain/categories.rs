@@ -279,10 +279,18 @@ impl KategorieMap {
 
     pub fn infer_generated_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Option<GeneratedInference> {
         resolve_request(request.clone()).map(|spec| match spec.target {
-            ColumnTarget::Generator(generator) => GeneratedInference {
-                generated_befehle: vec![generator.art.to_string().to_lowercase()],
-                required_columns: Vec::new(),
-                direct_columns: Vec::new(),
+            ColumnTarget::Generator(generator) => {
+                let generated_name = match generator.art {
+                    crate::domain::ids::domain_id::GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+                    crate::domain::ids::domain_id::GeneratorArt::Multiplikationen => "multiplikationen",
+                    crate::domain::ids::domain_id::GeneratorArt::Primvielfache => "primvielfache",
+                    crate::domain::ids::domain_id::GeneratorArt::MetaKonkret => "metakonkret",
+                };
+                GeneratedInference {
+                    generated_befehle: vec![generated_name.to_string()],
+                    required_columns: Vec::new(),
+                    direct_columns: Vec::new(),
+                }
             },
             ColumnTarget::Combination(_) => GeneratedInference::default(),
             other => {
