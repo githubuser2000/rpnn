@@ -23,10 +23,6 @@ where
     if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
         None
     } else {
-        Some(GeneratedInference {
-            generated_befehle: source.generated_befehle,
-            required_columns: source.required_columns,
-            direct_columns: source.direct_columns,
-        })
+        Some(source)
     }
 }

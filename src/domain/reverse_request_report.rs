@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use crate::cli::TextBereich;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
+use crate::domain::python_source_of_truth::{generated_pairs_for_command, kombination_name_for_index, multiplication_pairs_for_command};
 use crate::domain::indices::ColumnNumber;
 use crate::domain::spalten_anfrage::SpaltenAnfrage;
 use crate::reta_ausgabe::OutputSyntax;
 
 use crate::domain::model::spalten_anfrage::CanonicalColumnSpec;
-use crate::domain::python_source_of_truth::{generated_pairs_for_command, kombination_name_for_index, multiplication_pairs_for_command};
 
 pub fn spec_to_report_line(spec: &CanonicalColumnSpec) -> String {
     spec.header_display.clone()

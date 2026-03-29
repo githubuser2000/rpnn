@@ -2548,12 +2548,9 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SourceGeneratedInference {
-    pub generated_befehle: Vec<String>,
-    pub required_columns: Vec<u32>,
-    pub direct_columns: Vec<u32>,
-}
+
+
+
 
 pub fn normalize_cli_token(s: &str) -> String {
     normalize_key(s)
@@ -2569,6 +2566,202 @@ fn stable_dedup_columns(cols: Vec<u32>) -> Vec<u32> {
         }
     }
     out
+}
+
+pub fn exact_supplemental_columns_for_pair(_ober: &str, _unter: &str) -> Vec<u32> {
+    Vec::new()
+}
+
+pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let mut cols = exact_columns_for_pair(ober, unter);
+    cols.extend(exact_supplemental_columns_for_pair(ober, unter));
+    stable_dedup_columns(cols)
+}
+pub fn generated_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for command in [
+        "primzahlkreuzprocontra",
+        "lovepolygon",
+        "gleichheitfreiheit",
+        "geistemotionenergiematerietopologie",
+        "primcreativitytype",
+        "mondexponzierenlogarithmustyp",
+        "vervielfachezeile",
+    ] {
+        out.extend(generated_pairs_for_command(command));
+    }
+    out.push(("Modallogik".to_string(), "Modallogik".to_string()));
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn combination_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for unter in [
+        "tiere",
+        "berufe",
+        "kreativität",
+        "liebe",
+        "männer",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "emotionen",
+        "personen",
+        "wirtschaftssysteme",
+        "eigentum",
+    ] {
+        out.push(("KombinationGalaxie".to_string(), unter.to_string()));
+    }
+    for unter in [
+        "tiere",
+        "berufe",
+        "transzendentalien",
+        "primzahlkreuz",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "ontologie",
+        "personen",
+        "mechanismen",
+        "gegentranszendentalien",
+        "maschinen",
+        "geist",
+        "bewusstsein",
+    ] {
+        out.push(("KombinationUniversum".to_string(), unter.to_string()));
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for ober in ["primvielfache", "multiplikationen"] {
+        for unter in [
+            "motivgleichfoermig",
+            "strukturgleichfoermig",
+            "motivstern",
+            "strukturstern",
+            "motivgebrstern",
+            "strukgebrstern",
+            "motivgebrgleichf",
+            "strukgebrgleichf",
+        ] {
+            out.push((ober.to_string(), unter.to_string()));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn generated_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let mut push = |ober: &str, unter: &str| {
+        out.push((ober.to_string(), unter.to_string()));
+    };
+
+    match key.as_str() {
+        "primzahlkreuzprocontra" => {
+            push("Universum", "Primzahlkreuz");
+            push("Bedeutung", "Primzahlkreuz");
+            push("Pro_Contra", "Primzahlkreuz");
+        }
+        "lovepolygon" => {
+            push("Menschliches", "Liebe");
+            push("Grundstrukturen", "Liebe");
+        }
+        "gleichheitfreiheit" => {
+            push("Planet", "Gleichheit");
+            push("Menschliches", "Gleichheit");
+            push("Grundstrukturen", "Gleichheit");
+        }
+        "geistemotionenergiematerietopologie" => {
+            push("Universum", "Geist");
+            push("Multiversum", "Geist");
+            push("Grundstrukturen", "Geist");
+        }
+        "primcreativitytype" | "mondexponzierenlogarithmustyp" => {
+            push("Wichtigstes_zum_verstehen", "Gestirn");
+            push("Bedeutung", "Gestirn");
+        }
+        "vervielfachezeile" => {
+            push("Wichtigstes_zum_verstehen", "Primzahlen");
+            push("Bedeutung", "Primzahlen");
+        }
+        _ => {}
+    }
+
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let unter = match key.as_str() {
+        "primmotgleichf" => Some("motivgleichfoermig"),
+        "primstrukgleichf" => Some("strukturgleichfoermig"),
+        "primmotivstern" => Some("motivstern"),
+        "primstrukturstern" => Some("strukturstern"),
+        "primmotivsterngebr" => Some("motivgebrstern"),
+        "primstruktursterngebr" => Some("strukgebrstern"),
+        "primmotgleichfgebr" => Some("motivgebrgleichf"),
+        "primstrukgleichfgebr" => Some("strukgebrgleichf"),
+        _ => None,
+    };
+
+    if let Some(unter) = unter {
+        out.push(("primvielfache".to_string(), unter.to_string()));
+        out.push(("multiplikationen".to_string(), unter.to_string()));
+    }
+
+    out
+}
+
+pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str> {
+    match normalize_key(ober).as_str() {
+        "kombinationgalaxie" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            3 => Some("kreativität"),
+            4 => Some("liebe"),
+            7 => Some("männer"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            12 => Some("emotionen"),
+            13 => Some("personen"),
+            16 => Some("wirtschaftssysteme"),
+            17 => Some("eigentum"),
+            _ => None,
+        },
+        "kombinationuniversum" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            5 => Some("transzendentalien"),
+            6 => Some("primzahlkreuz"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            11 => Some("ontologie"),
+            13 => Some("personen"),
+            14 => Some("mechanismen"),
+            15 => Some("gegentranszendentalien"),
+            17 => Some("maschinen"),
+            18 => Some("geist"),
+            19 => Some("bewusstsein"),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
@@ -2596,17 +2789,9 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
             out.extend_from_slice(decl.columns);
         }
     }
-    stable_dedup_columns(out)
-}
-
-pub fn exact_supplemental_columns_for_pair(_ober: &str, _unter: &str) -> Vec<u32> {
-    Vec::new()
-}
-
-pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let mut cols = exact_columns_for_pair(ober, unter);
-    cols.extend(exact_supplemental_columns_for_pair(ober, unter));
-    stable_dedup_columns(cols)
+    out.sort_unstable();
+    out.dedup();
+    out
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
@@ -2646,142 +2831,70 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 }
 
 
-pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<SourceGeneratedInference> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
 
-    let sub_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == unter_n);
-    let ober_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == ober_n);
-
-    let mut generated_befehle = Vec::<String>::new();
-    let mut required_columns = Vec::<u32>::new();
-
-    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
-    {
-        generated_befehle.push("primzahlkreuzprocontra".to_string());
-    }
-
-    if ober_has(&["menschliches", "grundstrukturen"]) && sub_has(&["liebe", "ethik"]) {
-        generated_befehle.push("lovepolygon".to_string());
-        required_columns.push(9);
-    }
-
-    if ober_has(&["planet", "menschliches", "grundstrukturen"])
-        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"])
-    {
-        generated_befehle.push("gleichheitfreiheit".to_string());
-        required_columns.push(132);
-    }
-
-    if ober_has(&["universum", "multiversum", "grundstrukturen", "menschliches"])
-        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"])
-    {
-        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
-        required_columns.push(242);
-    }
-
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"])
-    {
-        generated_befehle.push("primcreativitytype".to_string());
-        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
-        required_columns.push(64);
-    }
-
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
-        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen", "offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])
-    {
-        generated_befehle.push("vervielfachezeile".to_string());
-        required_columns.push(19);
-        required_columns.push(90);
-    }
-
-    generated_befehle.sort();
-    generated_befehle.dedup();
-    required_columns.sort();
-    required_columns.dedup();
-
-    if generated_befehle.is_empty() {
-        None
-    } else {
-        Some(SourceGeneratedInference { generated_befehle, required_columns, direct_columns: Vec::new() })
-    }
-}
 
 pub fn is_strict_generated_pair(ober: &str, unter: &str) -> bool {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
-    let sub_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == unter_n);
-    let ober_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == ober_n);
 
-    ober_has(&["universum", "bedeutung", "procontra", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
+    matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra" | "nachvollziehen")
+        && matches!(ober_n.as_str(), "universum" | "bedeutung" | "procontra" | "grundstrukturen")
 }
-
-pub fn generated_pairs_for_command(command: &str) -> Vec<(String, String)> {
-    let cmd = normalize_key(command);
-    let pairs: &[(&str,&str)] = match cmd.as_str() {
-        "primzahlkreuzprocontra" => &[("Universum","Primzahlkreuz"),("Bedeutung","Primzahlkreuz"),("Pro_Contra","Primzahlkreuz"),("Grundstrukturen","Primzahlkreuz")],
-        "lovepolygon" => &[("Menschliches","Liebe"),("Grundstrukturen","Liebe")],
-        "gleichheitfreiheit" => &[("Planet","Gleichheit"),("Menschliches","Gleichheit"),("Grundstrukturen","Gleichheit")],
-        "geistemotionenergiematerietopologie" => &[("Universum","Geist"),("Multiversum","Geist"),("Grundstrukturen","Geist"),("Menschliches","Geist")],
-        "primcreativitytype" | "mondexponzierenlogarithmustyp" => &[("Wichtigstes_zum_verstehen","Gestirn"),("Bedeutung","Gestirn")],
-        "vervielfachezeile" => &[("Wichtigstes_zum_verstehen","Primzahlen"),("Bedeutung","Primzahlen"),("Galaxie","Offenbarung_des_Johannes")],
-        _ => &[],
-    };
-    pairs.iter().map(|(o,u)| ((*o).to_string(), (*u).to_string())).collect()
-}
-
-pub fn multiplication_pairs_for_command(command: &str) -> Vec<(String, String)> {
-    let cmd = normalize_key(command);
-    if cmd != "multiplikationen" && cmd != "primvielfache" {
-        return Vec::new();
-    }
-    let unters = [
-        "motivgleichfoermig","strukturgleichfoermig","motivstern","strukturstern",
-        "motivgebrstern","strukgebrstern","motivgebrgleichf","strukgebrgleichf",
-    ];
-    unters.iter().map(|u| (command.to_string(), (*u).to_string())).collect()
-}
-
-pub fn generated_seed_pairs() -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    for cmd in ["primzahlkreuzprocontra","lovepolygon","gleichheitfreiheit","geistemotionenergiematerietopologie","primcreativitytype","mondexponzierenlogarithmustyp","vervielfachezeile"] {
-        out.extend(generated_pairs_for_command(cmd));
-    }
-    out.push(("Modallogik".to_string(), "Modallogik".to_string()));
-    stable_dedup_pairs(out)
-}
-
-pub fn multiplication_seed_pairs() -> Vec<(String, String)> {
-    let mut out = multiplication_pairs_for_command("primvielfache");
-    out.extend(multiplication_pairs_for_command("multiplikationen"));
-    stable_dedup_pairs(out)
-}
-
-pub fn combination_seed_pairs() -> Vec<(String, String)> {
-    let galaxie = ["tiere","berufe","kreativität","liebe","männer","persönlichkeit","religion","motive","emotionen","personen","wirtschaftssysteme","eigentum"];
-    let universum = ["tiere","berufe","transzendentalien","primzahlkreuz","persönlichkeit","religion","motive","ontologie","personen","mechanismen","gegentranszendentalien","maschinen","geist","bewusstsein"];
-    let mut out=Vec::new();
-    out.extend(galaxie.iter().map(|u| ("KombinationGalaxie".to_string(), (*u).to_string())));
-    out.extend(universum.iter().map(|u| ("KombinationUniversum".to_string(), (*u).to_string())));
-    stable_dedup_pairs(out)
-}
-
-pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str> {
+pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<crate::domain::categories::GeneratedInference> {
     let ober_n = normalize_key(ober);
-    match ober_n.as_str() {
-        "kombinationgalaxie" => match idx {1=>Some("tiere"),2=>Some("berufe"),3=>Some("kreativität"),4=>Some("liebe"),7=>Some("männer"),8=>Some("persönlichkeit"),9=>Some("religion"),10=>Some("motive"),12=>Some("emotionen"),13=>Some("personen"),16=>Some("wirtschaftssysteme"),17=>Some("eigentum"), _=>None},
-        "kombinationuniversum" => match idx {1=>Some("tiere"),2=>Some("berufe"),5=>Some("transzendentalien"),6=>Some("primzahlkreuz"),8=>Some("persönlichkeit"),9=>Some("religion"),10=>Some("motive"),11=>Some("ontologie"),13=>Some("personen"),14=>Some("mechanismen"),15=>Some("gegentranszendentalien"),17=>Some("maschinen"),18=>Some("geist"),19=>Some("bewusstsein"), _=>None},
-        _ => None,
-    }
-}
+    let unter_n = normalize_key(unter);
+    let ober_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == ober_n);
+    let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
 
-fn stable_dedup_pairs(pairs: Vec<(String, String)>) -> Vec<(String, String)> {
-    use std::collections::BTreeSet;
-    let mut seen=BTreeSet::new();
-    let mut out=Vec::new();
-    for p in pairs { if seen.insert(p.clone()) { out.push(p); } }
-    out
+    let mut generated_befehle = Vec::<String>::new();
+
+    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]) {
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
+    }
+
+    if ober_has(&["menschliches", "grundstrukturen"])
+        && sub_has(&["liebe", "ethik"]) {
+        generated_befehle.push("lovepolygon".to_string());
+    }
+
+    if ober_has(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"]) {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+    }
+
+    if ober_has(&["universum", "multiversum", "grundstrukturen"])
+        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
+        generated_befehle.push("primcreativitytype".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"]) {
+        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+    }
+
+    if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
+        || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])) {
+        generated_befehle.push("vervielfachezeile".to_string());
+    }
+
+    generated_befehle.sort();
+    generated_befehle.dedup();
+
+    if generated_befehle.is_empty() {
+        None
+    } else {
+        Some(crate::domain::categories::GeneratedInference {
+            generated_befehle,
+            required_columns: Vec::new(),
+            direct_columns: Vec::new(),
+        })
+    }
 }

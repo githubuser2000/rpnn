@@ -7,7 +7,6 @@ use crate::domain::python_source_of_truth::{exact_columns_for_pair, is_strict_ge
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
-use crate::domain::ids::domain_id::GeneratorArt;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
@@ -167,16 +166,6 @@ fn to_boxed_request_pipeline_error(
 }
 
 
-
-fn canonical_generator_command(art: GeneratorArt) -> &'static str {
-    match art {
-        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
-        GeneratorArt::Multiplikationen => "multiplikationen",
-        GeneratorArt::Primvielfache => "primvielfache",
-        GeneratorArt::MetaKonkret => "metakonkret",
-    }
-}
-
 fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget) {
     match target {
         ColumnTarget::DirectColumn(col) => sel.direct_columns.push(col),
@@ -184,7 +173,7 @@ fn apply_canonical_spec(sel: &mut LegacyResolvedSelection, target: ColumnTarget)
         ColumnTarget::Pair(a, b) => sel.exact_modal_pairs.push((usize::from(a), usize::from(b))),
         ColumnTarget::Generator(generator_spec) => {
             sel.generated_befehle
-                .insert(canonical_generator_command(generator_spec.art).to_string());
+                .insert(generator_spec.art.to_string().to_lowercase());
         }
         ColumnTarget::Combination(_) => {}
     }
