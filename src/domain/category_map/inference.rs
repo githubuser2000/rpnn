@@ -1,5 +1,5 @@
-use crate::domain::python_source_of_truth::source_generated_inference_for_pair;
 use crate::domain::categories::GeneratedInference;
+use crate::domain::python_source_of_truth::source_generated_inference_for_pair;
 
 pub fn infer_generated_pair_from_direct_columns<F>(
     ober: &str,

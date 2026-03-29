@@ -1,4 +1,4 @@
-use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
+use crate::domain::python_source_of_truth;
 use crate::domain::ids::domain_id::{GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage::{
     CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
@@ -46,36 +46,30 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
         });
     }
 
-    let (ober, cli_unter) = req.to_cli_pair()?;
-    let mut cols: Vec<u16> = exact_columns_for_pair(&ober, &cli_unter)
-        .into_iter()
-        .map(|n| (n as u16) + 1)
-        .collect();
-    if cols.is_empty() {
-        cols = fuzzy_columns_for_pair(&ober, &cli_unter)
-            .into_iter()
-            .map(|n| (n as u16) + 1)
-            .collect();
+    if let Some((ober, unter_name)) = req.to_cli_pair() {
+        let mut cols = python_source_of_truth::exact_columns_for_pair(&ober, &unter_name);
+        if cols.is_empty() {
+            cols = python_source_of_truth::fuzzy_columns_for_pair(&ober, &unter_name);
+        }
+        cols.sort_unstable();
+        cols.dedup();
+
+        let header_display = unter_name.clone();
+        let target = match cols.len() {
+            0 => return None,
+            1 => ColumnTarget::DirectColumn(cols[0] as u16),
+            _ => ColumnTarget::DirectColumns(cols.into_iter().map(|n| n as u16).collect()),
+        };
+
+        return Some(CanonicalColumnSpec {
+            request: req,
+            target,
+            header_display,
+            aliases_for_report: vec![],
+        });
     }
-    cols.sort_unstable();
-    cols.dedup();
 
-    if cols.is_empty() {
-        return None;
-    }
-
-    let target = if cols.len() == 1 {
-        ColumnTarget::DirectColumn(cols[0])
-    } else {
-        ColumnTarget::DirectColumns(cols.clone())
-    };
-
-    Some(CanonicalColumnSpec {
-        request: req,
-        target,
-        header_display: cli_unter,
-        aliases_for_report: vec![],
-    })
+    None
 }
 
 fn resolve_eigenschaft(req: SpaltenAnfrage, spec: EigenschaftRequest) -> Option<CanonicalColumnSpec> {

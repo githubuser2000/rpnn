@@ -372,8 +372,8 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let source = source_generated_inference_for_pair(ober, unter);
-        let mut required_columns: Vec<u32> = source.required_columns.into_iter().map(|n| n + 1).collect();
         let mut generated_befehle = source.generated_befehle;
+        let mut required_columns = source.required_columns;
 
         generated_befehle.sort();
         generated_befehle.dedup();

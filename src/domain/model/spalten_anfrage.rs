@@ -191,7 +191,7 @@ impl StandardUnterId {
             Self::SymboleReligion => "Religion".to_string(),
             Self::Eigenschaft(req) => req.key.canonical_name().to_string(),
             Self::Primzahlkreuz => "Primzahlkreuz".to_string(),
-            Self::PythonSubcategory(value) => value.clone(),
+            Self::PythonSubcategory(name) => name.clone(),
         }
     }
 }

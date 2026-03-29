@@ -11,13 +11,6 @@ pub struct PyDecl {
     pub columns: &'static [u32],
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SourceGeneratedInference {
-    pub generated_befehle: Vec<String>,
-    pub required_columns: Vec<u32>,
-}
-
-
 fn normalize_key(s: &str) -> String {
     s.to_lowercase().replace("_", "").replace("-", "").replace(" ", "")
 }
@@ -2555,100 +2548,20 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
-fn exact_matching_decls(ober: &str, unter: &str) -> Vec<&'static PyDecl> {
+pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
-    PY_DECLS
-        .iter()
-        .filter(|decl| {
-            let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-            let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
-            main_match && sub_match
-        })
-        .collect()
-}
-
-fn contains_normalized_alias(aliases: &[&str], needles: &[&str]) -> bool {
-    aliases.iter().any(|alias| {
-        let normalized = normalize_key(alias);
-        needles.iter().any(|needle| normalized == normalize_key(needle))
-    })
-}
-
-pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let mut out = Vec::new();
-    for decl in exact_matching_decls(ober, unter) {
-        out.extend_from_slice(decl.columns);
+    for decl in PY_DECLS {
+        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
+        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
+        if main_match && sub_match {
+            out.extend_from_slice(decl.columns);
+        }
     }
     out.sort_unstable();
     out.dedup();
     out
-}
-
-pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> SourceGeneratedInference {
-    let ober_n = normalize_key(ober);
-    let decls = exact_matching_decls(ober, unter);
-    let cols = exact_columns_for_pair(ober, unter);
-
-    let has_col = |n: u32| cols.contains(&n);
-    let sub_has = |needles: &[&str]| decls.iter().any(|decl| contains_normalized_alias(decl.sub_aliases, needles));
-
-    let mut generated_befehle = Vec::<String>::new();
-    let mut required_columns = Vec::<u32>::new();
-
-    if (ober_n == "procontra" || ober_n == "bedeutung" || ober_n == "universum" || ober_n == "grundstrukturen")
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
-    {
-        generated_befehle.push("primzahlkreuzprocontra".to_string());
-    }
-
-    if has_col(9) && (ober_n == "menschliches" || ober_n == "grundstrukturen") && sub_has(&["liebe", "ethik"]) {
-        generated_befehle.push("lovepolygon".to_string());
-        required_columns.push(9);
-    }
-
-    if has_col(132)
-        && (ober_n == "planet" || ober_n == "menschliches" || ober_n == "grundstrukturen")
-        && sub_has(&["gleichheitfreiheit", "gleichheit", "freiheit", "dominieren", "ungleichheit", "ordnung", "ordnen", "filterung"])
-    {
-        generated_befehle.push("gleichheitfreiheit".to_string());
-        required_columns.push(132);
-    }
-
-    if has_col(242)
-        && (ober_n == "universum" || ober_n == "multiversum" || ober_n == "grundstrukturen")
-        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"])
-    {
-        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
-        required_columns.push(242);
-    }
-
-    if has_col(64)
-        && (ober_n == "bedeutung" || ober_n == "wichtigsteszumverstehen" || ober_n == "wichtigsteverstehen")
-        && sub_has(&["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"])
-    {
-        generated_befehle.push("primcreativitytype".to_string());
-        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
-        required_columns.push(64);
-    }
-
-    if (has_col(19) || has_col(90))
-        && ((ober_n == "bedeutung" || ober_n == "wichtigsteszumverstehen" || ober_n == "wichtigsteverstehen")
-            && sub_has(&["primzahlen", "vielfache", "vielfacher", "multis", "multiplikationen"])
-            || ((ober_n == "galaxie" || ober_n == "alteschriften" || ober_n == "kreis" || ober_n == "galaxien" || ober_n == "kreise")
-                && sub_has(&["offenbarung", "offenbarungjohannes", "offenbarungdesjohannes", "johannes", "bibel"])))
-    {
-        generated_befehle.push("vervielfachezeile".to_string());
-        if has_col(19) { required_columns.push(19); }
-        if has_col(90) { required_columns.push(90); }
-    }
-
-    generated_befehle.sort();
-    generated_befehle.dedup();
-    required_columns.sort_unstable();
-    required_columns.dedup();
-
-    SourceGeneratedInference { generated_befehle, required_columns }
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
@@ -2701,4 +2614,82 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
         }
     }
     out
+}
+
+
+#[derive(Debug, Clone, Default)]
+pub struct SourceGeneratedInference {
+    pub generated_befehle: Vec<String>,
+    pub required_columns: Vec<u32>,
+}
+
+pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> SourceGeneratedInference {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+
+    let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
+    let ober_is = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == ober_n);
+
+    let mut generated_befehle = Vec::<String>::new();
+    let mut required_columns = Vec::<u32>::new();
+
+    if (ober_is(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]))
+        || (ober_is(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"]))
+    {
+        generated_befehle.push("vervielfachezeile".to_string());
+        required_columns.extend([19u32, 90u32]);
+    }
+
+    if ober_is(&["menschliches", "grundstrukturen"])
+        && sub_has(&["liebe", "ethik"])
+    {
+        generated_befehle.push("lovepolygon".to_string());
+        required_columns.push(9);
+    }
+
+    if ober_is(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&[
+            "gleichheit", "freiheit", "ordnung", "ordnen",
+            "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"
+        ])
+    {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+        required_columns.push(132);
+    }
+
+    if ober_is(&["universum", "multiversum", "grundstrukturen"])
+        && sub_has(&[
+            "geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl",
+            "gefühle", "energie", "materie", "topologie"
+        ])
+    {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+        required_columns.push(242);
+    }
+
+    if ober_is(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&[
+            "gestirn", "mond", "sonne", "planet", "evolution", "intelligenz",
+            "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"
+        ])
+    {
+        generated_befehle.push("primcreativitytype".to_string());
+        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+        required_columns.push(64);
+    }
+
+    if ober_is(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
+    {
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
+    }
+
+    generated_befehle.sort();
+    generated_befehle.dedup();
+    required_columns.sort_unstable();
+    required_columns.dedup();
+
+    SourceGeneratedInference { generated_befehle, required_columns }
 }
