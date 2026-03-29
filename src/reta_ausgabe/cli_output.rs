@@ -6,7 +6,6 @@ use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
 
-use crate::domain::python_source_of_truth;
 use crate::reta_ausgabe::output_syntax::OutputSyntax;
 use crate::reta_ausgabe::table_cell::{TableCell, TableRow};
 use crate::reta_ausgabe::tables::Tables;

@@ -7,4 +7,3 @@ pub mod utils;
 
 pub use bereich::TextBereich;
 pub use parser::parse_cli_args;
-pub use parser_types::{SpaltenNamen, SpaltenNamenListe};
