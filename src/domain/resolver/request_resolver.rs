@@ -64,8 +64,10 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
                     aliases_for_report: vec![],
                 });
             }
-            let mut exact: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, &sub)
-                .into_iter().map(|n| (n as u16) + 1).collect();
+            let mut exact: Vec<u16> = python_source_of_truth::exact_all_direct_columns_for_pair(&ober, &sub)
+                .into_iter()
+                .map(|n| (n as u16) + 1)
+                .collect();
             exact.sort();
             exact.dedup();
             let target = match exact.len() {

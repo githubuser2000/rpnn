@@ -4,6 +4,45 @@ use crate::domain::typed_exact_decl::{
 };
 // Auto-generated from reta.todel Python sources and runtime metadata
 
+fn normalize_cli_token(s: &str) -> String {
+    s.to_lowercase()
+        .replace("_", "")
+        .replace("-", "")
+        .replace(" ", "")
+}
+
+
+pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let mut cols = exact_columns_for_pair(ober, unter);
+    cols.extend(exact_supplemental_columns_for_pair(ober, unter));
+    cols.sort();
+    cols.dedup();
+    cols
+}
+
+pub fn exact_supplemental_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let ober_n = normalize_cli_token(ober);
+    let unter_n = normalize_cli_token(unter);
+
+    let mut cols: Vec<u32> = Vec::new();
+
+    // Diese Funktion soll NUR den ergänzenden Raum abbilden,
+    // also Paare, die nicht aus PY_DECLS/reta kommen,
+    // sondern aus merged_filtered.csv bzw. dem Vor-Refactoring-Verhalten.
+
+    // Anfangs leer oder mit den bereits bekannten Spezialpaaren befüllen.
+    // WICHTIG: exact only, niemals fuzzy.
+    // Beispielgerüst:
+    //
+    // if ober_n == "universum" && unter_n == "irgendwas" {
+    //     cols.extend([123, 456]);
+    // }
+
+    cols.sort();
+    cols.dedup();
+    cols
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct PyDecl {
     pub main_aliases: &'static [&'static str],
