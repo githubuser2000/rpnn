@@ -2548,6 +2548,12 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceGeneratedInference {
+    pub generated_befehle: Vec<String>,
+    pub required_columns: Vec<u32>,
+}
+
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
@@ -2617,79 +2623,65 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 }
 
 
-#[derive(Debug, Clone, Default)]
-pub struct SourceGeneratedInference {
-    pub generated_befehle: Vec<String>,
-    pub required_columns: Vec<u32>,
-}
-
-pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> SourceGeneratedInference {
+pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<SourceGeneratedInference> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
 
-    let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
-    let ober_is = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == ober_n);
+    let sub_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == unter_n);
+    let ober_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == ober_n);
 
     let mut generated_befehle = Vec::<String>::new();
     let mut required_columns = Vec::<u32>::new();
 
-    if (ober_is(&["procontra", "bedeutung", "universum", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]))
-        || (ober_is(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
-            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"]))
+    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
     {
-        generated_befehle.push("vervielfachezeile".to_string());
-        required_columns.extend([19u32, 90u32]);
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
     }
 
-    if ober_is(&["menschliches", "grundstrukturen"])
-        && sub_has(&["liebe", "ethik"])
-    {
+    if ober_has(&["menschliches", "grundstrukturen"]) && sub_has(&["liebe", "ethik"]) {
         generated_befehle.push("lovepolygon".to_string());
         required_columns.push(9);
     }
 
-    if ober_is(&["planet", "menschliches", "grundstrukturen"])
-        && sub_has(&[
-            "gleichheit", "freiheit", "ordnung", "ordnen",
-            "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"
-        ])
+    if ober_has(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"])
     {
         generated_befehle.push("gleichheitfreiheit".to_string());
         required_columns.push(132);
     }
 
-    if ober_is(&["universum", "multiversum", "grundstrukturen"])
-        && sub_has(&[
-            "geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl",
-            "gefühle", "energie", "materie", "topologie"
-        ])
+    if ober_has(&["universum", "multiversum", "grundstrukturen", "menschliches"])
+        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"])
     {
         generated_befehle.push("geistemotionenergiematerietopologie".to_string());
         required_columns.push(242);
     }
 
-    if ober_is(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&[
-            "gestirn", "mond", "sonne", "planet", "evolution", "intelligenz",
-            "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"
-        ])
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"])
     {
         generated_befehle.push("primcreativitytype".to_string());
         generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
         required_columns.push(64);
     }
 
-    if ober_is(&["procontra", "bedeutung", "universum", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen", "offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])
     {
-        generated_befehle.push("primzahlkreuzprocontra".to_string());
+        generated_befehle.push("vervielfachezeile".to_string());
+        required_columns.push(19);
+        required_columns.push(90);
     }
 
     generated_befehle.sort();
     generated_befehle.dedup();
-    required_columns.sort_unstable();
+    required_columns.sort();
     required_columns.dedup();
 
-    SourceGeneratedInference { generated_befehle, required_columns }
+    if generated_befehle.is_empty() {
+        None
+    } else {
+        Some(SourceGeneratedInference { generated_befehle, required_columns })
+    }
 }

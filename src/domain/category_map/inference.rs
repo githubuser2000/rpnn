@@ -14,8 +14,14 @@ where
     direct_columns.dedup();
 
     let source = source_generated_inference_for_pair(ober, unter);
-    let mut generated_befehle = source.generated_befehle;
-    let mut required_columns = source.required_columns;
+    let mut generated_befehle = source
+        .as_ref()
+        .map(|it| it.generated_befehle.clone())
+        .unwrap_or_default();
+    let mut required_columns = source
+        .as_ref()
+        .map(|it| it.required_columns.clone())
+        .unwrap_or_default();
 
     generated_befehle.sort();
     generated_befehle.dedup();
