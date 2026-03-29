@@ -15,6 +15,7 @@ use crate::domain::model::spalten_anfrage::{
     StandardUnterId as CanonicalStandardUnterId,
 };
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
+use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 
@@ -279,6 +280,21 @@ impl KategorieMap {
             .unwrap_or_default()
     }
 
+    fn canonical_request_for_cli_pair(&self, ober: &str, unter: &str) -> Option<CanonicalSpaltenAnfrage> {
+        bridge_cli_selection(ober, unter)
+    }
+
+    fn finde_spaltennummern_ueber_canonical_request(&self, ober: &str, unter: &str) -> Vec<u32> {
+        self.canonical_request_for_cli_pair(ober, unter)
+            .map(|req| self.finde_spaltennummern_fuer_canonical_request(&req))
+            .unwrap_or_default()
+    }
+
+    fn infer_generated_ueber_canonical_request(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
+        self.canonical_request_for_cli_pair(ober, unter)
+            .and_then(|req| self.infer_generated_canonical_request(&req))
+    }
+
     pub fn infer_generated_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Option<GeneratedInference> {
         resolve_request(request.clone()).map(|spec| match spec.target {
             ColumnTarget::Generator(generator) => GeneratedInference {
@@ -309,11 +325,21 @@ impl KategorieMap {
     }
 
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
-        let mut direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
+        let mut direct_columns = self.finde_spaltennummern_ueber_canonical_request(ober, unter);
+        if direct_columns.is_empty() {
+            direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
+        }
         direct_columns.sort();
         direct_columns.dedup();
 
-        let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
+        let mut source = self
+            .infer_generated_ueber_canonical_request(ober, unter)
+            .unwrap_or_default();
+
+        let legacy_source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
+        source.generated_befehle.extend(legacy_source.generated_befehle);
+        source.required_columns.extend(legacy_source.required_columns);
+        source.direct_columns.extend(legacy_source.direct_columns);
 
         if let Some(exact) = resolve_exact_generator(ober, unter) {
             source.generated_befehle.extend(exact.generated_befehle.into_iter());
@@ -340,10 +366,16 @@ impl KategorieMap {
     }
 
     pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-        python_source_of_truth::exact_all_direct_columns_for_pair(ober, unter)
-            .into_iter()
-            .map(|n| n + 1)
-            .collect()
+        let mut exact = self.finde_spaltennummern_ueber_canonical_request(ober, unter);
+        if exact.is_empty() {
+            exact = python_source_of_truth::exact_all_direct_columns_for_pair(ober, unter)
+                .into_iter()
+                .map(|n| n + 1)
+                .collect();
+        }
+        exact.sort_unstable();
+        exact.dedup();
+        exact
     }
 
     pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
@@ -384,6 +416,7 @@ impl KategorieMap {
         Self::merge_meta_konkret_aliases(&mut main_to_sub);
         Self::merge_fraction_number_aliases(&mut main_to_sub);
         Self::merge_html_meta_aliases(&mut main_to_sub);
+        Self::merge_canonical_request_aliases(&mut main_to_sub);
         Self::realign_primary_pairs_to_source_of_truth(&mut main_to_sub);
 
         self.hauptkategorien = Self::convert_main_to_hauptkategorien(main_to_sub);
@@ -482,6 +515,22 @@ impl KategorieMap {
         }
     }
 
+    fn merge_canonical_request_aliases(
+        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
+    ) {
+        for request in Self::typed_eigenschaften_requests_fuer_alles() {
+            let Some((main, sub)) = request.to_cli_pair() else {
+                continue;
+            };
+            let ids: Vec<u32> = resolve_request(request)
+                .map(|spec| canonical_target_to_columns(&spec.target))
+                .unwrap_or_default();
+            if ids.is_empty() {
+                continue;
+            }
+            Self::set_entry_exact(main_to_sub, &main, &sub, ids);
+        }
+    }
 
     fn realign_primary_pairs_to_source_of_truth(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
