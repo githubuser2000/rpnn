@@ -1,5 +1,5 @@
 use crate::domain::ids::domain_id::{DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt};
-use crate::domain::python_source_of_truth;
+use crate::domain::python_source_of_truth::{self, is_strict_generated_pair};
 use crate::domain::model::spalten_anfrage::{
     CanonicalColumnSpec, ColumnTarget, CombinationSpec, EigenschaftRequest, GeneratorParameter, GeneratorSpec,
     KombiUnterId, SpaltenAnfrage, StandardUnterId,
@@ -53,12 +53,19 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
                 DomainId::MetaKonkret => "MetaKonkret",
                 DomainId::GebrochenRational(_) | DomainId::Kombination(_) | DomainId::Generator(_) | DomainId::SonstigePythonDecl => return None,
             };
+            if is_strict_generated_pair(ober, &sub) {
+                return Some(CanonicalColumnSpec {
+                    request: req,
+                    target: ColumnTarget::Generator(GeneratorSpec {
+                        art: GeneratorArt::Primzahlkreuz,
+                        parameter: GeneratorParameter::Keine,
+                    }),
+                    header_display: sub,
+                    aliases_for_report: vec![],
+                });
+            }
             let mut exact: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, &sub)
                 .into_iter().map(|n| (n as u16) + 1).collect();
-            if exact.is_empty() {
-                exact = python_source_of_truth::fuzzy_columns_for_pair(ober, &sub)
-                    .into_iter().map(|n| (n as u16) + 1).collect();
-            }
             exact.sort();
             exact.dedup();
             let target = match exact.len() {
@@ -83,13 +90,46 @@ fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<Canon
         StandardUnterId::SymboleReligion => {
             (ColumnTarget::DirectColumn(700), "Symbole Religion".to_string())
         }
-        StandardUnterId::Primzahlkreuz => (
-            ColumnTarget::Generator(GeneratorSpec {
-                art: GeneratorArt::Primzahlkreuz,
-                parameter: GeneratorParameter::Keine,
-            }),
-            "Primzahlkreuz".to_string(),
-        ),
+        StandardUnterId::Primzahlkreuz => {
+            let ober = match domain {
+                DomainId::Menschliches => "Menschliches",
+                DomainId::Religion => "Religion",
+                DomainId::Galaxie => "Galaxie",
+                DomainId::Universum => "Universum",
+                DomainId::Grundstrukturen => "Grundstrukturen",
+                DomainId::Kontinuum => "Kontinuum",
+                DomainId::Multiversum => "Multiversum",
+                DomainId::Planet10Oder12 => "Planet",
+                DomainId::Eigenschaften => "Eigenschaften",
+                DomainId::EigenschaftenN => "Eigenschaften_n",
+                DomainId::Eigenschaften1ProN => "Eigenschaften_1/n",
+                DomainId::MetaKonkret => "MetaKonkret",
+                DomainId::GebrochenRational(_) | DomainId::Kombination(_) | DomainId::Generator(_) | DomainId::SonstigePythonDecl => return None,
+            };
+            if is_strict_generated_pair(ober, "Primzahlkreuz") {
+                (
+                    ColumnTarget::Generator(GeneratorSpec {
+                        art: GeneratorArt::Primzahlkreuz,
+                        parameter: GeneratorParameter::Keine,
+                    }),
+                    "Primzahlkreuz".to_string(),
+                )
+            } else {
+                let mut exact: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, "Primzahlkreuz")
+                    .into_iter().map(|n| (n as u16) + 1).collect();
+                exact.sort();
+                exact.dedup();
+                let target = match exact.len() {
+                    0 => ColumnTarget::Generator(GeneratorSpec {
+                        art: GeneratorArt::Primzahlkreuz,
+                        parameter: GeneratorParameter::Keine,
+                    }),
+                    1 => ColumnTarget::DirectColumn(exact[0]),
+                    _ => ColumnTarget::DirectColumns(exact),
+                };
+                (target, "Primzahlkreuz".to_string())
+            }
+        },
     };
 
     Some(CanonicalColumnSpec {

@@ -14,7 +14,7 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -312,9 +312,11 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-        source.direct_columns.extend(direct_columns.iter().copied());
-        source.direct_columns.sort();
-        source.direct_columns.dedup();
+        if !is_strict_generated_pair(ober, unter) {
+            source.direct_columns.extend(direct_columns.iter().copied());
+            source.direct_columns.sort();
+            source.direct_columns.dedup();
+        }
 
         if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
@@ -331,15 +333,10 @@ impl KategorieMap {
     }
 
     pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
-        let exakt = self.finde_spaltennummern_exakt(ober, unter);
-        if !exakt.is_empty() {
-            return exakt;
+        if is_strict_generated_pair(ober, unter) {
+            return Vec::new();
         }
-
-        python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
-            .into_iter()
-            .map(|n| n + 1)
-            .collect()
+        self.finde_spaltennummern_exakt(ober, unter)
     }
 
     fn lade_kategorien(&mut self) {

@@ -197,8 +197,6 @@ pub fn parse_cli_args(
                                     .is_empty()
                                 || !crate::domain::python_source_of_truth::exact_columns_for_pair(&oberkategorie, &unterkategorie)
                                     .is_empty()
-                                || !crate::domain::python_source_of_truth::fuzzy_columns_for_pair(&oberkategorie, &unterkategorie)
-                                    .is_empty()
                                 || kategorie_map
                                     .infer_generated_pair(&oberkategorie, &unterkategorie)
                                     .is_some();

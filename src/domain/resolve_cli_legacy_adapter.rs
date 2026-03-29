@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
-use crate::domain::python_source_of_truth::{exact_columns_for_pair, fuzzy_columns_for_pair};
+use crate::domain::python_source_of_truth::{exact_columns_for_pair, is_strict_generated_pair};
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
@@ -43,14 +43,14 @@ pub fn resolve_cli_selection(
         return Ok(out);
     }
 
-    if let Some(non_legacy) = resolve_via_non_legacy_exact_and_fuzzy(kategorie_map, ober, unter)? {
+    if let Some(non_legacy) = resolve_via_non_legacy_exact(kategorie_map, ober, unter)? {
         return Ok(non_legacy);
     }
 
     resolve_via_legacy_pipeline(kategorie_map, ober, unter)
 }
 
-fn resolve_via_non_legacy_exact_and_fuzzy(
+fn resolve_via_non_legacy_exact(
     kategorie_map: &KategorieMap,
     ober: &str,
     unter: &str,
@@ -67,16 +67,9 @@ fn resolve_via_non_legacy_exact_and_fuzzy(
             .collect::<Result<Vec<u16>, _>>()?,
     );
 
-    direct_columns.extend(
-        exact_columns_for_pair(ober, unter)
-            .into_iter()
-            .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-            .collect::<Result<Vec<u16>, _>>()?,
-    );
-
-    if direct_columns.is_empty() {
+    if !is_strict_generated_pair(ober, unter) {
         direct_columns.extend(
-            fuzzy_columns_for_pair(ober, unter)
+            exact_columns_for_pair(ober, unter)
                 .into_iter()
                 .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
                 .collect::<Result<Vec<u16>, _>>()?,

@@ -2806,6 +2806,15 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
 }
 
 
+
+
+pub fn is_strict_generated_pair(ober: &str, unter: &str) -> bool {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+
+    matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra" | "nachvollziehen")
+        && matches!(ober_n.as_str(), "universum" | "bedeutung" | "procontra" | "grundstrukturen")
+}
 pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<crate::domain::categories::GeneratedInference> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);

@@ -1,5 +1,5 @@
 use crate::domain::categories::GeneratedInference;
-use crate::domain::python_source_of_truth::source_generated_inference_for_pair;
+use crate::domain::python_source_of_truth::{is_strict_generated_pair, source_generated_inference_for_pair};
 
 pub fn infer_generated_pair_from_direct_columns<F>(
     ober: &str,
@@ -14,9 +14,11 @@ where
     direct_columns.dedup();
 
     let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-    source.direct_columns.extend(direct_columns.iter().copied());
-    source.direct_columns.sort();
-    source.direct_columns.dedup();
+    if !is_strict_generated_pair(ober, unter) {
+        source.direct_columns.extend(direct_columns.iter().copied());
+        source.direct_columns.sort();
+        source.direct_columns.dedup();
+    }
 
     if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
         None
