@@ -2775,15 +2775,15 @@ pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
-    let mut out = Vec::new();
+    let mut found: Option<Vec<u32>> = None;
     for decl in PY_DECLS {
         let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
         let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
         if main_match && sub_match {
-            out.extend_from_slice(decl.columns);
+            found = Some(decl.columns.to_vec());
         }
     }
-    stable_dedup_columns(out)
+    stable_dedup_columns(found.unwrap_or_default())
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {

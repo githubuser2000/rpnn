@@ -313,11 +313,52 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
+
         if !is_strict_generated_pair(ober, unter) {
             source.direct_columns.extend(direct_columns.iter().copied());
             source.direct_columns.sort();
             source.direct_columns.dedup();
         }
+
+        let has = |n: u32| source.direct_columns.contains(&n);
+
+        if has(9) {
+            source.generated_befehle.push("lovepolygon".to_string());
+            source.required_columns.push(9);
+        }
+
+        if has(132) {
+            source.generated_befehle.push("gleichheitfreiheit".to_string());
+            source.required_columns.push(132);
+        }
+
+        if has(242) {
+            source.generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+            source.required_columns.push(242);
+        }
+
+        if has(64) {
+            source.generated_befehle.push("primcreativitytype".to_string());
+            source.generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+            source.required_columns.push(64);
+        }
+
+        if has(19) || has(90) {
+            source.generated_befehle.push("vervielfachezeile".to_string());
+            if has(19) {
+                source.required_columns.push(19);
+            }
+            if has(90) {
+                source.required_columns.push(90);
+            }
+        }
+
+        source.generated_befehle.sort();
+        source.generated_befehle.dedup();
+        source.required_columns.sort();
+        source.required_columns.dedup();
+        source.direct_columns.sort();
+        source.direct_columns.dedup();
 
         if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
