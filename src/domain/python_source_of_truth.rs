@@ -2,6 +2,7 @@ use crate::domain::decl_model::HtmlDeclMeta;
 use crate::domain::typed_exact_decl::{
     all_typed_exact_decls, is_typed_exact_decl_column, typed_exact_decl_for_column,
 };
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 // Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
@@ -2569,15 +2570,13 @@ fn stable_dedup_columns(cols: Vec<u32>) -> Vec<u32> {
 }
 
 pub fn exact_supplemental_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let _ober_n = normalize_cli_token(ober);
-    let _unter_n = normalize_cli_token(unter);
+    let _ = canonical_exact_cli_pair(ober, unter);
 
     // Vorbild 2 (`src_vorRefactoring230327`) soll hier als zweiter
     // exakter Datenraum einspeisen.
     //
-    // Absichtlich noch exact-only und ohne fuzzy.
-    let cols: Vec<u32> = Vec::new();
-    stable_dedup_columns(cols)
+    // Absichtlich weiterhin exact-only und ohne fuzzy.
+    stable_dedup_columns(Vec::new())
 }
 
 pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
@@ -2585,6 +2584,16 @@ pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     cols.extend(exact_supplemental_columns_for_pair(ober, unter));
     stable_dedup_columns(cols)
 }
+
+fn canonical_exact_cli_pair(ober: &str, unter: &str) -> Option<(String, String)> {
+    SpaltenAnfrage::parse(ober, unter).ok().map(|request| request.ober_unter_cli_pair())
+}
+
+fn decl_matches_exact_pair(decl: &PyDecl, ober: &str, unter: &str) -> bool {
+    decl.main_aliases.iter().any(|alias| *alias == ober)
+        && decl.sub_aliases.iter().any(|alias| *alias == unter)
+}
+
 pub fn generated_seed_pairs() -> Vec<(String, String)> {
     let mut out = Vec::new();
     for command in [
@@ -2773,13 +2782,13 @@ pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str
 }
 
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
+    let Some((ober_exact, unter_exact)) = canonical_exact_cli_pair(ober, unter) else {
+        return Vec::new();
+    };
+
     let mut out = Vec::new();
     for decl in PY_DECLS {
-        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
-        if main_match && sub_match {
+        if decl_matches_exact_pair(decl, &ober_exact, &unter_exact) {
             out.extend_from_slice(decl.columns);
         }
     }
@@ -2787,19 +2796,7 @@ pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-    let mut out = Vec::new();
-    for decl in PY_DECLS {
-        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a).contains(&unter_n));
-        if main_match && sub_match {
-            out.extend_from_slice(decl.columns);
-        }
-    }
-    out.sort_unstable();
-    out.dedup();
-    out
+    exact_columns_for_pair(ober, unter)
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
