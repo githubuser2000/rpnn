@@ -14,7 +14,7 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, generated_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
+use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -250,43 +250,15 @@ impl KategorieMap {
             paare.insert((ober.to_string(), unter.to_string()));
         }
 
-        for unter in [
-            "tiere",
-            "berufe",
-            "kreativität",
-            "liebe",
-            "männer",
-            "persönlichkeit",
-            "religion",
-            "motive",
-            "emotionen",
-            "personen",
-            "wirtschaftssysteme",
-            "eigentum",
-        ] {
-            push_pair(&mut paare_set, "KombinationGalaxie", unter);
-        }
-
-        for unter in [
-            "tiere",
-            "berufe",
-            "transzendentalien",
-            "primzahlkreuz",
-            "persönlichkeit",
-            "religion",
-            "motive",
-            "ontologie",
-            "personen",
-            "mechanismen",
-            "gegentranszendentalien",
-            "maschinen",
-            "geist",
-            "bewusstsein",
-        ] {
-            push_pair(&mut paare_set, "KombinationUniversum", unter);
+        for (ober, unter) in combination_seed_pairs() {
+            push_pair(&mut paare_set, &ober, &unter);
         }
 
         for (ober, unter) in generated_seed_pairs() {
+            push_pair(&mut paare_set, &ober, &unter);
+        }
+
+        for (ober, unter) in multiplication_seed_pairs() {
             push_pair(&mut paare_set, &ober, &unter);
         }
 

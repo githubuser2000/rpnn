@@ -2548,6 +2548,94 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
+
+
+pub fn generated_seed_pairs() -> Vec<(String, String)> {
+    let mut out = vec![
+        ("Universum".to_string(), "Primzahlkreuz".to_string()),
+        ("Bedeutung".to_string(), "Primzahlkreuz".to_string()),
+        ("Pro_Contra".to_string(), "Primzahlkreuz".to_string()),
+        ("Menschliches".to_string(), "Liebe".to_string()),
+        ("Grundstrukturen".to_string(), "Liebe".to_string()),
+        ("Planet".to_string(), "Gleichheit".to_string()),
+        ("Menschliches".to_string(), "Gleichheit".to_string()),
+        ("Grundstrukturen".to_string(), "Gleichheit".to_string()),
+        ("Universum".to_string(), "Geist".to_string()),
+        ("Multiversum".to_string(), "Geist".to_string()),
+        ("Grundstrukturen".to_string(), "Geist".to_string()),
+        ("Wichtigstes_zum_verstehen".to_string(), "Gestirn".to_string()),
+        ("Bedeutung".to_string(), "Gestirn".to_string()),
+        ("Wichtigstes_zum_verstehen".to_string(), "Primzahlen".to_string()),
+        ("Bedeutung".to_string(), "Primzahlen".to_string()),
+        ("Modallogik".to_string(), "Modallogik".to_string()),
+    ];
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn combination_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for unter in [
+        "tiere",
+        "berufe",
+        "kreativität",
+        "liebe",
+        "männer",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "emotionen",
+        "personen",
+        "wirtschaftssysteme",
+        "eigentum",
+    ] {
+        out.push(("KombinationGalaxie".to_string(), unter.to_string()));
+    }
+    for unter in [
+        "tiere",
+        "berufe",
+        "transzendentalien",
+        "primzahlkreuz",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "ontologie",
+        "personen",
+        "mechanismen",
+        "gegentranszendentalien",
+        "maschinen",
+        "geist",
+        "bewusstsein",
+    ] {
+        out.push(("KombinationUniversum".to_string(), unter.to_string()));
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for ober in ["primvielfache", "multiplikationen"] {
+        for unter in [
+            "motivgleichfoermig",
+            "strukturgleichfoermig",
+            "motivstern",
+            "strukturstern",
+            "motivgebrstern",
+            "strukgebrstern",
+            "motivgebrgleichf",
+            "strukgebrgleichf",
+        ] {
+            out.push((ober.to_string(), unter.to_string()));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
@@ -2616,51 +2704,6 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
     out
 }
 
-
-
-
-pub fn generated_seed_pairs() -> Vec<(String, String)> {
-    let mut pairs = vec![
-        ("Universum", "Primzahlkreuz"),
-        ("Bedeutung", "Primzahlkreuz"),
-        ("Pro_Contra", "Primzahlkreuz"),
-        ("Menschliches", "Liebe"),
-        ("Grundstrukturen", "Liebe"),
-        ("Planet", "Gleichheit"),
-        ("Menschliches", "Gleichheit"),
-        ("Grundstrukturen", "Gleichheit"),
-        ("Universum", "Geist"),
-        ("Multiversum", "Geist"),
-        ("Grundstrukturen", "Geist"),
-        ("Wichtigstes_zum_verstehen", "Gestirn"),
-        ("Bedeutung", "Gestirn"),
-        ("Wichtigstes_zum_verstehen", "Primzahlen"),
-        ("Bedeutung", "Primzahlen"),
-        ("Modallogik", "Modallogik"),
-    ]
-    .into_iter()
-    .map(|(ober, unter)| (ober.to_string(), unter.to_string()))
-    .collect::<Vec<_>>();
-
-    for ober in ["primvielfache", "multiplikationen"] {
-        for unter in [
-            "motivgleichfoermig",
-            "strukturgleichfoermig",
-            "motivstern",
-            "strukturstern",
-            "motivgebrstern",
-            "strukgebrstern",
-            "motivgebrgleichf",
-            "strukgebrgleichf",
-        ] {
-            pairs.push((ober.to_string(), unter.to_string()));
-        }
-    }
-
-    pairs.sort();
-    pairs.dedup();
-    pairs
-}
 
 pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<crate::domain::categories::GeneratedInference> {
     let ober_n = normalize_key(ober);
