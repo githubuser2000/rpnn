@@ -371,29 +371,25 @@ impl KategorieMap {
         direct_columns.sort();
         direct_columns.dedup();
 
-        let source = source_generated_inference_for_pair(ober, unter);
-        let mut generated_befehle = source
-            .as_ref()
-            .map(|it| it.generated_befehle.clone())
-            .unwrap_or_default();
-        let mut required_columns = source
-            .as_ref()
-            .map(|it| it.required_columns.clone())
-            .unwrap_or_default();
+        let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
+        if source.direct_columns.is_empty() {
+            source.direct_columns = direct_columns.clone();
+        }
+        if source.required_columns.is_empty() {
+            source.required_columns = source.direct_columns.clone();
+        }
 
-        generated_befehle.sort();
-        generated_befehle.dedup();
-        required_columns.sort();
-        required_columns.dedup();
+        source.generated_befehle.sort();
+        source.generated_befehle.dedup();
+        source.required_columns.sort();
+        source.required_columns.dedup();
+        source.direct_columns.sort();
+        source.direct_columns.dedup();
 
-        if generated_befehle.is_empty() && direct_columns.is_empty() {
+        if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
         } else {
-            Some(GeneratedInference {
-                generated_befehle,
-                required_columns,
-                direct_columns,
-            })
+            Some(source)
         }
     }
 

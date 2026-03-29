@@ -30,46 +30,58 @@ pub fn resolve_request(req: SpaltenAnfrage) -> Option<CanonicalColumnSpec> {
 }
 
 fn resolve_standard(req: SpaltenAnfrage, unter: StandardUnterId) -> Option<CanonicalColumnSpec> {
-    if let StandardUnterId::Eigenschaft(spec) = unter.clone() {
-        return resolve_eigenschaft(req, spec);
-    }
-
-    if let StandardUnterId::Primzahlkreuz = unter {
-        return Some(CanonicalColumnSpec {
-            request: req,
-            target: ColumnTarget::Generator(GeneratorSpec {
+    let (target, header_display) = match unter {
+        StandardUnterId::Eigenschaft(spec) => return resolve_eigenschaft(req, spec),
+        StandardUnterId::PythonSubcategory(sub) => {
+            let ober = match &req {
+                SpaltenAnfrage::Standard { domain, .. } => domain_cli_name(*domain)?,
+                _ => return None,
+            };
+            let mut cols: Vec<u16> = python_source_of_truth::exact_columns_for_pair(ober, &sub)
+                .into_iter()
+                .map(|n| n as u16 + 1)
+                .collect();
+            if cols.is_empty() {
+                cols = python_source_of_truth::fuzzy_columns_for_pair(ober, &sub)
+                    .into_iter()
+                    .map(|n| n as u16 + 1)
+                    .collect();
+            }
+            let target = match cols.len() {
+                0 => return None,
+                1 => ColumnTarget::DirectColumn(cols[0]),
+                _ => ColumnTarget::DirectColumns(cols),
+            };
+            (target, sub)
+        }
+        StandardUnterId::Gewalt => (ColumnTarget::DirectColumn(496), "Gewalt".to_string()),
+        StandardUnterId::Politische => (ColumnTarget::DirectColumn(497), "politische".to_string()),
+        StandardUnterId::Richtungen => (ColumnTarget::DirectColumn(498), "Richtungen".to_string()),
+        StandardUnterId::Formationen => {
+            (ColumnTarget::DirectColumn(499), "Formationen".to_string())
+        }
+        StandardUnterId::Klasse => (ColumnTarget::DirectColumn(242), "Klasse".to_string()),
+        StandardUnterId::Hoelle => (ColumnTarget::DirectColumn(496), "Hölle".to_string()),
+        StandardUnterId::Liebe => (ColumnTarget::DirectColumn(14), "Liebe".to_string()),
+        StandardUnterId::Geist => (ColumnTarget::DirectColumn(15), "Geist".to_string()),
+        StandardUnterId::SymboleReligion => {
+            (ColumnTarget::DirectColumn(700), "Symbole Religion".to_string())
+        }
+        StandardUnterId::Primzahlkreuz => (
+            ColumnTarget::Generator(GeneratorSpec {
                 art: GeneratorArt::Primzahlkreuz,
                 parameter: GeneratorParameter::Keine,
             }),
-            header_display: "Primzahlkreuz".to_string(),
-            aliases_for_report: vec![],
-        });
-    }
+            "Primzahlkreuz".to_string(),
+        ),
+    };
 
-    if let Some((ober, unter_name)) = req.to_cli_pair() {
-        let mut cols = python_source_of_truth::exact_columns_for_pair(&ober, &unter_name);
-        if cols.is_empty() {
-            cols = python_source_of_truth::fuzzy_columns_for_pair(&ober, &unter_name);
-        }
-        cols.sort_unstable();
-        cols.dedup();
-
-        let header_display = unter_name.clone();
-        let target = match cols.len() {
-            0 => return None,
-            1 => ColumnTarget::DirectColumn(cols[0] as u16),
-            _ => ColumnTarget::DirectColumns(cols.into_iter().map(|n| n as u16).collect()),
-        };
-
-        return Some(CanonicalColumnSpec {
-            request: req,
-            target,
-            header_display,
-            aliases_for_report: vec![],
-        });
-    }
-
-    None
+    Some(CanonicalColumnSpec {
+        request: req,
+        target,
+        header_display,
+        aliases_for_report: vec![],
+    })
 }
 
 fn resolve_eigenschaft(req: SpaltenAnfrage, spec: EigenschaftRequest) -> Option<CanonicalColumnSpec> {
@@ -146,4 +158,20 @@ fn resolve_generator(
         header_display,
         aliases_for_report: vec![],
     })
+}
+
+fn domain_cli_name(domain: crate::domain::ids::domain_id::DomainId) -> Option<&'static str> {
+    use crate::domain::ids::domain_id::DomainId;
+    match domain {
+        DomainId::Menschliches => Some("Menschliches"),
+        DomainId::Religion => Some("Religion"),
+        DomainId::Galaxie => Some("Galaxie"),
+        DomainId::Universum => Some("Universum"),
+        DomainId::Grundstrukturen => Some("Grundstrukturen"),
+        DomainId::Kontinuum => Some("Kontinuum"),
+        DomainId::Multiversum => Some("Multiversum"),
+        DomainId::Planet10Oder12 => Some("Planet"),
+        DomainId::MetaKonkret => Some("MetaKonkret"),
+        _ => None,
+    }
 }

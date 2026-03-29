@@ -2548,12 +2548,6 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SourceGeneratedInference {
-    pub generated_befehle: Vec<String>,
-    pub required_columns: Vec<u32>,
-}
-
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
@@ -2584,6 +2578,80 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     out.sort_unstable();
     out.dedup();
     out
+}
+
+pub fn source_generated_inference_for_pair(
+    ober: &str,
+    unter: &str,
+) -> Option<crate::domain::categories::GeneratedInference> {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+    let ober_has = |vals: &[&str]| vals.iter().any(|v| *v == ober_n);
+    let sub_has = |vals: &[&str]| vals.iter().any(|v| *v == unter_n);
+
+    let direct_columns = exact_columns_for_pair(ober, unter);
+    let mut generated_befehle = Vec::<String>::new();
+    let mut required_columns = Vec::<u32>::new();
+
+    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
+    {
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
+    }
+
+    if ober_has(&["menschliches", "grundstrukturen"])
+        && sub_has(&["liebe", "ethik"])
+    {
+        generated_befehle.push("lovepolygon".to_string());
+        required_columns.extend(exact_columns_for_pair(ober, "Liebe"));
+    }
+
+    if ober_has(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"])
+    {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+    }
+
+    if ober_has(&["universum", "multiversum", "grundstrukturen"])
+        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"])
+    {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"])
+    {
+        generated_befehle.push("primcreativitytype".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["mond"])
+    {
+        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+    }
+
+    if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
+        || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"]))
+    {
+        generated_befehle.push("vervielfachezeile".to_string());
+    }
+
+    generated_befehle.sort();
+    generated_befehle.dedup();
+    required_columns.sort_unstable();
+    required_columns.dedup();
+
+    if generated_befehle.is_empty() && direct_columns.is_empty() {
+        None
+    } else {
+        Some(crate::domain::categories::GeneratedInference {
+            generated_befehle,
+            required_columns,
+            direct_columns,
+        })
+    }
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
@@ -2620,68 +2688,4 @@ pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
         }
     }
     out
-}
-
-
-pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<SourceGeneratedInference> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-
-    let sub_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == unter_n);
-    let ober_has = |aliases: &[&str]| aliases.iter().any(|alias| normalize_key(alias) == ober_n);
-
-    let mut generated_befehle = Vec::<String>::new();
-    let mut required_columns = Vec::<u32>::new();
-
-    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
-    {
-        generated_befehle.push("primzahlkreuzprocontra".to_string());
-    }
-
-    if ober_has(&["menschliches", "grundstrukturen"]) && sub_has(&["liebe", "ethik"]) {
-        generated_befehle.push("lovepolygon".to_string());
-        required_columns.push(9);
-    }
-
-    if ober_has(&["planet", "menschliches", "grundstrukturen"])
-        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"])
-    {
-        generated_befehle.push("gleichheitfreiheit".to_string());
-        required_columns.push(132);
-    }
-
-    if ober_has(&["universum", "multiversum", "grundstrukturen", "menschliches"])
-        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"])
-    {
-        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
-        required_columns.push(242);
-    }
-
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["gestirn", "mond", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"])
-    {
-        generated_befehle.push("primcreativitytype".to_string());
-        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
-        required_columns.push(64);
-    }
-
-    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen", "galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
-        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen", "offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])
-    {
-        generated_befehle.push("vervielfachezeile".to_string());
-        required_columns.push(19);
-        required_columns.push(90);
-    }
-
-    generated_befehle.sort();
-    generated_befehle.dedup();
-    required_columns.sort();
-    required_columns.dedup();
-
-    if generated_befehle.is_empty() {
-        None
-    } else {
-        Some(SourceGeneratedInference { generated_befehle, required_columns })
-    }
 }

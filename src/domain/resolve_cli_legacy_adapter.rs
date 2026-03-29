@@ -26,39 +26,6 @@ pub fn resolve_cli_selection(
     if let Some(canonical) = bridge_cli_selection(ober, unter).and_then(resolve_request) {
         let mut out = LegacyResolvedSelection::default();
         apply_canonical_spec(&mut out, canonical.target);
-
-        out.direct_columns.extend(
-            exact_columns_for_pair(ober, unter)
-                .into_iter()
-                .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-                .collect::<Result<Vec<u16>, _>>()?,
-        );
-
-        if out.direct_columns.is_empty() {
-            out.direct_columns.extend(
-                fuzzy_columns_for_pair(ober, unter)
-                    .into_iter()
-                    .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-                    .collect::<Result<Vec<u16>, _>>()?,
-            );
-        }
-
-        if let Some(inference) = kategorie_map.infer_generated_pair(ober, unter) {
-            out.generated_befehle.extend(inference.generated_befehle);
-            out.required_columns.extend(
-                inference.required_columns
-                    .into_iter()
-                    .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-                    .collect::<Result<Vec<u16>, _>>()?,
-            );
-            out.direct_columns.extend(
-                inference.direct_columns
-                    .into_iter()
-                    .map(|n| u16::try_from(n).map_err(|_| format!("Spaltenindex {} passt nicht in u16", n)))
-                    .collect::<Result<Vec<u16>, _>>()?,
-            );
-        }
-
         dedup_legacy_selection(&mut out);
         return Ok(out);
     }
