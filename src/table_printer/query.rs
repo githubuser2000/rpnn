@@ -10,6 +10,7 @@ use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
+use crate::table_printer::sanitize::normalize_display_header;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::reverse_request_report::print_reverse_request_pairs_dual;
@@ -327,14 +328,7 @@ fn sanitize_headers(headers: &[String]) -> Vec<String> {
     headers
         .iter()
         .enumerate()
-        .map(|(i, h)| {
-            let trimmed = h.trim();
-            if trimmed.is_empty() {
-                format!("SQL-Spalte {}", i + 1)
-            } else {
-                trimmed.to_string()
-            }
-        })
+        .map(|(i, h)| normalize_display_header(h, i))
         .collect()
 }
 

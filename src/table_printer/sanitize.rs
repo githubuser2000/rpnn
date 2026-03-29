@@ -59,37 +59,50 @@ pub fn sanitize_chunk_data_with_rows(
     (new_data, new_rows)
 }
 
-pub fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String {
-    let trimmed = header.trim();
-
-    if trimmed.is_empty() {
-        return format!("SQL-Spalte {}", global_index + 1);
+fn strip_meta_markers(mut s: String) -> String {
+    loop {
+        let Some(start) = s.find("[[") else { break; };
+        let Some(rel_end) = s[start..].find("]]") else { break; };
+        let end = start + rel_end + 2;
+        s.replace_range(start..end, "");
     }
-
-    trimmed.to_string()
+    s
 }
 
-
-pub fn sanitize_header_for_output(header: &str, global_index: usize, structured: bool) -> String {
-    let trimmed = header.trim();
-
-    if trimmed.is_empty() {
-        return format!("SQL-Spalte {}", global_index + 1);
-    }
-
-    if !structured {
-        return trimmed.to_string();
-    }
-
-    let mut out = trimmed.to_string();
+fn strip_trailing_id_suffix(mut s: String) -> String {
     loop {
-        if let Some(pos) = out.rfind(" (ID_") {
-            if out.ends_with(')') {
-                out = out[..pos].trim_end().to_string();
+        let trimmed = s.trim_end().to_string();
+        if let Some(pos) = trimmed.rfind(" (ID_") {
+            if trimmed.ends_with(')') {
+                s = trimmed[..pos].trim_end().to_string();
                 continue;
             }
         }
-        break;
+        return trimmed;
     }
-    out
+}
+
+pub fn normalize_display_header(header: &str, global_index: usize) -> String {
+    let trimmed = header.trim();
+    if trimmed.is_empty() {
+        return format!("SQL-Spalte {}", global_index + 1);
+    }
+
+    let without_meta = strip_meta_markers(trimmed.to_string());
+    let without_id = strip_trailing_id_suffix(without_meta);
+    let unquoted = without_id.trim().trim_matches('"').trim().to_string();
+
+    if unquoted.is_empty() {
+        format!("SQL-Spalte {}", global_index + 1)
+    } else {
+        unquoted
+    }
+}
+
+pub fn sanitize_header_preserve_id(header: &str, global_index: usize) -> String {
+    normalize_display_header(header, global_index)
+}
+
+pub fn sanitize_header_for_output(header: &str, global_index: usize, _structured: bool) -> String {
+    normalize_display_header(header, global_index)
 }

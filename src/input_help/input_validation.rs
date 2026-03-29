@@ -1,5 +1,4 @@
 use crate::input_help::pattern_definitions::*;
-use crate::input_help::generator_parser::str_as_generator_to_list_of_num_strs_alt;
 use crate::input_help::bruch_validator::is_zeilen_bruch_angabe_between_kommas;
 use crate::input_help::zeilen_angabe_validator::is_zeilen_angabe_between_kommas;
 
