@@ -15,9 +15,9 @@ use crate::domain::model::spalten_anfrage::{
     StandardUnterId as CanonicalStandardUnterId,
 };
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::resolver::resolve_cli::resolve_cli_ober_unter;
+use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -241,25 +241,7 @@ impl KategorieMap {
     pub fn alle_typed_requests_fuer_cli_alles(&self) -> Vec<CanonicalSpaltenAnfrage> {
         let mut requests = Self::typed_eigenschaften_requests_fuer_alles();
 
-        for (ober, unter) in self.alle_paare() {
-            if let Some(req) = bridge_cli_selection(&ober, &unter) {
-                requests.push(req);
-            }
-        }
-
-        for (ober, unter) in generated_seed_pairs() {
-            if let Some(req) = bridge_cli_selection(&ober, &unter) {
-                requests.push(req);
-            }
-        }
-
-        for (ober, unter) in combination_seed_pairs() {
-            if let Some(req) = bridge_cli_selection(&ober, &unter) {
-                requests.push(req);
-            }
-        }
-
-        for (ober, unter) in multiplication_seed_pairs() {
+        for (ober, unter) in self.alle_paare_fuer_cli_alles() {
             if let Some(req) = bridge_cli_selection(&ober, &unter) {
                 requests.push(req);
             }
@@ -291,17 +273,17 @@ impl KategorieMap {
             push_pair(&mut paare_set, &ober, &unter);
         }
 
-        for request in self.alle_typed_requests_fuer_cli_alles() {
-            if let Some((ober, unter)) = request.to_cli_pair() {
-                paare_set.insert((ober, unter));
-            }
-        }
-
         for decl in PY_DECLS {
             for &ober in decl.main_aliases {
                 for &unter in decl.sub_aliases {
                     paare_set.insert((ober.to_string(), unter.to_string()));
                 }
+            }
+        }
+
+        for request in self.alle_typed_requests_fuer_cli_alles() {
+            if let Some((ober, unter)) = request.to_cli_pair() {
+                paare_set.insert((ober, unter));
             }
         }
 
@@ -344,30 +326,30 @@ impl KategorieMap {
     }
 
     fn exact_columns_via_loaded_map(&self, ober: &str, unter: &str) -> Vec<u32> {
+        let ober_norm = normalize_key(ober);
+        let unter_norm = normalize_key(unter);
+        let mut out = Vec::new();
+
         for haupt in &self.hauptkategorien {
-            if haupt.name.as_str() != ober {
+            if normalize_key(haupt.name.as_str()) != ober_norm {
                 continue;
             }
 
-            for sub in &haupt.unterkategorien {
-                if sub.name.as_str() == unter {
-                    return sub.spaltennummern.to_vec();
+            for unterkategorie in &haupt.unterkategorien {
+                if normalize_key(unterkategorie.name.as_str()) == unter_norm {
+                    out.extend_from_slice(unterkategorie.spaltennummern.as_slice());
                 }
             }
         }
 
-        Vec::new()
+        out.sort_unstable();
+        out.dedup();
+        out
     }
 
-    fn exact_columns_via_canonical_cli(ober: &str, unter: &str) -> Vec<u32> {
-        if let Some(request) = bridge_cli_selection(ober, unter) {
-            return resolve_request(request)
-                .map(|spec| canonical_target_to_columns(&spec.target))
-                .unwrap_or_default();
-        }
-
+    fn exact_columns_via_canonical_cli(&self, ober: &str, unter: &str) -> Vec<u32> {
         resolve_cli_ober_unter(ober, unter)
-            .map(|spec| canonical_target_to_columns(&spec.target))
+            .map(|spec| canonical_target_to_columns(&spec.target).into_iter().map(|n| n + 1).collect())
             .unwrap_or_default()
     }
 
@@ -411,19 +393,20 @@ impl KategorieMap {
     }
 
     pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-        let mut cols = self.exact_columns_via_loaded_map(ober, unter);
-        if cols.is_empty() {
-            cols = Self::exact_columns_via_canonical_cli(ober, unter);
+        let mut exact = self.exact_columns_via_loaded_map(ober, unter);
+        if !exact.is_empty() {
+            return exact;
         }
-        if cols.is_empty() {
-            cols = python_source_of_truth::exact_all_direct_columns_for_pair(ober, unter)
-                .into_iter()
-                .map(|n| n + 1)
-                .collect();
+
+        exact = self.exact_columns_via_canonical_cli(ober, unter);
+        if !exact.is_empty() {
+            return exact;
         }
-        cols.sort();
-        cols.dedup();
-        cols
+
+        python_source_of_truth::exact_all_direct_columns_for_pair(ober, unter)
+            .into_iter()
+            .map(|n| n + 1)
+            .collect()
     }
 
     pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
@@ -567,38 +550,34 @@ impl KategorieMap {
     fn merge_canonical_request_aliases(
         main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
     ) {
-        let mut pairs = Vec::<(String, String)>::new();
+        let mut paare = Vec::<(String, String)>::new();
 
-        for (main, subs) in main_to_sub.iter() {
-            for sub in subs.keys() {
-                pairs.push((main.clone(), sub.clone()));
-            }
-        }
-
-        for key in EigenschaftKeyId::ALL.iter().copied() {
-            let unter = key.canonical_name().to_string();
-            for ober in Self::eigenschaft_main_aliases_for_key(key) {
-                pairs.push((ober, unter.clone()));
+        for (ober, subs) in main_to_sub.iter() {
+            for unter in subs.keys() {
+                paare.push((ober.clone(), unter.clone()));
             }
         }
 
         for (ober, unter) in generated_seed_pairs() {
-            pairs.push((ober, unter));
+            paare.push((ober, unter));
         }
         for (ober, unter) in combination_seed_pairs() {
-            pairs.push((ober, unter));
+            paare.push((ober, unter));
         }
         for (ober, unter) in multiplication_seed_pairs() {
-            pairs.push((ober, unter));
+            paare.push((ober, unter));
         }
 
-        pairs.sort();
-        pairs.dedup();
+        paare.sort();
+        paare.dedup();
 
-        for (ober, unter) in pairs {
-            let cols = Self::exact_columns_via_canonical_cli(&ober, &unter);
-            if !cols.is_empty() {
-                Self::set_entry_exact(main_to_sub, &ober, &unter, cols);
+        for (ober, unter) in paare {
+            let exact = resolve_cli_ober_unter(&ober, &unter)
+                .map(|spec| canonical_target_to_columns(&spec.target).into_iter().map(|n| n + 1).collect::<Vec<u32>>())
+                .unwrap_or_default();
+
+            if !exact.is_empty() {
+                Self::set_entry_exact(main_to_sub, &ober, &unter, exact);
             }
         }
     }
@@ -614,13 +593,15 @@ impl KategorieMap {
                 .unwrap_or_default();
 
             for sub_name in sub_names {
-                let mut exact = Self::exact_columns_via_canonical_cli(&main_name, &sub_name);
-                if exact.is_empty() {
-                    exact = python_source_of_truth::exact_all_direct_columns_for_pair(&main_name, &sub_name)
-                        .into_iter()
-                        .map(|n| n + 1)
-                        .collect::<Vec<u32>>();
-                }
+                let exact = resolve_cli_ober_unter(&main_name, &sub_name)
+                    .map(|spec| canonical_target_to_columns(&spec.target).into_iter().map(|n| n + 1).collect::<Vec<u32>>())
+                    .filter(|cols| !cols.is_empty())
+                    .unwrap_or_else(|| {
+                        python_source_of_truth::exact_all_direct_columns_for_pair(&main_name, &sub_name)
+                            .into_iter()
+                            .map(|n| n + 1)
+                            .collect::<Vec<u32>>()
+                    });
 
                 if !exact.is_empty() {
                     Self::set_entry_exact(main_to_sub, &main_name, &sub_name, exact);
