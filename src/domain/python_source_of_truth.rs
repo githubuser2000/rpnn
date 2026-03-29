@@ -2551,7 +2551,8 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
-    let mut out = Vec::new();
+    let mut out = Vec::<u32>::new();
+
     for decl in PY_DECLS {
         let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
         let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
@@ -2559,6 +2560,7 @@ pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
             out.extend_from_slice(decl.columns);
         }
     }
+
     out.sort_unstable();
     out.dedup();
     out

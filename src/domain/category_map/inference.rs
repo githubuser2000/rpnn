@@ -17,6 +17,10 @@ where
     direct_columns.dedup();
 
     let has = |n: u32| direct_columns.contains(&n);
+    let is_pair = |ober_aliases: &[&str], unter_aliases: &[&str]| {
+        ober_aliases.iter().any(|alias| normalize_key(alias) == ober_n)
+            && unter_aliases.iter().any(|alias| normalize_key(alias) == unter_n)
+    };
 
     let mut generated_befehle = Vec::<String>::new();
     let mut required_columns = Vec::<u32>::new();
@@ -26,15 +30,24 @@ where
     {
         generated_befehle.push("primzahlkreuzprocontra".to_string());
     }
-    if has(9) { generated_befehle.push("lovepolygon".to_string()); required_columns.push(9); }
-    if has(132) { generated_befehle.push("gleichheitfreiheit".to_string()); required_columns.push(132); }
-    if has(242) { generated_befehle.push("geistemotionenergiematerietopologie".to_string()); required_columns.push(242); }
-    if has(64) {
+    if is_pair(&["Menschliches", "Grundstrukturen"], &["Liebe", "Liebe_(7)"]) && has(9) {
+        generated_befehle.push("lovepolygon".to_string());
+        required_columns.push(9);
+    }
+    if is_pair(&["Planet", "Menschliches", "Grundstrukturen"], &["Gleichheit", "Freiheit"]) && has(132) {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+        required_columns.push(132);
+    }
+    if is_pair(&["Universum", "Multiversum", "Grundstrukturen"], &["Geist", "Geist_(15)"]) && has(242) {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+        required_columns.push(242);
+    }
+    if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Gestirn", "Mond"]) && has(64) {
         generated_befehle.push("primcreativitytype".to_string());
         generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
         required_columns.push(64);
     }
-    if has(19) || has(90) {
+    if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Primzahlen", "Wichtigste"]) && (has(19) || has(90)) {
         generated_befehle.push("vervielfachezeile".to_string());
         if has(19) { required_columns.push(19); }
         if has(90) { required_columns.push(90); }

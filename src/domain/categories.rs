@@ -375,6 +375,10 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let has = |n: u32| direct_columns.contains(&n);
+        let is_pair = |ober_aliases: &[&str], unter_aliases: &[&str]| {
+            ober_aliases.iter().any(|alias| normalize_key(alias) == ober_n)
+                && unter_aliases.iter().any(|alias| normalize_key(alias) == unter_n)
+        };
 
         let mut generated_befehle = Vec::<String>::new();
         let mut required_columns = Vec::<u32>::new();
@@ -385,51 +389,28 @@ impl KategorieMap {
             generated_befehle.push("primzahlkreuzprocontra".to_string());
         }
 
-        // Generatoren dürfen nicht bloß deshalb automatisch aktiviert werden,
-        // weil eine normale Kategorien-Auswahl zufällig eine Quellspalte benutzt,
-        // die auch von einem Generator verwendet wird. Sonst wird z.B.
-        // `--spaltenname menschliches motive` fälschlich in den Generatorpfad
-        // gedrückt, obwohl reta hier nur die direkten religion.csv-Spalten meint.
-        // Deshalb wird die Brücke hier nur für tatsächlich generatorische CLI-Paare
-        // aktiviert und nicht mehr allein über `has(<col>)`.
-
-        if matches!(ober_n.as_str(), "menschliches" | "grundstrukturen")
-            && unter_n == "liebe"
-            && has(9)
-        {
+        if is_pair(&["Menschliches", "Grundstrukturen"], &["Liebe", "Liebe_(7)"]) && has(9) {
             generated_befehle.push("lovepolygon".to_string());
             required_columns.push(9);
         }
 
-        if matches!(ober_n.as_str(), "planet" | "menschliches" | "grundstrukturen")
-            && matches!(unter_n.as_str(), "gleichheit" | "freiheit" | "gleichheitfreiheit")
-            && has(132)
-        {
+        if is_pair(&["Planet", "Menschliches", "Grundstrukturen"], &["Gleichheit", "Freiheit"]) && has(132) {
             generated_befehle.push("gleichheitfreiheit".to_string());
             required_columns.push(132);
         }
 
-        if matches!(ober_n.as_str(), "universum" | "multiversum" | "grundstrukturen")
-            && unter_n == "geist"
-            && has(242)
-        {
+        if is_pair(&["Universum", "Multiversum", "Grundstrukturen"], &["Geist", "Geist_(15)"]) && has(242) {
             generated_befehle.push("geistemotionenergiematerietopologie".to_string());
             required_columns.push(242);
         }
 
-        if matches!(ober_n.as_str(), "wichtigsteszumverstehen" | "bedeutung")
-            && matches!(unter_n.as_str(), "gestirn" | "mond" | "mond64")
-            && has(64)
-        {
+        if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Gestirn", "Mond"]) && has(64) {
             generated_befehle.push("primcreativitytype".to_string());
             generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
             required_columns.push(64);
         }
 
-        if matches!(ober_n.as_str(), "wichtigsteszumverstehen" | "bedeutung")
-            && unter_n == "primzahlen"
-            && (has(19) || has(90))
-        {
+        if is_pair(&["Wichtigstes_zum_verstehen", "Bedeutung"], &["Primzahlen", "Wichtigste"]) && (has(19) || has(90)) {
             generated_befehle.push("vervielfachezeile".to_string());
             if has(19) {
                 required_columns.push(19);
