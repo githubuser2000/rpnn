@@ -251,10 +251,22 @@ impl KategorieMap {
         requests
     }
 
+    fn declared_python_pairs() -> Vec<(String, String)> {
+        let mut pairs = std::collections::BTreeSet::new();
+        for decl in PY_DECLS {
+            for &ober in decl.main_aliases {
+                for &unter in decl.sub_aliases {
+                    pairs.insert((ober.to_string(), unter.to_string()));
+                }
+            }
+        }
+        pairs.into_iter().collect()
+    }
+
     pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
         use std::collections::BTreeSet;
 
-        let mut paare_set: BTreeSet<(String, String)> = self.alle_paare().into_iter().collect();
+        let mut paare_set: BTreeSet<(String, String)> = Self::declared_python_pairs().into_iter().collect();
 
         fn push_pair(paare: &mut BTreeSet<(String, String)>, ober: &str, unter: &str) {
             paare.insert((ober.to_string(), unter.to_string()));
