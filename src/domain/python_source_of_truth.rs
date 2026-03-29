@@ -2857,39 +2857,78 @@ pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<cr
     let mut generated_befehle = Vec::<String>::new();
 
     if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
-        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]) {
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"])
+    {
         generated_befehle.push("primzahlkreuzprocontra".to_string());
     }
 
     if ober_has(&["menschliches", "grundstrukturen"])
-        && sub_has(&["liebe", "ethik"]) {
+        && sub_has(&["liebe", "ethik"])
+    {
         generated_befehle.push("lovepolygon".to_string());
     }
 
     if ober_has(&["planet", "menschliches", "grundstrukturen"])
-        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"]) {
+        && sub_has(&[
+            "gleichheit",
+            "freiheit",
+            "ordnung",
+            "ordnen",
+            "filterung",
+            "dominieren",
+            "ungleichheit",
+            "gleichheitfreiheit",
+        ])
+    {
         generated_befehle.push("gleichheitfreiheit".to_string());
     }
 
     if ober_has(&["universum", "multiversum", "grundstrukturen"])
-        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
+        && sub_has(&[
+            "geist",
+            "bewusstsein",
+            "emotion",
+            "emotionen",
+            "gefuehl",
+            "gefuehle",
+            "gefühl",
+            "gefühle",
+            "energie",
+            "materie",
+            "topologie",
+        ])
+    {
         generated_befehle.push("geistemotionenergiematerietopologie".to_string());
     }
 
     if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
+        && sub_has(&[
+            "gestirn",
+            "sonne",
+            "planet",
+            "evolution",
+            "intelligenz",
+            "kreativ",
+            "kreativitaet",
+            "kreativität",
+            "lernen",
+            "erwerben",
+        ])
+    {
         generated_befehle.push("primcreativitytype".to_string());
     }
 
     if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
-        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"]) {
+        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"])
+    {
         generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
     }
 
     if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
         && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
         || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
-            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])) {
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"]))
+    {
         generated_befehle.push("vervielfachezeile".to_string());
     }
 
@@ -2899,13 +2938,9 @@ pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<cr
     if generated_befehle.is_empty() {
         None
     } else {
-        let mut required_columns = Vec::<u32>::new();
-        required_columns.sort();
-        required_columns.dedup();
-
         Some(crate::domain::categories::GeneratedInference {
             generated_befehle,
-            required_columns,
+            required_columns: Vec::new(),
             direct_columns: Vec::new(),
         })
     }

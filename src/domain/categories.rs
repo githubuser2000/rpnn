@@ -16,6 +16,7 @@ use crate::domain::model::spalten_anfrage::{
 };
 use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
 
