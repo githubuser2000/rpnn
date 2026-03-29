@@ -1,16 +1,15 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::data_access::csv_importer::import_csvs_to_sqlite;
 use crate::domain::categories::lade_kategorie_map;
+use crate::data_access::csv_importer::import_csvs_to_sqlite;
+use crate::table_printer::query_column_by_index;
+use crate::domain::tabellen_utils::show_usage;
+use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
+use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
 use crate::domain::generator_registry::ParametersMain;
 use crate::domain::pypy_compat::apply_pypy_compat;
-use crate::domain::resolve_cli_legacy_adapter::resolve_cli_selection;
-use crate::domain::model::spalten_anfrage::SpaltenAnfrage;
-use crate::domain::tabellen_utils::show_usage;
-use crate::processing::kategorie_verarbeiter::verarbeite_kategorien;
-use crate::processing::spalten_verarbeiter::SpaltenVerarbeiter;
-use crate::table_printer::query_column_by_index;
+use crate::domain::request_pipeline::RawSelectionRequest;
 
 pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -29,96 +28,31 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         crate::cli::parse_cli_args(&args, Some(&kategorie_map));
 
     let mut generated_befehle: BTreeSet<String> = BTreeSet::new();
-    let mut typed_requests: Vec<SpaltenAnfrage> = Vec::new();
 
     for spalten_namen in &spalten_namen_liste.eintraege {
-        generated_befehle.extend(verarbeite_kategorien(
-            &kategorie_map,
-            &mut bereich,
-            spalten_namen,
-        )?);
-
-        if let Some(request) = spalten_namen.typed_request.clone() {
-            typed_requests.push(request);
-        }
-
-        let resolved = resolve_cli_selection(
-            &kategorie_map,
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        )?;
-
-        if spalten_namen.typed_request.is_none() {
-            let mut synthetic_ids: Vec<u16> = Vec::new();
-            synthetic_ids.extend(resolved.direct_columns.iter().copied());
-            synthetic_ids.extend(resolved.required_columns.iter().copied());
-            synthetic_ids.extend(
-                resolved
-                    .exact_direct_columns
-                    .iter()
-                    .filter_map(|&n| u16::try_from(n).ok()),
-            );
-            synthetic_ids.sort_unstable();
-            synthetic_ids.dedup();
-
-            if !synthetic_ids.is_empty() {
-                typed_requests.push(SpaltenAnfrage::DirektSpalten { ids: synthetic_ids });
-            }
-        }
-
-        generated_befehle.extend(resolved.generated_befehle.iter().cloned());
-
-        bereich
-            .exact_visible_columns
-            .extend(resolved.direct_columns.iter().map(|&n| n as usize));
-        bereich
-            .exact_visible_columns
-            .extend(resolved.required_columns.iter().map(|&n| n as usize));
-        bereich
-            .exact_visible_columns
-            .extend(resolved.exact_direct_columns.iter().copied());
-
-        for pair in resolved.exact_modal_pairs {
-            if !bereich.exact_modal_pairs.contains(&pair) {
-                bereich.exact_modal_pairs.push(pair);
-            }
-        }
-
-        for spec in resolved.exact_meta_konkret_specs {
-            if !bereich.exact_meta_konkret_specs.contains(&spec) {
-                bereich.exact_meta_konkret_specs.push(spec);
-            }
-        }
-
-        bereich.exact_generated_befehle.extend(
-            resolved
-                .generated_befehle
-                .iter()
-                .cloned(),
+        generated_befehle.extend(
+            verarbeite_kategorien(&kategorie_map, &mut bereich, spalten_namen)?
         );
-    }
 
-    bereich.exact_visible_columns.sort_unstable();
-    bereich.exact_visible_columns.dedup();
+        let resolved = RawSelectionRequest::new(
+            spalten_namen.oberkategorie.clone(),
+            spalten_namen.unterkategorie.clone(),
+        )
+        .parse()?
+        .expand(&kategorie_map)
+        .resolve(&kategorie_map);
+        resolved.apply_to_bereich(&mut bereich);
+    }
 
     generated_befehle.extend(bereich.exact_generated_befehle.iter().cloned());
 
-    let wants_gebr_prim_generator = generated_befehle
-        .iter()
-        .any(|g| g.contains("gebr") && g.contains("prim"));
-
+    let wants_gebr_prim_generator = generated_befehle.iter().any(|g| g.contains("gebr") && g.contains("prim"));
     if wants_gebr_prim_generator {
-        let upper = if bereich.bis_zeile > 1 {
-            bereich.bis_zeile.min(23)
-        } else {
-            23
-        };
-
+        let upper = if bereich.bis_zeile > 1 { bereich.bis_zeile.min(23) } else { 23 };
         for n in 2..=upper {
             bereich.pypy_compat.gebrochengalaxie.insert(n);
             bereich.pypy_compat.gebrochenuniversum.insert(n);
         }
-
         bereich.hide_fraction_inputs();
     }
 
@@ -141,7 +75,6 @@ pub fn main_workflow() -> Result<(), Box<dyn std::error::Error>> {
         &generated_befehle,
         &parameters_main,
         &kategorie_map,
-        &typed_requests,
     )?;
 
     Ok(())

@@ -6,24 +6,32 @@ pub struct ResolvedHeaderMeta {
     pub class_attr: Option<String>,
 }
 
+fn strip_meta_markers(mut s: String) -> String {
+    loop {
+        let Some(start) = s.find("[[") else { break; };
+        let Some(rel_end) = s[start..].find("]]") else { break; };
+        let end = start + rel_end + 2;
+        s.replace_range(start..end, "");
+    }
+
+    if let Some(pos) = s.find('\u{1f}') {
+        s.truncate(pos);
+    }
+
+    s.trim().to_string()
+}
+
 fn strip_id_suffix(s: &str) -> String {
-    if let Some(pos) = s.rfind("(ID_") {
-        s[..pos].trim().to_string()
+    let cleaned = strip_meta_markers(s.to_string());
+    if let Some(pos) = cleaned.rfind("(ID_") {
+        cleaned[..pos].trim().to_string()
     } else {
-        s.trim().to_string()
+        cleaned.trim().to_string()
     }
 }
 
 pub fn resolve_header_meta(raw: &str, col_idx: usize, is_header_row: bool) -> ResolvedHeaderMeta {
-    let visible_text = {
-        let mut s = raw.to_string();
-
-        if let Some(pos) = s.find('\u{1f}') {
-            s.truncate(pos);
-        }
-
-        s.trim().trim_matches('"').to_string()
-    };
+    let visible_text = strip_meta_markers(raw.trim().trim_matches('"').to_string());
 
     if !is_header_row {
         return ResolvedHeaderMeta {

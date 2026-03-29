@@ -46,6 +46,26 @@ pub fn collect_spalten_nummern(
     Ok(nums)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct Col1(usize);
+
+impl Col1 {
+    fn try_new(value: usize) -> Result<Self, Box<dyn std::error::Error>> {
+        if value == 0 {
+            return Err("Spalte 0 existiert nicht".into());
+        }
+        Ok(Self(value))
+    }
+
+    fn to_zero_based(self) -> usize {
+        self.0 - 1
+    }
+
+    fn get(self) -> usize {
+        self.0
+    }
+}
+
 pub fn resolve_spaltennamen(
     column_names: &[String],
     spalten_nummern: &[usize],
@@ -53,11 +73,13 @@ pub fn resolve_spaltennamen(
     let mut names = Vec::new();
 
     for &nr in spalten_nummern {
-        if nr == 0 || nr > column_names.len() {
-            return Err(format!("Spalte {} existiert nicht", nr).into());
+        let col1 = Col1::try_new(nr)?;
+        let idx0 = col1.to_zero_based();
+        if idx0 >= column_names.len() {
+            return Err(format!("Spalte {} existiert nicht", col1.get()).into());
         }
 
-        let name = &column_names[nr - 1];
+        let name = &column_names[idx0];
         names.push(format!("\"{}\"", name.replace("\"", "\"\"")));
     }
 

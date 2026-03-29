@@ -1,3 +1,4 @@
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlDeclMeta {
     pub p1_groups: Vec<String>,
@@ -38,6 +39,28 @@ impl HtmlDeclMeta {
             render_p2_slots(&self.p2_slots),
             render_p4_tags(&self.p4_tags)
         )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HtmlEigenschaftFamilie {
+    N,
+    EinsDurchN,
+}
+
+impl HtmlEigenschaftFamilie {
+    pub fn render_p1(self) -> &'static str {
+        match self {
+            Self::N => "Eigenschaften_n",
+            Self::EinsDurchN => "Eigenschaften_1/n",
+        }
+    }
+
+    pub fn default_p4(self) -> Vec<u8> {
+        match self {
+            Self::N => vec![0, 5],
+            Self::EinsDurchN => vec![3, 5, 1, 4],
+        }
     }
 }
 
@@ -104,16 +127,22 @@ fn render_p1_groups(groups: &[String]) -> String {
 }
 
 fn render_p2_slots(slots: &[Option<String>]) -> String {
-    let mut out = String::from("p2_");
+    let mut out = String::from("p2_p3_");
     for (i, slot) in slots.iter().enumerate() {
-        if i > 0 {
+        if i == 0 {
+            out.push('0');
+            out.push('_');
+            if let Some(value) = slot {
+                out.push_str(value);
+            }
+        } else {
             out.push(',');
-        }
-        out.push_str("p3_");
-        out.push_str(&i.to_string());
-        out.push('_');
-        if let Some(value) = slot {
-            out.push_str(value);
+            out.push_str("p3_");
+            out.push_str(&i.to_string());
+            out.push('_');
+            if let Some(value) = slot {
+                out.push_str(value);
+            }
         }
     }
     out

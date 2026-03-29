@@ -1,3 +1,4 @@
+use crate::domain::parser::cli_alias_parser::parse_spalten_anfrage;
 use crate::cli::parser::{SpaltenAuswahlModus, SpaltenNamen, SpaltenNamenListe};
 use crate::cli::{parse_cli_args, TextBereich};
 use crate::domain::categories::KategorieMap;
@@ -103,26 +104,44 @@ impl<'a> SpaltenVerarbeiter<'a> {
             return Ok(());
         }
 
-        let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        );
+        if let Some(request) = &spalten_namen.typed_request {
+            let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_canonical_request(request);
 
-        if !direkte_spalten.is_empty() {
-            setze_gefundene_spalten(bereich, direkte_spalten);
-            bereich.mark_columns_resolved();
-            return Ok(());
-        }
-
-        if let Some(inference) = self.kategorie_map.infer_generated_pair(
-            &spalten_namen.oberkategorie,
-            &spalten_namen.unterkategorie,
-        ) {
-            if !inference.required_columns.is_empty() {
-                setze_gefundene_spalten(bereich, inference.required_columns.clone());
+            if !direkte_spalten.is_empty() {
+                setze_gefundene_spalten(bereich, direkte_spalten);
+                bereich.mark_columns_resolved();
+                return Ok(());
             }
-            bereich.mark_columns_resolved();
-            return Ok(());
+
+            if let Some(inference) = self.kategorie_map.infer_generated_canonical_request(request) {
+                if !inference.required_columns.is_empty() {
+                    setze_gefundene_spalten(bereich, inference.required_columns.clone());
+                }
+                bereich.mark_columns_resolved();
+                return Ok(());
+            }
+        } else {
+            let direkte_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+            );
+
+            if !direkte_spalten.is_empty() {
+                setze_gefundene_spalten(bereich, direkte_spalten);
+                bereich.mark_columns_resolved();
+                return Ok(());
+            }
+
+            if let Some(inference) = self.kategorie_map.infer_generated_pair(
+                &spalten_namen.oberkategorie,
+                &spalten_namen.unterkategorie,
+            ) {
+                if !inference.required_columns.is_empty() {
+                    setze_gefundene_spalten(bereich, inference.required_columns.clone());
+                }
+                bereich.mark_columns_resolved();
+                return Ok(());
+            }
         }
 
         self.suche_und_setze_spalten(bereich, spalten_namen_liste)?;
@@ -142,10 +161,14 @@ impl<'a> SpaltenVerarbeiter<'a> {
                 exact_hit = true;
                 continue;
             }
-            let gefundene_spalten = self.kategorie_map.finde_spaltennummern_fuer_kategorien(
-                &spalten_namen.oberkategorie,
-                &spalten_namen.unterkategorie,
-            );
+            let gefundene_spalten = if let Some(request) = &spalten_namen.typed_request {
+                self.kategorie_map.finde_spaltennummern_fuer_canonical_request(request)
+            } else {
+                self.kategorie_map.finde_spaltennummern_fuer_kategorien(
+                    &spalten_namen.oberkategorie,
+                    &spalten_namen.unterkategorie,
+                )
+            };
             alle_gefundene_spalten.extend(gefundene_spalten);
         }
 
@@ -177,10 +200,22 @@ impl<'a> SpaltenVerarbeiter<'a> {
         }
 
         if let Some(letzte_spalten_namen) = spalten_namen_liste.eintraege.last() {
-            if let Some(inference) = self.kategorie_map.infer_generated_pair(
+           let typed_inference = letzte_spalten_namen
+    .typed_request
+    .as_ref()
+    .and_then(|request| self.kategorie_map.infer_generated_canonical_request(request))
+    .or_else(|| {
+        parse_spalten_anfrage(
+            &letzte_spalten_namen.oberkategorie,
+            &letzte_spalten_namen.unterkategorie,
+        )
+        .ok()
+        .and_then(|request| self.kategorie_map.infer_generated_canonical_request(&request))
+    });
+           if let Some(inference) = typed_inference.or_else(|| self.kategorie_map.infer_generated_pair(
                 &letzte_spalten_namen.oberkategorie,
                 &letzte_spalten_namen.unterkategorie,
-            ) {
+            )) {
                 if !inference.required_columns.is_empty() {
                     setze_gefundene_spalten(bereich, inference.required_columns.clone());
                 }

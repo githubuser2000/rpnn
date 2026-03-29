@@ -10,9 +10,11 @@ use crate::data_fetcher::fetch_data_with_stats;
 use crate::generated_columns_words_registry::{apply_generated_columns, ParametersMain};
 use crate::multiples_teiler::teiler_utils::prime_factors;
 use crate::table_printer::printer::print_table_chunked_with_line_numbers;
+use crate::table_printer::sanitize::normalize_display_header;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::reverse_request_report::print_reverse_request_pairs_dual;
+use crate::domain::model::spalten_anfrage::SpaltenAnfrage;
 
 fn build_original_line_numbers(bereich: &TextBereich, data_len: usize) -> Vec<usize> {
     if !bereich.zeilen_bereiche.is_empty() {
@@ -261,6 +263,44 @@ fn should_use_full_table_for_generated(
         || contains_any_alias(&tokens, &["vielfache", "vielfacher", "primzahlen"])
 }
 
+fn should_use_full_table_for_requests(
+    kategorie_map: &KategorieMap,
+    typed_requests: &[SpaltenAnfrage],
+    generated_befehle: &BTreeSet<String>,
+    parameters_main: &ParametersMain,
+) -> bool {
+    if typed_requests.is_empty() {
+        return should_use_full_table_for_generated(generated_befehle, parameters_main)
+            || !generated_befehle.is_empty();
+    }
+
+    for request in typed_requests {
+        let generated_for_request = kategorie_map
+            .infer_generated_canonical_request(request)
+            .map(|inf| inf.generated_befehle.into_iter().collect::<BTreeSet<String>>())
+            .unwrap_or_default();
+
+        let Some((ober, unter)) = request.to_cli_pair() else {
+            continue;
+        };
+        let typed_parameters = ParametersMain {
+            bedeutung0: ober.clone(),
+            procontra0: ober.clone(),
+            grundstrukturen0: ober,
+            unter0: unter,
+        };
+
+        if should_use_full_table_for_generated(&generated_for_request, &typed_parameters)
+            || !generated_for_request.is_empty()
+        {
+            return true;
+        }
+    }
+
+    should_use_full_table_for_generated(generated_befehle, parameters_main)
+        || !generated_befehle.is_empty()
+}
+
 fn build_full_table_row_query(column_names: &[String], _bereich: &TextBereich) -> String {
     let columns = column_names
         .iter()
@@ -279,7 +319,7 @@ fn attach_column_ids_to_headers(headers: &[String], columns_1_based: &[usize]) -
         .map(|(idx, header)| {
             let col_1_based = columns_1_based.get(idx).copied().unwrap_or(idx + 1);
             let py_col_0_based = col_1_based.saturating_sub(1);
-            format!("{}\u{1f}COL:{}", header, py_col_0_based)
+            format!("{} [[COL:{}]]", header, py_col_0_based)
         })
         .collect()
 }
@@ -288,14 +328,7 @@ fn sanitize_headers(headers: &[String]) -> Vec<String> {
     headers
         .iter()
         .enumerate()
-        .map(|(i, h)| {
-            let trimmed = h.trim();
-            if trimmed.is_empty() {
-                format!("SQL-Spalte {}", i + 1)
-            } else {
-                trimmed.to_string()
-            }
-        })
+        .map(|(i, h)| normalize_display_header(h, i))
         .collect()
 }
 
@@ -305,11 +338,16 @@ pub fn query_column_by_index(
     generated_befehle: &BTreeSet<String>,
     parameters_main: &ParametersMain,
     kategorie_map: &KategorieMap,
+    typed_requests: &[SpaltenAnfrage],
 ) -> Result<(), Box<dyn std::error::Error>> {
    expand_bereich_rows(conn, &mut bereich)?;
     let column_names = get_column_names(conn)?;
-    let wants_generated = should_use_full_table_for_generated(generated_befehle, parameters_main)
-        || !generated_befehle.is_empty();
+    let wants_generated = should_use_full_table_for_requests(
+        kategorie_map,
+        typed_requests,
+        generated_befehle,
+        parameters_main,
+    );
     let is_generated_mode = wants_generated;
 
     let (query, headers): (String, Vec<String>) = if is_generated_mode {

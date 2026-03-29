@@ -31,20 +31,32 @@ pub fn verarbeite_kategorien(
         bereich.mark_columns_resolved();
     }
 
-    let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
-        &spalten_namen.oberkategorie,
-        &spalten_namen.unterkategorie,
-    );
+    if let Some(request) = &spalten_namen.typed_request {
+        let gefundene_spalten = kategorie_map.finde_spaltennummern_fuer_canonical_request(request);
+        if !gefundene_spalten.is_empty() {
+            merge_exact_columns_into_bereich(bereich, gefundene_spalten);
+            return Ok(generated_befehle);
+        }
 
-    if !gefundene_spalten.is_empty() {
-        merge_exact_columns_into_bereich(bereich, gefundene_spalten);
-        return Ok(generated_befehle);
+        if let Some(inference) = kategorie_map.infer_generated_canonical_request(request) {
+            generated_befehle.extend(inference.generated_befehle);
+        }
+    } else {
+        let gefundene_spalten = kategorie_map.finde_spaltennummern_exakt(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        );
+
+        if !gefundene_spalten.is_empty() {
+            merge_exact_columns_into_bereich(bereich, gefundene_spalten);
+            return Ok(generated_befehle);
+        }
+
+        generated_befehle.extend(infer_generator_only_request(
+            &spalten_namen.oberkategorie,
+            &spalten_namen.unterkategorie,
+        ));
     }
-
-    generated_befehle.extend(infer_generator_only_request(
-        &spalten_namen.oberkategorie,
-        &spalten_namen.unterkategorie,
-    ));
 
     if !generated_befehle.is_empty() {
         bereich.mark_columns_resolved();

@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use crate::domain::generator_logic::common::{contains_any_alias, normalize_token, selected_by_pair};
 use crate::domain::generator_logic::number_theory::gcd;
+use crate::domain::eigenschaften::{EigenschaftKeyId, EigenschaftStandardFamilie};
 
 pub type Table = Vec<Vec<String>>;
 pub type RowSet = BTreeSet<usize>;
@@ -286,6 +287,108 @@ fn build_generator_rules() -> Vec<Box<dyn GeneratedColumnRule>> {
     ]
 }
 
+
+fn encode_hex_utf8(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 2);
+    for b in s.as_bytes() {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{:02x}", b);
+    }
+    out
+}
+
+fn st_to_tag_num(st: ST) -> u8 {
+    match st {
+        ST::SternPolygon => 0,
+        ST::GleichfoermigesPolygon => 1,
+        ST::KeinPolygon => 2,
+        ST::Galaxie => 3,
+        ST::Universum => 4,
+        ST::KeinParaOdMetaP => 5,
+        ST::GebrRat => 6,
+    }
+}
+
+fn append_safe_html_meta_marker(
+    header: &str,
+    tags: Option<&BTreeSet<ST>>,
+    source_text: Option<&str>,
+) -> String {
+    let mut extras: Vec<String> = Vec::new();
+
+    if let Some(tags) = tags {
+        let mut nums: Vec<u8> = tags.iter().copied().map(st_to_tag_num).collect();
+        nums.sort_unstable();
+        nums.dedup();
+        extras.push(format!(
+            "TAGS={}",
+            nums.into_iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
+
+    if let Some(src) = source_text {
+        if !src.is_empty() {
+            extras.push(format!("SRCHEX={}", encode_hex_utf8(src)));
+            let src_l = src.to_lowercase();
+            let family = if src_l.contains("gleichförmigen polygonen") || src_l.contains("gleichfoermigen polygonen") || src_l.contains("(1/n)") {
+                Some("1N")
+            } else if src_l.contains("sternenpolygonen") || src_l.contains("(n)") {
+                Some("N")
+            } else {
+                None
+            };
+            if let Some(fam) = family {
+                extras.push(format!("FAMILY={}", fam));
+            }
+            let quoted_segment = {
+                let chars: Vec<(usize, char)> = src.char_indices().collect();
+                chars.iter().find_map(|(i, ch)| {
+                    if *ch == '„' || *ch == '"' {
+                        let after = *i + src[*i..].chars().next()?.len_utf8();
+                        let tail = src.get(after..)?;
+                        let end_rel = tail.char_indices().find_map(|(j, ch2)| {
+                            if ch2 == '“' || ch2 == '"' { Some(j) } else { None }
+                        })?;
+                        Some(tail[..end_rel].to_string())
+                    } else {
+                        None
+                    }
+                })
+            };
+            if let Some(seg) = quoted_segment {
+                let seg_n = normalize_token(&seg);
+                let mut best: Option<(usize, crate::domain::eigenschaften::EigenschaftKeyId)> = None;
+                for key in crate::domain::eigenschaften::EigenschaftKeyId::ALL.iter().copied() {
+                    let canon = normalize_token(key.canonical_name());
+                    if !canon.is_empty() && seg_n.contains(&canon) {
+                        let score = canon.len() + 100;
+                        if best.map(|(n, _)| score > n).unwrap_or(true) { best = Some((score, key)); }
+                    }
+                    for alias in key.aliases() {
+                        let a = normalize_token(alias);
+                        if !a.is_empty() && seg_n.contains(&a) {
+                            let score = a.len();
+                            if best.map(|(n, _)| score > n).unwrap_or(true) { best = Some((score, key)); }
+                        }
+                    }
+                }
+                if let Some((_, key)) = best {
+                    extras.push(format!("EIGKEY={}", key.canonical_name()));
+                }
+            }
+        }
+    }
+
+    if extras.is_empty() {
+        header.to_string()
+    } else {
+        format!("{header} [[RPNN:{}]]", extras.join(";"))
+    }
+}
+
 pub fn apply_generated_columns(
     headers: &mut Vec<String>,
     data: &mut Vec<Vec<String>>,
@@ -368,10 +471,26 @@ pub fn apply_generated_columns(
 
     let header_row: Vec<String> = table.first().cloned().unwrap_or_else(|| original_headers.clone());
 
-    *headers = keep_indices.iter().map(|&i| {
-        let raw: String = header_row.get(i).cloned().or_else(|| original_headers.get(i).cloned()).unwrap_or_default();
-        if raw.trim().is_empty() { format!("SQL-Spalte {}", i + 1) } else { raw }
-    }).collect();
+    *headers = keep_indices
+        .iter()
+        .map(|&i| {
+            let raw: String = header_row
+                .get(i)
+                .cloned()
+                .or_else(|| original_headers.get(i).cloned())
+                .unwrap_or_default();
+            let visible = if raw.trim().is_empty() {
+                format!("SQL-Spalte {}", i + 1)
+            } else {
+                raw
+            };
+
+            let tags = tables.generated_spalten_parameter_tags.get(&i);
+            let source_text = tables.generated_spalten_parameter.get(&i).map(|s| s.as_str());
+
+            append_safe_html_meta_marker(&visible, tags, source_text)
+        })
+        .collect();
 
     *data = table.into_iter().skip(1).map(|row| {
         keep_indices.iter().map(|&i| row.get(i).cloned().unwrap_or_default()).collect::<Vec<_>>()
@@ -901,11 +1020,10 @@ fn register_generated_column(
         .generated_spalten_parameter_tags
         .insert(new_col, tags);
 
-    let key = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    if tables.generated_spalten_parameter.contains_key(&key) {
+    if tables.generated_spalten_parameter.contains_key(&new_col) {
         panic!("generated_spalten_parameter key collision");
     }
-    tables.generated_spalten_parameter.insert(key, source_text);
+    tables.generated_spalten_parameter.insert(new_col, source_text);
 }
 
 fn get_cell(table: &Table, row: usize, col: usize) -> &str {
@@ -1260,6 +1378,27 @@ pub fn prepare_modal_into_table(
     entry.vervielfachter = new_verv;
 }
 
+
+fn eigenschaft_standard_familie_for_modal_concept(
+    left: usize,
+    right: usize,
+) -> Option<EigenschaftStandardFamilie> {
+    if let Some(key) = EigenschaftKeyId::from_modal_pair(left, right) {
+        return Some(key.standard_familie());
+    }
+
+    let left_family = EigenschaftKeyId::from_any_column(left).map(|k| k.standard_familie());
+    let right_family = EigenschaftKeyId::from_any_column(right).map(|k| k.standard_familie());
+
+    match (left_family, right_family) {
+        (Some(EigenschaftStandardFamilie::EinsDurchN), _) => Some(EigenschaftStandardFamilie::EinsDurchN),
+        (_, Some(EigenschaftStandardFamilie::EinsDurchN)) => Some(EigenschaftStandardFamilie::EinsDurchN),
+        (Some(EigenschaftStandardFamilie::N), _) => Some(EigenschaftStandardFamilie::N),
+        (_, Some(EigenschaftStandardFamilie::N)) => Some(EigenschaftStandardFamilie::N),
+        _ => None,
+    }
+}
+
 pub fn concat_modallogik(table: &mut Table, concepts_rows_set_of_tuple: &BTreeSet<(usize, usize)>, rows_as_numbers: &mut RowSet, tables: &mut Tables) {
     let distances = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
     let end = tables.last_line_number.min(table.len().saturating_sub(1));
@@ -1309,7 +1448,10 @@ pub fn concat_modallogik(table: &mut Table, concepts_rows_set_of_tuple: &BTreeSe
                     into.entry(i).or_default().push(piece);
                 }
             }
-            let condition_n_vs_1_per_n = concept.0 == 62 || concept.0 == 63 || (358..=367).contains(&concept.0) || (371..=374).contains(&concept.0);
+            let condition_n_vs_1_per_n = matches!(
+            eigenschaft_standard_familie_for_modal_concept(concept.0, concept.1),
+            Some(EigenschaftStandardFamilie::EinsDurchN)
+        );
             let fill_ = if condition_n_vs_1_per_n { get_cell(&table_copy, i, 197) } else { get_cell(&table_copy, i, 4) };
             if let Some(parts) = into.get_mut(&i) {
                 if !(parts.len() == 1 && parts[0].is_empty()) { parts.push(format!("Alles nur bezogen auf Satz {}", fill_)); }
@@ -1317,7 +1459,10 @@ pub fn concat_modallogik(table: &mut Table, concepts_rows_set_of_tuple: &BTreeSe
         }
         let values: Vec<String> = (0..=end).map(|w| into.remove(&w).unwrap_or_default().join(" | ")).collect();
         append_generated_col(table, values);
-        let condition_n_vs_1_per_n = concept.0 == 62 || concept.0 == 63 || (358..=367).contains(&concept.0) || (371..=374).contains(&concept.0);
+        let condition_n_vs_1_per_n = matches!(
+            eigenschaft_standard_familie_for_modal_concept(concept.0, concept.1),
+            Some(EigenschaftStandardFamilie::EinsDurchN)
+        );
         register_generated_column(
             tables,
             rows_as_numbers,
@@ -1465,8 +1610,25 @@ pub fn concat1_primzahlkreuz_pro_contra(table: &mut Table, rows_as_numbers: &mut
     rows_as_numbers.insert(new_col_2);
     tables.generated_spalten_parameter_tags.insert(new_col_1, tagset(&[ST::SternPolygon, ST::Universum]));
     tables.generated_spalten_parameter_tags.insert(new_col_2, tagset(&[ST::SternPolygon, ST::Universum]));
-    let key1 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    tables.generated_spalten_parameter.insert(key1, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
-    let key2 = tables.generated_spalten_parameter.len() + tables.spalten_vanilla_amount;
-    tables.generated_spalten_parameter.insert(key2, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+    tables.generated_spalten_parameter.insert(new_col_1, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+    tables.generated_spalten_parameter.insert(new_col_2, format!("{} | {} | {}", parameters_main.bedeutung0, parameters_main.procontra0, parameters_main.grundstrukturen0));
+}
+
+
+pub fn generated_befehle_for_request(
+    request: &crate::domain::spalten_anfrage::SpaltenAnfrage,
+) -> BTreeSet<String> {
+    request.generated_befehle_hint().into_iter().collect()
+}
+
+pub fn parameters_main_for_request(
+    request: &crate::domain::spalten_anfrage::SpaltenAnfrage,
+) -> ParametersMain {
+    let (bedeutung0, procontra0, grundstrukturen0, unter0) = request.parameters_main_hint();
+    ParametersMain {
+        bedeutung0: bedeutung0.unwrap_or_default(),
+        procontra0: procontra0.unwrap_or_default(),
+        grundstrukturen0: grundstrukturen0.unwrap_or_default(),
+        unter0: unter0.unwrap_or_default(),
+    }
 }

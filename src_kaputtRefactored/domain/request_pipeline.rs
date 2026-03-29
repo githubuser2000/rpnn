@@ -13,21 +13,34 @@ pub struct RawSelectionRequest {
 
 #[derive(Debug, Clone)]
 pub struct ParsedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExpandedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
     pub generated_befehle: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ResolvedSelectionRequest {
+    pub ober: String,
+    pub unter: String,
     pub request: SpaltenAnfrage,
     pub generated_befehle: BTreeSet<String>,
     pub direct_columns: Vec<u32>,
     pub required_columns: Vec<u32>,
+}
+
+pub fn parse_many<I>(pairs: I) -> Result<Vec<ParsedSelectionRequest>, RequestPipelineError>
+where
+    I: IntoIterator<Item = RawSelectionRequest>,
+{
+    pairs.into_iter().map(RawSelectionRequest::parse).collect()
 }
 
 impl RawSelectionRequest {
@@ -38,49 +51,43 @@ impl RawSelectionRequest {
     pub fn parse(self) -> Result<ParsedSelectionRequest, RequestPipelineError> {
         let request = SpaltenAnfrage::parse(&self.ober, &self.unter)
             .map_err(RequestPipelineError::ParseSpaltenAnfrage)?;
-        Ok(ParsedSelectionRequest { request })
+        Ok(ParsedSelectionRequest { ober: self.ober, unter: self.unter, request })
     }
 }
 
 impl ParsedSelectionRequest {
     pub fn expand(self, kategorie_map: &KategorieMap) -> ExpandedSelectionRequest {
         let mut generated_befehle = BTreeSet::new();
-        let cli = self.request.to_cli();
-        let parts: Vec<&str> = cli.split_whitespace().collect();
-        if parts.len() >= 3 {
-            let ober = parts[1];
-            let unter = parts[2..].join(" ");
-            if let Some(inference) = kategorie_map.infer_generated_pair(ober, &unter) {
-                generated_befehle.extend(inference.generated_befehle);
-            }
+        if let Some(inference) = kategorie_map.infer_generated_request(&self.request) {
+            generated_befehle.extend(inference.generated_befehle);
         }
-        ExpandedSelectionRequest { request: self.request, generated_befehle }
+        ExpandedSelectionRequest { ober: self.ober, unter: self.unter, request: self.request, generated_befehle }
     }
 }
 
 impl ExpandedSelectionRequest {
-    pub fn resolve(self, kategorie_map: &KategorieMap) -> ResolvedSelectionRequest {
-        let cli = self.request.to_cli();
-        let parts: Vec<&str> = cli.split_whitespace().collect();
-        let (direct_columns, required_columns) = if parts.len() >= 4 {
-            let ober = parts[1];
-            let unter = parts[2..].join(" ");
-            let direct_columns = kategorie_map.finde_spaltennummern_fuer_kategorien(ober, &unter);
-            let required_columns = kategorie_map
-                .infer_generated_pair(ober, &unter)
-                .map(|g| g.required_columns)
-                .unwrap_or_default();
-            (direct_columns, required_columns)
-        } else {
-            (Vec::new(), Vec::new())
-        };
+    pub fn resolve(self, kategorie_map: &KategorieMap) -> Result<ResolvedSelectionRequest, RequestPipelineError> {
+        let direct_columns = kategorie_map.finde_spaltennummern_fuer_request(&self.request);
+        let required_columns = kategorie_map
+            .infer_generated_request(&self.request)
+            .map(|g| g.required_columns)
+            .unwrap_or_default();
 
-        ResolvedSelectionRequest {
+        if direct_columns.is_empty() && required_columns.is_empty() && self.generated_befehle.is_empty() {
+            return Err(RequestPipelineError::NoColumnsForRequest {
+                ober: self.ober,
+                unter: self.unter,
+            });
+        }
+
+        Ok(ResolvedSelectionRequest {
+            ober: self.ober,
+            unter: self.unter,
             request: self.request,
             generated_befehle: self.generated_befehle,
             direct_columns,
             required_columns,
-        }
+        })
     }
 }
 

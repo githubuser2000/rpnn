@@ -1,14 +1,7 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use crate::domain::model::spalten_anfrage::{ColumnTarget, SpaltenAnfrage as CanonicalSpaltenAnfrage};
-use crate::domain::python_source_of_truth::{
-    self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair,
-    multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS,
-};
-use crate::domain::request_bridge::bridge_cli_selection;
-use crate::domain::resolver::request_resolver::resolve_request;
-use crate::domain::spalten_anfrage::SpaltenAnfrage;
+use crate::domain::python_source_of_truth::{self, PY_DECLS};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -86,6 +79,14 @@ impl SpaltenNummern {
         &self.0
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn contains(&self, needle: u32) -> bool {
+        self.0.contains(&needle)
+    }
+
     pub fn to_vec(&self) -> Vec<u32> {
         self.0.to_vec()
     }
@@ -102,6 +103,7 @@ impl AsRef<[u32]> for SpaltenNummern {
         self.as_slice()
     }
 }
+
 
 pub trait UnterkategorieEntry {
     fn unter_name(&self) -> &str;
@@ -192,13 +194,11 @@ pub struct GeneratedInference {
     pub direct_columns: Vec<u32>,
 }
 
-fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
-    match target {
-        ColumnTarget::DirectColumn(id) => vec![u32::from(*id)],
-        ColumnTarget::DirectColumns(ids) => ids.iter().map(|id| u32::from(*id)).collect(),
-        ColumnTarget::Pair(left, right) => vec![u32::from(*left), u32::from(*right)],
-        ColumnTarget::Generator(_) | ColumnTarget::Combination(_) => Vec::new(),
-    }
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
 }
 
 impl KategorieMap {
@@ -210,139 +210,105 @@ impl KategorieMap {
         instanz
     }
 
-    pub fn alle_typed_requests_fuer_cli_alles(&self) -> Vec<CanonicalSpaltenAnfrage> {
-        let mut out = Vec::new();
-        for (ober, unter) in self.alle_paare_fuer_cli_alles() {
-            if let Some(request) = bridge_cli_selection(&ober, &unter) {
-                out.push(request);
-            }
-        }
-        out.sort_by_key(|req| req.to_cli_pair());
-        out.dedup();
-        out
-    }
-
-    pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
-        let mut paare: BTreeSet<(String, String)> = self.alle_paare().into_iter().collect();
-
-        for (ober, unter) in generated_seed_pairs() {
-            paare.insert((ober, unter));
-        }
-        for (ober, unter) in combination_seed_pairs() {
-            paare.insert((ober, unter));
-        }
-        for (ober, unter) in multiplication_seed_pairs() {
-            paare.insert((ober, unter));
-        }
-
-        paare.into_iter().collect()
-    }
-
-    pub fn finde_spaltennummern_fuer_canonical_request(
-        &self,
-        request: &CanonicalSpaltenAnfrage,
-    ) -> Vec<u32> {
-        resolve_request(request.clone())
-            .map(|spec| canonical_target_to_columns(&spec.target))
-            .unwrap_or_default()
-    }
-
-    pub fn infer_generated_canonical_request(
-        &self,
-        request: &CanonicalSpaltenAnfrage,
-    ) -> Option<GeneratedInference> {
-        resolve_request(request.clone())
-            .map(|spec| match spec.target {
-                ColumnTarget::Generator(generator) => GeneratedInference {
-                    generated_befehle: vec![generator.art.to_string().to_lowercase()],
-                    required_columns: Vec::new(),
-                    direct_columns: Vec::new(),
-                },
-                ColumnTarget::Combination(_) => GeneratedInference::default(),
-                other => {
-                    let direct_columns = canonical_target_to_columns(&other);
-                    GeneratedInference {
-                        generated_befehle: Vec::new(),
-                        required_columns: direct_columns.clone(),
-                        direct_columns,
-                    }
-                }
-            })
-            .filter(|inf| {
-                !inf.generated_befehle.is_empty()
-                    || !inf.required_columns.is_empty()
-                    || !inf.direct_columns.is_empty()
-            })
-    }
-
-    pub fn infer_generated_request(&self, request: &SpaltenAnfrage) -> Option<GeneratedInference> {
-        let (ober, unter) = request.ober_unter_cli_pair();
-        self.infer_generated_pair(&ober, &unter)
-    }
-
-    pub fn finde_spaltennummern_fuer_request(&self, request: &SpaltenAnfrage) -> Vec<u32> {
-        let (ober, unter) = request.ober_unter_cli_pair();
-        self.finde_spaltennummern_fuer_kategorien(&ober, &unter)
-    }
-
     pub fn infer_generated_pair(&self, ober: &str, unter: &str) -> Option<GeneratedInference> {
+        let ober_n = normalize_key(ober);
+        let unter_n = normalize_key(unter);
+
         let mut direct_columns = self.finde_spaltennummern_fuer_kategorien(ober, unter);
-        direct_columns.sort_unstable();
+        direct_columns.sort();
         direct_columns.dedup();
 
-        let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-        if !is_strict_generated_pair(ober, unter) {
-            source.direct_columns.extend(direct_columns.iter().copied());
-            source.required_columns.extend(direct_columns.iter().copied());
-            source.direct_columns.sort_unstable();
-            source.direct_columns.dedup();
-            source.required_columns.sort_unstable();
-            source.required_columns.dedup();
+        let has = |n: u32| direct_columns.contains(&n);
+
+        let mut generated_befehle = Vec::<String>::new();
+        let mut required_columns = Vec::<u32>::new();
+
+        if matches!(ober_n.as_str(), "procontra" | "bedeutung" | "universum")
+            && matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra")
+        {
+            generated_befehle.push("primzahlkreuzprocontra".to_string());
         }
 
-        if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
+        if has(9) {
+            generated_befehle.push("lovepolygon".to_string());
+            required_columns.push(9);
+        }
+
+        if has(132) {
+            generated_befehle.push("gleichheitfreiheit".to_string());
+            required_columns.push(132);
+        }
+
+        if has(242) {
+            generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+            required_columns.push(242);
+        }
+
+        if has(64) {
+            generated_befehle.push("primcreativitytype".to_string());
+            generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+            required_columns.push(64);
+        }
+
+        if has(19) || has(90) {
+            generated_befehle.push("vervielfachezeile".to_string());
+            if has(19) {
+                required_columns.push(19);
+            }
+            if has(90) {
+                required_columns.push(90);
+            }
+        }
+
+        generated_befehle.sort();
+        generated_befehle.dedup();
+        required_columns.sort();
+        required_columns.dedup();
+
+        if generated_befehle.is_empty() && direct_columns.is_empty() {
             None
         } else {
-            Some(source)
+            Some(GeneratedInference {
+                generated_befehle,
+                required_columns,
+                direct_columns,
+            })
         }
     }
 
     pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-        python_source_of_truth::exact_all_direct_columns_for_pair(ober, unter)
+        python_source_of_truth::exact_columns_for_pair(ober, unter)
             .into_iter()
             .map(|n| n + 1)
             .collect()
     }
 
     pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
-        if is_strict_generated_pair(ober, unter) {
-            return Vec::new();
+        let exakt = self.finde_spaltennummern_exakt(ober, unter);
+        if !exakt.is_empty() {
+            return exakt;
         }
-        self.finde_spaltennummern_exakt(ober, unter)
+
+        python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
+            .into_iter()
+            .map(|n| n + 1)
+            .collect()
     }
 
     fn lade_kategorien(&mut self) {
         let mut main_to_sub: HashMap<String, HashMap<String, Vec<u32>>> = HashMap::new();
 
         for decl in PY_DECLS {
-            let ids: Vec<u32> = decl.columns.iter().map(|&id| id + 1).collect();
-            let mut inserted_any = false;
+            let korrigierte_ids: Vec<u32> = decl.columns.iter().map(|&id| id + 1).collect();
 
             for &main_cat in decl.main_aliases {
                 for &sub_cat in decl.sub_aliases {
-                    if let Ok(request) = SpaltenAnfrage::parse(main_cat, sub_cat) {
-                        let (ober, unter) = request.ober_unter_cli_pair();
-                        Self::insert_entry(&mut main_to_sub, &ober, &unter, ids.clone());
-                        inserted_any = true;
-                    }
-                }
-            }
-
-            if !inserted_any {
-                for &main_cat in decl.main_aliases {
-                    for &sub_cat in decl.sub_aliases {
-                        Self::insert_entry(&mut main_to_sub, main_cat, sub_cat, ids.clone());
-                    }
+                    Self::insert_entry(
+                        &mut main_to_sub,
+                        main_cat,
+                        sub_cat,
+                        korrigierte_ids.clone(),
+                    );
                 }
             }
         }
@@ -353,88 +319,75 @@ impl KategorieMap {
     fn convert_main_to_hauptkategorien(
         main_to_sub: HashMap<String, HashMap<String, Vec<u32>>>,
     ) -> Vec<Oberkategorie> {
-        let mut oberkategorien = Vec::new();
-        let mut sorted_main: Vec<(String, HashMap<String, Vec<u32>>)> = main_to_sub.into_iter().collect();
-        sorted_main.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut hauptkategorien: Vec<Oberkategorie> = main_to_sub
+            .into_iter()
+            .map(|(haupt_name, unter_map)| {
+                let mut unterkategorien: Vec<Unterkategorie> = unter_map
+                    .into_iter()
+                    .map(|(unter_name, spaltennummern)| Unterkategorie::new(unter_name, spaltennummern))
+                    .collect();
 
-        for (main_cat, sub_map) in sorted_main {
-            let mut sub_entries: Vec<(String, Vec<u32>)> = sub_map.into_iter().collect();
-            sub_entries.sort_by(|a, b| a.0.cmp(&b.0));
+                unterkategorien.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+                Oberkategorie::new(haupt_name, unterkategorien)
+            })
+            .collect();
 
-            let unterkategorien = sub_entries
-                .into_iter()
-                .map(|(sub_cat, ids)| Unterkategorie::new(sub_cat, ids))
-                .collect();
-
-            oberkategorien.push(Oberkategorie::new(main_cat, unterkategorien));
-        }
-
-        oberkategorien
-    }
-
-    fn insert_entry(
-        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
-        main_cat: &str,
-        sub_cat: &str,
-        ids: Vec<u32>,
-    ) {
-        let sub_map = main_to_sub.entry(main_cat.to_string()).or_default();
-        let entry = sub_map.entry(sub_cat.to_string()).or_default();
-        entry.extend(ids);
-        entry.sort_unstable();
-        entry.dedup();
+        hauptkategorien.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+        hauptkategorien
     }
 
     pub fn alle_paare(&self) -> Vec<(String, String)> {
-        let mut paare: BTreeSet<(String, String)> = BTreeSet::new();
+        let mut paare = Vec::new();
+
         for haupt in &self.hauptkategorien {
             for unter in &haupt.unterkategorien {
-                paare.insert((haupt.name.to_string(), unter.name.to_string()));
+                paare.push((haupt.name.as_str().to_string(), unter.name.as_str().to_string()));
             }
         }
-        paare.into_iter().collect()
+
+        paare.sort();
+        paare.dedup();
+        paare
     }
 
     pub fn alle_spaltennummern(&self) -> Vec<u32> {
         let mut nummern = Vec::new();
+
         for haupt in &self.hauptkategorien {
             for unter in &haupt.unterkategorien {
                 nummern.extend(unter.spaltennummern.as_slice().iter().copied());
             }
         }
+
         nummern.sort_unstable();
         nummern.dedup();
         nummern
     }
 
-    pub fn alle_hauptkategorien(&self) -> Vec<String> {
-        self.hauptkategorien.iter().map(|k| k.name.to_string()).collect()
-    }
+    fn insert_entry(
+        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
+        main_category: &str,
+        sub_category: &str,
+        new_ids: Vec<u32>,
+    ) {
+        let main_entry = main_to_sub
+            .entry(main_category.to_string())
+            .or_insert_with(HashMap::new);
 
-    pub fn alle_unterkategorien_fuer_hauptkategorie(&self, hauptkategorie: &str) -> Vec<String> {
-        self.hauptkategorien
-            .iter()
-            .find(|haupt| haupt.name.as_str() == hauptkategorie)
-            .map(|haupt| haupt.unterkategorien.iter().map(|u| u.name.to_string()).collect())
-            .unwrap_or_default()
-    }
+        let existing_ids = main_entry
+            .entry(sub_category.to_string())
+            .or_insert_with(Vec::new);
 
-    pub fn kategorien_count(&self) -> usize {
-        self.hauptkategorien.len()
-    }
-
-    pub fn unterkategorien_count(&self) -> usize {
-        let mut set = HashSet::<(String, String)>::new();
-        for haupt in &self.hauptkategorien {
-            for unter in &haupt.unterkategorien {
-                set.insert((haupt.name.to_string(), unter.name.to_string()));
-            }
+        let mut all_ids: HashSet<u32> = existing_ids.iter().cloned().collect();
+        for &id in &new_ids {
+            all_ids.insert(id);
         }
-        set.len()
+
+        let mut sorted_ids: Vec<u32> = all_ids.into_iter().collect();
+        sorted_ids.sort();
+        *existing_ids = sorted_ids;
     }
 }
-
-
 pub fn lade_kategorie_map() -> KategorieMap {
-    KategorieMap::new()
-}
+        KategorieMap::new()
+    }

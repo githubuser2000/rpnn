@@ -1,6 +1,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
+
 use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 
 #[derive(Debug, Clone, Default)]
@@ -82,18 +84,10 @@ pub fn resolve_exact_generator(ober: &str, unter: &str) -> Option<ExactResolved>
 
     match ober_n.as_str() {
         "universummetakonkret" | "metakonkret" => resolve_meta_konkret(unter),
-
-        // Python-kompatible Aliasfamilie für ParametersMain.konzept2 / Eigenschaften_1/n
-        "eigenschaft"
-        | "eigenschaften"
-        | "eigenschaftenn"
-        | "eigenschaftenn1"
-        | "eigenschaften1n"
-        | "konzept"
-        | "konzepte"
-        | "konzept2"
-        | "konzepte2" => resolve_eigenschaften_like(unter),
-
+        "eigenschaft" | "eigenschaften" | "eigenschaftenn" | "eigenschaftenn1" | "eigenschaften1n" => {
+            resolve_eigenschaften_like(unter)
+        }
+        "konzept" | "konzepte" | "konzept2" | "konzepte2" => resolve_eigenschaften_like(unter),
         _ => None,
     }
 }
@@ -103,4 +97,10 @@ pub fn try_run_exact_generator_bridge(
     _args: &[String],
 ) -> Result<bool, Box<dyn std::error::Error>> {
     Ok(false)
+}
+
+
+pub fn resolve_exact_generator_for_request(request: &SpaltenAnfrage) -> Option<ExactResolved> {
+    let (ober, unter) = request.ober_unter_cli_pair();
+    resolve_exact_generator(&ober, &unter)
 }

@@ -1,3 +1,8 @@
+use crate::domain::decl_model::HtmlDeclMeta;
+use crate::domain::typed_exact_decl::{
+    all_typed_exact_decls, is_typed_exact_decl_column, typed_exact_decl_for_column,
+};
+use crate::domain::spalten_anfrage::SpaltenAnfrage;
 // Auto-generated from reta.todel Python sources and runtime metadata
 
 #[derive(Debug, Clone, Copy)]
@@ -5,6 +10,10 @@ pub struct PyDecl {
     pub main_aliases: &'static [&'static str],
     pub sub_aliases: &'static [&'static str],
     pub columns: &'static [u32],
+}
+
+fn canonical_cli_pair_exact(ober: &str, unter: &str) -> Option<(String, String)> {
+    SpaltenAnfrage::parse(ober, unter).ok().map(|r| r.ober_unter_cli_pair())
 }
 
 fn normalize_key(s: &str) -> String {
@@ -1817,308 +1826,308 @@ pub static DECL_378: PyDecl = PyDecl {
     columns: &[449u32],
 };
 
-pub static PY_DECLS: &[PyDecl] = &[
-    DECL_0,
-    DECL_1,
-    DECL_2,
-    DECL_3,
-    DECL_4,
-    DECL_5,
-    DECL_6,
-    DECL_7,
-    DECL_8,
-    DECL_9,
-    DECL_10,
-    DECL_11,
-    DECL_12,
-    DECL_13,
-    DECL_14,
-    DECL_15,
-    DECL_16,
-    DECL_17,
-    DECL_19,
-    DECL_20,
-    DECL_21,
-    DECL_22,
-    DECL_23,
-    DECL_24,
-    DECL_25,
-    DECL_26,
-    DECL_27,
-    DECL_28,
-    DECL_29,
-    DECL_30,
-    DECL_31,
-    DECL_32,
-    DECL_33,
-    DECL_34,
-    DECL_35,
-    DECL_36,
-    DECL_37,
-    DECL_38,
-    DECL_39,
-    DECL_40,
-    DECL_41,
-    DECL_42,
-    DECL_43,
-    DECL_44,
-    DECL_45,
-    DECL_46,
-    DECL_47,
-    DECL_48,
-    DECL_49,
-    DECL_50,
-    DECL_51,
-    DECL_52,
-    DECL_53,
-    DECL_54,
-    DECL_55,
-    DECL_56,
-    DECL_57,
-    DECL_58,
-    DECL_59,
-    DECL_60,
-    DECL_61,
-    DECL_62,
-    DECL_63,
-    DECL_64,
-    DECL_65,
-    DECL_66,
-    DECL_67,
-    DECL_68,
-    DECL_69,
-    DECL_70,
-    DECL_71,
-    DECL_72,
-    DECL_73,
-    DECL_74,
-    DECL_75,
-    DECL_76,
-    DECL_77,
-    DECL_78,
-    DECL_79,
-    DECL_80,
-    DECL_81,
-    DECL_82,
-    DECL_83,
-    DECL_84,
-    DECL_85,
-    DECL_86,
-    DECL_87,
-    DECL_88,
-    DECL_108,
-    DECL_109,
-    DECL_110,
-    DECL_111,
-    DECL_112,
-    DECL_113,
-    DECL_114,
-    DECL_115,
-    DECL_116,
-    DECL_117,
-    DECL_118,
-    DECL_119,
-    DECL_120,
-    DECL_121,
-    DECL_122,
-    DECL_123,
-    DECL_124,
-    DECL_125,
-    DECL_126,
-    DECL_127,
-    DECL_128,
-    DECL_129,
-    DECL_130,
-    DECL_131,
-    DECL_132,
-    DECL_133,
-    DECL_134,
-    DECL_135,
-    DECL_136,
-    DECL_137,
-    DECL_138,
-    DECL_139,
-    DECL_140,
-    DECL_141,
-    DECL_142,
-    DECL_143,
-    DECL_144,
-    DECL_145,
-    DECL_146,
-    DECL_147,
-    DECL_148,
-    DECL_149,
-    DECL_150,
-    DECL_151,
-    DECL_152,
-    DECL_153,
-    DECL_154,
-    DECL_155,
-    DECL_156,
-    DECL_157,
-    DECL_158,
-    DECL_159,
-    DECL_160,
-    DECL_161,
-    DECL_162,
-    DECL_163,
-    DECL_164,
-    DECL_165,
-    DECL_166,
-    DECL_167,
-    DECL_168,
-    DECL_169,
-    DECL_170,
-    DECL_171,
-    DECL_172,
-    DECL_173,
-    DECL_174,
-    DECL_175,
-    DECL_176,
-    DECL_177,
-    DECL_178,
-    DECL_179,
-    DECL_180,
-    DECL_181,
-    DECL_182,
-    DECL_183,
-    DECL_184,
-    DECL_185,
-    DECL_186,
-    DECL_187,
-    DECL_188,
-    DECL_189,
-    DECL_190,
-    DECL_191,
-    DECL_192,
-    DECL_193,
-    DECL_194,
-    DECL_195,
-    DECL_196,
-    DECL_197,
-    DECL_198,
-    DECL_199,
-    DECL_200,
-    DECL_201,
-    DECL_202,
-    DECL_203,
-    DECL_204,
-    DECL_205,
-    DECL_206,
-    DECL_207,
-    DECL_208,
-    DECL_209,
-    DECL_210,
-    DECL_211,
-    DECL_212,
-    DECL_213,
-    DECL_214,
-    DECL_215,
-    DECL_216,
-    DECL_217,
-    DECL_218,
-    DECL_219,
-    DECL_220,
-    DECL_221,
-    DECL_222,
-    DECL_223,
-    DECL_224,
-    DECL_225,
-    DECL_226,
-    DECL_227,
-    DECL_228,
-    DECL_229,
-    DECL_230,
-    DECL_231,
-    DECL_232,
-    DECL_233,
-    DECL_234,
-    DECL_235,
-    DECL_236,
-    DECL_237,
-    DECL_238,
-    DECL_239,
-    DECL_240,
-    DECL_241,
-    DECL_242,
-    DECL_243,
-    DECL_244,
-    DECL_245,
-    DECL_246,
-    DECL_247,
-    DECL_248,
-    DECL_249,
-    DECL_250,
-    DECL_251,
-    DECL_252,
-    DECL_253,
-    DECL_254,
-    DECL_255,
-    DECL_256,
-    DECL_257,
-    DECL_258,
-    DECL_259,
-    DECL_260,
-    DECL_261,
-    DECL_262,
-    DECL_266,
-    DECL_267,
-    DECL_268,
-    DECL_269,
-    DECL_270,
-    DECL_271,
-    DECL_272,
-    DECL_273,
-    DECL_274,
-    DECL_275,
-    DECL_280,
-    DECL_281,
-    DECL_282,
-    DECL_283,
-    DECL_284,
-    DECL_285,
-    DECL_286,
-    DECL_287,
-    DECL_288,
-    DECL_289,
-    DECL_290,
-    DECL_296,
-    DECL_320,
-    DECL_321,
-    DECL_322,
-    DECL_333,
-    DECL_338,
-    DECL_339,
-    DECL_340,
-    DECL_341,
-    DECL_342,
-    DECL_343,
-    DECL_353,
-    DECL_354,
-    DECL_355,
-    DECL_356,
-    DECL_357,
-    DECL_358,
-    DECL_359,
-    DECL_360,
-    DECL_361,
-    DECL_362,
-    DECL_363,
-    DECL_364,
-    DECL_365,
-    DECL_366,
-    DECL_367,
-    DECL_368,
-    DECL_369,
-    DECL_370,
-    DECL_371,
-    DECL_372,
-    DECL_373,
-    DECL_374,
-    DECL_375,
-    DECL_376,
-    DECL_377,
-    DECL_378,
+pub static PY_DECLS: &[&PyDecl] = &[
+    &DECL_0,
+    &DECL_1,
+    &DECL_2,
+    &DECL_3,
+    &DECL_4,
+    &DECL_5,
+    &DECL_6,
+    &DECL_7,
+    &DECL_8,
+    &DECL_9,
+    &DECL_10,
+    &DECL_11,
+    &DECL_12,
+    &DECL_13,
+    &DECL_14,
+    &DECL_15,
+    &DECL_16,
+    &DECL_17,
+    &DECL_19,
+    &DECL_20,
+    &DECL_21,
+    &DECL_22,
+    &DECL_23,
+    &DECL_24,
+    &DECL_25,
+    &DECL_26,
+    &DECL_27,
+    &DECL_28,
+    &DECL_29,
+    &DECL_30,
+    &DECL_31,
+    &DECL_32,
+    &DECL_33,
+    &DECL_34,
+    &DECL_35,
+    &DECL_36,
+    &DECL_37,
+    &DECL_38,
+    &DECL_39,
+    &DECL_40,
+    &DECL_41,
+    &DECL_42,
+    &DECL_43,
+    &DECL_44,
+    &DECL_45,
+    &DECL_46,
+    &DECL_47,
+    &DECL_48,
+    &DECL_49,
+    &DECL_50,
+    &DECL_51,
+    &DECL_52,
+    &DECL_53,
+    &DECL_54,
+    &DECL_55,
+    &DECL_56,
+    &DECL_57,
+    &DECL_58,
+    &DECL_59,
+    &DECL_60,
+    &DECL_61,
+    &DECL_62,
+    &DECL_63,
+    &DECL_64,
+    &DECL_65,
+    &DECL_66,
+    &DECL_67,
+    &DECL_68,
+    &DECL_69,
+    &DECL_70,
+    &DECL_71,
+    &DECL_72,
+    &DECL_73,
+    &DECL_74,
+    &DECL_75,
+    &DECL_76,
+    &DECL_77,
+    &DECL_78,
+    &DECL_79,
+    &DECL_80,
+    &DECL_81,
+    &DECL_82,
+    &DECL_83,
+    &DECL_84,
+    &DECL_85,
+    &DECL_86,
+    &DECL_87,
+    &DECL_88,
+    &DECL_108,
+    &DECL_109,
+    &DECL_110,
+    &DECL_111,
+    &DECL_112,
+    &DECL_113,
+    &DECL_114,
+    &DECL_115,
+    &DECL_116,
+    &DECL_117,
+    &DECL_118,
+    &DECL_119,
+    &DECL_120,
+    &DECL_121,
+    &DECL_122,
+    &DECL_123,
+    &DECL_124,
+    &DECL_125,
+    &DECL_126,
+    &DECL_127,
+    &DECL_128,
+    &DECL_129,
+    &DECL_130,
+    &DECL_131,
+    &DECL_132,
+    &DECL_133,
+    &DECL_134,
+    &DECL_135,
+    &DECL_136,
+    &DECL_137,
+    &DECL_138,
+    &DECL_139,
+    &DECL_140,
+    &DECL_141,
+    &DECL_142,
+    &DECL_143,
+    &DECL_144,
+    &DECL_145,
+    &DECL_146,
+    &DECL_147,
+    &DECL_148,
+    &DECL_149,
+    &DECL_150,
+    &DECL_151,
+    &DECL_152,
+    &DECL_153,
+    &DECL_154,
+    &DECL_155,
+    &DECL_156,
+    &DECL_157,
+    &DECL_158,
+    &DECL_159,
+    &DECL_160,
+    &DECL_161,
+    &DECL_162,
+    &DECL_163,
+    &DECL_164,
+    &DECL_165,
+    &DECL_166,
+    &DECL_167,
+    &DECL_168,
+    &DECL_169,
+    &DECL_170,
+    &DECL_171,
+    &DECL_172,
+    &DECL_173,
+    &DECL_174,
+    &DECL_175,
+    &DECL_176,
+    &DECL_177,
+    &DECL_178,
+    &DECL_179,
+    &DECL_180,
+    &DECL_181,
+    &DECL_182,
+    &DECL_183,
+    &DECL_184,
+    &DECL_185,
+    &DECL_186,
+    &DECL_187,
+    &DECL_188,
+    &DECL_189,
+    &DECL_190,
+    &DECL_191,
+    &DECL_192,
+    &DECL_193,
+    &DECL_194,
+    &DECL_195,
+    &DECL_196,
+    &DECL_197,
+    &DECL_198,
+    &DECL_199,
+    &DECL_200,
+    &DECL_201,
+    &DECL_202,
+    &DECL_203,
+    &DECL_204,
+    &DECL_205,
+    &DECL_206,
+    &DECL_207,
+    &DECL_208,
+    &DECL_209,
+    &DECL_210,
+    &DECL_211,
+    &DECL_212,
+    &DECL_213,
+    &DECL_214,
+    &DECL_215,
+    &DECL_216,
+    &DECL_217,
+    &DECL_218,
+    &DECL_219,
+    &DECL_220,
+    &DECL_221,
+    &DECL_222,
+    &DECL_223,
+    &DECL_224,
+    &DECL_225,
+    &DECL_226,
+    &DECL_227,
+    &DECL_228,
+    &DECL_229,
+    &DECL_230,
+    &DECL_231,
+    &DECL_232,
+    &DECL_233,
+    &DECL_234,
+    &DECL_235,
+    &DECL_236,
+    &DECL_237,
+    &DECL_238,
+    &DECL_239,
+    &DECL_240,
+    &DECL_241,
+    &DECL_242,
+    &DECL_243,
+    &DECL_244,
+    &DECL_245,
+    &DECL_246,
+    &DECL_247,
+    &DECL_248,
+    &DECL_249,
+    &DECL_250,
+    &DECL_251,
+    &DECL_252,
+    &DECL_253,
+    &DECL_254,
+    &DECL_255,
+    &DECL_256,
+    &DECL_257,
+    &DECL_258,
+    &DECL_259,
+    &DECL_260,
+    &DECL_261,
+    &DECL_262,
+    &DECL_266,
+    &DECL_267,
+    &DECL_268,
+    &DECL_269,
+    &DECL_270,
+    &DECL_271,
+    &DECL_272,
+    &DECL_273,
+    &DECL_274,
+    &DECL_275,
+    &DECL_280,
+    &DECL_281,
+    &DECL_282,
+    &DECL_283,
+    &DECL_284,
+    &DECL_285,
+    &DECL_286,
+    &DECL_287,
+    &DECL_288,
+    &DECL_289,
+    &DECL_290,
+    &DECL_296,
+    &DECL_320,
+    &DECL_321,
+    &DECL_322,
+    &DECL_333,
+    &DECL_338,
+    &DECL_339,
+    &DECL_340,
+    &DECL_341,
+    &DECL_342,
+    &DECL_343,
+    &DECL_353,
+    &DECL_354,
+    &DECL_355,
+    &DECL_356,
+    &DECL_357,
+    &DECL_358,
+    &DECL_359,
+    &DECL_360,
+    &DECL_361,
+    &DECL_362,
+    &DECL_363,
+    &DECL_364,
+    &DECL_365,
+    &DECL_366,
+    &DECL_367,
+    &DECL_368,
+    &DECL_369,
+    &DECL_370,
+    &DECL_371,
+    &DECL_372,
+    &DECL_373,
+    &DECL_374,
+    &DECL_375,
+    &DECL_376,
+    &DECL_377,
+    &DECL_378,
 ];
 
 pub static EXACT_HTML_META: &[(u32, &str)] = &[
@@ -2544,28 +2553,265 @@ pub static EXACT_HTML_META: &[(u32, &str)] = &[
 ];
 
 
-pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let ober_n = normalize_key(ober);
-    let unter_n = normalize_key(unter);
-    let mut found: Option<Vec<u32>> = None;
-    for decl in PY_DECLS {
-        let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
-        let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a) == unter_n);
-        if main_match && sub_match {
-            found = Some(decl.columns.to_vec());
+
+
+
+
+pub fn normalize_cli_token(s: &str) -> String {
+    normalize_key(s)
+}
+
+fn stable_dedup_columns(cols: Vec<u32>) -> Vec<u32> {
+    use std::collections::BTreeSet;
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::new();
+    for c in cols {
+        if seen.insert(c) {
+            out.push(c);
         }
     }
-    let mut out = found.unwrap_or_default();
-    out.sort_unstable();
+    out
+}
+
+pub fn exact_supplemental_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let _ober_n = normalize_cli_token(ober);
+    let _unter_n = normalize_cli_token(unter);
+
+    // Vorbild 2 (`src_vorRefactoring230327`) soll hier als zweiter
+    // exakter Datenraum einspeisen.
+    //
+    // Absichtlich noch exact-only und ohne fuzzy.
+    let cols: Vec<u32> = Vec::new();
+    stable_dedup_columns(cols)
+}
+
+pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let mut cols = exact_columns_for_pair(ober, unter);
+    cols.extend(exact_supplemental_columns_for_pair(ober, unter));
+    stable_dedup_columns(cols)
+}
+pub fn generated_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for command in [
+        "primzahlkreuzprocontra",
+        "lovepolygon",
+        "gleichheitfreiheit",
+        "geistemotionenergiematerietopologie",
+        "primcreativitytype",
+        "mondexponzierenlogarithmustyp",
+        "vervielfachezeile",
+    ] {
+        out.extend(generated_pairs_for_command(command));
+    }
+    out.push(("Modallogik".to_string(), "Modallogik".to_string()));
+    out.sort();
     out.dedup();
     out
+}
+
+pub fn combination_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for unter in [
+        "tiere",
+        "berufe",
+        "kreativität",
+        "liebe",
+        "männer",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "emotionen",
+        "personen",
+        "wirtschaftssysteme",
+        "eigentum",
+    ] {
+        out.push(("KombinationGalaxie".to_string(), unter.to_string()));
+    }
+    for unter in [
+        "tiere",
+        "berufe",
+        "transzendentalien",
+        "primzahlkreuz",
+        "persönlichkeit",
+        "religion",
+        "motive",
+        "ontologie",
+        "personen",
+        "mechanismen",
+        "gegentranszendentalien",
+        "maschinen",
+        "geist",
+        "bewusstsein",
+    ] {
+        out.push(("KombinationUniversum".to_string(), unter.to_string()));
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_seed_pairs() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for ober in ["primvielfache", "multiplikationen"] {
+        for unter in [
+            "motivgleichfoermig",
+            "strukturgleichfoermig",
+            "motivstern",
+            "strukturstern",
+            "motivgebrstern",
+            "strukgebrstern",
+            "motivgebrgleichf",
+            "strukgebrgleichf",
+        ] {
+            out.push((ober.to_string(), unter.to_string()));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn generated_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let mut push = |ober: &str, unter: &str| {
+        out.push((ober.to_string(), unter.to_string()));
+    };
+
+    match key.as_str() {
+        "primzahlkreuzprocontra" => {
+            push("Universum", "Primzahlkreuz");
+            push("Bedeutung", "Primzahlkreuz");
+            push("Pro_Contra", "Primzahlkreuz");
+        }
+        "lovepolygon" => {
+            push("Menschliches", "Liebe");
+            push("Grundstrukturen", "Liebe");
+        }
+        "gleichheitfreiheit" => {
+            push("Planet", "Gleichheit");
+            push("Menschliches", "Gleichheit");
+            push("Grundstrukturen", "Gleichheit");
+        }
+        "geistemotionenergiematerietopologie" => {
+            push("Universum", "Geist");
+            push("Multiversum", "Geist");
+            push("Grundstrukturen", "Geist");
+        }
+        "primcreativitytype" | "mondexponzierenlogarithmustyp" => {
+            push("Wichtigstes_zum_verstehen", "Gestirn");
+            push("Bedeutung", "Gestirn");
+        }
+        "vervielfachezeile" => {
+            push("Wichtigstes_zum_verstehen", "Primzahlen");
+            push("Bedeutung", "Primzahlen");
+        }
+        _ => {}
+    }
+
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn multiplication_pairs_for_command(command: &str) -> Vec<(String, String)> {
+    let key = normalize_key(command);
+    let mut out = Vec::new();
+
+    let unter = match key.as_str() {
+        "primmotgleichf" => Some("motivgleichfoermig"),
+        "primstrukgleichf" => Some("strukturgleichfoermig"),
+        "primmotivstern" => Some("motivstern"),
+        "primstrukturstern" => Some("strukturstern"),
+        "primmotivsterngebr" => Some("motivgebrstern"),
+        "primstruktursterngebr" => Some("strukgebrstern"),
+        "primmotgleichfgebr" => Some("motivgebrgleichf"),
+        "primstrukgleichfgebr" => Some("strukgebrgleichf"),
+        _ => None,
+    };
+
+    if let Some(unter) = unter {
+        out.push(("primvielfache".to_string(), unter.to_string()));
+        out.push(("multiplikationen".to_string(), unter.to_string()));
+    }
+
+    out
+}
+
+pub fn kombination_name_for_index(ober: &str, idx: usize) -> Option<&'static str> {
+    match normalize_key(ober).as_str() {
+        "kombinationgalaxie" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            3 => Some("kreativität"),
+            4 => Some("liebe"),
+            7 => Some("männer"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            12 => Some("emotionen"),
+            13 => Some("personen"),
+            16 => Some("wirtschaftssysteme"),
+            17 => Some("eigentum"),
+            _ => None,
+        },
+        "kombinationuniversum" => match idx {
+            1 => Some("tiere"),
+            2 => Some("berufe"),
+            5 => Some("transzendentalien"),
+            6 => Some("primzahlkreuz"),
+            8 => Some("persönlichkeit"),
+            9 => Some("religion"),
+            10 => Some("motive"),
+            11 => Some("ontologie"),
+            13 => Some("personen"),
+            14 => Some("mechanismen"),
+            15 => Some("gegentranszendentalien"),
+            17 => Some("maschinen"),
+            18 => Some("geist"),
+            19 => Some("bewusstsein"),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn exact_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let Some((want_ober, want_unter)) = canonical_cli_pair_exact(ober, unter) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::new();
+    for decl in PY_DECLS.iter() {
+        let mut matched = false;
+        for main_alias in decl.main_aliases.iter() {
+            for sub_alias in decl.sub_aliases.iter() {
+                if let Some((decl_ober, decl_unter)) = canonical_cli_pair_exact(main_alias, sub_alias) {
+                    if decl_ober == want_ober && decl_unter == want_unter {
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if matched {
+                break;
+            }
+        }
+
+        if matched {
+            out.extend_from_slice(decl.columns);
+        }
+    }
+
+    stable_dedup_columns(out)
 }
 
 pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
     let ober_n = normalize_key(ober);
     let unter_n = normalize_key(unter);
     let mut out = Vec::new();
-    for decl in PY_DECLS {
+    for decl in PY_DECLS.iter().copied() {
         let main_match = decl.main_aliases.iter().any(|a| normalize_key(a) == ober_n);
         let sub_match = decl.sub_aliases.iter().any(|a| normalize_key(a).contains(&unter_n));
         if main_match && sub_match {
@@ -2578,10 +2824,106 @@ pub fn fuzzy_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
 }
 
 pub fn exact_meta_for_column(col: u32) -> Option<String> {
+    exact_decl_meta_for_column(col).map(|meta| meta.render())
+}
+
+fn legacy_exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
     for (c, meta) in EXACT_HTML_META {
         if *c == col {
-            return Some((*meta).to_string());
+            return HtmlDeclMeta::parse(meta);
         }
     }
     None
+}
+
+pub fn exact_decl_meta_for_column(col: u32) -> Option<HtmlDeclMeta> {
+    if let Some(meta) = typed_exact_decl_for_column(col) {
+        return Some(meta);
+    }
+    if is_typed_exact_decl_column(col) {
+        panic!("typed exact decl missing for column {}", col);
+    }
+    legacy_exact_decl_meta_for_column(col)
+}
+
+pub fn all_exact_decl_meta() -> Vec<(u32, HtmlDeclMeta)> {
+    let mut out = all_typed_exact_decls();
+    for (col, meta) in EXACT_HTML_META {
+        if is_typed_exact_decl_column(*col) {
+            continue;
+        }
+        if let Some(parsed) = HtmlDeclMeta::parse(meta) {
+            out.push((*col, parsed));
+        }
+    }
+    out
+}
+
+
+
+
+pub fn is_strict_generated_pair(ober: &str, unter: &str) -> bool {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+
+    matches!(unter_n.as_str(), "primzahlkreuz" | "primzahlkreuzprocontra" | "nachvollziehen")
+        && matches!(ober_n.as_str(), "universum" | "bedeutung" | "procontra" | "grundstrukturen")
+}
+pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<crate::domain::categories::GeneratedInference> {
+    let ober_n = normalize_key(ober);
+    let unter_n = normalize_key(unter);
+    let ober_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == ober_n);
+    let sub_has = |aliases: &[&str]| aliases.iter().any(|a| normalize_key(a) == unter_n);
+
+    let mut generated_befehle = Vec::<String>::new();
+
+    if ober_has(&["procontra", "bedeutung", "universum", "grundstrukturen"])
+        && sub_has(&["primzahlkreuz", "primzahlkreuzprocontra", "nachvollziehen"]) {
+        generated_befehle.push("primzahlkreuzprocontra".to_string());
+    }
+
+    if ober_has(&["menschliches", "grundstrukturen"])
+        && sub_has(&["liebe", "ethik"]) {
+        generated_befehle.push("lovepolygon".to_string());
+    }
+
+    if ober_has(&["planet", "menschliches", "grundstrukturen"])
+        && sub_has(&["gleichheit", "freiheit", "ordnung", "ordnen", "filterung", "dominieren", "ungleichheit", "gleichheitfreiheit"]) {
+        generated_befehle.push("gleichheitfreiheit".to_string());
+    }
+
+    if ober_has(&["universum", "multiversum", "grundstrukturen"])
+        && sub_has(&["geist", "bewusstsein", "emotion", "emotionen", "gefuehl", "gefuehle", "gefühl", "gefühle", "energie", "materie", "topologie"]) {
+        generated_befehle.push("geistemotionenergiematerietopologie".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["gestirn", "sonne", "planet", "evolution", "intelligenz", "kreativ", "kreativitaet", "kreativität", "lernen", "erwerben"]) {
+        generated_befehle.push("primcreativitytype".to_string());
+    }
+
+    if ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["mond", "logarithmus", "exponieren", "exponential", "exponentiell"]) {
+        generated_befehle.push("mondexponzierenlogarithmustyp".to_string());
+    }
+
+    if (ober_has(&["bedeutung", "wichtigsteszumverstehen", "wichtigsteverstehen"])
+        && sub_has(&["primzahlen", "vielfache", "multis", "multiplikationen"]))
+        || (ober_has(&["galaxie", "alteschriften", "kreis", "galaxien", "kreise"])
+            && sub_has(&["offenbarung", "offenbarungdesjohannes", "johannes", "bibel"])) {
+        generated_befehle.push("vervielfachezeile".to_string());
+    }
+
+    generated_befehle.sort();
+    generated_befehle.dedup();
+
+    if generated_befehle.is_empty() {
+        None
+    } else {
+        Some(crate::domain::categories::GeneratedInference {
+            generated_befehle,
+            required_columns: exact_all_direct_columns_for_pair(ober, unter),
+            direct_columns: exact_all_direct_columns_for_pair(ober, unter),
+        })
+    }
 }
