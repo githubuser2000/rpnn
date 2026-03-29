@@ -16,6 +16,16 @@ use crate::domain::model::spalten_anfrage::{
 };
 use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
+
+fn canonical_generator_command(art: GeneratorArt) -> &'static str {
+    match art {
+        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+        GeneratorArt::Multiplikationen => "multiplikationen",
+        GeneratorArt::Primvielfache => "primvielfache",
+        GeneratorArt::MetaKonkret => "metakonkret",
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
 
@@ -215,15 +225,6 @@ fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
         ColumnTarget::DirectColumns(ids) => ids.iter().map(|id| *id as u32).collect(),
         ColumnTarget::Pair(left, right) => vec![*left as u32, *right as u32],
         ColumnTarget::Generator(_) | ColumnTarget::Combination(_) => Vec::new(),
-    }
-}
-
-fn canonical_generator_command(art: GeneratorArt) -> &'static str {
-    match art {
-        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
-        GeneratorArt::Multiplikationen => "multiplikationen",
-        GeneratorArt::Primvielfache => "primvielfache",
-        GeneratorArt::MetaKonkret => "metakonkret",
     }
 }
 

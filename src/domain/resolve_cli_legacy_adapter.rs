@@ -2,12 +2,12 @@ use std::collections::BTreeSet;
 
 use crate::domain::categories::KategorieMap;
 use crate::domain::exact_generator_bridge::resolve_exact_generator;
-use crate::domain::ids::domain_id::GeneratorArt;
 use crate::domain::model::spalten_anfrage::ColumnTarget;
 use crate::domain::python_source_of_truth::{exact_columns_for_pair, is_strict_generated_pair};
 use crate::domain::request_bridge::bridge_cli_selection;
 use crate::domain::request_pipeline::RawSelectionRequest;
 use crate::domain::resolver::request_resolver::resolve_request;
+use crate::domain::ids::domain_id::GeneratorArt;
 
 #[derive(Debug, Clone, Default)]
 pub struct LegacyResolvedSelection {
