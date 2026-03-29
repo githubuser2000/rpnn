@@ -14,6 +14,7 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
+use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 
@@ -313,11 +314,23 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
+
+        if let Some(exact) = resolve_exact_generator(ober, unter) {
+            source.generated_befehle.extend(exact.generated_befehle.into_iter());
+            source.required_columns.extend(exact.direct_columns.iter().copied().map(|n| n as u32));
+            source.direct_columns.extend(exact.direct_columns.into_iter().map(|n| n as u32));
+        }
+
         if !is_strict_generated_pair(ober, unter) {
             source.direct_columns.extend(direct_columns.iter().copied());
-            source.direct_columns.sort();
-            source.direct_columns.dedup();
         }
+
+        source.generated_befehle.sort();
+        source.generated_befehle.dedup();
+        source.required_columns.sort();
+        source.required_columns.dedup();
+        source.direct_columns.sort();
+        source.direct_columns.dedup();
 
         if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
@@ -337,7 +350,16 @@ impl KategorieMap {
         if is_strict_generated_pair(ober, unter) {
             return Vec::new();
         }
-        self.finde_spaltennummern_exakt(ober, unter)
+
+        let exakt = self.finde_spaltennummern_exakt(ober, unter);
+        if !exakt.is_empty() {
+            return exakt;
+        }
+
+        python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
+            .into_iter()
+            .map(|n| n + 1)
+            .collect()
     }
 
     fn lade_kategorien(&mut self) {

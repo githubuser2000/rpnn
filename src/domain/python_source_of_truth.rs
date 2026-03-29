@@ -1,4 +1,5 @@
 use crate::domain::decl_model::HtmlDeclMeta;
+use crate::domain::exact_mappings::{EIGENSCHAFT_MAPPINGS, META_KONKRET_MAPPINGS};
 use crate::domain::typed_exact_decl::{
     all_typed_exact_decls, is_typed_exact_decl_column, typed_exact_decl_for_column,
 };
@@ -2569,14 +2570,59 @@ fn stable_dedup_columns(cols: Vec<u32>) -> Vec<u32> {
 }
 
 pub fn exact_supplemental_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
-    let _ober_n = normalize_cli_token(ober);
-    let _unter_n = normalize_cli_token(unter);
+    let ober_n = normalize_cli_token(ober);
+    let unter_n = normalize_cli_token(unter);
+    let mut cols: Vec<u32> = Vec::new();
 
-    // Vorbild 2 (`src_vorRefactoring230327`) soll hier als zweiter
-    // exakter Datenraum einspeisen.
-    //
-    // Absichtlich noch exact-only und ohne fuzzy.
-    let cols: Vec<u32> = Vec::new();
+    let is_eigenschaften_like = matches!(
+        ober_n.as_str(),
+        "eigenschaft"
+            | "eigenschaften"
+            | "eigenschaftenn"
+            | "eigenschaften1n"
+            | "konzept"
+            | "konzepte"
+            | "konzept1"
+            | "konzepte1"
+            | "konzept2"
+            | "konzepte2"
+    );
+
+    if is_eigenschaften_like {
+        for (aliases, direct_columns, maybe_pair) in EIGENSCHAFT_MAPPINGS {
+            let alias_match = aliases
+                .iter()
+                .any(|alias| normalize_cli_token(alias) == unter_n);
+            if !alias_match {
+                continue;
+            }
+
+            cols.extend(direct_columns.iter().map(|&n| n as u32));
+            if let Some((left, right)) = maybe_pair {
+                cols.push(*left as u32);
+                cols.push(*right as u32);
+            }
+        }
+    }
+
+    if matches!(ober_n.as_str(), "universummetakonkret" | "metakonkret") {
+        for (aliases, (left, right)) in META_KONKRET_MAPPINGS {
+            let alias_match = aliases
+                .iter()
+                .any(|alias| normalize_cli_token(alias) == unter_n);
+            if !alias_match {
+                continue;
+            }
+
+            cols.push(*left as u32);
+            cols.push(*right as u32);
+            cols.push(5);
+            cols.push(131);
+            cols.push(198);
+            cols.push(201);
+        }
+    }
+
     stable_dedup_columns(cols)
 }
 
