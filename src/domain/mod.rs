@@ -7,7 +7,6 @@ pub mod reverse_request_report;
 pub mod selection_state;
 pub mod tabellen_utils;
 pub mod generator_logic;
-pub mod category_map;
 
 pub mod python_source_of_truth;
 pub mod decl_model;

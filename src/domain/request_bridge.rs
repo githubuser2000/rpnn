@@ -1,7 +1,97 @@
 use crate::domain::eigenschaften::EigenschaftKeyId;
 use crate::domain::ids::domain_id::{DomainId, GebrochenRationalArt, GeneratorArt, KombinationsArt};
 use crate::domain::model::spalten_anfrage as canonical;
+use crate::domain::model::spalten_anfrage::{EigenschaftRequest, EigenschaftsFamilie, GeneratorParameter, KombiUnterId, StandardUnterId};
 use crate::domain::spalten_anfrage as legacy;
+
+fn canonical_standard(domain: DomainId, unter: StandardUnterId) -> canonical::SpaltenAnfrage {
+    canonical::SpaltenAnfrage::Standard { domain, unter }
+}
+
+fn canonical_python(domain: DomainId, unter: impl Into<String>) -> canonical::SpaltenAnfrage {
+    canonical_standard(domain, StandardUnterId::PythonSubcategory(unter.into()))
+}
+
+fn map_eigenschaft(
+    familie: EigenschaftsFamilie,
+    unter: &str,
+    fallback_domain: DomainId,
+) -> canonical::SpaltenAnfrage {
+    if let Some(key) = EigenschaftKeyId::from_alias(unter) {
+        return canonical_standard(
+            fallback_domain,
+            StandardUnterId::Eigenschaft(EigenschaftRequest { familie, key }),
+        );
+    }
+
+    canonical_python(fallback_domain, unter)
+}
+
+fn map_menschliches(unter: &legacy::MenschlichesUnter) -> canonical::SpaltenAnfrage {
+    let mapped = match unter {
+        legacy::MenschlichesUnter::Liebe => StandardUnterId::Liebe,
+        legacy::MenschlichesUnter::Gleichheit => StandardUnterId::PythonSubcategory("Gleichheit".to_string()),
+        legacy::MenschlichesUnter::Hoelle => StandardUnterId::Hoelle,
+        legacy::MenschlichesUnter::Klasse => StandardUnterId::Klasse,
+        legacy::MenschlichesUnter::Gewalt => StandardUnterId::Gewalt,
+        legacy::MenschlichesUnter::Politische => StandardUnterId::Politische,
+        legacy::MenschlichesUnter::Richtungen => StandardUnterId::Richtungen,
+        legacy::MenschlichesUnter::Formationen => StandardUnterId::Formationen,
+        legacy::MenschlichesUnter::Motive => StandardUnterId::PythonSubcategory("Motive".to_string()),
+        legacy::MenschlichesUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
+    };
+    canonical_standard(DomainId::Menschliches, mapped)
+}
+
+fn map_universum(unter: &legacy::UniversumUnter) -> canonical::SpaltenAnfrage {
+    let mapped = match unter {
+        legacy::UniversumUnter::Geist => StandardUnterId::Geist,
+        legacy::UniversumUnter::Primzahlkreuz => StandardUnterId::Primzahlkreuz,
+        legacy::UniversumUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
+    };
+    canonical_standard(DomainId::Universum, mapped)
+}
+
+fn map_religion(unter: &legacy::ReligionUnter) -> canonical::SpaltenAnfrage {
+    let mapped = match unter {
+        legacy::ReligionUnter::Religion => StandardUnterId::SymboleReligion,
+        legacy::ReligionUnter::Ethik => StandardUnterId::PythonSubcategory("Ethik".to_string()),
+        legacy::ReligionUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
+    };
+    canonical_standard(DomainId::Religion, mapped)
+}
+
+fn map_standard_sonstige(
+    ober: &legacy::StandardOberkategorie,
+    unter: &str,
+) -> canonical::SpaltenAnfrage {
+    match ober {
+        legacy::StandardOberkategorie::Planet => canonical_python(DomainId::Planet10Oder12, unter),
+        legacy::StandardOberkategorie::Galaxie => canonical_python(DomainId::Galaxie, unter),
+        legacy::StandardOberkategorie::Multiversum => canonical_python(DomainId::Multiversum, unter),
+        legacy::StandardOberkategorie::Grundstrukturen => canonical_python(DomainId::Grundstrukturen, unter),
+        legacy::StandardOberkategorie::Bedeutung => canonical_python(DomainId::SonstigePythonDecl, unter),
+        legacy::StandardOberkategorie::ProContra => canonical_python(DomainId::SonstigePythonDecl, unter),
+        legacy::StandardOberkategorie::WichtigstesZumVerstehen => canonical_python(DomainId::SonstigePythonDecl, unter),
+        legacy::StandardOberkategorie::UniversumMetaKonkret => canonical::SpaltenAnfrage::Generator {
+            art: GeneratorArt::MetaKonkret,
+            parameter: GeneratorParameter::Text(unter.to_string()),
+        },
+        legacy::StandardOberkategorie::EigenschaftenN => {
+            map_eigenschaft(EigenschaftsFamilie::N, unter, DomainId::EigenschaftenN)
+        }
+        legacy::StandardOberkategorie::Eigenschaften1ProN => {
+            map_eigenschaft(EigenschaftsFamilie::EinsDurchN, unter, DomainId::Eigenschaften1ProN)
+        }
+        legacy::StandardOberkategorie::Sonstige(name) => canonical_python(
+            if name == "Eigenschaften" { DomainId::Eigenschaften } else { DomainId::SonstigePythonDecl },
+            unter,
+        ),
+        legacy::StandardOberkategorie::Menschliches
+        | legacy::StandardOberkategorie::Universum
+        | legacy::StandardOberkategorie::Religion => canonical_python(DomainId::SonstigePythonDecl, unter),
+    }
+}
 
 pub fn bridge_cli_selection(ober: &str, unter: &str) -> Option<canonical::SpaltenAnfrage> {
     let legacy = legacy::SpaltenAnfrage::parse(ober, unter).ok()?;
@@ -9,154 +99,60 @@ pub fn bridge_cli_selection(ober: &str, unter: &str) -> Option<canonical::Spalte
 }
 
 pub fn bridge_legacy_request(request: &legacy::SpaltenAnfrage) -> Option<canonical::SpaltenAnfrage> {
-    use canonical::{EigenschaftRequest, EigenschaftsFamilie, GeneratorParameter, KombiUnterId, SpaltenAnfrage, StandardUnterId};
-    use legacy::{MenschlichesUnter, ReligionUnter, StandardAnfrage, StandardOberkategorie, UniversumUnter};
-
     let mapped = match request {
-        legacy::SpaltenAnfrage::Standard(StandardAnfrage::Menschliches(unter)) => {
-            let unter = match unter {
-                MenschlichesUnter::Liebe => StandardUnterId::Liebe,
-                MenschlichesUnter::Gleichheit => StandardUnterId::PythonSubcategory("Gleichheit".to_string()),
-                MenschlichesUnter::Hoelle => StandardUnterId::Hoelle,
-                MenschlichesUnter::Klasse => StandardUnterId::Klasse,
-                MenschlichesUnter::Gewalt => StandardUnterId::Gewalt,
-                MenschlichesUnter::Politische => StandardUnterId::Politische,
-                MenschlichesUnter::Richtungen => StandardUnterId::Richtungen,
-                MenschlichesUnter::Formationen => StandardUnterId::Formationen,
-                MenschlichesUnter::Motive => StandardUnterId::PythonSubcategory("Motive".to_string()),
-                MenschlichesUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
-            };
-            SpaltenAnfrage::Standard {
-                domain: DomainId::Menschliches,
-                unter,
-            }
+        legacy::SpaltenAnfrage::Standard(legacy::StandardAnfrage::Menschliches(unter)) => {
+            map_menschliches(unter)
         }
-        legacy::SpaltenAnfrage::Standard(StandardAnfrage::Universum(unter)) => {
-            let unter = match unter {
-                UniversumUnter::Geist => StandardUnterId::Geist,
-                UniversumUnter::Primzahlkreuz => StandardUnterId::Primzahlkreuz,
-                UniversumUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
-            };
-            SpaltenAnfrage::Standard {
-                domain: DomainId::Universum,
-                unter,
-            }
+        legacy::SpaltenAnfrage::Standard(legacy::StandardAnfrage::Universum(unter)) => {
+            map_universum(unter)
         }
-        legacy::SpaltenAnfrage::Standard(StandardAnfrage::Religion(unter)) => {
-            let unter = match unter {
-                ReligionUnter::Religion => StandardUnterId::SymboleReligion,
-                ReligionUnter::Ethik => StandardUnterId::PythonSubcategory("Ethik".to_string()),
-                ReligionUnter::Sonstige(name) => StandardUnterId::PythonSubcategory(name.clone()),
-            };
-            SpaltenAnfrage::Standard {
-                domain: DomainId::Religion,
-                unter,
-            }
+        legacy::SpaltenAnfrage::Standard(legacy::StandardAnfrage::Religion(unter)) => {
+            map_religion(unter)
         }
-        legacy::SpaltenAnfrage::Standard(StandardAnfrage::Sonstige { ober, unter }) => {
-            match ober {
-                StandardOberkategorie::Menschliches => SpaltenAnfrage::Standard {
-                    domain: DomainId::Menschliches,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Universum => SpaltenAnfrage::Standard {
-                    domain: DomainId::Universum,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Religion => SpaltenAnfrage::Standard {
-                    domain: DomainId::Religion,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Planet => SpaltenAnfrage::Standard {
-                    domain: DomainId::Planet10Oder12,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Galaxie => SpaltenAnfrage::Standard {
-                    domain: DomainId::Galaxie,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Multiversum => SpaltenAnfrage::Standard {
-                    domain: DomainId::Multiversum,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Grundstrukturen => SpaltenAnfrage::Standard {
-                    domain: DomainId::Grundstrukturen,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::Bedeutung => SpaltenAnfrage::Standard {
-                    domain: DomainId::SonstigePythonDecl,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::ProContra => SpaltenAnfrage::Standard {
-                    domain: DomainId::SonstigePythonDecl,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::WichtigstesZumVerstehen => SpaltenAnfrage::Standard {
-                    domain: DomainId::SonstigePythonDecl,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::UniversumMetaKonkret => SpaltenAnfrage::Standard {
-                    domain: DomainId::MetaKonkret,
-                    unter: StandardUnterId::PythonSubcategory(unter.clone()),
-                },
-                StandardOberkategorie::EigenschaftenN => {
-                    let key = EigenschaftKeyId::from_alias(unter)?;
-                    SpaltenAnfrage::Standard {
-                        domain: DomainId::EigenschaftenN,
-                        unter: StandardUnterId::Eigenschaft(EigenschaftRequest {
-                            familie: EigenschaftsFamilie::N,
-                            key,
-                        }),
-                    }
-                }
-                StandardOberkategorie::Eigenschaften1ProN => {
-                    let key = EigenschaftKeyId::from_alias(unter)?;
-                    SpaltenAnfrage::Standard {
-                        domain: DomainId::Eigenschaften1ProN,
-                        unter: StandardUnterId::Eigenschaft(EigenschaftRequest {
-                            familie: EigenschaftsFamilie::EinsDurchN,
-                            key,
-                        }),
-                    }
-                }
-                StandardOberkategorie::Sonstige(_) => return None,
-            }
+        legacy::SpaltenAnfrage::Standard(legacy::StandardAnfrage::Sonstige { ober, unter }) => {
+            map_standard_sonstige(ober, unter)
         }
-        legacy::SpaltenAnfrage::KombinationGalaxie { unter } => SpaltenAnfrage::Kombination {
+        legacy::SpaltenAnfrage::KombinationGalaxie { unter } => canonical::SpaltenAnfrage::Kombination {
             art: KombinationsArt::Galaxie,
-            unter: map_kombi_unter(unter)?,
+            unter: match unter.as_str() {
+                "tiere" => KombiUnterId::Tiere,
+                "berufe" => KombiUnterId::Berufe,
+                "religion" => KombiUnterId::Religion,
+                "politik" => KombiUnterId::Politik,
+                _ => KombiUnterId::Unbekannt,
+            },
         },
-        legacy::SpaltenAnfrage::KombinationUniversum { unter } => SpaltenAnfrage::Kombination {
+        legacy::SpaltenAnfrage::KombinationUniversum { unter } => canonical::SpaltenAnfrage::Kombination {
             art: KombinationsArt::Universum,
-            unter: map_kombi_unter(unter)?,
+            unter: match unter.as_str() {
+                "tiere" => KombiUnterId::Tiere,
+                "berufe" => KombiUnterId::Berufe,
+                "religion" => KombiUnterId::Religion,
+                "politik" => KombiUnterId::Politik,
+                _ => KombiUnterId::Unbekannt,
+            },
         },
-        legacy::SpaltenAnfrage::GebrochenRationalGalaxie { unter } => SpaltenAnfrage::GebrochenRational {
+        legacy::SpaltenAnfrage::GebrochenRationalGalaxie { unter } => canonical::SpaltenAnfrage::GebrochenRational {
             art: GebrochenRationalArt::Galaxie,
             index: unter.parse().ok()?,
         },
-        legacy::SpaltenAnfrage::GebrochenRationalUniversum { unter } => {
-            SpaltenAnfrage::GebrochenRational {
-                art: GebrochenRationalArt::Universum,
-                index: unter.parse().ok()?,
-            }
-        }
-        legacy::SpaltenAnfrage::GebrochenRationalGefuehle { unter } => {
-            SpaltenAnfrage::GebrochenRational {
-                art: GebrochenRationalArt::Gefuehle,
-                index: unter.parse().ok()?,
-            }
-        }
-        legacy::SpaltenAnfrage::GebrochenRationalStrukturgroesse { unter } => {
-            SpaltenAnfrage::GebrochenRational {
-                art: GebrochenRationalArt::Strukturgroesse,
-                index: unter.parse().ok()?,
-            }
-        }
-        legacy::SpaltenAnfrage::Primvielfache { unter } => SpaltenAnfrage::Generator {
+        legacy::SpaltenAnfrage::GebrochenRationalUniversum { unter } => canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Universum,
+            index: unter.parse().ok()?,
+        },
+        legacy::SpaltenAnfrage::GebrochenRationalGefuehle { unter } => canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Gefuehle,
+            index: unter.parse().ok()?,
+        },
+        legacy::SpaltenAnfrage::GebrochenRationalStrukturgroesse { unter } => canonical::SpaltenAnfrage::GebrochenRational {
+            art: GebrochenRationalArt::Strukturgroesse,
+            index: unter.parse().ok()?,
+        },
+        legacy::SpaltenAnfrage::Primvielfache { unter } => canonical::SpaltenAnfrage::Generator {
             art: GeneratorArt::Primvielfache,
             parameter: GeneratorParameter::Text(unter.clone()),
         },
-        legacy::SpaltenAnfrage::Multiplikationen { unter } => SpaltenAnfrage::Generator {
+        legacy::SpaltenAnfrage::Multiplikationen { unter } => canonical::SpaltenAnfrage::Generator {
             art: GeneratorArt::Multiplikationen,
             parameter: GeneratorParameter::Text(unter.clone()),
         },
@@ -180,14 +176,4 @@ where
         .into_iter()
         .filter_map(|(ober, unter)| bridge_cli_selection(ober.as_ref(), unter.as_ref()))
         .collect()
-}
-
-fn map_kombi_unter(value: &str) -> Option<canonical::KombiUnterId> {
-    match value.trim() {
-        "tiere" => Some(canonical::KombiUnterId::Tiere),
-        "berufe" => Some(canonical::KombiUnterId::Berufe),
-        "religion" => Some(canonical::KombiUnterId::Religion),
-        "politik" => Some(canonical::KombiUnterId::Politik),
-        _ => None,
-    }
 }
