@@ -14,7 +14,6 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::exact_generator_bridge::resolve_exact_generator;
 use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
 
 
@@ -220,6 +219,12 @@ fn canonical_target_to_columns(target: &ColumnTarget) -> Vec<u32> {
     }
 }
 
+fn normalize_key(s: &str) -> String {
+    s.to_lowercase()
+        .replace('_', "")
+        .replace('-', "")
+        .replace(' ', "")
+}
 
 impl KategorieMap {
     pub fn new() -> Self {
@@ -308,23 +313,11 @@ impl KategorieMap {
         direct_columns.dedup();
 
         let mut source = source_generated_inference_for_pair(ober, unter).unwrap_or_default();
-
-        if let Some(exact) = resolve_exact_generator(ober, unter) {
-            source.generated_befehle.extend(exact.generated_befehle.into_iter());
-            source.required_columns.extend(exact.direct_columns.iter().copied().map(|n| n as u32));
-            source.direct_columns.extend(exact.direct_columns.into_iter().map(|n| n as u32));
-        }
-
         if !is_strict_generated_pair(ober, unter) {
             source.direct_columns.extend(direct_columns.iter().copied());
+            source.direct_columns.sort();
+            source.direct_columns.dedup();
         }
-
-        source.generated_befehle.sort();
-        source.generated_befehle.dedup();
-        source.required_columns.sort();
-        source.required_columns.dedup();
-        source.direct_columns.sort();
-        source.direct_columns.dedup();
 
         if source.generated_befehle.is_empty() && source.direct_columns.is_empty() {
             None
@@ -344,16 +337,7 @@ impl KategorieMap {
         if is_strict_generated_pair(ober, unter) {
             return Vec::new();
         }
-
-        let exakt = self.finde_spaltennummern_exakt(ober, unter);
-        if !exakt.is_empty() {
-            return exakt;
-        }
-
-        python_source_of_truth::fuzzy_columns_for_pair(ober, unter)
-            .into_iter()
-            .map(|n| n + 1)
-            .collect()
+        self.finde_spaltennummern_exakt(ober, unter)
     }
 
     fn lade_kategorien(&mut self) {
@@ -364,7 +348,7 @@ impl KategorieMap {
 
             for &main_cat in decl.main_aliases {
                 for &sub_cat in decl.sub_aliases {
-                    Self::set_entry_exact(
+                    Self::insert_entry(
                         &mut main_to_sub,
                         main_cat,
                         sub_cat,
@@ -378,7 +362,6 @@ impl KategorieMap {
         Self::merge_meta_konkret_aliases(&mut main_to_sub);
         Self::merge_fraction_number_aliases(&mut main_to_sub);
         Self::merge_html_meta_aliases(&mut main_to_sub);
-        Self::realign_primary_pairs_to_source_of_truth(&mut main_to_sub);
 
         self.hauptkategorien = Self::convert_main_to_hauptkategorien(main_to_sub);
     }
@@ -427,7 +410,7 @@ impl KategorieMap {
                             mains.insert("konzept2".to_string());
                             mains.insert("konzepte2".to_string());
                         }
-                        "Eigenschaft" | "Eigenschaften" | "Eigenschaften_n" => {
+                        "Eigenschaften_n" | "Eigenschaft" | "Eigenschaften" => {
                             mains.insert("Eigenschaften_n".to_string());
                             mains.insert("konzept1".to_string());
                             mains.insert("konzepte1".to_string());
@@ -471,30 +454,6 @@ impl KategorieMap {
             let ids = vec![col + 1];
             for (main, sub) in pairs {
                 Self::insert_entry(main_to_sub, &main, &sub, ids.clone());
-            }
-        }
-    }
-
-
-    fn realign_primary_pairs_to_source_of_truth(
-        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
-    ) {
-        let mains: Vec<String> = main_to_sub.keys().cloned().collect();
-        for main_name in mains {
-            let sub_names: Vec<String> = main_to_sub
-                .get(&main_name)
-                .map(|subs| subs.keys().cloned().collect())
-                .unwrap_or_default();
-
-            for sub_name in sub_names {
-                let exact = python_source_of_truth::exact_all_direct_columns_for_pair(&main_name, &sub_name)
-                    .into_iter()
-                    .map(|n| n + 1)
-                    .collect::<Vec<u32>>();
-
-                if !exact.is_empty() {
-                    Self::set_entry_exact(main_to_sub, &main_name, &sub_name, exact);
-                }
             }
         }
     }
@@ -754,22 +713,6 @@ impl KategorieMap {
         let mut sorted_ids: Vec<u32> = all_ids.into_iter().collect();
         sorted_ids.sort();
         *existing_ids = sorted_ids;
-    }
-
-    fn set_entry_exact(
-        main_to_sub: &mut HashMap<String, HashMap<String, Vec<u32>>>,
-        main_category: &str,
-        sub_category: &str,
-        new_ids: Vec<u32>,
-    ) {
-        let main_entry = main_to_sub
-            .entry(main_category.to_string())
-            .or_insert_with(HashMap::new);
-
-        let mut sorted_ids = new_ids;
-        sorted_ids.sort_unstable();
-        sorted_ids.dedup();
-        main_entry.insert(sub_category.to_string(), sorted_ids);
     }
 }
 pub fn lade_kategorie_map() -> KategorieMap {
