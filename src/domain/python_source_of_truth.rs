@@ -2568,8 +2568,16 @@ fn stable_dedup_columns(cols: Vec<u32>) -> Vec<u32> {
     out
 }
 
-pub fn exact_supplemental_columns_for_pair(_ober: &str, _unter: &str) -> Vec<u32> {
-    Vec::new()
+pub fn exact_supplemental_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
+    let _ober_n = normalize_cli_token(ober);
+    let _unter_n = normalize_cli_token(unter);
+
+    // Vorbild 2 (`src_vorRefactoring230327`) soll hier als zweiter
+    // exakter Datenraum einspeisen.
+    //
+    // Absichtlich noch exact-only und ohne fuzzy.
+    let cols: Vec<u32> = Vec::new();
+    stable_dedup_columns(cols)
 }
 
 pub fn exact_all_direct_columns_for_pair(ober: &str, unter: &str) -> Vec<u32> {
@@ -2891,9 +2899,13 @@ pub fn source_generated_inference_for_pair(ober: &str, unter: &str) -> Option<cr
     if generated_befehle.is_empty() {
         None
     } else {
+        let mut required_columns = Vec::<u32>::new();
+        required_columns.sort();
+        required_columns.dedup();
+
         Some(crate::domain::categories::GeneratedInference {
             generated_befehle,
-            required_columns: Vec::new(),
+            required_columns,
             direct_columns: Vec::new(),
         })
     }
