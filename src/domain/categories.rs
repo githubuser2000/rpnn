@@ -14,17 +14,8 @@ use crate::domain::model::spalten_anfrage::{
     SpaltenAnfrage as CanonicalSpaltenAnfrage,
     StandardUnterId as CanonicalStandardUnterId,
 };
-use crate::domain::python_source_of_truth::{self, combination_seed_pairs, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
-
-
-fn canonical_generator_command(art: GeneratorArt) -> &'static str {
-    match art {
-        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
-        GeneratorArt::Multiplikationen => "multiplikationen",
-        GeneratorArt::Primvielfache => "primvielfache",
-        GeneratorArt::MetaKonkret => "metakonkret",
-    }
-}
+use crate::domain::python_source_of_truth::{self, combination_seed_pairs, exact_all_direct_columns_for_pair, generated_seed_pairs, is_strict_generated_pair, multiplication_seed_pairs, source_generated_inference_for_pair, PY_DECLS};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OberkategorieName(String);
@@ -235,6 +226,16 @@ fn normalize_key(s: &str) -> String {
         .replace(' ', "")
 }
 
+
+fn canonical_generator_command(art: GeneratorArt) -> &'static str {
+    match art {
+        GeneratorArt::Primzahlkreuz => "primzahlkreuzprocontra",
+        GeneratorArt::Multiplikationen => "multiplikationen",
+        GeneratorArt::Primvielfache => "primvielfache",
+        GeneratorArt::MetaKonkret => "metakonkret",
+    }
+}
+
 impl KategorieMap {
     pub fn new() -> Self {
         let mut instanz = Self {
@@ -251,37 +252,19 @@ impl KategorieMap {
         requests
     }
 
-    fn declared_python_pairs() -> Vec<(String, String)> {
-        let mut pairs = std::collections::BTreeSet::new();
-        for decl in PY_DECLS {
-            for &ober in decl.main_aliases {
-                for &unter in decl.sub_aliases {
-                    pairs.insert((ober.to_string(), unter.to_string()));
-                }
-            }
-        }
-        pairs.into_iter().collect()
-    }
-
     pub fn alle_paare_fuer_cli_alles(&self) -> Vec<(String, String)> {
         use std::collections::BTreeSet;
 
         let mut paare_set: BTreeSet<(String, String)> = Self::declared_python_pairs().into_iter().collect();
 
-        fn push_pair(paare: &mut BTreeSet<(String, String)>, ober: &str, unter: &str) {
-            paare.insert((ober.to_string(), unter.to_string()));
-        }
-
         for (ober, unter) in combination_seed_pairs() {
-            push_pair(&mut paare_set, &ober, &unter);
+            paare_set.insert((ober, unter));
         }
-
         for (ober, unter) in generated_seed_pairs() {
-            push_pair(&mut paare_set, &ober, &unter);
+            paare_set.insert((ober, unter));
         }
-
         for (ober, unter) in multiplication_seed_pairs() {
-            push_pair(&mut paare_set, &ober, &unter);
+            paare_set.insert((ober, unter));
         }
 
         for request in self.alle_typed_requests_fuer_cli_alles() {
@@ -291,6 +274,26 @@ impl KategorieMap {
         }
 
         paare_set.into_iter().collect()
+    }
+
+    fn declared_python_pairs() -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        for decl in PY_DECLS {
+            for &ober in decl.main_aliases {
+                for &unter in decl.sub_aliases {
+                    pairs.push((ober.to_string(), unter.to_string()));
+                }
+            }
+        }
+        let mut seen = BTreeSet::new();
+        let mut out = Vec::new();
+        for p in pairs {
+            let key = (normalize_key(&p.0), normalize_key(&p.1));
+            if seen.insert(key) {
+                out.push(p);
+            }
+        }
+        out
     }
 
     pub fn finde_spaltennummern_fuer_canonical_request(&self, request: &CanonicalSpaltenAnfrage) -> Vec<u32> {
@@ -352,16 +355,13 @@ impl KategorieMap {
     }
 
     pub fn finde_spaltennummern_exakt(&self, ober: &str, unter: &str) -> Vec<u32> {
-        python_source_of_truth::exact_columns_for_pair(ober, unter)
+        exact_all_direct_columns_for_pair(ober, unter)
             .into_iter()
             .map(|n| n + 1)
             .collect()
     }
 
     pub fn finde_spaltennummern_fuer_kategorien(&self, ober: &str, unter: &str) -> Vec<u32> {
-        if is_strict_generated_pair(ober, unter) {
-            return Vec::new();
-        }
         self.finde_spaltennummern_exakt(ober, unter)
     }
 
