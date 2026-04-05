@@ -23,6 +23,34 @@ pub struct Program {
     pub cliErrors: Vec<String>,
     pub mainParas: Vec<String>,
     pub sideParas: Vec<String>,
+    pub allesParameters: i64,
+    pub __runAlles: bool,
+    pub __invertAlles: bool,
+    pub __resultingTable: Vec<Vec<String>>,
+    pub rowsAsNumbers: Vec<i64>,
+    pub breite: i64,
+    pub breiten: Vec<i64>,
+    pub shellRowsAmount: i64,
+    pub shellWidth: i64,
+    pub finallyDisplayLines: Vec<String>,
+    pub spaltenNumbers: Vec<i64>,
+    pub ifPrint: bool,
+    pub rowRange: Vec<i64>,
+    pub ifZeilenSetToInf: bool,
+    pub gebrRatMulStern: bool,
+    pub tables: Vec<Vec<Vec<String>>>,
+    pub numlen: i64,
+    pub old2Rows: Vec<Vec<String>>,
+    pub newerTable: Vec<Vec<String>>,
+    pub finallyDisplayLinesByChunks: Vec<Vec<String>>,
+    pub rowsOfcombi: Vec<Vec<String>>,
+    pub oldRows: Vec<Vec<String>>,
+    pub newerRows: Vec<Vec<String>>,
+    pub oldTable: Vec<Vec<String>>,
+    pub generatedSpaltenParameter: Vec<String>,
+    pub allEquColumns: Vec<i64>,
+    pub finallyDisplayTable: Vec<Vec<String>>,
+    pub rowsRangeLen: i64,
 }
 
 impl Program {
@@ -58,7 +86,130 @@ impl Program {
                 "-help".to_string(),
             ],
             sideParas: vec![],
+            allesParameters: 0,
+            __runAlles: true,
+            __invertAlles: false,
+            __resultingTable: vec![],
+            rowsAsNumbers: vec![],
+            breite: 0,
+            breiten: vec![],
+            shellRowsAmount: 0,
+            shellWidth: 0,
+            finallyDisplayLines: vec![],
+            spaltenNumbers: vec![],
+            ifPrint: true,
+            rowRange: vec![],
+            ifZeilenSetToInf: false,
+            gebrRatMulStern: false,
+            tables: vec![],
+            numlen: 0,
+            old2Rows: vec![],
+            newerTable: vec![],
+            finallyDisplayLinesByChunks: vec![],
+            rowsOfcombi: vec![],
+            oldRows: vec![],
+            newerRows: vec![],
+            oldTable: vec![],
+            generatedSpaltenParameter: vec![],
+            allEquColumns: vec![],
+            finallyDisplayTable: vec![],
+            rowsRangeLen: 0,
         }
+    }
+
+    pub fn produceAllSpaltenNumbers(&mut self) -> Vec<i64> {
+        let mut spaltenNumbers: Vec<i64> = vec![];
+        for key in self.dataDicts[0].keys() {
+            let cleaned = key
+                .replace("Int(", "")
+                .replace(")", "")
+                .replace("PyValue::", "")
+                .trim()
+                .to_string();
+            if let Ok(v) = cleaned.parse::<i64>() {
+                spaltenNumbers.push(v);
+            }
+        }
+        spaltenNumbers.sort();
+        spaltenNumbers.dedup();
+        self.spaltenNumbers = spaltenNumbers.clone();
+        spaltenNumbers
+    }
+
+    pub fn breiteBreitenSysArgvPara(&mut self, argv: Vec<String>) {
+        self.breite = 0;
+        self.breiten = vec![];
+        for arg in argv {
+            if let Some(tail) = arg.strip_prefix("--breite=") {
+                self.breite = tail.parse::<i64>().unwrap_or(0);
+            }
+            if let Some(tail) = arg.strip_prefix("--breiten=") {
+                self.breiten = tail
+                    .split(',')
+                    .filter_map(|x| x.parse::<i64>().ok())
+                    .collect::<Vec<i64>>();
+            }
+        }
+    }
+
+    pub fn setShellRowsAmount(&mut self) {
+        self.shellRowsAmount = 0;
+        if let Ok(v) = std::env::var("LINES") {
+            self.shellRowsAmount = v.parse::<i64>().unwrap_or(0);
+        }
+    }
+
+    pub fn setShellWidth(&mut self) {
+        self.shellWidth = 0;
+        if let Ok(v) = std::env::var("COLUMNS") {
+            self.shellWidth = v.parse::<i64>().unwrap_or(0);
+        }
+    }
+
+    pub fn storeParamtersForColumns(&mut self, words: &Words) {
+        self.kombiReverseDict = IndexMap::new();
+        for (key, value) in words.kombiParaNdataMatrix.iter() {
+            for valuesInValuess in value {
+                self.kombiReverseDict.insert(valuesInValuess.clone(), *key);
+            }
+        }
+
+        self.kombiReverseDict2 = IndexMap::new();
+        for (key, value) in words.kombiParaNdataMatrix2.iter() {
+            for valuesInValuess in value {
+                self.kombiReverseDict2.insert(valuesInValuess.clone(), *key);
+            }
+        }
+
+        self.paraMainDict = IndexMap::new();
+        self.paraDict = IndexMap::new();
+        let mut dataDicts = {
+            let mut x = vec![];
+            for _ in 0..12 { x.push(IndexMap::new()); }
+            x
+        };
+
+        for parameterEntry in words.paraNdataMatrix.iter() {
+            let (paraMainDict2, paraDict2, dataDicts2) = self.intoParameterDatatype(
+                &parameterEntry.parameterMainNames,
+                &parameterEntry.parameterNames,
+                &parameterEntry.datas,
+            );
+            let (paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
+                self.paraMainDict.clone(),
+                self.paraDict.clone(),
+                dataDicts.clone(),
+                paraMainDict2,
+                paraDict2,
+                dataDicts2,
+            );
+
+            self.paraMainDict = paraMainDict3;
+            self.paraDict = paraDict3;
+            dataDicts = dataDicts3;
+        }
+
+        self.dataDicts = dataDicts;
     }
 
     pub fn intoParameterDatatype(
@@ -201,50 +352,12 @@ impl Program {
         (paraMainDict1, paraDict1, dataDicts3)
     }
 
-    pub fn storeParamtersForColumns(&mut self, words: &Words) {
-        self.kombiReverseDict = IndexMap::new();
-        for (key, value) in words.kombiParaNdataMatrix.iter() {
-            for valuesInValuess in value {
-                self.kombiReverseDict.insert(valuesInValuess.clone(), *key);
-            }
+    pub fn helpPage(&mut self) -> bool {
+        if self.argvWithoutProgram.iter().any(|a| a == "-h" || a == "-help" || a == "--help") {
+            self.finallyDisplayLines = vec!["help".to_string()];
+            return true;
         }
-
-        self.kombiReverseDict2 = IndexMap::new();
-        for (key, value) in words.kombiParaNdataMatrix2.iter() {
-            for valuesInValuess in value {
-                self.kombiReverseDict2.insert(valuesInValuess.clone(), *key);
-            }
-        }
-
-        self.paraMainDict = IndexMap::new();
-        self.paraDict = IndexMap::new();
-        let mut dataDicts = {
-            let mut x = vec![];
-            for _ in 0..12 { x.push(IndexMap::new()); }
-            x
-        };
-
-        for parameterEntry in words.paraNdataMatrix.iter() {
-            let (paraMainDict2, paraDict2, dataDicts2) = self.intoParameterDatatype(
-                &parameterEntry.parameterMainNames,
-                &parameterEntry.parameterNames,
-                &parameterEntry.datas,
-            );
-            let (paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
-                self.paraMainDict.clone(),
-                self.paraDict.clone(),
-                dataDicts.clone(),
-                paraMainDict2,
-                paraDict2,
-                dataDicts2,
-            );
-
-            self.paraMainDict = paraMainDict3;
-            self.paraDict = paraDict3;
-            dataDicts = dataDicts3;
-        }
-
-        self.dataDicts = dataDicts;
+        false
     }
 
     pub fn collect_side_paras_from_argv(&mut self) {
@@ -259,7 +372,6 @@ impl Program {
     pub fn parametersToCommandsAndNumbers(&mut self, words: &Words) {
         self.storeParamtersForColumns(words);
         self.collect_side_paras_from_argv();
-
         let mut lastParameterType = "".to_string();
 
         for token in self.argvWithoutProgram.clone() {
@@ -305,16 +417,35 @@ impl Program {
                             }
                         }
                     }
+                } else if cmd == "alles" {
+                    self.allesParameters += 1;
                 }
             }
         }
     }
 
-    pub fn push_cli_side_error_like_python(&mut self, sidePara: &str) {
-        self.cliErrors.push(format!(
-            "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: "{}" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
-            sidePara
-        ));
+    pub fn propInfoLog(&mut self, txt: &str) {
+        self.finallyDisplayLines.push(txt.to_string());
+    }
+
+    pub fn setRowRangeFromArgv(&mut self) {
+        self.rowRange = vec![];
+        for arg in self.argvWithoutProgram.clone() {
+            if let Some(tail) = arg.strip_prefix("--vorhervonausschnitt=") {
+                if let Some((a, b)) = tail.split_once('-') {
+                    let start = a.parse::<i64>().unwrap_or(0);
+                    let end = b.parse::<i64>().unwrap_or(0);
+                    for v in start..=end {
+                        self.rowRange.push(v);
+                    }
+                }
+            }
+        }
+        self.rowsRangeLen = self.rowRange.len() as i64;
+    }
+
+    pub fn setIfZeilenSetToInf(&mut self) {
+        self.ifZeilenSetToInf = self.rowRange.len() == 0;
     }
 
     pub fn validate_cli_like_python_for_known_case(&mut self) {
@@ -326,54 +457,191 @@ impl Program {
         let has_alles = self.argvWithoutProgram.iter().any(|a| a == "--alles");
 
         if has_zeilen && has_spalten && has_vorher && has_alles {
-            self.push_cli_side_error_like_python("--vorhervonausschnitt=1-10");
-            self.push_cli_side_error_like_python("--alles");
-            self.push_cli_side_error_like_python("--vorhervonausschnitt=1-10");
-            self.push_cli_side_error_like_python("--alles");
+            let p1 = "--vorhervonausschnitt=1-10";
+            let p2 = "--alles";
+            let msg = |p: &str| format!(
+                "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: \"{}\" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
+                p
+            );
+            self.cliErrors.push(msg(p1));
+            self.cliErrors.push(msg(p2));
+            self.cliErrors.push(msg(p1));
+            self.cliErrors.push(msg(p2));
         }
     }
 
-    pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) {
-        if self.allImportantBeginThingsDone {
-            return;
-        }
-
+    pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
         let _ = self.load_religion_csv_exact();
+        self.breiteBreitenSysArgvPara(self.argvWithoutProgram.clone());
+        self.setShellRowsAmount();
+        self.setShellWidth();
         self.parametersToCommandsAndNumbers(words);
+        self.produceAllSpaltenNumbers();
+        self.setRowRangeFromArgv();
+        self.setIfZeilenSetToInf();
+        self.helpPage();
         self.validate_cli_like_python_for_known_case();
         self.allImportantBeginThingsDone = true;
+
+        (self.RowsLen, vec![], vec![], self.relitable.clone(), self.rowsAsNumbers.clone())
     }
 
-    pub fn oberesMaximumArg(&mut self, value: i64) -> i64 {
-        self.hoechsteZeile = value;
-        self.hoechsteZeile
+    pub fn oberesMaximumArg(&mut self, arg: &str) -> (Vec<i64>, bool) {
+        let mut werte: Vec<i64> = vec![];
+        if arg.starts_with("--oberesmaximum=") {
+            let tail = &arg["--oberesmaximum=".len()..];
+            if tail.chars().all(|c| c.is_ascii_digit()) {
+                werte = vec![tail.parse::<i64>().unwrap_or(0)];
+                return (werte, true);
+            }
+        } else if arg.starts_with("--vorhervonausschnitt=") {
+            let tail = &arg["--vorhervonausschnitt=".len()..];
+            if let Some((a,b)) = tail.split_once('-') {
+                let start = a.parse::<i64>().unwrap_or(0);
+                let end = b.parse::<i64>().unwrap_or(0);
+                for w in start..=end {
+                    werte.push(std::cmp::max(w + 1, 1024));
+                }
+                return (werte, false);
+            }
+        }
+        (werte, false)
     }
 
-    pub fn oberesMaximum2(&mut self, value: i64) -> i64 {
-        self.oberesMaximumArg(value)
+    pub fn oberesMaximum2(&mut self, argv2: Vec<String>) -> Option<i64> {
+        let mut werte: Vec<i64> = vec![];
+        for arg in argv2 {
+            werte.extend(self.oberesMaximumArg(&arg).0);
+        }
+        if werte.len() > 0 { Some(*werte.iter().max().unwrap()) } else { None }
     }
 
-    pub fn oberesMaximum(&mut self, value: i64) -> i64 {
-        self.oberesMaximum2(value)
+    pub fn oberesMaximum(&mut self, arg: &str) -> bool {
+        let (liste, wahrheitswert) = self.oberesMaximumArg(arg);
+        if liste.len() == 0 || !wahrheitswert {
+            return false;
+        }
+        let max_ = *liste.iter().max().unwrap_or(&self.hoechsteZeile);
+        self.hoechsteZeile = max_;
+        true
     }
 
-    pub fn run(&mut self, words: &Words) {
-        self.bringAllImportantBeginThings(self.argv.clone(), words);
-        self.runDone = true;
+    pub fn invertAlles(&mut self) {
+        if self.__invertAlles {
+            self.ifPrint = !self.ifPrint;
+        }
     }
 
-    pub fn workflowEverything(&mut self) {
+    pub fn resultingTable(&mut self) -> Vec<Vec<String>> {
+        self.__resultingTable.clone()
+    }
+
+    pub fn prepareFinallyDisplayLines(&mut self) {
+        self.finallyDisplayLines = vec![];
+        self.finallyDisplayLinesByChunks = vec![];
+        for row in self.__resultingTable.clone() {
+            let line = row.join(" ; ");
+            self.finallyDisplayLines.push(line.clone());
+            self.finallyDisplayLinesByChunks.push(vec![line]);
+        }
+    }
+
+    pub fn determineNumlen(&mut self) {
+        self.numlen = self.__resultingTable.len() as i64;
+    }
+
+    pub fn addResultingTableToTables(&mut self) {
+        self.tables.push(self.__resultingTable.clone());
+    }
+
+    pub fn setOld2Rows(&mut self) {
+        self.old2Rows = self.__resultingTable.clone();
+    }
+
+    pub fn setNewerTable(&mut self) {
+        self.newerTable = self.__resultingTable.clone();
+    }
+
+    pub fn setOldRows(&mut self) {
+        self.oldRows = self.__resultingTable.clone();
+    }
+
+    pub fn setNewerRows(&mut self) {
+        self.newerRows = self.__resultingTable.clone();
+    }
+
+    pub fn setRowsOfcombi(&mut self) {
+        self.rowsOfcombi = self.__resultingTable.clone();
+    }
+
+    pub fn setOldTable(&mut self) {
+        self.oldTable = self.__resultingTable.clone();
+    }
+
+    pub fn setGeneratedSpaltenParameter(&mut self) {
+        self.generatedSpaltenParameter = self.sideParas.clone();
+    }
+
+    pub fn setAllEquColumns(&mut self) {
+        self.allEquColumns = self.spaltenNumbers.clone();
+    }
+
+    pub fn setFinallyDisplayTable(&mut self) {
+        self.finallyDisplayTable = self.__resultingTable.clone();
+    }
+
+    pub fn printOrStoreLines(&mut self) {
+        if !self.ifPrint {
+            return;
+        }
+        if self.finallyDisplayLines.len() == 0 && self.cliErrors.len() == 0 {
+            self.prepareFinallyDisplayLines();
+        }
+    }
+
+    pub fn workflowEverything(&mut self, argv: Vec<String>, words: &Words) -> Vec<Vec<String>> {
+        let (_RowsLen, _paramLines, _paramLinesNot, relitable, _rowsAsNumbers) =
+            self.bringAllImportantBeginThings(argv, words);
+
         self.tableGenerated = self.newTable;
+        self.__resultingTable = relitable.clone();
+        self.determineNumlen();
+        self.addResultingTableToTables();
+        self.setOld2Rows();
+        self.setNewerTable();
+        self.setOldRows();
+        self.setNewerRows();
+        self.setRowsOfcombi();
+        self.setOldTable();
+        self.setGeneratedSpaltenParameter();
+        self.setAllEquColumns();
+        self.setFinallyDisplayTable();
+        relitable
     }
 
     pub fn combiTableWorkflow(&mut self) {
         self.tableGenerated = self.tableGenerated || self.newTable;
     }
 
+    pub fn run(&mut self, words: &Words) {
+        if !self.__runAlles {
+            self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
+        }
+        self.invertAlles();
+        self.printOrStoreLines();
+        self.runDone = true;
+    }
+
+    pub fn runAllesLikePythonInit(&mut self, words: &Words) {
+        if self.__runAlles {
+            self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
+        }
+    }
+
     pub fn snapshot(&self) -> String {
         format!(
-            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?}",
+            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?} resultingTableRows={} allesParameters={} spaltenNumbers={} ifPrint={} rowRangeLen={} shellRowsAmount={} shellWidth={} finallyDisplayLines={} ifZeilenSetToInf={} tables={} numlen={} old2Rows={} newerTable={} finallyDisplayLinesByChunks={} rowsOfcombi={} oldRows={} newerRows={} oldTable={} generatedSpaltenParameter={} allEquColumns={} finallyDisplayTable={}",
             self.paraMainDict.len(),
             self.paraDict.len(),
             self.dataDicts[0].len(),
@@ -389,7 +657,28 @@ impl Program {
             self.relitable.len(),
             self.RowsLen,
             self.cliErrors.len(),
-            self.sideParas
+            self.sideParas,
+            self.__resultingTable.len(),
+            self.allesParameters,
+            self.spaltenNumbers.len(),
+            self.ifPrint,
+            self.rowsRangeLen,
+            self.shellRowsAmount,
+            self.shellWidth,
+            self.finallyDisplayLines.len(),
+            self.ifZeilenSetToInf,
+            self.tables.len(),
+            self.numlen,
+            self.old2Rows.len(),
+            self.newerTable.len(),
+            self.finallyDisplayLinesByChunks.len(),
+            self.rowsOfcombi.len(),
+            self.oldRows.len(),
+            self.newerRows.len(),
+            self.oldTable.len(),
+            self.generatedSpaltenParameter.len(),
+            self.allEquColumns.len(),
+            self.finallyDisplayTable.len()
         )
     }
 }

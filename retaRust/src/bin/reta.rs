@@ -6,12 +6,16 @@ fn main() {
     let words = Words::new();
 
     let mut program = Program::new(argv);
+    program.runAllesLikePythonInit(&words);
     program.run(&words);
-    program.workflowEverything();
     program.combiTableWorkflow();
 
     if program.cliErrors.len() > 0 {
         for line in program.cliErrors.iter() {
+            println!("{}", line);
+        }
+    } else if program.finallyDisplayLines.len() > 0 {
+        for line in program.finallyDisplayLines.iter() {
             println!("{}", line);
         }
     } else {
