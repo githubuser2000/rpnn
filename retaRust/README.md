@@ -1,24 +1,40 @@
-# zip_longest literal
+# multibin grundstruk stricter
 
-Dieser Stand drückt zwei Stellen noch strenger in Python-Richtung:
+Dieses Paket bleibt bei:
+- **einem Cargo.toml**
+- **zwei Binaries**
+  - `reta`
+  - `grundStrukHtml`
 
-- `intoParameterDatatype(...)`
-- `mergeParameterDicts(...)`
+## Was strenger geworden ist
 
-## Strenger als zuvor
+### `grundStrukHtml`
+Kein bloßer Platzhalter mehr, sondern Python-nähere Shared-Logik mit:
+- `cmp_before`
+- `cmpx`
+- `sorted`
+- `merge_dicts`
+- `traverseHierarchy`
+- `myprint`
+- `grundstruk_html_from_i18n`
 
-- `case 2` wird jetzt getrennt geführt
-- `index2a` und `intoA` bleiben getrennte Zwischenstrukturen
-- die Zusammenführung läuft jetzt explizit über eine `zip_longest`-artige Schleife
-- fehlende Seite wird nicht mit einer "schönen" Rust-Abkürzung ersetzt, sondern mit Python-naher Auffülllogik
+Datenbasis:
+- `wahl15Words` direkt aus Python ausgewertet
+- `grundstrukturen`-Name direkt eingebunden
 
-## Datenbasis
+Zusätzlich jetzt:
+- `tools/compare_grundstruk.py`
+  - echte Python-vs-Rust-Diff-Schleife
+  - für `normal` und `blank`
 
-- `paraNdataMatrix`: **379 echte Einträge**
-- `kombiParaNdataMatrix`: **12 echte Schlüssel**
-- `kombiParaNdataMatrix2`: **14 echte Schlüssel**
+### `reta`
+Bleibt im selben Paket mit gemeinsamer Shared-Logik.
+In diesem Paket weiter als Teilmenge:
+- `paraNdataMatrix`: **120 Einträge**
+- `kombiParaNdataMatrix`: **12 Schlüssel**
+- `kombiParaNdataMatrix2`: **14 Schlüssel**
 
-## Noch offen
+## Nächster harter Schritt
 
-- vollständiger Anschluss dieser strengeren `storeParamtersForColumns`-Innensemantik an den restlichen Programmlauf
-- noch exaktere Reproduktion einzelner Python-Typflüsse
+- Diffs von `tools/compare_grundstruk.py` abarbeiten
+- Zeichen für Zeichen an Python annähern, statt umzubauen

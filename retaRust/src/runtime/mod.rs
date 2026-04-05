@@ -2723,25 +2723,29 @@ impl I18nExact {
 
 #[derive(Clone, Debug)]
 pub struct ProgramState {
+    pub argv: Vec<String>,
     pub paraMainDict: IndexMap<String, Vec<String>>,
     pub paraDict: IndexMap<(String, String), Vec<Vec<PyAtom>>>,
     pub dataDicts: Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
     pub kombiReverseDict: IndexMap<String, i64>,
     pub kombiReverseDict2: IndexMap<String, i64>,
+    pub newTable: bool,
 }
 
 impl ProgramState {
-    pub fn new() -> Self {
+    pub fn new(argv: Vec<String>) -> Self {
         let mut dataDicts = vec![];
         for _ in 0..12 {
             dataDicts.push(IndexMap::new());
         }
         Self {
+            argv,
             paraMainDict: IndexMap::new(),
             paraDict: IndexMap::new(),
             dataDicts,
             kombiReverseDict: IndexMap::new(),
             kombiReverseDict2: IndexMap::new(),
+            newTable: false,
         }
     }
 }

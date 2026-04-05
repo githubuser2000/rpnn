@@ -1,7 +1,19 @@
 [package]
-name = "reta_transcompilation_zip_longest_literal"
+name = "reta_multibin_grundstruk_diffloop"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 indexmap = "2"
+
+[lib]
+name = "reta_shared"
+path = "src/lib.rs"
+
+[[bin]]
+name = "reta"
+path = "src/bin/reta.rs"
+
+[[bin]]
+name = "grundStrukHtml"
+path = "src/bin/grundStrukHtml.rs"
