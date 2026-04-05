@@ -1,0 +1,6 @@
+{
+  "status": "continued strict python-first pass",
+  "bitexact_verified": false,
+  "current_focus": "prepare next output/table parity step",
+  "rule": "python is truth; no semantic simplification; not idiomatic"
+}
