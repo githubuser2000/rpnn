@@ -16,6 +16,8 @@ pub struct Program {
     pub newTable: bool,
     pub allImportantBeginThingsDone: bool,
     pub runDone: bool,
+    pub hoechsteZeile: i64,
+    pub tableGenerated: bool,
 }
 
 impl Program {
@@ -36,6 +38,8 @@ impl Program {
             newTable: false,
             allImportantBeginThingsDone: false,
             runDone: false,
+            hoechsteZeile: 0,
+            tableGenerated: false,
         }
     }
 
@@ -74,9 +78,10 @@ impl Program {
                 let mut parameterMainNamePerLoop: Vec<String> = vec![];
 
                 for parameterMainName in parameterMainNames {
-                    let iter_parameter_names: Vec<String> =
+                    let parameterNames2 =
                         if parameterNames.len() > 0 { parameterNames.clone() } else { vec!["".to_string()] };
-                    for parameterName in iter_parameter_names {
+
+                    for parameterName in parameterNames2 {
                         into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                         if matches!(i, 5 | 6 | 9 | 10) {
                             parameterMainNamePerLoop.push(parameterName.clone());
@@ -84,18 +89,13 @@ impl Program {
                     }
                 }
 
-                let case_num: i64 =
-                    if i == 4 && matches!(spaltenNummerOderEtc, PyValue::Bool(_)) {
-                        1
-                    } else if matches!(i, 5 | 6 | 9 | 10) {
-                        2
-                    } else if i == 4 {
-                        4
-                    } else {
-                        3
-                    };
+                let case_num =
+                    if i == 4 && matches!(spaltenNummerOderEtc, PyValue::Bool(_)) { 1 }
+                    else if matches!(i, 5 | 6 | 9 | 10) { 2 }
+                    else if i == 4 { 4 }
+                    else { 3 };
 
-                let index1: usize = if case_num != 1 { i } else { 3 };
+                let index1 = if case_num != 1 { i } else { 3 };
                 let index2a: Vec<String>;
                 let intoA: Vec<Vec<PairStr>>;
 
@@ -142,10 +142,10 @@ impl Program {
         IndexMap<(String, String), Vec<Vec<PyValue>>>,
         Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
     ) {
-        let paraMainDict1: IndexMap<String, Vec<String>> =
-            paraMainDict1.into_iter().chain(paraMainDict2.into_iter()).collect();
-        let paraDict1: IndexMap<(String, String), Vec<Vec<PyValue>>> =
-            paraDict1.into_iter().chain(paraDict2.into_iter()).collect();
+        let paraMainDict1 =
+            paraMainDict1.into_iter().chain(paraMainDict2.into_iter()).collect::<IndexMap<String, Vec<String>>>();
+        let paraDict1 =
+            paraDict1.into_iter().chain(paraDict2.into_iter()).collect::<IndexMap<(String, String), Vec<Vec<PyValue>>>>();
         let mut dataDicts3 = dataDicts1.clone();
 
         let max_len = if dataDicts1.len() > dataDicts2.len() { dataDicts1.len() } else { dataDicts2.len() };
@@ -190,6 +190,7 @@ impl Program {
                 self.kombiReverseDict.insert(valuesInValuess.clone(), *key);
             }
         }
+
         self.kombiReverseDict2 = IndexMap::new();
         for (key, value) in words.kombiParaNdataMatrix2.iter() {
             for valuesInValuess in value {
@@ -219,28 +220,33 @@ impl Program {
                 paraDict2,
                 dataDicts2,
             );
+
             self.paraMainDict = paraMainDict3;
             self.paraDict = paraDict3;
             dataDicts = dataDicts3;
         }
+
         self.dataDicts = dataDicts;
     }
 
     pub fn parametersToCommandsAndNumbers(&mut self, words: &Words) {
         self.storeParamtersForColumns(words);
-        let mut lastParameterType: String = "".to_string();
+        let mut lastParameterType = "".to_string();
 
         for token in self.argvWithoutProgram.clone() {
             if token.starts_with("-") && !token.starts_with("--") {
                 lastParameterType = token[1..].to_string();
                 continue;
             }
+
             if token.starts_with("--") {
                 let cmd = token[2..].to_string();
+
                 if lastParameterType == "spalten" {
                     if let Some(eq) = cmd.find('=') {
                         let main = cmd[..eq].to_string();
                         let right = cmd[eq + 1..].to_string();
+
                         for single in right.split(',') {
                             if self.paraDict.contains_key(&(main.clone(), single.to_string())) {
                                 self.newTable = true;
@@ -255,6 +261,7 @@ impl Program {
                     if let Some(eq) = cmd.find('=') {
                         let left = cmd[..eq].to_string();
                         let right = cmd[eq + 1..].to_string();
+
                         if left == "galaxie" {
                             for single in right.split(',') {
                                 if self.kombiReverseDict.contains_key(single) {
@@ -278,13 +285,53 @@ impl Program {
         if self.allImportantBeginThingsDone {
             return;
         }
+
         self.argvWithoutProgram = if self.argv.len() > 1 { self.argv[1..].to_vec() } else { vec![] };
         self.parametersToCommandsAndNumbers(words);
         self.allImportantBeginThingsDone = true;
     }
 
+    pub fn oberesMaximumArg(&mut self, value: i64) -> i64 {
+        self.hoechsteZeile = value;
+        self.hoechsteZeile
+    }
+
+    pub fn oberesMaximum2(&mut self, value: i64) -> i64 {
+        self.oberesMaximumArg(value)
+    }
+
+    pub fn oberesMaximum(&mut self, value: i64) -> i64 {
+        self.oberesMaximum2(value)
+    }
+
     pub fn run(&mut self, words: &Words) {
         self.bringAllImportantBeginThings(words);
         self.runDone = true;
+    }
+
+    pub fn workflowEverything(&mut self) {
+        self.tableGenerated = self.newTable;
+    }
+
+    pub fn combiTableWorkflow(&mut self) {
+        self.tableGenerated = self.tableGenerated || self.newTable;
+    }
+
+    pub fn snapshot(&self) -> String {
+        format!(
+            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={}",
+            self.paraMainDict.len(),
+            self.paraDict.len(),
+            self.dataDicts[0].len(),
+            self.dataDicts[3].len(),
+            self.kombiReverseDict.len(),
+            self.kombiReverseDict2.len(),
+            self.newTable,
+            self.argvWithoutProgram,
+            self.allImportantBeginThingsDone,
+            self.runDone,
+            self.hoechsteZeile,
+            self.tableGenerated
+        )
     }
 }

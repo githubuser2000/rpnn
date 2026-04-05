@@ -7,20 +7,9 @@ fn main() {
 
     let mut program = Program::new(argv);
     program.run(&words);
-
-    eprintln!(
-        "reta toward-bitexact next pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={}",
-        program.paraMainDict.len(),
-        program.paraDict.len(),
-        program.dataDicts[0].len(),
-        program.dataDicts[3].len(),
-        program.kombiReverseDict.len(),
-        program.kombiReverseDict2.len(),
-        program.newTable,
-        program.argvWithoutProgram,
-        program.allImportantBeginThingsDone,
-        program.runDone
-    );
+    program.workflowEverything();
+    program.combiTableWorkflow();
+    println!("{}", program.snapshot());
 }
 
 pub const PYTHON_SOURCE__STOREPARAMTERSFORCOLUMNS: &str = r#"    def storeParamtersForColumns(self):
@@ -1176,6 +1165,221 @@ pub const PYTHON_SOURCE__BRINGALLIMPORTANTBEGINTHINGS: &str = r#"    def bringAl
             kombiTable_Kombis2,
             maintable2subtable_Relation2,
         )"#;
+pub const PYTHON_SOURCE__OBERESMAXIMUMARG: &str = r#"    def oberesMaximumArg(self, arg) -> tuple:
+        werte: list = []
+        if (
+            arg[2 : 3 + i18n.zeilenParasLen["oberesmaximum"]]
+            == i18n.zeilenParas["oberesmaximum"] + "="
+            and arg[3 + i18n.zeilenParasLen["oberesmaximum"] :].isdecimal()
+        ):
+            werte = [int(arg[3 + i18n.zeilenParasLen["oberesmaximum"] :])]
+            return werte, True
+        elif (
+            arg[2 : 3 + i18n.zeilenParasLen["vorhervonausschnitt"]]
+            == i18n.zeilenParas["vorhervonausschnitt"] + "="
+        ):
+            werteList: list = [
+                a + 1
+                for a in BereichToNumbers2(
+                    arg[3 + i18n.zeilenParasLen["vorhervonausschnitt"] :], False, 0
+                )
+            ]
+            werte = [max(w, 1024) for w in werteList]
+            return werte, False
+        else:
+            return werte, False"#;
+pub const PYTHON_SOURCE__OBERESMAXIMUM2: &str = r#"    def oberesMaximum2(self, argv2) -> Optional[int]:
+        try:
+            werte: list = [self.tables.hoechsteZeile[1024]]
+        except:
+            werte: list = []
+        for arg in argv2:
+            werte += self.oberesMaximumArg(arg)[0]
+
+        return max(werte) if len(werte) > 0 else None"#;
+pub const PYTHON_SOURCE__OBERESMAXIMUM: &str = r#"    def oberesMaximum(self, arg) -> bool:
+        liste, wahrheitswert = self.oberesMaximumArg(arg)
+        if len(liste) == 0 or not wahrheitswert:
+            return False
+        max_ = max(liste + [self.tables.hoechsteZeile[1024]])
+        self.tables.hoechsteZeile = max_
+        return True"#;
+pub const PYTHON_SOURCE____INIT__: &str = r#"    def __init__(
+        self,
+        argv=[],
+        alternativeShellRowsAmount: Optional[int] = None,
+        Txt=None,
+        runAlles=True,
+    ):
+        global Tables, infoLog
+        self.argv = [a.strip() for a in argv]
+        self.allesParameters = 0
+        self.tables = Tables(self.oberesMaximum2(argv[1:]), Txt)
+
+        self.breiteHasBeenOnceZero: bool = False
+        self.obZeilenBereicheAngegeben = False
+        if platform.system() == "Windows":
+            self.tables.getOut.color = False
+
+        self.__runAlles = runAlles
+        self.__invertAlles = False
+        if runAlles:
+            self.__resultingTable = self.workflowEverything(self.argv)"#;
 pub const PYTHON_SOURCE__RUN: &str = r#"    def run(self):
         if not self.__runAlles:
             self.__resultingTable = self.workflowEverything(self.argv)"#;
+pub const PYTHON_SOURCE__WORKFLOWEVERYTHING: &str = r#"    def workflowEverything(self, argv) -> list:
+        global infoLog
+        (
+            self.RowsLen,
+            paramLines,
+            paramLinesNot,
+            self.relitable,
+            self.rowsAsNumbers,
+            animalsProfessionsTable,
+            self.rowsOfcombi,
+            kombiTable_Kombis,
+            maintable2subtable_Relation,
+            spaltenreihenfolgeundnurdiese,
+            primSpalten,
+            gebr,
+            animalsProfessionsTable2,
+            kombiTable_Kombis2,
+            maintable2subtable_Relation2,
+        ) = self.bringAllImportantBeginThings(argv)
+
+        # x("gebr", gebr)
+        (
+            finallyDisplayLines,
+            newTable,
+            numlen,
+            rowsRange,
+            old2newTable,
+        ) = self.tables.getPrepare.prepare4out(
+            paramLines,
+            paramLinesNot,
+            self.relitable,
+            self.rowsAsNumbers,
+            gebrSpalten=gebr,
+            primSpalten=primSpalten,
+        )
+
+        if len(self.rowsOfcombi) > 0:
+            newTable = self.combiTableWorkflow(
+                animalsProfessionsTable,
+                finallyDisplayLines,
+                kombiTable_Kombis,
+                maintable2subtable_Relation,
+                newTable,
+                old2newTable,
+                paramLines,
+                csvFileNames.kombi13,
+            )
+
+        if len(self.rowsOfcombi2) > 0:
+            newTable = self.combiTableWorkflow(
+                animalsProfessionsTable2,
+                finallyDisplayLines,
+                kombiTable_Kombis2,
+                maintable2subtable_Relation2,
+                newTable,
+                old2newTable,
+                paramLines,
+                csvFileNames.kombi15,
+            )
+
+        newTable = self.tables.getOut.onlyThatColumns(
+            newTable, spaltenreihenfolgeundnurdiese
+        )
+        self.newTable = newTable
+        self.finallyDisplayLines = finallyDisplayLines
+        self.rowsRange = rowsRange
+        self.numlen = numlen
+
+        return self.tables.getOut.cliOut(
+            finallyDisplayLines, newTable, numlen, rowsRange
+        )"#;
+pub const PYTHON_SOURCE__COMBITABLEWORKFLOW: &str = r#"    def combiTableWorkflow(
+        self,
+        animalsProfessionsTable,
+        finallyDisplayLines,
+        kombiTable_Kombis,
+        maintable2subtable_Relation,
+        newTable,
+        old2newTable,
+        paramLines,
+        csvFileName,
+    ):
+        """alle  Schritte für kombi:
+        1. lesen: KombiTable und relation, was von kombitable zu haupt gehört
+                  und matrix mit zellen sind zahlen der kombinationen
+                  d.h. 3 Sachen sind das Ergebnis
+        2. prepare: die Zeilen, die infrage kommen für Kombi, d.h.:
+                                key = haupttabellenzeilennummer
+                                value = kombitabellenzeilennummer
+        3. Zeilenumbruch machen, wie es bei der Haupt+Anzeige-Tabelle auch gemacht wurde
+           prepare4out
+        4. Vorbereiten des Joinens beider Tabellen direkt hier rein programmiert
+           (Müsste ich unbedingt mal refactoren!)
+        5. joinen
+           Wenn ich hier jetzt alles joine, und aber nicht mehrere Zellen mache pro Kombitablezeile,
+           d.h. nicht genauso viele Zeilen wie es der Kombitablezeilen entspricht,
+           d.h. ich mache nur eine Zeile, in der ich alle kombitableteilen nur konkatteniere,
+           dann ist das Ergebnis Mist in der Ausagbe, weil der Zeilenumbruch noch mal gemacht werden müsste,
+           der jedoch bereits schon gemacht wurde.
+           Der musste aber vorher gemacht werden, denn wenn man ihn jetzt machen würde,
+           dann müsste man das eigentlich WIEDER mit der ganzen Tabelle tun!
+           Also etwa alles völlig umprogrammieren?
+        6. noch mal nur das ausgeben lassen, das nur ausgegeben werden soll
+        7. letztendliche Ausagebe von allem!!
+        """
+        ChosenKombiLines = self.tables.getCombis.prepare_kombi(
+            finallyDisplayLines,
+            animalsProfessionsTable,
+            paramLines,
+            finallyDisplayLines,
+            kombiTable_Kombis,
+        )
+        komb_rows = (
+            self.rowsOfcombi
+            if csvFileName == csvFileNames.kombi13
+            else (self.rowsOfcombi2 if csvFileName == csvFileNames.kombi15 else None)
+        )
+        (
+            finallyDisplayLines_kombi,
+            newTable_kombi_1,
+            lineLen_kombi_1,
+            animalsProfessionsTable,
+            old2newTableAnimalsProfessions,
+        ) = self.tables.getPrepare.prepare4out(
+            OrderedSet(),
+            OrderedSet(),
+            animalsProfessionsTable,
+            komb_rows,
+            {},
+            self.tables.getCombis.sumOfAllCombiRowsAmount,
+            reliTableLenUntilNow=len(newTable[0])
+            - (
+                len(self.rowsOfcombi) + len(self.rowsOfcombi2)
+                if csvFileName == csvFileNames.kombi13
+                else len(self.rowsOfcombi2)
+                if csvFileName == csvFileNames.kombi15
+                else None
+            ),
+            kombiCSVNumber=0
+            if csvFileName == csvFileNames.kombi13
+            else 1
+            if csvFileName == csvFileNames.kombi15
+            else None,
+        )
+        KombiTables = self.tables.getCombis.prepareTableJoin(
+            ChosenKombiLines, newTable_kombi_1
+        )
+        newTable = self.tables.getCombis.tableJoin(
+            newTable,
+            KombiTables,
+            maintable2subtable_Relation,
+            old2newTable,
+            komb_rows,
+        )
+        return newTable"#;

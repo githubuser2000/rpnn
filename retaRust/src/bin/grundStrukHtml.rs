@@ -1,3 +1,3 @@
 fn main() {
-    eprintln!("This artifact continues reta in the same non-idiomatic, python-first direction toward later bitexactness.");
+    println!("This artifact continues reta 1:1 pressure and keeps the compare scaffold available.");
 }
