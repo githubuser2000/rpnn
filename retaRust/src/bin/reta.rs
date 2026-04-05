@@ -1,15 +1,15 @@
-use reta_shared::shared::words_python_like::Words;
-use reta_shared::shared::reta_python_like::Program;
+use reta_shared::shared::words_py::Words;
+use reta_shared::shared::reta_py::Program;
 
 fn main() {
     let argv = std::env::args().collect::<Vec<_>>();
     let words = Words::new();
 
-    let mut program = Program::new(argv.clone());
-    program.bringAllImportantBeginThings(&words);
+    let mut program = Program::new(argv);
+    program.run(&words);
 
     eprintln!(
-        "reta same names same shapes pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={}",
+        "reta strict python followup pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={}",
         program.paraMainDict.len(),
         program.paraDict.len(),
         program.dataDicts[0].len(),
@@ -18,7 +18,8 @@ fn main() {
         program.kombiReverseDict2.len(),
         program.newTable,
         program.argvWithoutProgram,
-        program.allImportantBeginThingsDone
+        program.allImportantBeginThingsDone,
+        program.runDone
     );
 }
 

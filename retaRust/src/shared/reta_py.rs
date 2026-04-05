@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use crate::shared::words_python_like::{Words, PyValue};
+use crate::shared::words_py::{Words, PyValue};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
