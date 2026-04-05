@@ -1,11 +1,6 @@
 {
-  "focus": "reta early strict parameter semantics",
-  "subset_count": 180,
-  "kombiParaNdataMatrix": 12,
-  "kombiParaNdataMatrix2": 14,
-  "next_targets": [
-    "bringAllImportantBeginThings",
-    "full CLI parameter flow",
-    "table/generator integration"
-  ]
+  "focus": "same names same shapes same source order pressure",
+  "subset_count": 520,
+  "rule": "python is truth; no idiomatic improvement",
+  "next_target": "next source-order block after bringAllImportantBeginThings"
 }

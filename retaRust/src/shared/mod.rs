@@ -1,2 +1,2 @@
-pub mod exact_i18n;
-pub mod python_like_reta;
+pub mod words_python_like;
+pub mod reta_python_like;

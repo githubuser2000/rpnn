@@ -1,30 +1,24 @@
-use reta_shared::shared::exact_i18n::I18nSubset;
-use reta_shared::shared::python_like_reta::{ProgramState, parametersToCommandsAndNumbers, storeParamtersForColumns};
+use reta_shared::shared::words_python_like::Words;
+use reta_shared::shared::reta_python_like::Program;
 
 fn main() {
     let argv = std::env::args().collect::<Vec<_>>();
-    let i18n = I18nSubset::new();
-    let mut state = ProgramState::new(argv.clone());
-    parametersToCommandsAndNumbers(&mut state, &i18n);
+    let words = Words::new();
+
+    let mut program = Program::new(argv.clone());
+    program.bringAllImportantBeginThings(&words);
 
     eprintln!(
-        "reta strict next pass: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={} newTable={} argv={:?}",
-        state.paraMainDict.len(),
-        state.paraDict.len(),
-        state.dataDicts[0].len(),
-        state.kombiReverseDict.len(),
-        state.kombiReverseDict2.len(),
-        state.newTable,
-        argv
-    );
-
-    let mut state2 = ProgramState::new(argv);
-    storeParamtersForColumns(&i18n, &mut state2);
-    eprintln!(
-        "store only: paraMainDict={} paraDict={} dataDict3={}",
-        state2.paraMainDict.len(),
-        state2.paraDict.len(),
-        state2.dataDicts[3].len()
+        "reta same names same shapes pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={}",
+        program.paraMainDict.len(),
+        program.paraDict.len(),
+        program.dataDicts[0].len(),
+        program.dataDicts[3].len(),
+        program.kombiReverseDict.len(),
+        program.kombiReverseDict2.len(),
+        program.newTable,
+        program.argvWithoutProgram,
+        program.allImportantBeginThingsDone
     );
 }
 

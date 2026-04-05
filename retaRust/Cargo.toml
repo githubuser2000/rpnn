@@ -1,5 +1,5 @@
 [package]
-name = "reta_strict_next_pass"
+name = "reta_same_names_same_shapes_pass"
 version = "0.1.0"
 edition = "2021"
 

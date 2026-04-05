@@ -1,21 +1,23 @@
-# reta strict next pass
+# reta same names same shapes pass
 
-Dies ist der nächste Schritt auf `reta`, nicht mehr `grundStrukHtml`.
+Dieser Stand drückt `reta` weiter in Richtung:
 
-## Fokus
-Striktere Python-Nähe für die frühe Parameter-/Dict-Phase:
+- gleiche Namen
+- gleiche Formen
+- gleiche Datenstrukturen soweit in diesem Block umsetzbar
+- keine bessere Architektur
+- keine idiomatische Rust-Zielsetzung
 
-- `storeParamtersForColumns`
-- `parametersToCommandsAndNumbers`
+## Enthalten
+- `Program`
+- `Words`
 - `intoParameterDatatype`
 - `mergeParameterDicts`
+- `storeParamtersForColumns`
+- `parametersToCommandsAndNumbers`
+- `bringAllImportantBeginThings`
 
 ## Datenstand
-- `paraNdataMatrix`: **180 Einträge**
+- `paraNdataMatrix`: **520 Einträge**
 - `kombiParaNdataMatrix`: **12 Schlüssel**
 - `kombiParaNdataMatrix2`: **14 Schlüssel**
-
-## Ehrliche Grenze
-Noch keine vollständige `reta`-Parität.
-Das ist bewusst der nächste harte Block:
-erst frühe Dict-/Parameter-Semantik stabilisieren, dann auf weitere Python-Blöcke gehen.
