@@ -1,19 +1,30 @@
-use reta_shared::shared::exact_i18n::I18nExact;
-use reta_shared::shared::python_like_store::{ProgramState, parametersToCommandsAndNumbers};
+use reta_shared::shared::exact_i18n::I18nSubset;
+use reta_shared::shared::python_like_reta::{ProgramState, parametersToCommandsAndNumbers, storeParamtersForColumns};
 
 fn main() {
     let argv = std::env::args().collect::<Vec<_>>();
-    let i18n = I18nExact::from_python_evaluated_shapes_subset();
-    let mut state = ProgramState::new(argv);
+    let i18n = I18nSubset::new();
+    let mut state = ProgramState::new(argv.clone());
     parametersToCommandsAndNumbers(&mut state, &i18n);
+
     eprintln!(
-        "reta multibin line by line: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={} newTable={}",
+        "reta strict next pass: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={} newTable={} argv={:?}",
         state.paraMainDict.len(),
         state.paraDict.len(),
         state.dataDicts[0].len(),
         state.kombiReverseDict.len(),
         state.kombiReverseDict2.len(),
-        state.newTable
+        state.newTable,
+        argv
+    );
+
+    let mut state2 = ProgramState::new(argv);
+    storeParamtersForColumns(&i18n, &mut state2);
+    eprintln!(
+        "store only: paraMainDict={} paraDict={} dataDict3={}",
+        state2.paraMainDict.len(),
+        state2.paraDict.len(),
+        state2.dataDicts[3].len()
     );
 }
 

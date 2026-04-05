@@ -11,23 +11,13 @@ pub struct OrderedDictLike {
 }
 
 impl OrderedDictLike {
-    pub fn new() -> Self {
-        Self { items: vec![] }
-    }
-    pub fn items(&self) -> Vec<(String, PyVal)> {
-        self.items.clone()
-    }
-    pub fn len(&self) -> usize {
-        self.items.len()
-    }
-    pub fn contains_key(&self, key: &str) -> bool {
-        self.items.iter().any(|(k, _)| k == key)
-    }
+    pub fn new() -> Self { Self { items: vec![] } }
+    pub fn items(&self) -> Vec<(String, PyVal)> { self.items.clone() }
+    pub fn len(&self) -> usize { self.items.len() }
+    pub fn contains_key(&self, key: &str) -> bool { self.items.iter().any(|(k, _)| k == key) }
     pub fn get(&self, key: &str) -> Option<PyVal> {
         for (k, v) in &self.items {
-            if k == key {
-                return Some(v.clone());
-            }
+            if k == key { return Some(v.clone()); }
         }
         None
     }
@@ -139,7 +129,7 @@ pub fn cmp_before(value: &(String, PyVal)) -> (bool, String) {
         let toSort = value;
         return (isNumber, toSort);
     }
-    return (isNumber, toSort);
+    (isNumber, toSort)
 }
 
 pub fn cmpx(erster: &(String, PyVal), zweiter: &(String, PyVal)) -> i64 {
@@ -163,8 +153,10 @@ pub fn cmpx(erster: &(String, PyVal), zweiter: &(String, PyVal)) -> i64 {
         return 1;
     } else if !isNumber1 && isNumber2 {
         return -1;
+    } else if value1 < value2 {
+        return 1;
     } else {
-        return if value1 < value2 { 1 } else { 0 };
+        return 0;
     }
 }
 
@@ -190,35 +182,30 @@ pub fn od_from_items(items: Vec<(String, PyVal)>) -> OrderedDictLike {
 pub fn merge_dicts(dict1: OrderedDictLike, dict2: OrderedDictLike) -> OrderedDictLike {
     let mut dict1 = dict1;
     for (key, dict2_value) in dict2.items() {
-        if (
-            dict1.contains_key(&key)
+        if dict1.contains_key(&key)
             && matches!(dict1.get(&key), Some(PyVal::OrderedDictLike(_)))
             && matches!(dict2_value, PyVal::OrderedDictLike(_))
-        ) {
+        {
             if let Some(PyVal::OrderedDictLike(left)) = dict1.get(&key) {
                 if let PyVal::OrderedDictLike(right) = dict2_value.clone() {
                     let merged = merge_dicts(left, right);
                     dict1.set(key, PyVal::OrderedDictLike(merged));
                 }
             }
-        } else {
-            if dict1.contains_key(&key) {
-                if matches!(dict2_value, PyVal::OrderedDictLike(_))
-                    && !matches!(dict1.get(&key), Some(PyVal::OrderedDictLike(_)))
-                {
-                    let existing = dict1.get(&key);
-                    if let Some(existing) = existing {
-                        if let PyVal::OrderedDictLike(right) = dict2_value {
-                            let mut temp = OrderedDictLike::new();
-                            temp.set(key.clone(), existing);
-                            temp.update_like_python(right);
-                            dict1.set(key, PyVal::OrderedDictLike(od_from_items(sorted(temp.items()))));
-                        }
-                    }
+        } else if dict1.contains_key(&key)
+            && matches!(dict2_value, PyVal::OrderedDictLike(_))
+            && !matches!(dict1.get(&key), Some(PyVal::OrderedDictLike(_)))
+        {
+            if let Some(existing) = dict1.get(&key) {
+                if let PyVal::OrderedDictLike(right) = dict2_value {
+                    let mut temp = OrderedDictLike::new();
+                    temp.set(key.clone(), existing);
+                    temp.update_like_python(right);
+                    dict1.set(key, PyVal::OrderedDictLike(od_from_items(sorted(temp.items()))));
                 }
-            } else {
-                dict1.set(key, dict2_value);
             }
+        } else if !dict1.contains_key(&key) {
+            dict1.set(key, dict2_value);
         }
     }
     od_from_items(sorted(dict1.items()))
@@ -245,13 +232,7 @@ pub fn traverseHierarchy(liste: Vec<String>, thing: OrderedDictLike, listenIndex
 
 pub fn myprint(d: OrderedDictLike, tiefe: usize, blank: bool, i18n: &I18nLike, out: &mut String) {
     let bereich = d.items();
-    let iter: Vec<(String, PyVal)> = if tiefe < 2 {
-        bereich
-    } else {
-        let mut x = d.items();
-        x.reverse();
-        x
-    };
+    let iter: Vec<(String, PyVal)> = if tiefe < 2 { bereich } else { let mut x = d.items(); x.reverse(); x };
     for (k, v) in iter {
         let bereichLen = match &v {
             PyVal::OrderedDictLike(inner) => (inner.items().len() > 1) || tiefe < 2,
@@ -266,36 +247,34 @@ pub fn myprint(d: OrderedDictLike, tiefe: usize, blank: bool, i18n: &I18nLike, o
             PyVal::NoneValue => tiefe < 2,
         };
         if bereichLen {
-            out.push_str(&["<div style=\"", "white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" ", ">"].join(""));
+            out.push_str("<div style=\"white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" >");
         }
         if matches!(v, PyVal::NoneValue) {
-            let blank_part = if blank {
-                [
-                    " class=\"ordGru\" onchange=\"toggleP2(this,-10,",
-                    "'",
-                    "✗",
-                    &i18n.grundstrukturen0,
-                    ",",
-                    &k,
-                    "');\"",
-                    " id=\"ordGru",
-                    &k,
-                    "\" value=\"",
-                    &k,
-                    "\"",
-                ].join("")
-            } else {
-                "".to_string()
-            };
-            out.push_str(&["<input type=\"checkbox\"", &blank_part, ">"].join(""));
+            out.push_str("<input type=\"checkbox\"");
+            if blank {
+                out.push_str(" class=\"ordGru\" onchange=\"toggleP2(this,-10,'✗");
+                out.push_str(&i18n.grundstrukturen0);
+                out.push_str(",");
+                out.push_str(&k);
+                out.push_str("');\" id=\"ordGru");
+                out.push_str(&k);
+                out.push_str("\" value=\"");
+                out.push_str(&k);
+                out.push_str("\"");
+            }
+            out.push_str(">");
         }
         if matches!(v, PyVal::NoneValue) || listenVergleich {
-            let kkk = if matches!(v, PyVal::NoneValue) {
-                ["<label id=\"ordGruB", &k, "\">", &k.replace("_", " "), "</label>"].join("")
+            if matches!(v, PyVal::NoneValue) {
+                out.push_str("<label id=\"ordGruB");
+                out.push_str(&k);
+                out.push_str("\">");
+                out.push_str(&k.replace("_", " "));
+                out.push_str("</label> ");
             } else {
-                k.clone()
-            };
-            out.push_str(&format!("{0} ", kkk));
+                out.push_str(&k);
+                out.push_str(" ");
+            }
         }
         if matches!(v, PyVal::NoneValue) {
             out.push_str("</input>");
@@ -311,13 +290,12 @@ pub fn myprint(d: OrderedDictLike, tiefe: usize, blank: bool, i18n: &I18nLike, o
 
 pub fn grundstruk_html_from_i18n(i18n: &I18nLike, blank: bool) -> String {
     let mut wahlNeu = od_from_items(sorted(vec![]));
-
     let mut liste: Vec<String>;
     for (key, value) in &i18n.wahl15 {
         let key = "_".to_string() + key;
         liste = key.split("_").filter(|x| !x.is_empty()).map(|x| x.to_string()).collect::<Vec<_>>();
         let mut thing = od_from_items(sorted(vec![]));
-        if liste.len() > 0 {
+        if !liste.is_empty() {
             thing = traverseHierarchy(liste.into_iter().rev().collect::<Vec<_>>(), thing, 0, value);
             wahlNeu = merge_dicts(thing, wahlNeu);
         }
@@ -332,13 +310,15 @@ pub fn grundstruk_html_from_i18n(i18n: &I18nLike, blank: bool) -> String {
     wahlNeu2 = merge_dicts(wahlNeu2, od_from_items(sorted(inner15.items())));
 
     let mut out = String::new();
-    out.push_str(&[
-        "<div style=\"",
-        if blank && false { "display:none;" } else { "" },
-        "white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" ",
-        if blank { "id='grundstrukturenDiv'" } else { "" },
-        ">",
-    ].join(""));
+    out.push_str("<div style=\"");
+    if blank && false {
+        out.push_str("display:none;");
+    }
+    out.push_str("white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" ");
+    if blank {
+        out.push_str("id='grundstrukturenDiv'");
+    }
+    out.push_str(">");
     myprint(wahlNeu2, 0, blank, i18n, &mut out);
     out.push_str("</div>\n");
     out

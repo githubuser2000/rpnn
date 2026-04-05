@@ -1,11 +1,18 @@
 [package]
-name = "grundstruk_special_branch_emulation"
+name = "reta_strict_next_pass"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+indexmap = "2"
+
 [lib]
-name = "grundstruk_shared"
+name = "reta_shared"
 path = "src/lib.rs"
+
+[[bin]]
+name = "reta"
+path = "src/bin/reta.rs"
 
 [[bin]]
 name = "grundStrukHtml"

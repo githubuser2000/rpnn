@@ -17,16 +17,14 @@ pub struct StoreParameterEntry {
 }
 
 #[derive(Clone, Debug)]
-pub struct I18nExact {
+pub struct I18nSubset {
     pub paraNdataMatrix: Vec<StoreParameterEntry>,
     pub kombiParaNdataMatrix: IndexMap<i64, Vec<String>>,
     pub kombiParaNdataMatrix2: IndexMap<i64, Vec<String>>,
-    pub grundstrukturen_name0: String,
-    pub wahl15: Vec<(String, String)>,
 }
 
-impl I18nExact {
-    pub fn from_python_evaluated_shapes_subset() -> Self {
+impl I18nSubset {
+    pub fn new() -> Self {
         let mut paraNdataMatrix: Vec<StoreParameterEntry> = vec![];
         paraNdataMatrix.push(StoreParameterEntry {
     parameterMainNames: vec!["['wichtigste']".to_string()],
@@ -868,6 +866,426 @@ impl I18nExact {
         vec![PyAtom::Int(242), PyAtom::Int(426)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
     ],
 });
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["warum_Transzendentalie_=_Komplexität_von_Michael_Commons".to_string(), "warumtranszendentaliegleichkomplexitaet".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(166), PyAtom::Int(5), PyAtom::Int(65)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Model_of_Hierarchical_Complexity".to_string(), "modelofhierarchicalcomplexity".to_string(), "komplex".to_string(), "komplexität".to_string(), "komplexitaet".to_string(), "complexity".to_string(), "model".to_string(), "abstraktion".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(203), PyAtom::Int(483), PyAtom::Int(65), PyAtom::Int(75)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Model_of_Hierarchical_Complexity".to_string(), "modelofhierarchicalcomplexity".to_string(), "komplex".to_string(), "komplexität".to_string(), "komplexitaet".to_string(), "complexity".to_string(), "model".to_string(), "abstraktion".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(203), PyAtom::Int(65), PyAtom::Int(75)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['multiversum']".to_string()],
+    parameterNames: vec!["Model_of_Hierarchical_Complexity".to_string(), "modelofhierarchicalcomplexity".to_string(), "komplex".to_string(), "komplexität".to_string(), "komplexitaet".to_string(), "complexity".to_string(), "model".to_string(), "abstraktion".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(203), PyAtom::Int(65), PyAtom::Int(75)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['operationen']".to_string()],
+    parameterNames: vec!["2".to_string(), "zwei".to_string(), "gerade".to_string(), "ungerade".to_string(), "alternierung".to_string(), "alternierend".to_string(), "zweierstruktur".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(331), PyAtom::Int(497), PyAtom::Int(498), PyAtom::Int(499), PyAtom::Int(78), PyAtom::Int(79), PyAtom::Int(80)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['operationen']".to_string()],
+    parameterNames: vec!["Multiplikation".to_string(), "multiplikation".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(158)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['operationen']".to_string()],
+    parameterNames: vec!["4".to_string(), "vier".to_string(), "viererstruktur".to_string(), "viererabfolgen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(104), PyAtom::Int(145), PyAtom::Int(76), PyAtom::Int(77), PyAtom::Int(81)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Gesellschaftsschicht".to_string(), "klasse".to_string(), "klassen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(241)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Moral".to_string(), "moral".to_string(), "warummoral".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(215), PyAtom::Int(216)],\n        vec![PyAtom::Tuple(vec![PyAtom::Int(216), PyAtom::Int(221)])],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Fachgebiete".to_string(), "fachgebiete".to_string(), "fachbereiche".to_string(), "themen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(183)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["Fachgebiete".to_string(), "fachgebiete".to_string(), "fachbereiche".to_string(), "themen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(183)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["Pflanzen".to_string(), "pflanzen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(113)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["Maschinen".to_string(), "maschinen".to_string(), "maschine".to_string(), "gerät".to_string(), "geräte".to_string(), "geraete".to_string(), "geraet".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(89)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["Organisationsform".to_string(), "organisationsform".to_string(), "organisationsart".to_string(), "firma".to_string(), "verein".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(99)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["System".to_string(), "system".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(440), PyAtom::Int(455), PyAtom::Int(476), PyAtom::Int(513), PyAtom::Int(69), PyAtom::Int(70)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["System".to_string(), "system".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(440), PyAtom::Int(455), PyAtom::Int(476), PyAtom::Int(513), PyAtom::Int(69), PyAtom::Int(70)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["Erklärung".to_string(), "erklärung".to_string(), "erklaerung".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(71)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['wirtschaft']".to_string()],
+    parameterNames: vec!["BWL".to_string(), "bwl".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(109)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Sinn_des_Lebens".to_string(), "sinndeslebens".to_string(), "lebenssinn".to_string(), "sinn".to_string(), "sinnsuche".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(189), PyAtom::Int(88)],\n        vec![PyAtom::Tuple(vec![PyAtom::Int(181), PyAtom::Int(182)])],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Intelligenzprobleme".to_string(), "intelligenzprobleme".to_string(), "intelligenzmaengel".to_string(), "intelligenzmängel".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(147)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Denkweise_von_Lebewesen".to_string(), "lebewesendenkweise".to_string(), "denkweise".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(146)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Gegentranszendentalien".to_string(), "gegentranszendentalien".to_string(), "gegenstrukturalien".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(138), PyAtom::Int(139), PyAtom::Int(202)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Gleichheit_Freiheit".to_string(), "gleichheitfreiheit".to_string(), "ungleichheit".to_string(), "dominieren".to_string(), "gleichheit".to_string(), "freiheit".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(132), PyAtom::Int(328), PyAtom::Int(331), PyAtom::Int(335)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Gefühle".to_string(), "emotionen".to_string(), "gefuehle".to_string(), "emotion".to_string(), "gefühl".to_string(), "gefuehl".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(105), PyAtom::Int(230), PyAtom::Int(243), PyAtom::Int(283), PyAtom::Int(284), PyAtom::Int(285), PyAtom::Int(286), PyAtom::Int(305)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Egoismus".to_string(), "egoismus".to_string(), "altruismus".to_string(), "selbstlosigkeit".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(136)],\n        vec![PyAtom::Tuple(vec![PyAtom::Int(66), PyAtom::Int(67)])],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Wirkung".to_string(), "wirkung".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(135)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["INCELs".to_string(), "incel".to_string(), "incels".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(68)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["irrationale_Zahlen_durch_Wurzelbildung".to_string(), "irrationalezahlendurchwurzelbildung".to_string(), "ausgangslage".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(73)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["dominierendes_Geschlecht".to_string(), "dominierendesgeschlecht".to_string(), "maennlich".to_string(), "männlich".to_string(), "weiblich".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(51)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Liebe".to_string(), "liebe".to_string(), "ethik".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(208), PyAtom::Int(28), PyAtom::Int(330), PyAtom::Int(8), PyAtom::Int(9)],\n        vec![PyAtom::Tuple(vec![PyAtom::Int(121), PyAtom::Int(122)])],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Glaube_Erkenntnis".to_string(), "glauben".to_string(), "erkenntnis".to_string(), "glaube".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(59)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['menschliches']".to_string()],
+    parameterNames: vec!["Angreifbarkeit".to_string(), "angreifbarkeit".to_string(), "angreifbar".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(57), PyAtom::Int(58)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)".to_string(), "Transzendentalien".to_string(), "transzendentalien".to_string(), "transzendentalie".to_string(), "strukturalien".to_string(), "alien".to_string(), "universalien".to_string(), "meta-paradigmen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(131), PyAtom::Int(229), PyAtom::Int(5)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['multiversum']".to_string()],
+    parameterNames: vec!["Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)".to_string(), "Transzendentalien".to_string(), "transzendentalien".to_string(), "transzendentalie".to_string(), "strukturalien".to_string(), "alien".to_string(), "universalien".to_string(), "meta-paradigmen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(131), PyAtom::Int(229), PyAtom::Int(5)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Bedingung_und_Auslöser_(1/3)".to_string(), "bedingung".to_string(), "bedingungen".to_string(), "auslöser".to_string(), "ausloeser".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(338)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Lebensbereiche_Problemklassen_(28)".to_string(), "lebensbereiche".to_string(), "lebensfelder".to_string(), "problemklassen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(405), PyAtom::Int(415), PyAtom::Int(416)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Maßnahmen_(39)".to_string(), "massnahmen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(384)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)".to_string(), "relativreziprokuniversell".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(350)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["universeller_Komperativ_(18→15)".to_string(), "universellerkomperativ".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(349)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Existenzialien_(3)".to_string(), "existenzialien".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(348)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Extremalien_(19)".to_string(), "extremalien".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(347), PyAtom::Int(352)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Erwartungshaltungen_(26)".to_string(), "erwartungen".to_string(), "erwartungshaltungen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(344)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Leidenschaften_(21)".to_string(), "leidenschaft".to_string(), "leidenschaften".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(343)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["relativer_Zeit-Betrag_(15_10_4_18_6)".to_string(), "relativerzeitbetrag".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(339)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Zahlenvergleich_(15_18_6)".to_string(), "zahlenvergleich".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(340)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Bestrebungen(1/5)".to_string(), "bestrebung".to_string(), "bestrebungen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(332), PyAtom::Int(414)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Prinzipien(1/8)".to_string(), "prinzipien".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(329), PyAtom::Int(378)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Attraktionen_(36)".to_string(), "attraktionen".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(311)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Optimierung_(10)".to_string(), "optimierung".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(310)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Themen_(6)".to_string(), "themen".to_string(), "thema".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(309)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Bedeutung_(10)".to_string(), "bedeutung".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(306)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Reziprokes".to_string(), "reziproke".to_string(), "reziprokes".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(131), PyAtom::Int(204), PyAtom::Int(205), PyAtom::Int(231), PyAtom::Int(257), PyAtom::Int(273), PyAtom::Int(281), PyAtom::Int(284), PyAtom::Int(285), PyAtom::Int(326), PyAtom::Int(327), PyAtom::Int(328), PyAtom::Int(329), PyAtom::Int(330), PyAtom::Int(331), PyAtom::Int(332), PyAtom::Int(334), PyAtom::Int(335), PyAtom::Int(338), PyAtom::Int(416), PyAtom::Int(42)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Achtung_(4)".to_string(), "achtung".to_string(), "achten".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(270), PyAtom::Int(393)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Zeit_(4)_als_Wirklichkeit".to_string(), "zeit".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(266), PyAtom::Int(267)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Absicht_16_ist_zu_genügen".to_string(), "absicht16".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(312)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Absicht_17_ist_zu_meinen".to_string(), "absicht17".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(263)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Absicht_6_ist_Vorteilsmaximierung".to_string(), "absicht6".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(262)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Absicht_7_ist_Selbstlosigkeit".to_string(), "absicht7".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(261)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Bewusstheit_statt_Bewusstsein_(1)".to_string(), "bewusstheit".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(282)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['grundstrukturen']".to_string()],
+    parameterNames: vec!["Verhalten_(11)".to_string(), "verhalten".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(301), PyAtom::Int(302), PyAtom::Int(413)],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![],\n        vec![]
+    ],
+});
 
         let mut kombiParaNdataMatrix: IndexMap<i64, Vec<String>> = IndexMap::new();
         kombiParaNdataMatrix.insert(1, vec!["Lebewesen".to_string(), "tiere".to_string(), "tier".to_string(), "lebewesen".to_string()]);
@@ -899,68 +1317,10 @@ impl I18nExact {
         kombiParaNdataMatrix2.insert(18, vec!["Geist".to_string(), "geist".to_string()]);
         kombiParaNdataMatrix2.insert(19, vec!["Bewusstsein".to_string(), "bewusstsein".to_string()]);
 
-        let mut wahl15: Vec<(String, String)> = vec![];
-        wahl15.push(("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)".to_string(), "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity),,nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)".to_string()));
-        wahl15.push(("Konkreta_und_Focus_(2)".to_string(), "Konkreta_und_Focus_(2)".to_string()));
-        wahl15.push(("Impulse_(5)".to_string(), "Impulse_(5)".to_string()));
-        wahl15.push(("Gefühle_(7)".to_string(), "Gefühle_(7)".to_string()));
-        wahl15.push(("Modus_und_Sein_(8)".to_string(), "Modus_und_Sein_(8)".to_string()));
-        wahl15.push(("Wirklichkeiten_Wahrheit_Wahrnehmung_(10)".to_string(), "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)".to_string()));
-        wahl15.push(("Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12".to_string(), "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12".to_string()));
-        wahl15.push(("Paradigmen_sind_Absichten_(13)".to_string(), "Paradigmen_sind_Absichten_(13)".to_string()));
-        wahl15.push(("Gedanken_sind_Positionen_(17)".to_string(), "Gedanken_sind_Positionen_(17)".to_string()));
-        wahl15.push(("Verbundenheiten_(18)".to_string(), "Verbundenheiten_(18)".to_string()));
-        wahl15.push(("Triebe_und_Bedürfnisse_(6)".to_string(), "Triebe_und_Bedürfnisse_(6)".to_string()));
-        wahl15.push(("Lust_(9)".to_string(), "Lust_(9)".to_string()));
-        wahl15.push(("Reflexe_(3),Existenzialien_(3)".to_string(), "Reflexe_(3),Existenzialien_(3)".to_string()));
-        wahl15.push(("Absicht_6_ist_Vorteilsmaximierung".to_string(), "Absicht_6_ist_Vorteilsmaximierung".to_string()));
-        wahl15.push(("Absicht_7_ist_Selbstlosigkeit".to_string(), "Absicht_7_ist_Selbstlosigkeit".to_string()));
-        wahl15.push(("Absicht_10_ist_Wirklichkeit_erkennen".to_string(), "Absicht_10_ist_Wirklichkeit_erkennen".to_string()));
-        wahl15.push(("Absicht_17_ist_zu_meinen".to_string(), "Absicht_17_ist_zu_meinen".to_string()));
-        wahl15.push(("Zeit_(4)_als_Wirklichkeit".to_string(), "Zeit_(4)_als_Wirklichkeit".to_string()));
-        wahl15.push(("Funktionen_Vorstellungen_(16)".to_string(), "Funktionen_Vorstellungen_(16)".to_string()));
-        wahl15.push(("Achtung_(4)".to_string(), "Achtung_(4)".to_string()));
-        wahl15.push(("Absicht_1/8".to_string(), "Absicht_1/8".to_string()));
-        wahl15.push(("Absicht_1/6_ist_Reinigung_und_Klarheit".to_string(), "Absicht_1/6_ist_Reinigung_und_Klarheit".to_string()));
-        wahl15.push(("Reflektion_und_Kategorien_(1/15)".to_string(), "Reflektion_und_Kategorien_(1/15)".to_string()));
-        wahl15.push(("Bewusstheit_statt_Bewusstsein_(1)".to_string(), "Bewusstheit_statt_Bewusstsein_(1)".to_string()));
-        wahl15.push(("Energie_und_universelle_Eigenschaften_(30)".to_string(), "Energie_und_universelle_Eigenschaften_(30)".to_string()));
-        wahl15.push(("Stimmungen_Kombinationen_(14)".to_string(), "Stimmungen_Kombinationen_(14)".to_string()));
-        wahl15.push(("Klassen_(20)".to_string(), "Klassen_(20)".to_string()));
-        wahl15.push(("Empathie_(37)".to_string(), "Empathie_(37)".to_string()));
-        wahl15.push(("Garben_und_Verhalten_nachfühlen(31)".to_string(), "Garben_und_Verhalten_nachfühlen(31)".to_string()));
-        wahl15.push(("Verhalten_(11)".to_string(), "Verhalten_(11)".to_string()));
-        wahl15.push(("Bedeutung_(10)".to_string(), "Bedeutung_(10)".to_string()));
-        wahl15.push(("Themen_(6)".to_string(), "Themen_(6)".to_string()));
-        wahl15.push(("Optimierung_(10)".to_string(), "Optimierung_(10)".to_string()));
-        wahl15.push(("Attraktionen_(36)".to_string(), "Attraktionen_(36)".to_string()));
-        wahl15.push(("Absicht_16_ist_zu_genügen".to_string(), "Absicht_16_ist_zu_genügen".to_string()));
-        wahl15.push(("Liebe_(7)".to_string(), "Liebe_(7)".to_string()));
-        wahl15.push(("Koalitionen_(10)".to_string(), "Koalitionen_(10)".to_string()));
-        wahl15.push(("Ansichten_Standpunkte_(18_17)".to_string(), "Ansichten_Standpunkte_(18_17)".to_string()));
-        wahl15.push(("Prinzipien(1/8)".to_string(), "Prinzipien(1/8)".to_string()));
-        wahl15.push(("Bestrebungen(1/5)".to_string(), "Bestrebungen(1/5)".to_string()));
-        wahl15.push(("Bedingung_und_Auslöser_(1/3)".to_string(), "Bedingung_und_Auslöser_(1/3)".to_string()));
-        wahl15.push(("relativer_Zeit-Betrag_(15_10_4_18_6)".to_string(), "relativer_Zeit-Betrag_(15_10_4_18_6)".to_string()));
-        wahl15.push(("Zahlenvergleich_(15_18_6)".to_string(), "Zahlenvergleich_(15_18_6)".to_string()));
-        wahl15.push(("Leidenschaften_(21)".to_string(), "Leidenschaften_(21)".to_string()));
-        wahl15.push(("Erwartungshaltungen_(26)".to_string(), "Erwartungshaltungen_(26)".to_string()));
-        wahl15.push(("Extremalien_(19),Ziele_(19)".to_string(), "Extremalien_(19),Ziele_(19)".to_string()));
-        wahl15.push(("universeller_Komperativ_(18→15)".to_string(), "universeller_Komperativ_(18→15)".to_string()));
-        wahl15.push(("Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)".to_string(), "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)".to_string()));
-        wahl15.push(("Sollen_Frage_Vorgehensweise_(1/13)".to_string(), "Sollen_Frage_Vorgehensweise_(1/13)".to_string()));
-        wahl15.push(("Fundament_(1/19)".to_string(), "Fundament_(1/19)".to_string()));
-        wahl15.push(("abhängige_Verbundenheit_(90)".to_string(), "abhängige_Verbundenheit_(90)".to_string()));
-        wahl15.push(("Absicht_13_ist_Helfen".to_string(), "Absicht_13_ist_Helfen".to_string()));
-        wahl15.push(("Karte_Filter_und_Unterscheidung_(1/12)".to_string(), "Karte_Filter_und_Unterscheidung_(1/12)".to_string()));
-        wahl15.push(("Maßnahmen_39".to_string(), "Maßnahmen_(39)".to_string()));
-
         Self {
             paraNdataMatrix,
             kombiParaNdataMatrix,
             kombiParaNdataMatrix2,
-            grundstrukturen_name0: "grundstrukturen".to_string(),
-            wahl15,
         }
     }
 }
@@ -4690,715 +5050,3 @@ pub const PYTHON_SOURCE__WORDS_KOMBI_MATRIX_2: &str = r#"OrderedDict(
         19: (_("Bewusstsein"), _("bewusstsein")),
     }
 )"#;
-pub const PYTHON_SOURCE__WAHL15WORDS: &str = r#"wahl15Words: dict = {
-    "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,"
-    + Primzahlkreuz_pro_contra_strs[1]: ",".join(
-        (
-            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
-            _("Geist_(15)"),
-            _("Model_of_Hierarchical_Complexity),"),
-            Primzahlkreuz_pro_contra_strs_Fkt[1],
-        ),
-    ),
-    "Konkreta_und_Focus_(2)": _("Konkreta_und_Focus_(2)"),
-    "Impulse_(5)": _("Impulse_(5)"),
-    "Gefühle_(7)": _("Gefühle_(7)"),
-    "Modus_und_Sein_(8)": _("Modus_und_Sein_(8)"),
-    "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)": _(
-        "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)"
-    ),
-    "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12": ",".join(
-        (("Meta-Systeme_(12)"), _("Ordnung_und_Filterung_12_und_1pro12"))
-    ),
-    "Paradigmen_sind_Absichten_(13)": _("Paradigmen_sind_Absichten_(13)"),
-    "Gedanken_sind_Positionen_(17)": _("Gedanken_sind_Positionen_(17)"),
-    "Verbundenheiten_(18)": _("Verbundenheiten_(18)"),
-    "Triebe_und_Bedürfnisse_(6)": _("Triebe_und_Bedürfnisse_(6)"),
-    "Lust_(9)": _("Lust_(9)"),
-    "Reflexe_(3),Existenzialien_(3)": ",".join(
-        (_("Reflexe_(3)"), _("Existenzialien_(3)"))
-    ),
-    "Absicht_6_ist_Vorteilsmaximierung": _("Absicht_6_ist_Vorteilsmaximierung"),
-    "Absicht_7_ist_Selbstlosigkeit": _("Absicht_7_ist_Selbstlosigkeit"),
-    "Absicht_10_ist_Wirklichkeit_erkennen": _("Absicht_10_ist_Wirklichkeit_erkennen"),
-    "Absicht_17_ist_zu_meinen": _("Absicht_17_ist_zu_meinen"),
-    "Zeit_(4)_als_Wirklichkeit": _("Zeit_(4)_als_Wirklichkeit"),
-    "Funktionen_Vorstellungen_(16)": _("Funktionen_Vorstellungen_(16)"),
-    "Achtung_(4)": _("Achtung_(4)"),
-    "Absicht_1/8": _("Absicht_1/8"),
-    "Absicht_1/6_ist_Reinigung_und_Klarheit": _(
-        "Absicht_1/6_ist_Reinigung_und_Klarheit"
-    ),
-    "Reflektion_und_Kategorien_(1/15)": _("Reflektion_und_Kategorien_(1/15)"),
-    "Bewusstheit_statt_Bewusstsein_(1)": _("Bewusstheit_statt_Bewusstsein_(1)"),
-    "Energie_und_universelle_Eigenschaften_(30)": _(
-        "Energie_und_universelle_Eigenschaften_(30)"
-    ),
-    "Stimmungen_Kombinationen_(14)": _("Stimmungen_Kombinationen_(14)"),
-    "Klassen_(20)": _("Klassen_(20)"),
-    "Empathie_(37)": _("Empathie_(37)"),
-    "Garben_und_Verhalten_nachfühlen(31)": _("Garben_und_Verhalten_nachfühlen(31)"),
-    "Verhalten_(11)": _("Verhalten_(11)"),
-    "Bedeutung_(10)": _("Bedeutung_(10)"),
-    "Themen_(6)": _("Themen_(6)"),
-    "Optimierung_(10)": _("Optimierung_(10)"),
-    "Attraktionen_(36)": _("Attraktionen_(36)"),
-    "Absicht_16_ist_zu_genügen": _("Absicht_16_ist_zu_genügen"),
-    "Liebe_(7)": _("Liebe_(7)"),
-    "Koalitionen_(10)": _("Koalitionen_(10)"),
-    "Ansichten_Standpunkte_(18_17)": _("Ansichten_Standpunkte_(18_17)"),
-    "Prinzipien(1/8)": _("Prinzipien(1/8)"),
-    "Bestrebungen(1/5)": _("Bestrebungen(1/5)"),
-    "Bedingung_und_Auslöser_(1/3)": _("Bedingung_und_Auslöser_(1/3)"),
-    "relativer_Zeit-Betrag_(15_10_4_18_6)": _("relativer_Zeit-Betrag_(15_10_4_18_6)"),
-    "Zahlenvergleich_(15_18_6)": _("Zahlenvergleich_(15_18_6)"),
-    "Leidenschaften_(21)": _("Leidenschaften_(21)"),
-    "Erwartungshaltungen_(26)": _("Erwartungshaltungen_(26)"),
-    "Extremalien_(19),Ziele_(19)": ",".join((_("Extremalien_(19)"), _("Ziele_(19)"))),
-    "universeller_Komperativ_(18→15)": _("universeller_Komperativ_(18→15)"),
-    "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)": _(
-        "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)"
-    ),
-    "Sollen_Frage_Vorgehensweise_(1/13)": _("Sollen_Frage_Vorgehensweise_(1/13)"),
-    "Fundament_(1/19)": _("Fundament_(1/19)"),
-    "abhängige_Verbundenheit_(90)": _("abhängige_Verbundenheit_(90)"),
-    "Absicht_13_ist_Helfen": _("Absicht_13_ist_Helfen"),
-    "Karte_Filter_und_Unterscheidung_(1/12)": _(
-        "Karte_Filter_und_Unterscheidung_(1/12)"
-    ),
-    "Maßnahmen_39": _("Maßnahmen_(39)"),
-}"#;
-pub const PYTHON_SOURCE__LIBRETAPROMPT: &str = r#"import os
-import re
-import sys
-from copy import copy, deepcopy
-from enum import Enum
-from fractions import Fraction
-from typing import Optional
-
-import reta
-
-from center import (
-    BereichToNumbers2,
-    Primzahlkreuz_pro_contra_strs,
-    i18n,
-    isZeilenAngabe,
-    isZeilenAngabe_betweenKommas,
-    isZeilenBruchAngabe,
-    isZeilenBruchOrGanzZahlAngabe,
-    kpattern,
-    x,
-)
-
-wahl15 = i18n.wahl15
-wahl16 = i18n.wahl16
-
-# retaProgram = reta.Program([sys.argv[0], "-" + i18n.retapy.nichtsWort])
-retaProgram = reta.Program([sys.argv[0], "-" + i18n.retapy.nichtsWort])
-mainParas = ["-" + a for a in retaProgram.mainParaCmds]
-spalten = ["--" + a[0] + "=" for a in retaProgram.paraDict.keys()] + ["--="]
-eigsN, eigsR = [], []
-for pp in retaProgram.paraDict.keys():
-    if pp[0] == i18n.konzeptE["konzept"]:
-        eigsN += [pp[1]]
-    elif pp[0] == i18n.konzeptE["konzept2"]:
-        eigsR += [pp[1]]
-
-
-def custom_split(text):
-    stack = []
-    result = []
-    start = 0  # Start index for each substring
-    for i, char in enumerate(text):
-        if char in "({[":
-            stack.append(char)
-
-        elif char in ")}]":
-            if stack:
-                stack.pop()
-        elif char.isspace() and not stack:
-            result.append(text[start:i])
-            start = i + 1  # Skip the whitespace character for the next substring
-    # Append the last substring if it exists
-    if start < len(text):
-        result.append(text[start:])
-
-    return result
-
-
-def custom_split2(input_string, delimiter):
-    result = []
-    temp = ""
-    stack = []
-
-    for char in input_string:
-        if char in "({[":
-            stack.append("(")
-            temp += char
-        elif char in ")}]":
-            if stack and stack[-1] in "({[":
-                stack.pop()
-                temp += char
-            else:
-                temp += char
-        elif char == delimiter and not stack:
-            result.append(temp)
-            temp = ""
-        else:
-            temp += char
-    if temp:
-        result.append(temp)
-    return result
-
-
-class PromptModus(Enum):
-    normal = 0
-    speichern = 1
-    loeschenStart = 2
-    speicherungAusgaben = 3
-    loeschenSelect = 4
-    speicherungAusgabenMitZusatz = 5
-    AusgabeSelektiv = 6
-
-
-#
-#
-# DAS SOLLTE ICH BESSER ALLES ORDENTLICH IN RETA.PY PACKEN, STATT ES HIER AUSZUSCHREIBEN, WEIL SONST DOPPELT!
-# D.H. spezielle DatenTypen dafür in Reta.py anlegen!
-# DAS GEHT SCHNELL, FLEIßARBEIT, WEIL KAUM BUGGEFAHR
-#
-# startpunkt: dict = {}
-spaltenDict = {}
-for tupel in retaProgram.paraNdataMatrix:
-    for haupt in tupel[0]:
-        try:
-            spaltenDict[haupt] += list(tupel[1])
-        except KeyError:
-            spaltenDict[haupt] = list(tupel[1])
-        try:
-            spaltenDict["*"] += list(tupel[1])
-        except KeyError:
-            spaltenDict["*"] = list(tupel[1])
-
-
-spalten += [
-    "--" + i18n.ausgabeParas["breite"] + "=",
-    "--" + i18n.ausgabeParas["breiten"] + "=",
-    "--" + i18n.ausgabeParas["keinenummerierung"],
-    "--*=",
-]
-
-zeilenTypen = [
-    i18n.zeilenParas["sonne"],
-    i18n.zeilenParas["mond"],
-    i18n.zeilenParas["planet"],
-    i18n.zeilenParas["schwarzesonne"],
-    i18n.zeilenParas["SonneMitMondanteil"],
-    "*",
-]
-zeilenZeit = [
-    i18n.zeilenParas["heute"],
-    i18n.zeilenParas["gestern"],
-    i18n.zeilenParas["morgen"],
-    "*",
-]
-
-zeilenTypenB = [
-    i18n.zeilenParas["aussenerste"],
-    i18n.zeilenParas["innenerste"],
-    i18n.zeilenParas["aussenalle"],
-    i18n.zeilenParas["innenalle"],
-    "*",
-]
-
-ausgabeParas = [
-    "--" + s + ("=" if l else "")
-    for s, l in zip(i18n.ausgabeParas.values(), i18n.ausgabeParasEqSign.values())
-] + ["--*="]
-# ausgabeParas = [
-#    "--nocolor",
-#    "--justtext",
-#    "--art=",
-#    "--onetable",
-#    "--spaltenreihenfolgeundnurdiese=",
-#    "--endlessscreen",
-#    "--endless",
-#    "--dontwrap",
-#    "--breite=",
-#    "--breiten=",
-#    "--keineleereninhalte",
-#    "--keinenummerierung",
-#    "--keineueberschriften",
-# ]
-kombiMainParas = [
-    "--" + i18n.kombiMainParas["galaxie"] + "=",
-    "--" + i18n.kombiMainParas["universum"] + "=",
-    "--*=",
-]
-zeilenParas = [
-    # "--"+i18n.zeilenParas["nichts"]+"",
-    "--" + i18n.zeilenParas["zeit"] + "=",
-    "--" + i18n.zeilenParas["zaehlung"] + "=",
-    "--" + i18n.zeilenParas["vorhervonausschnitt"] + "=",
-    "--" + i18n.zeilenParas["vorhervonausschnittteiler"],
-    "--" + i18n.zeilenParas["primzahlvielfache"] + "=",
-    "--" + i18n.zeilenParas["nachtraeglichneuabzaehlung"] + "=",
-    "--" + i18n.zeilenParas["nachtraeglichneuabzaehlungvielfache"] + "=",
-    "--" + i18n.zeilenParas["alles"],
-    "--" + i18n.zeilenParas["potenzenvonzahlen"] + "=",
-    "--" + i18n.zeilenParas["typ"] + "=",
-    "--" + i18n.zeilenParas["vielfachevonzahlen"] + "=",
-    "--" + i18n.zeilenParas["oberesmaximum"] + "=",
-    "--" + i18n.zeilenParas["primzahlen"] + "=",
-    "--" + i18n.zeilenParas["invertieren"],
-    "--*=",
-]
-hauptForNeben = ["-" + s for s in set(i18n.hauptForNeben.values()) - {i18n.mainParaCmds["debug"]}]
-# hauptForNeben = ("-zeilen", "-spalten", "-kombination", "-ausgabe", "-h", "-help")
-
-notParameterValues = ausgabeParas + zeilenParas + kombiMainParas + spalten + mainParas
-hauptForNebenSet = set(hauptForNeben)
-
-ausgabeArt = list(i18n.ausgabeArt.values())
-# ausgabeArt = ["bbcode", "html", "csv", "shell", "markdown", "emacs"]
-
-# wahl15 = {
-#    #    "_": "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15)",
-#    "_15": "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,"
-#    + Primzahlkreuz_pro_contra_strs[1],
-#    "_2": "Konkreta_und_Focus_(2)",
-#    "_5": "Impulse_(5)",
-#    "_7": "Gefühle_(7)",
-#    "_8": "Modus_und_Sein_(8)",
-#    "_10": "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)",
-#    "_12": "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12",
-#    "_13": "Paradigmen_sind_Absichten_(13)",
-#    "_17": "Gedanken_sind_Positionen_(17)",
-#    "_18": "Verbundenheiten_(18)",
-#    "_6": "Triebe_und_Bedürfnisse_(6)",
-#    "_9": "Lust_(9)",
-#    "_3": "Reflexe_(3),Existenzialien_(3)",
-#    "_13_6": "Absicht_6_ist_Vorteilsmaximierung",
-#    "_13_7": "Absicht_7_ist_Selbstlosigkeit",
-#    "_13_10": "Absicht_10_ist_Wirklichkeit_erkennen",
-#    "_13_17": "Absicht_17_ist_zu_meinen",
-#    "_10_4": "Zeit_(4)_als_Wirklichkeit",
-#    "_16": "Funktionen_Vorstellungen_(16)",
-#    "_4": "Achtung_(4)",
-#    "_13_1pro8": "Absicht_1/8",
-#    "_13_1pro6": "Absicht_1/6_ist_Reinigung_und_Klarheit",
-#    "_1pro15": "Reflektion_und_Kategorien_(1/15)",
-#    "_1": "Regungen_(1)",
-#    "_30": "Energie_und_universelle_Eigenschaften_(30)",
-#    "_14": "Stimmungen_Kombinationen_(14)",
-#    "_20": "Klassen_(20)",
-#    "_37": "Empathie_(37)",
-#    "_31": "Garben_und_Verhalten_nachfühlen(31)",
-#    "_11": "Verhalten_(11)",
-#    "_5_10": "Bedeutung_(10)",
-#    "_17_6": "Themen_(6)",
-#    "_17_6_10mit4": "Optimierung_(10)",
-#    "_36": "Attraktionen_(36)",
-#    "_13_16": "Absicht_16_ist_zu_genügen",
-#    "_18_7": "Liebe_(7)",
-#    "_18_10": "Koalitionen_(10)",
-#    "_18_17": "Ansichten_Standpunkte_(18_17)",
-#    "_1pro8": "Prinzipien(1/8)",
-#    "_1pro5": "Bestrebungen(1/5)",
-#    "_1pro3": "Bedingung_und_Auslöser_(1/3)",
-#    "_10_4_18_6": "relativer_Zeit-Betrag_(15_10_4_18_6)",
-#    "_18_6": "Zahlenvergleich_(15_18_6)",
-#    "_21": "Leidenschaften_(21)",
-#    "_26": "Erwartungshaltungen_(26)",
-#    "_19": "Extremalien_(19),Ziele_(19)",
-#    "_18_15": "universeller_Komperativ_(18→15)",
-#    "_18_15_n-vs-1pron": "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)",
-#    "_1pro13": "Sollen_Frage_Vorgehensweise_(1/13)",
-#    "_1pro19": "Fundament_(1/19)",
-#    "_90": "abhängige_Verbundenheit_(90)",
-#    "_13_13": "Absicht_13_ist_Helfen",
-#    "_1pro12": "Karte_Filter_und_Unterscheidung_(1/12)",
-# }
-
-zumVergleich = []
-gebrochenErlaubteZahlen: set = set()
-for a in reta.Program(["reta", "-" + i18n.mainParaCmds["zeilen"]]).paraNdataMatrix:
-    for b in a[1]:
-        zumVergleich += [b]
-        if len(set(a[0]) & i18n.gebrochenUniGalEinzeln) > 0:
-            gebrochenErlaubteZahlen |= {int(b)}
-gebrochenErlaubteZahlen -= {max(gebrochenErlaubteZahlen)}
-
-flagX = False
-for a in wahl15.values():
-    for b in re.split(kpattern, a):
-        try:
-            assert b in zumVergleich
-        except:
-            print(b)
-            flagX = True
-if flagX:
-    print()
-    print("assert fehlgeschlagen")
-    exit()
-
-befehle = i18n.befehle
-# print(sys.argv[0].split(os.sep)[-1])
-# if sys.argv[0].split(os.sep)[-1] == "rpl":
-#    befehle += ["englisch", "english"]
-# befehle = ["15" + a for a in wahl15.keys()] + [
-#    "mond",
-#    "reta",
-#    "absicht",
-#    "motiv",
-#    "thomas",
-#    "universum",
-#    "motive",
-#    "absichten",
-#    "vielfache",
-#    "einzeln",
-#    "multis",
-#    "modulo",
-#    "prim",
-#    "primfaktorzerlegung",
-#    "procontra",
-#    "prim24",
-#    "primfaktorzerlegungModulo24",
-#    "help",
-#    "hilfe",
-#    "abc",
-#    "abcd",
-#    "alles",
-#    "a",
-#    "u",
-#    "befehle",
-#    "t",
-#    "richtung",
-#    "r",
-#    "v",
-#    "h",
-#    "p",
-#    "mo",
-#    "mu",
-#    "primzahlkreuz",
-#    "ende",
-#    "exit",
-#    "quit",
-#    "q",
-#    ":q",
-#    "shell",
-#    "s",
-#    "math",
-#    "loggen",
-#    "nichtloggen",
-#    "mulpri",
-#    "python",
-#    "w",
-#    "teiler",
-#    "BefehlSpeichernDanach",
-#    "S",
-#    "BefehlSpeicherungLöschen",
-#    "l",
-#    "BefehlSpeicherungAusgeben",
-#    "o",
-#    # "BefehlsSpeicherungsModusAus",
-#    # "x",
-#    "BefehlSpeichernDavor",
-#    "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
-#    "abstand",
-# ]
-befehle += [i18n.EIGS_N_R[0] + a for a in eigsN] + [i18n.EIGS_N_R[1] + a for a in eigsR]
-
-befehle2: set = set(befehle) - {"reta"}
-
-
-def isReTaParameter(t: str):
-    return (
-        len(t) > 0
-        and t[0] == "-"
-        and not isZeilenBruchOrGanzZahlAngabe(t)
-        and t.split("=")[0] in [str(c).split("=")[0] for c in notParameterValues]
-    )
-
-
-def is15or16command(text: str) -> bool:
-    if text[:3] == "15_":
-        if text[3:] == "":
-            return True
-        if text[3:] in wahl15:
-            return True
-    if text[:3] == "16_":
-        if text[3:] == "":
-            return True
-        if text[:5] == "16_15":
-            if text[5:] == "":
-                return True
-            if text[5] == "_" and text[6:] in wahl15:
-                return True
-        if text[3:] in wahl16:
-            return True
-    return False
-
-
-def stextFromKleinKleinKleinBefehl(promptMode2, stext, textDazu):
-    stext2 = []
-    ifKurzKurz = False
-    xtext = " ".join(stext)
-    # if isZeilenAngabe(xtext):
-    #    stext = [",".join(str(B) for B in BereichToNumbers2(xtext))]
-    stext2 = custom_split(xtext)
-    stext3 = []
-    del xtext
-    for kkk, s_ in enumerate(tuple(deepcopy(stext2))):
-        s_ = s_.strip(",")
-        s_m = s_
-        textDazu = []
-        if not is15or16command(s_) and s_ not in befehle and stext[0] != "reta":
-            nn: Optional[int] = 0
-            for iii, s_3 in enumerate(s_[::-1]):
-                if s_3.isdecimal() or (
-                    s_3 in (")", "]", "}")
-                    and "reta" not in s_
-                    and any(("(" in at or "[" in at or "{" for at in s_))
-                ):
-                    nn = iii
-                    break
-            if nn > 0:
-                s_b = s_[-nn:] + s_[:-nn]
-            else:
-                s_b = s_
-            n: Optional[int] = None
-            for ii, s_3 in enumerate(s_b):
-                if s_3.isdecimal() or (
-                    s_3 in ("(", "[", "{")
-                    and "reta" not in s_b
-                    and any((")" in at or "]" in at or "}" for at in s_b))
-                ):
-                    n = ii
-                    break
-            try:
-                if s_b[int(n) - 1] == "-":
-                    n -= 1
-            except:
-                pass
-
-            if n is not None:
-                (
-                    bruchAndGanzZahlEtwaKorrekterBereich,
-                    bruchBereichsAngaben,
-                    bruchRanges,
-                    zahlenAngaben__Z,
-                    fullBlockIsZahlenbereichAndBruch_Z,
-                ) = verifyBruchNganzZahlCommaList(
-                    [],
-                    "",
-                    [],
-                    [],
-                    [],
-                    s_b[n:],
-                    [],
-                )
-
-                if fullBlockIsZahlenbereichAndBruch_Z:
-                    s_ = s_b
-                    if not (
-                        (s_[0] == "(" and s_[-1] == ")")
-                        or (s_[0] == "[" and s_[-1] == "]")
-                        or (s_[0] == "{" and s_[-1] == "}")
-                    ):
-                        buchst = set(s_[:n]) & {
-                            i18n.befehle2[var]
-                            for var in i18n.befehle2.keys()
-                            if len(var) == 1
-                        }
-                    else:
-                        buchst = set()
-                    setTextLenIs1 = (
-                        len(
-                            set(stext)
-                            - {
-                                i18n.befehle2["e"],
-                                i18n.befehle2[
-                                    "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
-                                ],
-                            }
-                        )
-                        == 1
-                    )
-
-                    if (len(buchst) != len(s_[:n]) or len(buchst) == 0) and not (
-                        setTextLenIs1 and fullBlockIsZahlenbereichAndBruch_Z
-                    ):
-                        s_ = s_m
-                    else:
-                        ifKurzKurz = True
-                        # erst hier passiert wirklich etwas
-                        if n == len(buchst):
-                            buchst2: list = [
-                                a
-                                if a != i18n.befehle2["p"]
-                                else i18n.befehle2["mulpri"]
-                                for a in buchst
-                            ]
-                            textDazu += buchst2 + [str(s_[n:])]
-                        if (
-                            setTextLenIs1
-                            and len(buchst) == 0
-                            and promptMode2 != PromptModus.AusgabeSelektiv
-                        ):
-                            textDazu += [
-                                i18n.befehle2["mulpri"],
-                                i18n.befehle2["a"],
-                                i18n.befehle2["t"],
-                                i18n.befehle2["w"],
-                                i18n.befehle2[
-                                    "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
-                                ],
-                            ]
-                            if any(("/" in _s_ for _s_ in stext)):
-                                textDazu += [
-                                    i18n.befehle2["u"],
-                                    i18n.befehle2["B"],
-                                    i18n.befehle2["G"],
-                                    i18n.befehle2["E"],
-                                    i18n.befehle2["groesse"],
-                                ]
-                            if (
-                                "-" + i18n.retaPrompt.retaPromptParameter["e"]
-                                in sys.argv
-                            ):
-                                textDazu += [
-                                    "-" + i18n.mainParaCmds["ausgabe"],
-                                    "--" + i18n.ausgabeParas["keineueberschriften"],
-                                ]
-        else:
-            if i18n.befehle2["ee"] == s_:
-                textDazu += [
-                    "-" + i18n.mainParaCmds["ausgabe"],
-                    "--" + i18n.ausgabeParas["keineueberschriften"],
-                ]
-            else:
-                textDazu += [s_]
-
-        if len(textDazu) > 0:
-            stext3 += textDazu
-        else:
-            stext3 += [str(s_)]
-    for jjj, _s_ in enumerate(copy(stext3)):
-        if len(_s_) > 0 and _s_[0] == "(" and _s_[-1] == ")":
-            stext3[jjj] = "[" + stext3[jjj][1:-1] + "]"
-    if stext[0] not in [
-        "reta",
-        i18n.befehle2["shell"],
-        i18n.befehle2["python"],
-    ]:
-        stext = stext3
-    # x("stext", stext)
-    # print(stext)
-    return ifKurzKurz, stext
-
-
-def verifyBruchNganzZahlCommaList(
-    bruchAndGanzZahlEtwaKorrekterBereich,
-    bruchBereichsAngabe,
-    bruchBereichsAngaben,
-    bruchRange,
-    bruchRanges,
-    commaListe,
-    zahlenAngaben_,
-):
-    _bruchAndGanzZahlEtwaKorrekterBereich = []
-    _bruchBereichsAngaben = []
-    _bruchRanges = []
-    _zahlenAngaben_ = []
-    _etwaAllTrue = []
-
-    for etwaBruch in re.split(kpattern, commaListe):
-        (
-            bruchAndGanzZahlEtwaKorrekterBereich1,
-            bruchBereichsAngaben1,
-            bruchRanges1,
-            zahlenAngaben_1,
-            etwaAllTrue1,
-        ) = verifyBruchNganzZahlBetweenCommas(
-            bruchAndGanzZahlEtwaKorrekterBereich,
-            bruchBereichsAngabe,
-            bruchBereichsAngaben,
-            bruchRange,
-            bruchRanges,
-            etwaBruch,
-            zahlenAngaben_,
-        )
-        _bruchAndGanzZahlEtwaKorrekterBereich += [bruchAndGanzZahlEtwaKorrekterBereich1]
-        _bruchBereichsAngaben += [bruchBereichsAngaben1]
-        _bruchRanges += [bruchRanges1]
-        _zahlenAngaben_ += [zahlenAngaben_1]
-        _etwaAllTrue += [etwaAllTrue1]
-    return (
-        _bruchAndGanzZahlEtwaKorrekterBereich,
-        _bruchBereichsAngaben,
-        _bruchRanges,
-        _zahlenAngaben_,
-        all(_bruchAndGanzZahlEtwaKorrekterBereich),
-    )
-
-
-def verifyBruchNganzZahlBetweenCommas(
-    bruchAndGanzZahlEtwaKorrekterBereich,
-    bruchBereichsAngabe,
-    bruchBereichsAngaben,
-    bruchRange,
-    bruchRanges,
-    etwaBruch,
-    zahlenAngaben_,
-):
-    isBruch, isGanzZahl = isZeilenAngabe_betweenKommas(
-        bruchBereichsAngabe
-    ), isZeilenAngabe_betweenKommas(etwaBruch)
-    if isBruch != isGanzZahl:
-        bruchAndGanzZahlEtwaKorrekterBereich += [True]
-        if isBruch:
-            bruchRanges += [bruchRange]
-            bruchBereichsAngaben += [bruchBereichsAngabe]
-        elif isGanzZahl:
-            zahlenAngaben_ += [etwaBruch]
-    else:
-        bruchAndGanzZahlEtwaKorrekterBereich += [False]
-    # if isZeilenAngabe_betweenKommas(etwaBruch):
-    #    zahlenAngaben_ += [etwaBruch]
-    return (
-        bruchAndGanzZahlEtwaKorrekterBereich,
-        bruchBereichsAngaben,
-        bruchRanges,
-        zahlenAngaben_,
-        all(bruchAndGanzZahlEtwaKorrekterBereich),
-    )
-
-
-# def getFromZahlenBereichBruchAndZahlenbereich(a, brueche, zahlenAngaben_):
-#    ifAllTrue = []
-#    first = True
-#    for innerKomma in a.split(","):
-#        bruch = [bruch for bruch in innerKomma.split("/")]
-#        isBruch_ = [bruch1.isdecimal() for bruch1 in bruch] == [True, True]
-#        if first:
-#            isZahlenangabe_ = isZeilenAngabe(innerKomma)
-#        else:
-#            isZahlenangabe_ = isZeilenAngabe_betweenKommas(innerKomma)
-#        if isBruch_ or isZahlenangabe_:
-#            ifAllTrue += [True]
-#            if isBruch_:
-#                brueche += [bruch]
-#            if isZahlenangabe_:
-#                zahlenAngaben_ += [innerKomma]
-#        else:
-#            ifAllTrue += [True]
-#        first = False
-#    return brueche, zahlenAngaben_, all(ifAllTrue)
-def verkuerze_dict(dictionary: dict) -> dict:
-    dict2: dict = {}
-    for key, value in dictionary.items():
-        if value not in dict2.values():
-            dict2[key] = value
-    return dict2
-"#;

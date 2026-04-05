@@ -1,4 +1,21 @@
-# grundstruk special branch emulation
+# reta strict next pass
 
-This pass adds the remaining special merge branch instead of leaving it as a placeholder.
-Still not verified exact; compare loop remains the judge.
+Dies ist der nächste Schritt auf `reta`, nicht mehr `grundStrukHtml`.
+
+## Fokus
+Striktere Python-Nähe für die frühe Parameter-/Dict-Phase:
+
+- `storeParamtersForColumns`
+- `parametersToCommandsAndNumbers`
+- `intoParameterDatatype`
+- `mergeParameterDicts`
+
+## Datenstand
+- `paraNdataMatrix`: **180 Einträge**
+- `kombiParaNdataMatrix`: **12 Schlüssel**
+- `kombiParaNdataMatrix2`: **14 Schlüssel**
+
+## Ehrliche Grenze
+Noch keine vollständige `reta`-Parität.
+Das ist bewusst der nächste harte Block:
+erst frühe Dict-/Parameter-Semantik stabilisieren, dann auf weitere Python-Blöcke gehen.

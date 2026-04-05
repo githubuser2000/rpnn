@@ -1,6 +1,11 @@
 {
-  "focus": "grundStrukHtml special branch emulation",
-  "wahl15_size": 54,
-  "verified_exact": false,
-  "estimated_steps_remaining_to_exact": "2-4"
+  "focus": "reta early strict parameter semantics",
+  "subset_count": 180,
+  "kombiParaNdataMatrix": 12,
+  "kombiParaNdataMatrix2": 14,
+  "next_targets": [
+    "bringAllImportantBeginThings",
+    "full CLI parameter flow",
+    "table/generator integration"
+  ]
 }

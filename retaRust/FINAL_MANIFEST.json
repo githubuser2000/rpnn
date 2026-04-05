@@ -1,0 +1,6 @@
+{
+  "status": "final blind candidate",
+  "next_step": "run compare_grundstruk.py and zero remaining diffs",
+  "bitexact_verified": false,
+  "recommended_after_diff_zero": "switch focus to reta"
+}
