@@ -1,6 +1,6 @@
-# reta strict python followup pass
+# reta toward bitexact next pass
 
-Weiter strikt an Python gehalten.
+Weiter strikt wie Python und weiter in Richtung späterer Bitgenauigkeit.
 
 Enthalten:
 - `Program`
@@ -13,12 +13,12 @@ Enthalten:
 - `run`
 
 Datenstand:
-- `paraNdataMatrix`: **900 Einträge**
+- `paraNdataMatrix`: **379 Einträge**
 - `kombiParaNdataMatrix`: **12 Schlüssel**
 - `kombiParaNdataMatrix2`: **14 Schlüssel**
 
-Regel:
+Linie:
 - Python ist Wahrheit
-- keine bessere Architektur
-- nicht idiomatisch
-- gleiche Namen / Formen so weit in diesem Block umgesetzt
+- nicht idiomatisch besser
+- keine semantische Vereinfachung
+- Richtung spätere Bitgenauigkeit

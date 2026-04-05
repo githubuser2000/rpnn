@@ -1,5 +1,5 @@
 [package]
-name = "reta_strict_python_followup_pass"
+name = "reta_toward_bitexact_next_pass"
 version = "0.1.0"
 edition = "2021"
 

@@ -9,7 +9,7 @@ fn main() {
     program.run(&words);
 
     eprintln!(
-        "reta strict python followup pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={}",
+        "reta toward-bitexact next pass: paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={}",
         program.paraMainDict.len(),
         program.paraDict.len(),
         program.dataDicts[0].len(),

@@ -1,6 +1,6 @@
 {
-  "focus": "strict python followup",
-  "subset_count": 900,
-  "rule": "python is truth; no idiomatic improvement",
-  "next_target": "next real output-affecting block after run"
+  "focus": "toward later bitexactness",
+  "subset_count": 379,
+  "rule": "python is truth; no semantic simplification; not idiomatic",
+  "next_target": "next output-affecting block after current early flow"
 }
