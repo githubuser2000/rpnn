@@ -1,0 +1,14 @@
+{
+  "implemented_more_real": [
+    "phase 2 split-by-comma loop and lookup path",
+    "phase 3 direct paraDict(cmd, '') lookup path",
+    "phase 4 galaxie/universum lookup path",
+    "phase 5 width-zero finish order"
+  ],
+  "still_open": [
+    "real data population of paraDict and kombi reverse dicts",
+    "gebrochen branch",
+    "real i18n texts",
+    "full type/data parity"
+  ]
+}

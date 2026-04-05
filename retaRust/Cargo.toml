@@ -1,0 +1,7 @@
+[package]
+name = "reta_transcompilation_phase5_more_real"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+indexmap = "2"

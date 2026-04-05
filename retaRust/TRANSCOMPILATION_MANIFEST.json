@@ -1,0 +1,42 @@
+{
+  "focus_method": "Program.produceAllSpaltenNumbers",
+  "focus_method_line_range": [
+    70,
+    457
+  ],
+  "local_inner_functions": [
+    {
+      "name": "resultingSpaltenFromTuple"
+    },
+    {
+      "name": "spalten_removeDoublesNthenRemoveOneFromAnother"
+    }
+  ],
+  "coarse_python_phases": [
+    {
+      "name": "phase_01_mainParaCmds_and_scan",
+      "start_line": 188,
+      "end_line": 229
+    },
+    {
+      "name": "phase_02_eq_branch_parameter_values",
+      "start_line": 230,
+      "end_line": 336
+    },
+    {
+      "name": "phase_03_plain_parameter_branch",
+      "start_line": 337,
+      "end_line": 365
+    },
+    {
+      "name": "phase_04_kombi_branch",
+      "start_line": 366,
+      "end_line": 441
+    },
+    {
+      "name": "phase_05_finish_and_recursive_neg",
+      "start_line": 442,
+      "end_line": 457
+    }
+  ]
+}
