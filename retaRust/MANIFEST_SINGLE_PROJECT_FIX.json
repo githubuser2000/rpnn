@@ -1,0 +1,6 @@
+{
+  "status": "single project integrated",
+  "second_project_removed": true,
+  "csv_loader_integrated_in_existing_project": true,
+  "rule": "python is truth; no second project; no idiomatic redesign"
+}

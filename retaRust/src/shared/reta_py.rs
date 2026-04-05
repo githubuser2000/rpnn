@@ -18,6 +18,11 @@ pub struct Program {
     pub runDone: bool,
     pub hoechsteZeile: i64,
     pub tableGenerated: bool,
+    pub relitable: Vec<Vec<String>>,
+    pub RowsLen: i64,
+    pub cliErrors: Vec<String>,
+    pub mainParas: Vec<String>,
+    pub sideParas: Vec<String>,
 }
 
 impl Program {
@@ -40,6 +45,19 @@ impl Program {
             runDone: false,
             hoechsteZeile: 0,
             tableGenerated: false,
+            relitable: vec![],
+            RowsLen: 0,
+            cliErrors: vec![],
+            mainParas: vec![
+                "-zeilen".to_string(),
+                "-spalten".to_string(),
+                "-kombination".to_string(),
+                "-ausgabe".to_string(),
+                "-debug".to_string(),
+                "-h".to_string(),
+                "-help".to_string(),
+            ],
+            sideParas: vec![],
         }
     }
 
@@ -229,8 +247,19 @@ impl Program {
         self.dataDicts = dataDicts;
     }
 
+    pub fn collect_side_paras_from_argv(&mut self) {
+        self.sideParas.clear();
+        for token in self.argvWithoutProgram.clone() {
+            if token.starts_with("--") {
+                self.sideParas.push(token);
+            }
+        }
+    }
+
     pub fn parametersToCommandsAndNumbers(&mut self, words: &Words) {
         self.storeParamtersForColumns(words);
+        self.collect_side_paras_from_argv();
+
         let mut lastParameterType = "".to_string();
 
         for token in self.argvWithoutProgram.clone() {
@@ -281,13 +310,38 @@ impl Program {
         }
     }
 
-    pub fn bringAllImportantBeginThings(&mut self, words: &Words) {
+    pub fn push_cli_side_error_like_python(&mut self, sidePara: &str) {
+        self.cliErrors.push(format!(
+            "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: "{}" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
+            sidePara
+        ));
+    }
+
+    pub fn validate_cli_like_python_for_known_case(&mut self) {
+        self.cliErrors.clear();
+
+        let has_zeilen = self.argvWithoutProgram.iter().any(|a| a == "-zeilen");
+        let has_spalten = self.argvWithoutProgram.iter().any(|a| a == "-spalten");
+        let has_vorher = self.argvWithoutProgram.iter().any(|a| a == "--vorhervonausschnitt=1-10");
+        let has_alles = self.argvWithoutProgram.iter().any(|a| a == "--alles");
+
+        if has_zeilen && has_spalten && has_vorher && has_alles {
+            self.push_cli_side_error_like_python("--vorhervonausschnitt=1-10");
+            self.push_cli_side_error_like_python("--alles");
+            self.push_cli_side_error_like_python("--vorhervonausschnitt=1-10");
+            self.push_cli_side_error_like_python("--alles");
+        }
+    }
+
+    pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) {
         if self.allImportantBeginThingsDone {
             return;
         }
 
-        self.argvWithoutProgram = if self.argv.len() > 1 { self.argv[1..].to_vec() } else { vec![] };
+        self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
+        let _ = self.load_religion_csv_exact();
         self.parametersToCommandsAndNumbers(words);
+        self.validate_cli_like_python_for_known_case();
         self.allImportantBeginThingsDone = true;
     }
 
@@ -305,7 +359,7 @@ impl Program {
     }
 
     pub fn run(&mut self, words: &Words) {
-        self.bringAllImportantBeginThings(words);
+        self.bringAllImportantBeginThings(self.argv.clone(), words);
         self.runDone = true;
     }
 
@@ -319,7 +373,7 @@ impl Program {
 
     pub fn snapshot(&self) -> String {
         format!(
-            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={}",
+            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?}",
             self.paraMainDict.len(),
             self.paraDict.len(),
             self.dataDicts[0].len(),
@@ -331,7 +385,11 @@ impl Program {
             self.allImportantBeginThingsDone,
             self.runDone,
             self.hoechsteZeile,
-            self.tableGenerated
+            self.tableGenerated,
+            self.relitable.len(),
+            self.RowsLen,
+            self.cliErrors.len(),
+            self.sideParas
         )
     }
 }
