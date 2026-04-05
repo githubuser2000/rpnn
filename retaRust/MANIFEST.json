@@ -1,14 +1,16 @@
 {
-  "implemented_more_real": [
-    "phase 2 split-by-comma loop and lookup path",
-    "phase 3 direct paraDict(cmd, '') lookup path",
-    "phase 4 galaxie/universum lookup path",
-    "phase 5 width-zero finish order"
+  "counts": {
+    "paraNdataMatrix_entries": 379,
+    "kombiParaNdataMatrix": 12,
+    "kombiParaNdataMatrix2": 14
+  },
+  "stricter_changes": [
+    "literal index2a / intoA separation",
+    "zip_longest-like loop made explicit",
+    "case-2 path less folded"
   ],
   "still_open": [
-    "real data population of paraDict and kombi reverse dicts",
-    "gebrochen branch",
-    "real i18n texts",
-    "full type/data parity"
+    "full downstream integration",
+    "even more literal Python type-flow in edge cases"
   ]
 }

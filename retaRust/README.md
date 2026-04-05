@@ -1,35 +1,24 @@
-# Phase 5 more real
+# zip_longest literal
 
-Dieser Stand geht über die bloße Verkabelung hinaus und übernimmt mehr vom echten Python-Verhalten.
+Dieser Stand drückt zwei Stellen noch strenger in Python-Richtung:
 
-## Neu direkter übernommen
+- `intoParameterDatatype(...)`
+- `mergeParameterDicts(...)`
 
-- Phase 2
-  - iteriert jetzt wirklich über `cmd[eq+1:].split(",")`
-  - berücksichtigt führendes `-` pro Einzelwert
-  - ruft bei Treffern `resultingSpaltenFromTuple(...)` auf
-  - erzeugt Fehlerausgaben näher an den Python-Zweigen
+## Strenger als zuvor
 
-- Phase 3
-  - versucht jetzt bei parameterlosen Kommandos wirklich `self.paraDict[(cmd, "")]`
-  - ruft dann `resultingSpaltenFromTuple(...)` auf
-  - sonst Fehlerausgabe näher am Python-Zweig
+- `case 2` wird jetzt getrennt geführt
+- `index2a` und `intoA` bleiben getrennte Zwischenstrukturen
+- die Zusammenführung läuft jetzt explizit über eine `zip_longest`-artige Schleife
+- fehlende Seite wird nicht mit einer "schönen" Rust-Abkürzung ersetzt, sondern mit Python-naher Auffülllogik
 
-- Phase 4
-  - unterscheidet `galaxie=` und `universum=`
-  - iteriert über einzelne Kombi-Spalten
-  - versucht echte Lookup-Pfade über `kombiReverseDict` / `kombiReverseDict2`
-  - ruft bei Treffern `resultingSpaltenFromTuple(...)` auf
+## Datenbasis
 
-- Phase 5
-  - `--breite=0` wird jetzt in der Finish-Reihenfolge berücksichtigt
-  - Rekursion + anschließendes `spalten_removeDoublesNthenRemoveOneFromAnother()` folgen jetzt näher der Python-Reihenfolge
+- `paraNdataMatrix`: **379 echte Einträge**
+- `kombiParaNdataMatrix`: **12 echte Schlüssel**
+- `kombiParaNdataMatrix2`: **14 echte Schlüssel**
 
 ## Noch offen
 
-- reale Daten in `paraDict`, `kombiReverseDict`, `kombiReverseDict2`
-- echter gebrochen-Branch
-- echte i18n-Texte statt Platzhalter
-- vollständige Typ-/Datenparität
-
-Das ist jetzt deutlich näher am tatsächlichen Python-Ablauf als die vorigen Zwischenstände.
+- vollständiger Anschluss dieser strengeren `storeParamtersForColumns`-Innensemantik an den restlichen Programmlauf
+- noch exaktere Reproduktion einzelner Python-Typflüsse

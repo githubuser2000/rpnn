@@ -1,959 +1,790 @@
-use indexmap::IndexMap;
-use reta_transcompilation_zip_longest_literal::runtime::*;
+import gettext
+import os
+import pprint
+import sys
 
-#[allow(non_snake_case)]
-pub struct Program {
-    pub i18n: I18nExact,
-    pub state: ProgramState,
-}
+# import sys
+from collections import OrderedDict, defaultdict, namedtuple
 
-#[allow(non_snake_case)]
-impl Program {
-    pub fn new() -> Self {
-        Self {
-            i18n: I18nExact::from_python_evaluated_shapes(),
-            state: ProgramState::new(),
-        }
-    }
+# from dataclasses import dataclass
+from typing import Any, NamedTuple, Optional, Tuple, Union
 
-    /*
-    Strenger an Python:
-    - zip_longest-artige Schleife explizit
-    - case-2-Pfad getrennt
-    - index2a / intoA nicht zusammengefaltet
-    */
-    pub fn intoParameterDatatype(
-        &self,
-        parameterMainNames: &Vec<String>,
-        parameterNames: &Vec<String>,
-        datas: &Vec<Vec<PyAtom>>,
-    ) -> (
-        IndexMap<String, Vec<String>>,
-        IndexMap<(String, String), Vec<Vec<PyAtom>>>,
-        Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
-    ) {
-        let mut paraMainDict: IndexMap<String, Vec<String>> = IndexMap::new();
-        for name in parameterMainNames {
-            paraMainDict.insert(name.clone(), parameterNames.clone());
-        }
+# from typing import Optional, Union
+import pprint
 
-        let mut paraDict: IndexMap<(String, String), Vec<Vec<PyAtom>>> = IndexMap::new();
-        for name1 in parameterMainNames {
-            for name2 in parameterNames {
-                paraDict.insert((name1.clone(), name2.clone()), datas.clone());
-            }
-            if parameterNames.len() == 0 {
-                paraDict.insert((name1.clone(), "".to_string()), datas.clone());
-            }
-        }
+pp = pprint.PrettyPrinter(indent=4)
+try:
+    from orderedset import OrderedSet
+except (ModuleNotFoundError, ImportError):
+    OrderedSet = set
 
-        let mut dataDicts: Vec<IndexMap<String, Vec<Vec<PairStr>>>> = vec![];
-        for _ in 0..12 {
-            dataDicts.push(IndexMap::new());
-        }
 
-        for (i, d) in datas.iter().enumerate() {
-            for spaltenNummerOderEtc in d {
-                let mut into: Vec<PairStr> = vec![];
-                let mut parameterMainNamePerLoop: Vec<String> = vec![];
-                let case_num: i64;
+def alxp(text):
+    global output
+    """Für mich, damit ich mal alle prints ausschalten kann zum vorführen,
+    wenn ich noch beim Entwicklen war."""
+    if "-debug" in sys.argv:
+        if type(text) is str:
+            print(text)
+        else:
+            pp.pprint(text)
 
-                for parameterMainName in parameterMainNames {
-                    let iter_parameter_names: Vec<String> =
-                        if parameterNames.len() > 0 { parameterNames.clone() } else { vec!["".to_string()] };
 
-                    for parameterName in iter_parameter_names {
-                        if i == 4 && matches!(spaltenNummerOderEtc, PyAtom::Bool(_)) {
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
-                        } else if matches!(i, 5 | 6 | 9 | 10) {
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
-                            parameterMainNamePerLoop.push(parameterName.clone());
-                        } else {
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
-                        }
-                    }
-                }
+def x(text1, text):
+    global output
+    """Für mich, damit ich mal alle prints ausschalten kann zum vorführen,
+    wenn ich noch beim Entwicklen war."""
+    if "-debug" in sys.argv:
+        if type(text) is str:
+            print(text1 + ": " + text)
+        else:
+            print(text1 + ": ", end="")
+            pp.pprint(text)
 
-                if i == 4 && matches!(spaltenNummerOderEtc, PyAtom::Bool(_)) {
-                    case_num = 1;
-                } else if matches!(i, 5 | 6 | 9 | 10) {
-                    case_num = 2;
-                } else if i == 4 {
-                    case_num = 4;
-                } else {
-                    case_num = 3;
-                }
 
-                let index1: usize = if case_num != 1 { i } else { 3 };
+sprachen: defaultdict = defaultdict(lambda: "de")
+sprachen["english"] = "en"
+sprachen["englisch"] = "en"
+sprachen["deutsch"] = "de"
+sprachen["german"] = "de"
+sprachen["vietnamesisch"] = "vn"
+sprachen["vietnamese"] = "vn"
+sprachen["tiếngviệt"] = "vn"
+sprachen["chinesisch"] = "cn"
+sprachen["chinese"] = "cn"
+sprachen["中國人"] = "cn"
+sprachen["koreanisch"] = "kr"
+sprachen["korean"] = "kr"
+sprachen["한국인"] = "kr"
 
-                let index2a: Vec<String>;
-                let intoA: Vec<Vec<PairStr>>;
+sprachen2: defaultdict = defaultdict(lambda: "messages")
+sprachen2["english"] = "messages"
+sprachen2["englisch"] = "messages"
+sprachen2["deutsch"] = "messages"
+sprachen2["german"] = "messages"
+sprachen2["vietnamesisch"] = "vn"
+sprachen2["vietnamese"] = "vn"
+sprachen2["tiếngviệt"] = "vn"
+sprachen2["chinesisch"] = "cn"
+sprachen2["chinese"] = "cn"
+sprachen2["中國人"] = "cn"
+sprachen2["koreanisch"] = "kr"
+sprachen2["korean"] = "kr"
+sprachen2["한국인"] = "kr"
 
-                if case_num == 1 {
-                    index2a = vec!["('bool', 0)".to_string()];
-                    intoA = vec![into.clone()];
-                } else if case_num == 2 {
-                    if let PyAtom::Tuple(inner) = spaltenNummerOderEtc {
-                        index2a = inner.iter().map(|x| format!("{:?}", x)).collect();
-                    } else {
-                        index2a = vec![format!("{:?}", parameterMainNamePerLoop)];
-                    }
-                    intoA = into.iter().map(|x| vec![x.clone()]).collect();
-                } else if case_num == 3 || case_num == 4 {
-                    index2a = vec![format!("{:?}", spaltenNummerOderEtc)];
-                    intoA = vec![into.clone()];
-                } else {
-                    index2a = vec!["None".to_string()];
-                    intoA = vec![into.clone()];
-                }
 
-                let max_len = if index2a.len() > intoA.len() { index2a.len() } else { intoA.len() };
-                for pos in 0..max_len {
-                    let index2 = if pos < index2a.len() {
-                        index2a[pos].clone()
-                    } else {
-                        "None".to_string()
-                    };
-                    let into2 = if pos < intoA.len() {
-                        intoA[pos].clone()
-                    } else {
-                        vec![]
-                    };
+sprachenWahl = ""
+sprachenParameterWort = "-language="
 
-                    let entry = dataDicts[index1].entry(index2).or_insert_with(Vec::new);
-                    if !entry.iter().any(|e| e == &into2) {
-                        entry.push(into2);
-                    }
-                }
-            }
-        }
-
-        (paraMainDict, paraDict, dataDicts)
-    }
-
-    /*
-    Strenger an Python-Schleifenbau als zuvor.
-    */
-    pub fn mergeParameterDicts(
-        &self,
-        paraMainDict1: IndexMap<String, Vec<String>>,
-        paraDict1: IndexMap<(String, String), Vec<Vec<PyAtom>>>,
-        dataDicts1: Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
-        paraMainDict2: IndexMap<String, Vec<String>>,
-        paraDict2: IndexMap<(String, String), Vec<Vec<PyAtom>>>,
-        dataDicts2: Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
-    ) -> (
-        IndexMap<(String, String), Vec<Vec<PyAtom>>>,
-        Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
-    ) {
-        let _paraMainDict1: IndexMap<String, Vec<String>> =
-            paraMainDict1.into_iter().chain(paraMainDict2.into_iter()).collect();
-        let paraDict1: IndexMap<(String, String), Vec<Vec<PyAtom>>> =
-            paraDict1.into_iter().chain(paraDict2.into_iter()).collect();
-        let mut dataDicts3 = dataDicts1.clone();
-
-        let max_len = if dataDicts1.len() > dataDicts2.len() { dataDicts1.len() } else { dataDicts2.len() };
-        for i in 0..max_len {
-            let dict1 = dataDicts1.get(i);
-            let dict2 = dataDicts2.get(i);
-
-            match (dict1, dict2) {
-                (Some(d1), Some(d2)) => {
-                    if dataDicts3[i].keys().len() == 0 {
-                        dataDicts3[i] = d2.clone();
-                    } else {
-                        for (key1, value1) in d1 {
-                            for (key2, value2) in d2 {
-                                if key2 == key1 {
-                                    let entry = dataDicts3[i].entry(key1.clone()).or_insert_with(Vec::new);
-                                    entry.extend(value2.clone());
-                                } else if !dataDicts3[i].contains_key(key2) {
-                                    dataDicts3[i].insert(key2.clone(), value2.clone());
-                                }
-                            }
-                            if !dataDicts3[i].contains_key(key1) {
-                                dataDicts3[i].insert(key1.clone(), value1.clone());
-                            }
-                        }
-                    }
-                }
-                (Some(d1), None) => {
-                    dataDicts3[i] = d1.clone();
-                }
-                (None, Some(d2)) => {
-                    if i >= dataDicts3.len() {
-                        dataDicts3.push(d2.clone());
-                    } else {
-                        dataDicts3[i] = d2.clone();
-                    }
-                }
-                (None, None) => {}
-            }
-        }
-
-        (paraDict1, dataDicts3)
-    }
-
-    pub fn storeParamtersForColumns(&mut self) {
-        self.state.kombiReverseDict = IndexMap::new();
-        for (key, value) in self.i18n.kombiParaNdataMatrix.iter() {
-            for valuesInValuess in value {
-                self.state.kombiReverseDict.insert(valuesInValuess.clone(), *key);
-            }
-        }
-
-        self.state.kombiReverseDict2 = IndexMap::new();
-        for (key, value) in self.i18n.kombiParaNdataMatrix2.iter() {
-            for valuesInValuess in value {
-                self.state.kombiReverseDict2.insert(valuesInValuess.clone(), *key);
-            }
-        }
-
-        self.state.paraMainDict = IndexMap::new();
-        self.state.paraDict = IndexMap::new();
-        let mut dataDicts_local = {
-            let mut x = vec![];
-            for _ in 0..12 { x.push(IndexMap::new()); }
-            x
-        };
-
-        for parameterEntry in self.i18n.paraNdataMatrix.iter() {
-            let (paraMainDict2, paraDict2, dataDicts2) = self.intoParameterDatatype(
-                &parameterEntry.parameterMainNames,
-                &parameterEntry.parameterNames,
-                &parameterEntry.datas,
-            );
-            let (paraDict3, dataDicts3) = self.mergeParameterDicts(
-                self.state.paraMainDict.clone(),
-                self.state.paraDict.clone(),
-                dataDicts_local.clone(),
-                paraMainDict2.clone(),
-                paraDict2.clone(),
-                dataDicts2.clone(),
-            );
-
-            for (k, v) in paraMainDict2 {
-                self.state.paraMainDict.insert(k, v);
-            }
-            self.state.paraDict = paraDict3;
-            dataDicts_local = dataDicts3;
-        }
-
-        self.state.dataDicts = dataDicts_local;
-    }
-}
-
-pub const PYTHON_SOURCE__STOREPARAMTERSFORCOLUMNS: &str = r#"    def storeParamtersForColumns(self):
-        # global puniverseprims
-        def intoParameterDatatype(
-            parameterMainNames: tuple, parameterNames: tuple, datas: tuple
-        ) -> tuple:
-            """
-            ALLE PARAMETER DIESER FUNKTION SIND EIGENTLICH NUR EIN JEWEILIGES ELEMENT VON
-            paraNdataMatrix
-            ZUSAMMEN
-
-            Speichert einen Parameter mit seinem DatenSet
-            in 2 Datenstrukturen (die beides kombinieren 2x2)
-            Diese werden jedoch nur zurück gegeben und nicht in der Klasse gespeichert.
-            @return: alle Hauptparamter| alle Nebenparamter zu nur einem
-            Hauptparameter ergibt Mengen an Spalten | enthält alle Haup- und
-            Nebenparameter keys sind Spalten der Tabelle
-            """
-            paraMainDict = {}
-            for name in parameterMainNames:
-                paraMainDict[name] = parameterNames
-            paraDict = {}
-            for name1 in parameterMainNames:
-                for name2 in parameterNames:
-                    paraDict[(name1, name2)] = datas
-                if len(parameterNames) == 0:
-                    paraDict[(name1, "")] = datas
-            dataDicts: tuple = ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
-
-            # datas sind nicht die Haupt-und-Neben-Parameter, sondern alles das diese enthalten und meinen können
-            # ein datas Datensatz sind alle sets, die ein Haupt-Neben-Parameter Zusammenhang enthalten kann an sets
-            for i, d in enumerate(datas):
-                for spaltenNummerOderEtc in d:
-                    # spaltenNummerOderEtc ist hier also eine Zahl von einem set, die z.B. eine Spaltennummer meinen kann
-                    into = []
-                    parameterMainNamePerLoop = []
-                    case: int = None
-
-                    # das mit 2 Schleifen nur deshalb, damit immer alle Haupt- und Neben-Parameter in die Liste rein kommen
-                    for parameterMainName in parameterMainNames:
-                        for parameterName in (
-                            parameterNames if len(parameterNames) > 0 else ("",)
-                        ):
-                            # i ist die Nummer welches Set es ist
-                            if i == 4 and (
-                                type(spaltenNummerOderEtc) is bool
-                                or (
-                                    type(spaltenNummerOderEtc) in [tuple, list]
-                                    and len(spaltenNummerOderEtc) > 0
-                                    and type(spaltenNummerOderEtc[0]) is bool
-                                )
-                            ):
-                                case = 1
-                                into += [
-                                    (
-                                        parameterMainName,
-                                        parameterName,
-                                    )
-                                ]
-                            elif i in (
-                                5,
-                                6,
-                                9,
-                                10,
-                            ):  # and type(spaltenNummerOderEtc) is set:
-                                case = 2
-                                into += [[(parameterMainName, parameterName)]]
-                                parameterMainNamePerLoop += [parameterName]
-                            elif i == 2 and callable(spaltenNummerOderEtc):
-                                case = 2
-                                parameterMainNamePerLoop += [parameterName]
-                                into += [[(parameterMainName, parameterName)]]
-                            elif i == 4 and (
-                                type(spaltenNummerOderEtc) in (list, tuple)
-                            ):
-                                case = 4
-                                into += [(parameterMainName, parameterName)]
-                            elif i == 4 and (type(spaltenNummerOderEtc) in (set,)):
-                                case = 4
-                                into += [(parameterMainName, parameterName)]
-                                spaltenNummerOderEtc = spaltenNummerOderEtc.pop()
-                            else:
-                                case = 3
-                                try:
-                                    into += [(parameterMainName, parameterName)]
-                                except KeyError:
-                                    into = [(parameterMainName, parameterName)]
-
-                    index1 = i if case != 1 else 3
-                    index2a = (
-                        spaltenNummerOderEtc
-                        if case == 3
-                        else (
-                            spaltenNummerOderEtc
-                            if case == 4
-                            else ("bool", 0)
-                            if case == 1
-                            else tuple(
-                                (
-                                    int(para)
-                                    if para.isdecimal()
-                                    else para
-                                    if len(parameterNames) > 0
-                                    else None
-                                    for para in parameterMainNamePerLoop
-                                )
-                            )
-                            if case == 2
-                            else None
-                        )
-                    )
-                    intoA = into if case == 2 else (into,)
-                    for index2, into2 in zip_longest(
-                        index2a if case == 2 else (index2a,), intoA, fillvalue=into
-                    ):
-                        try:
-                            # x("index1", index1)
-                            # x("index1", d)
-                            dataDicts[index1][index2] += (
-                                (into2,)
-                                if into2 not in dataDicts[index1][index2]
-                                else ()
-                            )
-                        except KeyError:
-                            dataDicts[index1][index2] = (into2,)
-            return paraMainDict, paraDict, dataDicts
-
-        def mergeParameterDicts(
-            paraMainDict1: dict,
-            paraDict1: dict,
-            dataDicts1: list,
-            paraMainDict2: dict,
-            paraDict2: dict,
-            dataDicts2: list,
-        ) -> tuple:
-            """Merged die beiden 2x2 Datenstrukturen und speichert diese
-            in die Klasse und gibt sie dennoch auch mit return zurück
-            @param paraMainDict: Hauptparameter in der Kommandozeile
-            hat als Werte die Nebenparameter und keys sind die Hauptparamter
-            @param paraDict: Nebenparamteter in der Kommandozeile
-            hat als Werte die Spaltennummern dazugehörig
-            @param dataDicts: die beiden Parameter sagen welche Spaltennummern es
-            sein werden
-            @return: Spaltennummer sagt welche Parameter es ingesamt dazu sind | die
-            beiden Parameter sagen, welche Spalten es alle sind.
-
-            *paraNdataMatrix*
-            enthält die meisten Parameternamen mit den zugehörigen Spaltennummern mit Sonderdaten, weil einige Spalten generiert werden aus anderen
-
-            u.a. daraus wird das *paraDict* und *dataDict* gebaut. Beides hat das Gleiche drin, nur das andere jeweils mit Key und Value vertauscht.
-            Darin sind die Paramenternamen und csv Spaltennummern drin, die nicht verwechselt werden dürfen mit den dann real vorhandenen Spaltennummern, die nicht die gleichen als Zahl sind, wie die in der CSV-Datei.
-
-            *self.tables.generatedSpaltenParameter*
-            key ist Spaltennummer der Ausgabe, value ist ein Paar von 2 Strings über Überparametername und Unterparametername für den Klassenname für die Spalte des HTML-Tags.
-            <em>
-            Das beinhaltet das für alle Parameter und Ausgabe-Spalten-Nummern.</em>"""
-            global gebrochenSpaltenMaximumPlus1
-
-            paraMainDict1 = {**paraMainDict1, **paraMainDict2}
-            paraDict1 = {**paraDict1, **paraDict2}
-            dataDicts3 = deepcopy(dataDicts1)
-            for i, (dict1, dict2) in enumerate(zip_longest(dataDicts1, dataDicts2)):
-                if type(dict1) is dict and type(dict2) is dict:
-                    if len(dataDicts3[i].keys()) == 0:
-                        dataDicts3[i] = dataDicts2[i]
-                    else:
-                        for key1, value1 in dict1.items():
-                            for key2, value2 in dict2.items():
-                                if key2 == key1:
-                                    dataDicts3[i][key1] += value2
-                                elif key2 not in dataDicts3[i].keys():
-                                    dataDicts3[i][key2] = value2
-                elif type(dict1) is dict and dict2 is None:
-                    dataDicts3[i] = dict1
-                elif dict1 is None and type(dict2) is dict:
-                    dataDicts3[i] = dict2
-            return paraDict1, dataDicts3
-
-        Program.ParametersMain: namedtuple = i18n.ParametersMain
-
-        allowedPrimNumbersForCommand: tuple[str] = tuple(
-            (
-                str(num)
-                for num in tuple(
-                    OrderedSet(
-                        (
-                            num if primCreativity(num) == 1 else None
-                            for num in range(2, 32)
-                        )
-                    )
-                    - {None}
-                )
-            )
+flagS = False
+for arg in sys.argv:
+    if arg[: len(sprachenParameterWort)] == sprachenParameterWort:
+        sprachenWahl = arg[len(sprachenParameterWort) :]
+        flagS = True
+        break
+if "-debug" in sys.argv:
+    print("Sprachenwahl: {}".format(sprachenWahl))
+if flagS and sprachenWahl not in sprachen.keys():
+    print(
+        "allowed are: {}\nwrong: {}".format(
+            str(tuple(sprachen.keys()))[1:-1], sprachenWahl
         )
+    )
 
-        Program.lambdaGebrUnivUndGalax = lambda paraValues: {
-            abs(int(chosen)) if chosen.isdecimal() else None
-            for chosen in [value for value in (paraValues.split(","))]
-        } - {None, 0, 1}
+if len({"deutsch", "german", ""} & {sprachenWahl}) == 0:
+    alxp("not german")
+    subFolder = sprachen[sprachenWahl]
+    sprachenFileName = sprachen2[sprachenWahl]
+    i18nPath = os.path.join(os.path.dirname(__file__))
+    t = gettext.translation(
+        sprachenFileName, localedir=i18nPath, languages=[subFolder], fallback=False
+    )
+    t.install()
+    _ = t.gettext
+else:
+    alxp("german")
+    localedir = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+    translate = gettext.translation("nichts", localedir, fallback=True)
+    _ = translate.gettext
 
-        Program.lambdaPrimGalax = lambda paraValues: {
-            abs(int(chosen))
-            if chosen.isdecimal() and primCreativity(abs(int(chosen))) == 1
-            else None
-            for chosen in [value for value in (paraValues.split(","))]
-        } - {None, 0, 1}
+# sys.path.insert(1, "./..")
+Multiplikationen = [(_("Multiplikationen"), "")]
+"""
+ES FEHLEN NOCH ALLE ''
+fertig: in prepare ist nichts
+fertig: concat fertig
+fertig: center fertig
+fertig: lib4tables fertig
+fertig: reta.py fertig
+nichts drin: enum
+nichts drin: multis
+nichts drin: grundstruk html
+die aus den anderen dateien: nestedcompleter
+LibRetaPrompt: größten Teil entnommen
 
-        paraNdataMatrix: list[
-            Tuple[Any, dict[str, str], set[int], Optional[set]]
-        ] = i18n.paraNdataMatrix
-        Program.paraNdataMatrix = paraNdataMatrix
+ES FEHLEN NOCH ALLE ''
+"""
 
-        Program.kombiParaNdataMatrix: OrderedDict[
-            int, tuple[str]
-        ] = i18n.kombiParaNdataMatrix
+netzwerkWort = _("netzwerk")
+Primzahlkreuz_pro_contra_strs: tuple = (
+    "Primzahlkreuz_pro_contra",
+    "nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)",
+)
 
-        Program.kombiParaNdataMatrix2: OrderedDict[
-            int, tuple[str]
-        ] = i18n.kombiParaNdataMatrix2
-        self.kombiReverseDict: dict = {}
-        for key, value in Program.kombiParaNdataMatrix.items():
-            for valuesInValuess in value:
-                self.kombiReverseDict[valuesInValuess] = key
+keineTabellenAusgabe = _("ein Mal kein Tabelleninhalt")
+Primzahlkreuz_pro_contra_strs_Fkt: tuple = (
+    _("Primzahlkreuz_pro_contra"),
+    _("nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)"),
+)
+Primzahlkreuz_pro_contra_strs_Dict = {
+    Primzahlkreuz_pro_contra_strs: Primzahlkreuz_pro_contra_strs_Fkt,
+}
+gebrochenSpaltenMaximumPlus1: int = 24  # Das ist nicht die Spaltenbreite, sondern wie weit gebrochene Zahlen gehen dürfen bei Zähler und Nenner
 
-        self.kombiReverseDict2: dict = {}
-        for key, value in Program.kombiParaNdataMatrix2.items():
-            for valuesInValuess in value:
-                self.kombiReverseDict2[valuesInValuess] = key
+# DOPPELT
+# spalten: dict = {}
+# spalten |= {
+#    "breite": _("breite"),
+#    "breiten": _("breiten"),
+#    "keinenummerierung": _("keinenummerierung"),
+# }
 
-        allValues = [
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-            OrderedSet(),
-        ]
-        # x("paraNdataMatrix A4", paraNdataMatrix)
-        # x("allValues 11 A", allValues[11])
-        for possibleCommands in paraNdataMatrix:
-            for commandValue, aAllValue in zip(possibleCommands[2:], allValues):
-                try:
-                    aAllValue |= commandValue
-                except TypeError:
-                    print("FEHLER")
-                    print(commandValue)
-                    raise ValueError
-                    exit()
+primzahlWort = _("Primzahl")
 
-        self.AllSimpleCommandSpalten = set(allValues[0])
-        if self.__invertAlles:
-            allValues[0] = (
-                set(range(max(allValues[0])))
-                - set(allValues[0])
-                - {a[0] for a in allValues[1]}
-                - {a[1] for a in allValues[1]}
-            )
-        # x("allV1", allValues)
-        # x("allValues 4b", allValues[4])
-        # x("allValues 11 B", allValues[11])
-        """
-        Folgende Schleife ist eigentlich unnötig.
-        Sie ist für bool Werte da, wenn Sachen generiert werden.
-        Ich brauche aber gerade den bool wert gar nicht mehr, weil es in
-        diesem Fall auch anders geht, aber für die Zukunft kann das hilfreich sein.
-        Also lasse ich es mal stehen!
+geistWort = _("geist")
+emotionWort = _("emotion")
+ausgabeParas: dict = {
+    "nocolor": _("nocolor"),
+    "justtext": _("justtext"),
+    "art": _("art"),
+    "onetable": _("onetable"),
+    "spaltenreihenfolgeundnurdiese": _("spaltenreihenfolgeundnurdiese"),
+    "endlessscreen": _("endlessscreen"),
+    "endless": _("endless"),
+    "dontwrap": _("dontwrap"),
+    "breite": _("breite"),
+    "breiten": _("breiten"),
+    "keineleereninhalte": _("keineleereninhalte"),
+    "keinenummerierung": _("keinenummerierung"),
+    "keineueberschriften": _("keineueberschriften"),
+}
+ausgabeParasEqSign: dict = {
+    "nocolor": False,
+    "justtext": False,
+    "art": True,
+    "onetable": False,
+    "spaltenreihenfolgeundnurdiese": True,
+    "endlessscreen": False,
+    "endless": False,
+    "dontwrap": False,
+    "breite": True,
+    "breiten": True,
+    "keineleereninhalte": False,
+    "keinenummerierung": False,
+    "keineueberschriften": False,
+}
 
-        for possibleCommands in paraNdataMatrix:
-            for commandValue, aAllValue in zip(possibleCommands[6:], allValues[4:]):
-                aAllValue += [commandValue]
-        # allValues[1] = allValues[2]
-        """
-        allValues[2] = set((int(pNum) for pNum in allowedPrimNumbersForCommand))
-        allValues[3] = set(Program.kombiParaNdataMatrix.keys())
-        allValues[5] = set(range(2, gebrochenSpaltenMaximumPlus1))
-        allValues[6] = set(range(2, gebrochenSpaltenMaximumPlus1))
-        allValues[8] = set(Program.kombiParaNdataMatrix2.keys())
-        allValues[9] = set(range(2, gebrochenSpaltenMaximumPlus1))
-        allValues[10] = set(range(2, gebrochenSpaltenMaximumPlus1))
-        if self.__invertAlles:
-            for zahl in range(1, 11):
-                allValues[zahl] = set()
-        """
-        self.paraDictGenerated = {}
-        self.paraDictGenerated4htmlTags = {}
-        for key, value in paraNdataMatrix4onlyGenerated.items():
-            for firstParameter in value[0][1:]:
-                for secondParameter in value[1][1:]:
-                    self.paraDictGenerated[(firstParameter, secondParameter)] = key
-            self.paraDictGenerated4htmlTags[(value[0][0], value[1][0])] = key
-            allValues[7] |= {key}
-        """
+ausgabeParasLen = {key: len(value) for (key, value) in ausgabeParas.items()}
+kombiMainParas: dict = {
+    "galaxie": _("galaxie"),
+    "universum": _("universum"),
+}
+zeilenParas: dict = {
+    "alles": _("alles"),
+    "gestern": _("gestern"),
+    "heute": _("heute"),
+    "hoehemaximal": _("hoehemaximal"),
+    "mond": _("mond"),
+    "morgen": _("morgen"),
+    "nachtraeglichneuabzaehlung": _("nachtraeglichneuabzaehlung"),
+    "nachtraeglichneuabzaehlungvielfache": _("nachtraeglichneuabzaehlungvielfache"),
+    "oberesmaximum": _("oberesmaximum"),
+    "planet": _("planet"),
+    "potenzenvonzahlen": _("potenzenvonzahlen"),
+    "primzahlvielfache": _("primzahlvielfache"),
+    "schwarzesonne": _("schwarzesonne"),
+    "sonne": _("sonne"),
+    "typ": _("typ"),
+    "vielfachevonzahlen": _("vielfachevonzahlen"),
+    "vorhervonausschnitt": _("vorhervonausschnitt"),
+    "vorhervonausschnittteiler": _("vorhervonausschnittteiler"),
+    "zaehlung": _("zaehlung"),
+    "zeit": _("zeit"),
+    "primzahlen": _("primzahlen"),
+    "aussenerste": _("aussenerste"),
+    "innenerste": _("innenerste"),
+    "aussenalle": _("aussenalle"),
+    "innenalle": _("innenalle"),
+    "invertieren": _("invertieren"),
+    "SonneMitMondanteil": _("SonneMitMondanteil"),
+}
 
-        paraNdataMatrix += [
-            (
-                Program.ParametersMain.alles,
-                (),
-                *allValues,
-            )
-        ]
-        """
-        Hier wird erreicht, dass beide Dictionaries stückweise aufgefüllt werden.
-        Aus den 3 voran gegangen Datenstrukturen werden 2 Dicts gemacht.
-        """
-        self.paraMainDict, self.paraDict = {}, {}
-        for parameterEntry in paraNdataMatrix:
-            into = intoParameterDatatype(
-                parameterEntry[0],
-                parameterEntry[1],
-                tuple(
-                    parameterEntryElement
-                    for parameterEntryElement in parameterEntry[2:]
-                ),
-            )
-            self.paraDict, self.dataDict = mergeParameterDicts(
-                self.paraMainDict,
-                self.paraDict,
-                self.dataDict,
-                *into,
-            )
+zeilenParasLen = {key: len(value) for (key, value) in zeilenParas.items()}
+# zeilenParasLenPlus2 = {key: len(value) + 2 for (key, value) in zeilenParas.items()}
+hauptForNeben: dict = {
+    "zeilen": _("zeilen"),
+    "spalten": _("spalten"),
+    "kombination": _("kombination"),
+    "ausgabe": _("ausgabe"),
+    "h": _("h"),
+    "help": _("help"),
+    "debug": _("debug"),
+    "nichts": _("nichts"),
+}
 
-        self.dataDict[3] = Program.kombiParaNdataMatrix
-        self.dataDict[8] = Program.kombiParaNdataMatrix2
+ausgabeArt: dict = {
+    "bbcode": _("bbcode"),
+    "html": _("html"),
+    "csv": _("csv"),
+    "shell": _("shell"),
+    "markdown": _("markdown"),
+    "emacs": _("emacs"),
+    "nichts": _("nichts"),
+}
+# ausgabeArt2 = {value: key for key, value in ausgabeArt}
 
-        # alxp(self.paraDictGenerated)
-        # alxp("-|-|")
-        # alxp(self.paraDictGenerated4htmlTags)
-        # alxp("||-|")
-        # alxp(self.paraDict)
-        # alxp("--|-")
-        # alxp(self.dataDict)
-        # alxp("--||")
-        self.tables.dataDict = self.dataDict"#;
-pub const PYTHON_SOURCE__PARAMETERSTOCOMMANDSANDNUMBERS: &str = r#"    def parametersToCommandsAndNumbers(
-        self, argv, neg=""
-    ) -> Iterable[Union[set, set, set, list]]:
-        """Parameter in der Shell werden hier vorverarbeitet.
-        Die Paraemter führen dazu, dass Variablen gesetzt werden, z.B.
-        eine Menge die als Befehl kodiert, welche Zeilen und eine die kodiert
-        welche Spaltennummer ausgegeben werden sollen.
-        Außerdem welche extra Tabellen geladen werden sollen.
+wahl16Words: dict = {
+    "Multiversalien_(16)": _("Multiversalien_(16)"),
+    "P": _("P"),
+    # "Meta-Physik-Teilchen_(1)": _("Meta-Physik-Teilchen_(1)"),
+}
 
-        return paramLines, rowsAsNumbers, rowsOfcombi
+wahl15Words: dict = {
+    "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,"
+    + Primzahlkreuz_pro_contra_strs[1]: ",".join(
+        (
+            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
+            _("Geist_(15)"),
+            _("Model_of_Hierarchical_Complexity),"),
+            Primzahlkreuz_pro_contra_strs_Fkt[1],
+        ),
+    ),
+    "Konkreta_und_Focus_(2)": _("Konkreta_und_Focus_(2)"),
+    "Impulse_(5)": _("Impulse_(5)"),
+    "Gefühle_(7)": _("Gefühle_(7)"),
+    "Modus_und_Sein_(8)": _("Modus_und_Sein_(8)"),
+    "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)": _(
+        "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)"
+    ),
+    "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12": ",".join(
+        (("Meta-Systeme_(12)"), _("Ordnung_und_Filterung_12_und_1pro12"))
+    ),
+    "Paradigmen_sind_Absichten_(13)": _("Paradigmen_sind_Absichten_(13)"),
+    "Gedanken_sind_Positionen_(17)": _("Gedanken_sind_Positionen_(17)"),
+    "Verbundenheiten_(18)": _("Verbundenheiten_(18)"),
+    "Triebe_und_Bedürfnisse_(6)": _("Triebe_und_Bedürfnisse_(6)"),
+    "Lust_(9)": _("Lust_(9)"),
+    "Reflexe_(3),Existenzialien_(3)": ",".join(
+        (_("Reflexe_(3)"), _("Existenzialien_(3)"))
+    ),
+    "Absicht_6_ist_Vorteilsmaximierung": _("Absicht_6_ist_Vorteilsmaximierung"),
+    "Absicht_7_ist_Selbstlosigkeit": _("Absicht_7_ist_Selbstlosigkeit"),
+    "Absicht_10_ist_Wirklichkeit_erkennen": _("Absicht_10_ist_Wirklichkeit_erkennen"),
+    "Absicht_17_ist_zu_meinen": _("Absicht_17_ist_zu_meinen"),
+    "Zeit_(4)_als_Wirklichkeit": _("Zeit_(4)_als_Wirklichkeit"),
+    "Funktionen_Vorstellungen_(16)": _("Funktionen_Vorstellungen_(16)"),
+    "Achtung_(4)": _("Achtung_(4)"),
+    "Absicht_1/8": _("Absicht_1/8"),
+    "Absicht_1/6_ist_Reinigung_und_Klarheit": _(
+        "Absicht_1/6_ist_Reinigung_und_Klarheit"
+    ),
+    "Reflektion_und_Kategorien_(1/15)": _("Reflektion_und_Kategorien_(1/15)"),
+    "Bewusstheit_statt_Bewusstsein_(1)": _("Bewusstheit_statt_Bewusstsein_(1)"),
+    "Energie_und_universelle_Eigenschaften_(30)": _(
+        "Energie_und_universelle_Eigenschaften_(30)"
+    ),
+    "Stimmungen_Kombinationen_(14)": _("Stimmungen_Kombinationen_(14)"),
+    "Klassen_(20)": _("Klassen_(20)"),
+    "Empathie_(37)": _("Empathie_(37)"),
+    "Garben_und_Verhalten_nachfühlen(31)": _("Garben_und_Verhalten_nachfühlen(31)"),
+    "Verhalten_(11)": _("Verhalten_(11)"),
+    "Bedeutung_(10)": _("Bedeutung_(10)"),
+    "Themen_(6)": _("Themen_(6)"),
+    "Optimierung_(10)": _("Optimierung_(10)"),
+    "Attraktionen_(36)": _("Attraktionen_(36)"),
+    "Absicht_16_ist_zu_genügen": _("Absicht_16_ist_zu_genügen"),
+    "Liebe_(7)": _("Liebe_(7)"),
+    "Koalitionen_(10)": _("Koalitionen_(10)"),
+    "Ansichten_Standpunkte_(18_17)": _("Ansichten_Standpunkte_(18_17)"),
+    "Prinzipien(1/8)": _("Prinzipien(1/8)"),
+    "Bestrebungen(1/5)": _("Bestrebungen(1/5)"),
+    "Bedingung_und_Auslöser_(1/3)": _("Bedingung_und_Auslöser_(1/3)"),
+    "relativer_Zeit-Betrag_(15_10_4_18_6)": _("relativer_Zeit-Betrag_(15_10_4_18_6)"),
+    "Zahlenvergleich_(15_18_6)": _("Zahlenvergleich_(15_18_6)"),
+    "Leidenschaften_(21)": _("Leidenschaften_(21)"),
+    "Erwartungshaltungen_(26)": _("Erwartungshaltungen_(26)"),
+    "Extremalien_(19),Ziele_(19)": ",".join((_("Extremalien_(19)"), _("Ziele_(19)"))),
+    "universeller_Komperativ_(18→15)": _("universeller_Komperativ_(18→15)"),
+    "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)": _(
+        "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)"
+    ),
+    "Sollen_Frage_Vorgehensweise_(1/13)": _("Sollen_Frage_Vorgehensweise_(1/13)"),
+    "Fundament_(1/19)": _("Fundament_(1/19)"),
+    "abhängige_Verbundenheit_(90)": _("abhängige_Verbundenheit_(90)"),
+    "Absicht_13_ist_Helfen": _("Absicht_13_ist_Helfen"),
+    "Karte_Filter_und_Unterscheidung_(1/12)": _(
+        "Karte_Filter_und_Unterscheidung_(1/12)"
+    ),
+    "Maßnahmen_39": _("Maßnahmen_(39)"),
+}
 
-        @type  argv: list
-        @param argv: Programmparamenter
-        @type  neg: str
-        @param neg: MinusZeichen davor ?
-        @rtype: set, set, set
-        @return: Zeilen, Spalten, Spalten anderer Tabellen
-        """
-        global infoLog, shellRowsAmount  # , puniverseprims
-        if len(argv) == 1 and neg == "":
-            cliout(i18nR.cliout8SatzVersucheParaH)
-        spaltenreihenfolgeundnurdiese: tuple = ()
-        puniverseprims_only: set = OrderedSet()
-        rowsAsNumbers: set = set()
-        paramLines: set = OrderedSet()
-        self.bigParamaeter: list = []
-        self.__willBeOverwritten_rowsOfcombi: set = OrderedSet()
-        generRows = OrderedSet()
-        for arg in argv[1:]:
-            if len(arg) > 0 and arg[0] == "-":
-                if (
-                    len(arg) > 1
-                    and arg[1] == "-"
-                    and len(self.bigParamaeter) > 0
-                    and self.bigParamaeter[-1] == i18n.mainParaCmds["zeilen"]
-                ):
-                    if (
-                        arg[2 : i18n.zeilenParasLen["alles"] + 2]
-                        == i18n.zeilenParas["alles"]
-                        and len(neg) == 0
-                    ):
-                        paramLines.add("all")
-                        self.obZeilenBereicheAngegeben = True
-                    if (
-                        arg[2 : 2 + i18n.zeilenParasLen["alles"]]
-                        == i18n.zeilenParas["alles"]
-                        and len(neg) != 0
-                    ):
-                        pass
-                    elif (
-                        arg[2 : i18n.zeilenParasLen["zeit"] + 3]
-                        == i18n.zeilenParas["zeit"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        for subpara in arg[3 + i18n.zeilenParasLen["zeit"] :].split(
-                            ","
-                        ):
-                            if neg + i18n.zeilenParas["heute"] == subpara:
-                                paramLines.add("=")
-                            elif neg + i18n.zeilenParas["gestern"] == subpara:
-                                paramLines.add("<")
-                            elif neg + i18n.zeilenParas["morgen"] == subpara:
-                                paramLines.add(">")
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["zaehlung"]]
-                        == i18n.zeilenParas["zaehlung"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    arg[3 + i18n.zeilenParasLen["zaehlung"] :],
-                                    "n",
-                                    "",
-                                    True,
-                                )
-                            )
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["hoehemaximal"]]
-                        == i18n.zeilenParas["hoehemaximal"] + "="
-                    ):
-                        if arg[3 + i18n.zeilenParasLen["hoehemaximal"] :].isdecimal():
-                            self.tables.textHeight = abs(int(arg[15:]))
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["typ"]]
-                        == i18n.zeilenParas["typ"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        for word in arg[3 + i18n.zeilenParasLen["typ"] :].split(","):
-                            if word == neg + i18n.zeilenParas["sonne"]:
-                                paramLines.add("sonne")
-                            elif word == neg + i18n.zeilenParas["schwarzesonne"]:
-                                paramLines.add("schwarzesonne")
-                            elif word == neg + i18n.zeilenParas["planet"]:
-                                paramLines.add("planet")
-                            elif word == neg + i18n.zeilenParas["mond"]:
-                                paramLines.add("mond")
-                            elif word == neg + i18n.zeilenParas["SonneMitMondanteil"]:
-                                paramLines.add("SonneMitMondanteil")
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["primzahlen"]]
-                        == i18n.zeilenParas["primzahlen"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        for word in arg[3 + i18n.zeilenParasLen["primzahlen"] :].split(
-                            ","
-                        ):
-                            if word == neg + i18n.zeilenParas["aussenerste"]:
-                                paramLines.add("aussenerste")
-                            elif word == neg + i18n.zeilenParas["innenerste"]:
-                                paramLines.add("innenerste")
-                            elif word == neg + i18n.zeilenParas["aussenalle"]:
-                                paramLines.add("aussenalle")
-                            elif word == neg + i18n.zeilenParas["innenalle"]:
-                                paramLines.add("innenalle")
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["potenzenvonzahlen"]]
-                        == i18n.zeilenParas["potenzenvonzahlen"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "" or True:
-                            angabe = arg[3 + i18n.zeilenParasLen["potenzenvonzahlen"] :]
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    angabe, "^", neg, keineNegBeruecksichtigung=False
-                                )
-                            )
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["vielfachevonzahlen"]]
-                        == i18n.zeilenParas["vielfachevonzahlen"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    arg[
-                                        3 + i18n.zeilenParasLen["vielfachevonzahlen"] :
-                                    ],
-                                    "b",
-                                    neg,
-                                    keineNegBeruecksichtigung=True,
-                                )
-                            )
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["primzahlvielfache"]]
-                        == i18n.zeilenParas["primzahlvielfache"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            zahlenMenge = BereichToNumbers2(
-                                arg[3 + i18n.zeilenParasLen["primzahlvielfache"] :]
-                            )
-                            for zahl in zahlenMenge:
-                                paramLines.add(str(zahl) + "p")
-                    elif self.oberesMaximum(arg):
-                        pass
-                    elif (
-                        arg[2 : 2 + i18n.zeilenParasLen["invertieren"]]
-                        == i18n.zeilenParas["invertieren"]
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    "1", "i", neg, keineNegBeruecksichtigung=True
-                                )
-                            )
-                    elif (
-                        arg[2 : 2 + i18n.zeilenParasLen["vorhervonausschnittteiler"]]
-                        == i18n.zeilenParas["vorhervonausschnittteiler"]
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    "1", "w", neg, keineNegBeruecksichtigung=True
-                                )
-                            )
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["vorhervonausschnitt"]]
-                        == i18n.zeilenParas["vorhervonausschnitt"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        if neg == "":
-                            paramLines |= (
-                                self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                    arg[
-                                        3 + i18n.zeilenParasLen["vorhervonausschnitt"] :
-                                    ],
-                                    "a",
-                                    neg,
-                                    keineNegBeruecksichtigung=True,
-                                )
-                            )
-                    elif (
-                        arg[
-                            2 : 3
-                            + i18n.zeilenParasLen["nachtraeglichneuabzaehlungvielfache"]
-                        ]
-                        == i18n.zeilenParas["nachtraeglichneuabzaehlungvielfache"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        paramLines |= (
-                            self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                arg[
-                                    3
-                                    + i18n.zeilenParasLen[
-                                        "nachtraeglichneuabzaehlungvielfache"
-                                    ] :
-                                ],
-                                "y",
-                                neg,
-                            )
-                        )
-                    elif (
-                        arg[2 : 3 + i18n.zeilenParasLen["nachtraeglichneuabzaehlung"]]
-                        == i18n.zeilenParas["nachtraeglichneuabzaehlung"] + "="
-                    ):
-                        self.obZeilenBereicheAngegeben = True
-                        paramLines |= (
-                            self.tables.getPrepare.parametersCmdWithSomeBereich(
-                                arg[
-                                    3
-                                    + i18n.zeilenParasLen[
-                                        "nachtraeglichneuabzaehlung"
-                                    ] :
-                                ],
-                                "z",
-                                neg,
-                            )
-                        )
-                    elif len(neg) > 0:
-                        from LibRetaPrompt import zeilenParas
+kugelnKreise = ["kugeln", "kreise"]
+ParametersMain: NamedTuple = namedtuple(
+    "ParametersMain",
+    "wichtigste wichtigste2 religionen galaxie strukturgroesse universum multiversum wirtschaft menschliches procontra licht bedeutung symbole Multiplikationen konzept konzept2 inkrementieren operationen universummetakonkret primzahlwirkung gebrochenuniversum gebrochengalaxie gebrochenemotion gebrochengroesse primvielfache planet strukturenkleinere grundstrukturen teilchen kontinuum alles",
+)
 
-                        cliout(
-                            i18nR.cliout9Saetze[0]
-                            + arg
-                            + i18nR.cliout9Saetze[1]
-                            + self.bigParamaeter[-1]
-                            + i18nR.cliout9Saetze[2]
-                            + i18nR.cliout9Saetze[3]
-                            + ", ".join(zeilenParas)
-                        )
-                elif (
-                    len(arg) > 1
-                    and arg[1] == "-"
-                    and len(self.bigParamaeter) > 0
-                    and self.bigParamaeter[-1] == i18n.mainParaCmds["ausgabe"]
-                ):  # unteres Kommando
-                    if self.breiteBreitenSysArgvPara(arg[2:], neg):
-                        pass
-                    elif (
-                        arg[2 : 2 + i18n.ausgabeParasLen["keineueberschriften"]]
-                        == i18n.ausgabeParas["keineueberschriften"]
-                    ):
-                        self.tables.keineUeberschriften = True
-                    elif (
-                        arg[2 : 2 + i18n.ausgabeParasLen["keinenummerierung"]]
-                        == i18n.ausgabeParas["keinenummerierung"]
-                    ):
-                        self.tables.nummeriere = False
-                    elif (
-                        arg[2 : 2 + i18n.ausgabeParasLen["keineleereninhalte"]]
-                        == i18n.ausgabeParas["keineleereninhalte"]
-                    ):
-                        self.keineleereninhalte = True
-                        self.tables.keineleereninhalte = True
-                    elif (
-                        arg[
-                            2 : 3
-                            + i18n.ausgabeParasLen["spaltenreihenfolgeundnurdiese"]
-                        ]
-                        == i18n.ausgabeParas["spaltenreihenfolgeundnurdiese"] + "="
-                    ):
-                        spaltenreihenfolgeundnurdiese = tuple(
-                            BereichToNumbers2(
-                                arg[
-                                    3
-                                    + i18n.ausgabeParasLen[
-                                        "spaltenreihenfolgeundnurdiese"
-                                    ] :
-                                ]
-                            )
-                        )
-                    elif (
-                        arg[2 : i18n.ausgabeParasLen["art"] + 3]
-                        == i18n.ausgabeParas["art"] + "="
-                    ):
-                        breiteIstNull = "".join(
-                            ("--", i18n.ausgabeParas["breite"], "=0")
-                        )
-                        outputtype = arg[(arg.find("=") + 1) :]
-                        if outputtype == i18n.ausgabeArt["shell"]:
-                            self.tables.outType = OutputSyntax()
-                        elif outputtype == i18n.ausgabeArt["nichts"]:
-                            self.tables.outType = NichtsSyntax()
-                        elif outputtype == i18n.ausgabeArt["csv"]:
-                            self.tables.outType = csvSyntax()
-                            self.tables.getOut.oneTable = True
-                            self.breiteBreitenSysArgvPara(breiteIstNull[2:], "")
-                        elif outputtype == i18n.ausgabeArt["bbcode"]:
-                            self.htmlOrBBcode = True
-                            self.tables.outType = bbCodeSyntax()
-                        elif outputtype == i18n.ausgabeArt["html"]:
-                            self.tables.outType = htmlSyntax()
-                            self.htmlOrBBcode = True
-                        elif outputtype == i18n.ausgabeArt["emacs"]:
-                            self.tables.getOut.oneTable = True
-                            self.tables.outType = emacsSyntax()
-                            self.breiteBreitenSysArgvPara(breiteIstNull[2:], "")
-                        elif outputtype == i18n.ausgabeArt["markdown"]:
-                            self.tables.outType = markdownSyntax()
-                            self.tables.getOut.oneTable = True
-                            self.breiteBreitenSysArgvPara(breiteIstNull[2:], "")
-                    elif (
-                        arg[2:]
-                        in [i18n.ausgabeParas["nocolor"], i18n.ausgabeParas["justtext"]]
-                        and neg == ""
-                    ):
-                        self.tables.getOut.color = False
-                    elif (
-                        arg[2:]
-                        in [
-                            i18n.ausgabeParas["endlessscreen"],
-                            i18n.ausgabeParas["endless"],
-                            i18n.ausgabeParas["dontwrap"],
-                            i18n.ausgabeParas["onetable"],
-                        ]
-                        and neg == ""
-                    ):
-                        self.tables.getOut.oneTable = True
-                    elif len(neg) == 0:
-                        cliout(
-                            i18nR.cliout10Saetze[0]
-                            + arg
-                            + i18nR.cliout10Saetze[1]
-                            + self.bigParamaeter[-1]
-                            + i18nR.cliout10Saetze[2]
-                        )
-                else:  # oberes Kommando
-                    if arg[1:] in [
-                        i18n.hauptForNeben["zeilen"],
-                        i18n.hauptForNeben["spalten"],
-                        i18n.hauptForNeben["kombination"],
-                        i18n.hauptForNeben["ausgabe"],
-                    ]:
-                        self.bigParamaeter += [arg[1:]]
-                    elif arg[1:] in [i18n.hauptForNeben["debug"]]:
-                        infoLog = True
-                    elif (
-                        arg[1:] in [i18n.hauptForNeben["h"], i18n.hauptForNeben["help"]]
-                        and neg == ""
-                    ):
-                        self.helpPage()
+konzeptE = {"konzept": _("konzept"), "konzept2": _("konzept2")}
+gebrochenUniGal = {
+    "gebrochenuniversum": (
+        _("gebrochen-rational_Universum_n/m"),
+        _("gebrochenuniversum"),
+    ),
+    "gebrochengalaxie": (_("gebrochen-rational_Galaxie_n/m"), _("gebrochengalaxie")),
+    "gebrochenemotion": (_("gebrochen-rational_Gefuehle_n/m"), _("gebrochenemotion")),
+    "gebrochengroesse": (
+        _("gebrochen-rational_Strukturgroesse_n/m"),
+        _("gebrochengroesse"),
+    ),
+}
+gebrochenUniGalEinzeln = {b for a in gebrochenUniGal.values() for b in a}
+ParametersMain: NamedTuple = ParametersMain(
+    (
+        _("Wichtigstes_zum_verstehen"),
+        _("wichtigsteverstehen"),
+    ),
+    (
+        _("Wichtigstes_zum_gedanklich_einordnen"),
+        _("wichtigsteeinordnen"),
+    ),
+    (
+        _("Religionen"),
+        _("religionen"),
+        _("religion"),
+    ),
+    (
+        _("Galaxie"),
+        _("galaxie"),
+        _("alteschriften"),
+        _("kreis"),
+        _("galaxien"),
+        _("kreise"),
+    ),
+    (
+        _("Größenordnung"),
+        _("groessenordnung"),
+        _("strukturgroesse"),
+        _("strukturgroeße"),
+        _("strukturgrösse"),
+        _("strukturgröße"),
+        _("groesse"),
+        _("stufe"),
+        _("organisationen"),
+    ),
+    (
+        _("Universum"),
+        _("universum"),
+        _("transzendentalien"),
+        _("strukturalien"),
+        _("kugel"),
+        _("kugeln"),
+        _("ball"),
+        _("baelle"),
+        _("bälle"),
+    ),
+    (_("Multiversum"), _("multiversum")),
+    (_("Wirtschaft"), _("wirtschaft")),
+    (
+        _("Menschliches"),
+        _("menschliches"),
+    ),
+    (
+        _("Pro_Contra"),
+        _("procontra"),
+        _("dagegendafuer"),
+    ),
+    (
+        _("Licht"),
+        _("licht"),
+    ),
+    (
+        _("Bedeutung"),
+        _("bedeutung"),
+    ),
+    (
+        _("Symbole"),
+        _("symbole"),
+    ),
+    [a[0] for a in Multiplikationen],
+    (
+        _("Eigenschaften_n"),
+        _("eigenschaften"),
+        _("eigenschaft"),
+        konzeptE["konzept"],
+        _("konzepte"),
+    ),
+    (
+        _("Eigenschaften_1/n"),
+        konzeptE["konzept2"],
+        _("konzepte2"),
+    ),
+    (
+        _("Inkrementieren"),
+        _("inkrementieren"),
+    ),
+    (
+        _("Operationen"),
+        _("operationen"),
+    ),
+    (
+        _("Meta_vs_Konkret_(Universum)"),
+        _("universummetakonkret"),
+    ),
+    (
+        _("Primzahlwirkung"),
+        _("primzahlwirkung"),
+    ),
+    gebrochenUniGal["gebrochenuniversum"],
+    gebrochenUniGal["gebrochengalaxie"],
+    gebrochenUniGal["gebrochenemotion"],
+    gebrochenUniGal["gebrochengroesse"],
+    (
+        _("Primvielfache"),
+        _("primvielfache"),
+    ),
+    (_("Planet_(10_und_oder_12)"), _("planet")),
+    (
+        _("Strukturen_1_bis_9"),
+        _("strukturkleinerzehn"),
+    ),
+    (_("Grundstrukturen"), _("grundstrukturen")),
+    (_("Teilchen-Meta-Physik"), _("teilchen")),
+    (_("Kontinuum"), _("kontinuum")),
+    (_("alles"),),
+)
 
-        if not self.tables.getOut.oneTable:
-            shellRowsAmount, _, _, _ = getTextWrapThings()
+wahl15: dict = {
+    #    "_": _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15)"),
+    "15": ",".join(
+        (
+            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
+            _("Geist_(15)"),
+            _("Model_of_Hierarchical_Complexity"),
+            _("Biologischer_Baum_(15)"),
+            _("Teilchen_anderes_Universum"),
+            Primzahlkreuz_pro_contra_strs_Fkt[1],
+        )
+    ),
+    "2": _("Konkreta_und_Focus_(2)"),
+    "5": _("Impulse_(5)"),
+    "7": ",".join((_("Gefühle_(7)"), _("Anführer_Arten_(7)"), _("Erlösung"))),
+    "8": ",".join((_("Modus_und_Sein_(8)"), _("Bestrafung"),_("Gewalt"))),
+    "10": _("Wirklichkeiten_Wahrheit_Wahrnehmung_(10)"),
+    "1"+_("pro")+"30": _("analytische_Ontologie"),
+    "12": ",".join((_("Meta-Systeme_(12)"), _("Ordnung_und_Filterung_12_und_1pro12"))),
+    "13": _("Paradigmen_sind_Absichten_(13)"),
+    "17": _("Gedanken_sind_Positionen_(17)"),
+    "18": _("Verbundenheiten_(18)"),
+    "6": ",".join((_("Triebe_und_Bedürfnisse_(6)"), _("System"))),
+    "9": _("Lust_(9)"),
+    "3": _("Reflexe_(3),Existenzialien_(3)"),
+    "13_6": _("Absicht_6_ist_Vorteilsmaximierung"),
+    "13_7": _("Absicht_7_ist_Selbstlosigkeit"),
+    "13_10": _("Absicht_10_ist_Wirklichkeit_erkennen"),
+    "13_17": _("Absicht_17_ist_zu_meinen"),
+    "10_4": _("Zeit_(4)_als_Wirklichkeit"),
+    "16": _("Funktionen_Vorstellungen_(16)"),
+    "4": _("Achtung_(4)"),
+    "13_1"+_("pro")+"8": _("Absicht_1/8"),
+    "13_1"+_("pro")+"6": _("Absicht_1/6_ist_Reinigung_und_Klarheit"),
+    "1"+_("pro")+"15": _("Reflektion_und_Kategorien_(1/15)"),
+    "1": _("Bewusstheit_statt_Bewusstsein_(1)"),
+    "30": _("Energie_und_universelle_Eigenschaften_(30)"),
+    "14": _("Stimmungen_Kombinationen_(14)"),
+    "14_6": _("Rechnen"),
+    "20": _("Klassen_(20)"),
+    "37": _("Empathie_(37)"),
+    "31": _("Garben_und_Verhalten_nachfühlen(31)"),
+    "11": _("Verhalten_(11)"),
+    "5_10": _("Bedeutung_(10)"),
+    "17_6": _("Themen_(6)"),
+    "17_6_10"+_("mit")+"4": _("Optimierung_(10)"),
+    "36": _("Attraktionen_(36)"),
+    "13_16": _("Absicht_16_ist_zu_genügen"),
+    "18_7": _("Liebe_(7)"),
+    "18_10": _("Koalitionen_(10)"),
+    "18_17": _("Ansichten_Standpunkte_(18_17)"),
+    "1"+_("pro")+"8": _("Prinzipien(1/8)"),
+    "1"+_("pro")+"5": _("Bestrebungen(1/5)"),
+    "1"+_("pro")+"3": _("Bedingung_und_Auslöser_(1/3)"),
+    "10_4_18_6": _("relativer_Zeit-Betrag_(15_10_4_18_6)"),
+    "18_6": _("Zahlenvergleich_(15_18_6)"),
+    "21": _("Leidenschaften_(21)"),
+    "26": _("Erwartungshaltungen_(26)"),
+    "19": _("Extremalien_(19),Ziele_(19)"),
+    "18_15": _("universeller_Komperativ_(18→15)"),
+    "18_15_n-vs-1"+_("pro")+"n": _("Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)"),
+    "1"+_("pro")+"13": _("Sollen_Frage_Vorgehensweise_(1/13)"),
+    "1"+_("pro")+"19": _("Fundament_(1/19)"),
+    "90": _("abhängige_Verbundenheit_(90)"),
+    "13_13": _("Absicht_13_ist_Helfen"),
+    "1"+_("pro")+"12": _("Karte_Filter_und_Unterscheidung_(1/12)"),
+    "39": _("Maßnahmen_(39)"),
+    "1"+_("pro")+"6": _("innere_Werte_1/6_der_Reinigung_und_Klarheit"),
+    "28": _("Lebensbereiche_Problemklassen_(28)"),
+    "24": _("Netzwerk"),
+    "32": _("mathematisches_Design_(32)"),
+    _("gegen")+"5": _("gegen_5"),
+    "9_6": ParametersMain.strukturgroesse[0],
+    "51": _("Kontroverse_(51)"),
+    "13_4": _("Taetigkeiten"),
+    "7"+_("mit")+"6": _("Wohlbefinden_(7mit6)"),
 
-            self.tables.textWidth = (
-                self.tables.textWidth
-                if shellRowsAmount > self.tables.textWidth + 7 or shellRowsAmount <= 0
-                else shellRowsAmount - 7
-            )
-        self.tables.ifZeilenSetted = self.obZeilenBereicheAngegeben
-        return (
-            paramLines,
-            rowsAsNumbers,
-            self.__willBeOverwritten_rowsOfcombi,
-            spaltenreihenfolgeundnurdiese,
-            puniverseprims_only,
-            generRows,
-        )"#;
-pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
+}
+
+wahl16 = {
+    "1":  _("Meta-Physik-Teilchen_(1)"),
+    "2": ",".join((
+            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
+            _("Model_of_Hierarchical_Complexity"),)),
+
+    "3":  _("Teilchen_anderes_Universum"),
+    "5": ",".join((
+            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
+            _("Model_of_Hierarchical_Complexity"),_("Biologischer_Baum_(16_->_5)"), _("P5"),)),
+    "6": _("Geist_(15)"),
+    "15": ",".join((
+            _("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"),
+            _("Model_of_Hierarchical_Complexity"),)),
+    "10": _("Struktur-Wissenschaften_(10)"),
+    "16": ",".join(wahl16Words.values()),
+    "20": _("Muster-Wissenschaften_(20)"),
+}
+
+freiheitGleichheit = ("freiheit", "gleichheit")
+
+gemeinsamkeitenWort = _("Gemeinsamkeiten")
+
+# WICHTIG WICHTIG: die Befehle mit nur einem zeichen dürfen  nur ein Zeichen haben !!!!!!!
+befehle2: OrderedDict = OrderedDict({"15_" + a: "15_" + a for a in wahl15.keys()})
+befehle2.update({"16_15_" + a: "16_15_" + a for a in wahl15.keys() if a != "15"})
+#befehle2.update({"16_10_" + a: "16_15_" + a for a in wahl15.keys() if a != "15"})
+#befehle2.update({"16_20_" + a: "16_15_" + a for a in wahl15.keys() if a != "15"})
+            #_("Struktur-Wissenschaften_(10)"),
+            #_("Muster-Wissenschaften_(20)"),
+
+befehle2.update({"16_" + a: "16_" + a for a in wahl16.keys()})
+befehle2.update(
+    {
+        "invertieren" : _("invertieren"),
+        "netzwerk": netzwerkWort,
+        "komplex": _("komplex"),
+        "ee": _("ee"),
+        "groesse": _("groesse"),
+        "emotion": emotionWort,
+        freiheitGleichheit[0]: _(freiheitGleichheit[0]),
+        freiheitGleichheit[1]: _(freiheitGleichheit[1]),
+        "kurzbefehle": _("kurzbefehle"),
+        "leeren": _("leeren"),
+        "kugeln": _("kugeln"),
+        "kreise": _("kreise"),
+        "mond": _("mond"),
+        "reta": _("reta"),
+        "absicht": _("absicht"),
+        "motiv": _("motiv"),
+        "thomas": _("thomas"),
+        "universum": _("universum"),
+        "impulse": _("impulse"),
+        "motive": _("motive"),
+        "absichten": _("absichten"),
+        "primfaktorenvergleich": _("primfaktorenvergleich"),
+        "vielfache": _("vielfache"),
+        "einzeln": _("einzeln"),
+        "multis": _("multis"),
+        "multis3": _("multis3"),
+        "modulo": _("modulo"),
+        "prim": _("prim"),
+        "primfaktorzerlegung": _("primfaktorzerlegung"),
+        "prim24": _("prim24"),
+        "primfaktorzerlegungModulo24": _("primfaktorzerlegungModulo24"),
+        "help": _("HELP"),
+        "hilfe": _("hilfe"),
+        "abc": _("abc"),
+        "abcd": _("abcd"),
+        "alles": _("alles"),
+        "geist": geistWort,
+        "a": _("a"),
+        "R": _("R"),
+        "range": _("range"),
+        "B": _("B"),
+        "bewusstsein": _("bewusstsein"),
+        "E": _("E"),
+        "G": _("G"),
+        "u": _("u"),
+        "I": _("I"),
+        "T": _("T"),
+        "W": _("W"),
+        "wirklichkeit": _("wirklichkeit"),
+        "triebe": _("triebe"),
+        "befehle": _("befehle"),
+        "t": _("t"),
+        "richtung": _("richtung"),
+        "r": _("r"),
+        "v": _("v"),
+        "h": _("h"),
+        "p": _("p"),
+        "primzahlkreuz": _("primzahlkreuz"),
+        "ende": _("ende"),
+        "exit": _("exit"),
+        "quit": _("quit"),
+        "q": _("q"),
+        ":q": _(":q"),
+        "shell": _("shell"),
+        "s": _("s"),
+        "math": _("math"),
+        "loggen": _("loggen"),
+        "nichtloggen": _("nichtloggen"),
+        "mulpri": _("mulpri"),
+        "python": _("python"),
+        "w": _("w"),
+        "teiler": _("teiler"),
+        "BefehlSpeichernDanach": _("BefehlSpeichernDanach"),
+        "S": _("S"),
+        "BefehlSpeicherungLöschen": _("BefehlSpeicherungLöschen"),
+        "l": _("l"),
+        "BefehlSpeicherungAusgeben": _("BefehlSpeicherungAusgeben"),
+        "o": _("o"),
+        "e": _("e"),
+        # "BefehlsSpeicherungsModusAus": _("BefehlsSpeicherungsModusAus"),
+        # "x": _("x"),
+        "BefehlSpeichernDavor": _("BefehlSpeichernDavor"),
+        "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar": _(
+            "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        ),
+        "abstand": _("abstand"),
+        "abstandPrim": _("abstandPrim"),
+    }
+)
+# KurzLangBefehle sind die Befehle, die mehr als ein Zeichen groß sind und für reta dennoch Abkürzungen sind.
+
+# KurzKurzBefehle müssen auch in Fremdsprachen ein Zeichen groß bleiben!
+assert all(
+    [len(value) == 1 if len(key) == 1 else True for (key, value) in befehle2.items()]
+)
+
+
+def finde_mehrfache_vorkommen(stringliste):
+    # Ein Dictionary erstellen, um die Häufigkeit jedes Strings zu zählen
+    haeufigkeiten = {}
+    for string in stringliste:
+        if string in haeufigkeiten:
+            haeufigkeiten[string] += 1
+        else:
+            haeufigkeiten[string] = 1
+
+    # Einträge filtern, deren Häufigkeit größer als 1 ist
+    mehrfach_vorkommende_strings = [
+        string for string, haeufigkeit in haeufigkeiten.items() if haeufigkeit > 1
+    ]
+
+    return mehrfach_vorkommende_strings
+
+
+assert len(befehle2.keys()) == len(set(befehle2.keys()))
+if len(befehle2.values()) != len(set(befehle2.values())):
+    print(finde_mehrfache_vorkommen(befehle2.values()))
+assert len(befehle2.values()) == len(set(befehle2.values()))
+
+# WICHTIG WICHTIG: die Befehle mit nur einem zeichen dürfen  nur ein Zeichen haben !!!!!!!
+befehle: list = list(befehle2.values())
+# ["15" + a for a in wahl15.keys()] + [
+#    _("mond"),
+#    _("reta"),
+#    _("absicht"),
+#    _("motiv"),
+#    _("thomas"),
+#    _("universum"),
+#    _("motive"),
+#    _("absichten"),
+#    _("vielfache"),
+#    _("einzeln"),
+#    _("multis"),
+#    _("modulo"),
+#    _("prim"),
+#    _("primfaktorzerlegung"),
+#    _("prim24"),
+#    _("primfaktorzerlegungModulo24"),
+#    _("help"),
+#    _("hilfe"),
+#    _("abc"),
+#    _("abcd"),
+#    _("alles"),
+#    _("a"),
+#    _("u"),
+#    _("befehle"),
+#    _("t"),
+#    _("richtung"),
+#    _("r"),
+#    _("v"),
+#    _("h"),
+#    _("p"),
+#    _("mo"),
+#    _("mu"),
+#    _("primzahlkreuz"),
+#    _("ende"),
+#    _("exit"),
+#    _("quit"),
+#    _("q"),
+#    ":q",
+#    _("shell"),
+#    _("s"),
+#    _("math"),
+#    _("loggen"),
+#    _("nichtloggen"),
+#    _("mulpri"),
+#    _("python"),
+#    _("w"),
+#    _("teiler"),
+#    _("BefehlSpeichernDanach"),
+#    _("S"),
+#    _("BefehlSpeicherungLöschen"),
+#    _("l"),
+#    _("BefehlSpeicherungAusgeben"),
+#    _("o"),
+#    _("e"),
+#    # _("BefehlsSpeicherungsModusAus"),
+#    # _("x"),
+#    _("BefehlSpeichernDavor"),
+#    _("keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"),
+#    _("abstand"),
+# ]
+
+
+haupt2neben = {hauptForNeben["zeilen"]: zeilenParas,
+               hauptForNeben["ausgabe"]: ausgabeParas,
+               hauptForNeben["h"]: [],
+               hauptForNeben["help"]: [],
+               hauptForNeben["nichts"]: [],
+               hauptForNeben["debug"]: [],
+               hauptForNeben["spalten"]: [b for a in ParametersMain for b in a],
+               hauptForNeben["kombination"]: kombiMainParas}
+
+#haupt2nebenSpalten = {}
+
+
+# x("ParametersMain", ParametersMain)
+
+organisationWort = _("organisation")
+thomasWort = _("thomas")
+motivationWort = _("motivation")
+komplexWort = _("komplex")
+transzendentalienWort = _("transzendentalien")
+transzendentaliereziprokeWort = _("transzendentaliereziproke")
+verhaeltnisgleicherzahlWort = _("verhaeltnisgleicherzahl")
+gestirnWort = _("gestirn")
+primzahlkreuzWort = _("primzahlkreuz")
+GalaxieabsichtWort = _("Galaxieabsicht")
+paraNdataMatrix: list = [
     (
         ParametersMain.wichtigste,
         (
@@ -4509,8 +4340,10 @@ pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
         ("D", "d", _("Vier")),
         {449,},
     ),
-]"#;
-pub const PYTHON_SOURCE__WORDS_KOMBI_MATRIX_1: &str = r#"OrderedDict(
+]
+paraNdataMatrix = paraNdataMatrix
+
+kombiParaNdataMatrix: OrderedDict = OrderedDict(
     {
         1: (
             _("Lebewesen"),
@@ -4577,8 +4410,9 @@ pub const PYTHON_SOURCE__WORDS_KOMBI_MATRIX_1: &str = r#"OrderedDict(
         ),
         17: (_("Eigentum_und_Besitz"),),
     }
-)"#;
-pub const PYTHON_SOURCE__WORDS_KOMBI_MATRIX_2: &str = r#"OrderedDict(
+)
+
+kombiParaNdataMatrix2: OrderedDict = OrderedDict(
     {
         1: (
             _("Lebewesen"),
@@ -4677,17 +4511,545 @@ pub const PYTHON_SOURCE__WORDS_KOMBI_MATRIX_2: &str = r#"OrderedDict(
         18: (_("Geist"), geistWort),
         19: (_("Bewusstsein"), _("bewusstsein")),
     }
-)"#;
+)
 
-fn main() {
-    let mut program = Program::new();
-    program.storeParamtersForColumns();
-    eprintln!(
-        "zip_longest literal: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={}",
-        program.state.paraMainDict.len(),
-        program.state.paraDict.len(),
-        program.state.dataDicts[0].len(),
-        program.state.kombiReverseDict.len(),
-        program.state.kombiReverseDict2.len()
-    );
+
+def classify(mod):
+    if mod == 0:
+        return _("ja")
+    elif mod == 1:
+        return _("Gegenteil")
+    elif mod == 2:
+        return _("ähnlich")
+    elif mod == 3:
+        return _("entferntes Gegenteil")
+    elif mod == 4:
+        return _("entfernt ähnlich")
+
+
+class tableHandling:
+    parameterName: dict = {"kombination": _("kombination")}
+    art = ausgabeArt
+    into = {
+        "Kombination_(Galaxie_und_schwarzes_Loch)_(14_mit_13)": _(
+            "Kombination_(Galaxie_und_schwarzes_Loch)_(14_mit_13)"
+        ),
+        "Wichtigstes_zum_gedanklich_einordnen": _(
+            "Wichtigstes_zum_gedanklich_einordnen"
+        ),
+        "Zweitwichtigste": _("Zweitwichtigste"),
+        "berufe": _("berufe"),
+        "intelligenz": _("intelligenz"),
+        "tiere": _("tiere"),
+        "Kombination_(Universum_und_Galaxie)_(14_mit_15)": _(
+            "Kombination_(Universum_und_Galaxie)_(14_mit_15)"
+        ),
+    }
+    gestirnGrossschrift = {
+        "Gestirn": _("Gestirn"),
+        ", und außerdem ": _(", und außerdem "),
+        "Mond (Potenzen)": _("Mond (Potenzen)"),
+        "Sonne": _("Sonne"),
+        "Sonne (keine Potenzen)": _("Sonne (keine Potenzen)"),
+        "Planet (2*n)": _("Planet (2*n)"),
+        "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht": _(
+            "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht"
+        ),
+    }
+
+
+class concat:
+    themaWort = _("Thema: ")
+    polygon1 = {" der eigenen Strukturgröße (": _(" der eigenen Strukturgröße (")}
+    polygon2 = {
+        ") auf dich bei gleichförmigen Polygonen": _(
+            ") auf dich bei gleichförmigen Polygonen"
+        )
+    }
+    gleichheitFreiheitVergleich: dict = {
+        "Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert": _(
+            "Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert"
+        ),
+        "Dominieren, Unterordnen": _("Dominieren, Unterordnen"),
+        "Freiheit": _("Freiheit"),
+        "Einschränkung der Freiheit": _("Einschränkung der Freiheit"),
+        "Gleichheit": _("Gleichheit"),
+        "den anderen überbieten wollen": _("den anderen überbieten wollen"),
+        "den anderen unterbieten wollen": _("den anderen unterbieten wollen"),
+    }
+    energietopologie1 = {
+        "eine Denkart": _("eine Denkart"),
+        "eine Gefühlsart": _("eine Gefühlsart"),
+        "total eine Art, etwas geistig zu erzeugen": _(
+            "total eine Art, etwas geistig zu erzeugen"
+        ),
+        "total eine Art zu erleben": _("total eine Art zu erleben"),
+        "total eine Energie-Art": _("total eine Energie-Art"),
+        "etwas eine Art zu erleben": _("etwas eine Art zu erleben"),
+        "etwas eine Art, etwas geistig zu erzeugen": _(
+            "etwas eine Art, etwas geistig zu erzeugen"
+        ),
+        "wenig eine Art, etwas geistig zu erzeugen": _(
+            "wenig eine Art, etwas geistig zu erzeugen"
+        ),
+        "einigermaßen eine Energie-Art": _("einigermaßen eine Energie-Art"),
+        "kaum eine Energie-Art": _("kaum eine Energie-Art"),
+        "kaum eine Art, etwas geistig zu erzeugen": _(
+            "kaum eine Art, etwas geistig zu erzeugen"
+        ),
+        "eine Denkart": _("eine Denkart"),
+        "eine Gefühlsart": _("eine Gefühlsart"),
+        "total eine Art, etwas geistig zu erzeugen": _(
+            "total eine Art, etwas geistig zu erzeugen"
+        ),
+        "total eine Art zu erleben": _("total eine Art zu erleben"),
+        "total eine Energie-Art": _("total eine Energie-Art"),
+        "etwas eine Art zu erleben": _("etwas eine Art zu erleben"),
+        "etwas eine Art, etwas geistig zu erzeugen": _(
+            "etwas eine Art, etwas geistig zu erzeugen"
+        ),
+        "wenig eine Art, etwas geistig zu erzeugen": _(
+            "wenig eine Art, etwas geistig zu erzeugen"
+        ),
+        "einigermaßen eine Energie-Art": _("einigermaßen eine Energie-Art"),
+        "kaum eine Energie-Art": _("kaum eine Energie-Art"),
+        "kaum eine Art, etwas geistig zu erzeugen": _(
+            "kaum eine Art, etwas geistig zu erzeugen"
+        ),
+    }
+    ausgabeString = {
+        "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art": _(
+            "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art"
+        )
+    }
+    kreaZahl = {
+        "Evolutions-Züchtungs-Kreativität": _("Evolutions-Züchtungs-Kreativität"),
+        "0. Primzahl 1": _("0. Primzahl 1"),
+        "1. Primzahl und Sonnenzahl": _("1. Primzahl und Sonnenzahl"),
+        "2. Sonnenzahl, aber keine Primzahl": _("2. Sonnenzahl, aber keine Primzahl"),
+        "3. Mondzahl": _("3. Mondzahl"),
+    }
+    mondExpLog1 = {
+        "Mond-Typ eines Sternpolygons": _("Mond-Typ eines Sternpolygons"),
+        "Mond-Typ eines gleichförmigen Polygons": _(
+            "Mond-Typ eines gleichförmigen Polygons"
+        ),
+    }
+
+    mondExpLog2 = {"kein Mond": _("kein Mond")}
+    # wohl nich nötig zu übersetzen modalA_
+    # modalA1 = {"modalS": _("modalS")}
+    # modalA2 = {"vervielfachter": _("vervielfachter")}
+    # modalA3 = {"i_origS": _("i_origS")}
+
+    modalB = {
+        "mittelstark überdurchschnittlich: ": _("mittelstark überdurchschnittlich: "),
+        "überdurchschnittlich: ": _("überdurchschnittlich: "),
+        "mittelleicht überdurchschnittlich: ": _("mittelleicht überdurchschnittlich: "),
+        "sehr: ": _("sehr: "),
+        "sehr leicht überdurchschnittlich: ": _("sehr leicht überdurchschnittlich: "),
+    }
+    modalC = {
+        "intrinsisch": _("intrinsisch"),
+        "zuerst": _("zuerst"),
+        "extrinsisch": _("extrinsisch"),
+        "als zweites": _("als zweites"),
+    }
+    modalD = {
+        ", nicht: ": _(", nicht: "),
+        " (das alles nicht): ": _(" (das alles nicht): "),
+        "extrinsisch": _("extrinsisch"),
+        "als zweites": _("als zweites"),
+        "intrinsisch": _("intrinsisch"),
+        "zuerst": _("zuerst"),
+    }
+
+    generiertWort = {"Generiert: ": _("Generiert: ")}
+    allesNurBezogenAufSatz = _("Alles nur bezogen auf die selbe Strukturgröße einer ")
+    headline1 = "Gegen / pro: Nach Rechenregeln auf Primzahlkreuz und Vielfachern von Primzahlen"
+    gegen = {"gegen ": _("gegen ")}
+    pro = {"pro ": _("pro ")}
+    hineinversetzen = {
+        " Darin kann sich die ": _(" Darin kann sich die "),
+        " am Besten hineinversetzen.": _(" am Besten hineinversetzen."),
+    }
+    proIst = {
+        "pro dieser Zahl sind: ": _("pro dieser Zahl sind: "),
+        "pro dieser Zahl ist ": _("pro dieser Zahl ist "),
+    }
+    contraIst = {
+        " contra dieser Zahl sind: ": _(" contra dieser Zahl sind: "),
+        " contra dieser Zahl ist ": _(" contra dieser Zahl ist "),
+    }
+    hineinversetzenSatz = " - Die Zahlen, die für oder gegen diese Zahlen hier sind, können sich in diese am Besten gedanklich hineinversetzen."
+    polygone = {
+        "Sternpolygone": _("Sternpolygone"),
+        "gleichförmige Polygone": _("gleichförmige Polygone"),
+    }
+
+    kombisNamen: dict = {
+        "Motiv -> Motiv": _("Motiv -> Motiv"),
+        "Motiv -> Strukur": _("Motiv -> Strukur"),
+        "Struktur -> Motiv": _("Struktur -> Motiv"),
+        "Struktur -> Strukur": _("Struktur -> Strukur"),
+    }
+    # kombisNamen2: dict = {
+    #    "GalGal": _("GalGal"),
+    #    "GalUni": _("GalUni"),
+    #    "UniGal": _("UniGal"),
+    #    "UniUni": _("UniUni"),
+    # }
+
+    faktorenbla = {
+        ", mit Faktoren aus gebrochen-rationalen Zahlen": _(
+            ", mit Faktoren aus gebrochen-rationalen Zahlen"
+        )
+    }
+    genMul = {"generierte Multiplikationen ": _("generierte Multiplikationen ")}
+    ausserdem = {", außerdem: ": _(", außerdem: "), "| außerdem: ": _("| außerdem: ")}
+    Multiplikationen_ = {"Multiplikationen": _("Multiplikationen")}
+    nWichtigste = {
+        "Wichtigstes_zum_verstehen": _("Wichtigstes_zum_verstehen"),
+        "Viertwichtigste": _("Viertwichtigste"),
+    }
+    metaOrWhat = {
+        "Meta-Thema: ": _("Meta-Thema: "),
+        "Konkretes: ": _("Konkretes: "),
+        "Meta-": _("Meta-"),
+        "Konkret-": _("Konkret-"),
+        "Theorie-Thema: ": _("Theorie-Thema: "),
+        "Praxis: ": _("Praxis: "),
+        "Theorie-": _("Theorie-"),
+        "Praxis-": _("Praxis-"),
+        "Planungs-Thema: ": _("Planungs-Thema: "),
+        "Umsetzungs-Thema: ": _("Umsetzungs-Thema: "),
+        "Planung-": _("Planung-"),
+        "Umsetzung-": _("Umsetzung-"),
+        "Anlass-Thema: ": _("Anlass-Thema: "),
+        "Wirkungs-Thema: ": _("Wirkungs-Thema: "),
+        "Anlass-": _("Anlass-"),
+        "wirkung-": _("wirkung-"),
+        "Kraft-Gebung: ": _("Kraft-Gebung: "),
+        "Verstärkungs-Thema: ": _("Verstärkungs-Thema: "),
+        "Kraft-geben-": _("Kraft-geben-"),
+        "Verstärkung-": _("Verstärkung-"),
+        "Beherrschung: ": _("Beherrschung: "),
+        "Richtung-Thema: ": _("Richtung-Thema: "),
+        "beherrschend-": _("beherrschend-"),
+        "Richtung-": _("Richtung-"),
+    }
+    metaKonkret = {
+        "Meta": _("Meta"),
+        "Theorie": _("Theorie"),
+        "Management": _("Management"),
+        "ganzheitlich": _("ganzheitlich"),
+        "Verwertung, Unternehmung, Geschäft": _("Verwertung, Unternehmung, Geschäft"),
+        "regieren, beherrschen": _("regieren, beherrschen"),
+        "Konkretes": _("Konkretes"),
+        "Praxis": _("Praxis"),
+        "verändernd": _("verändernd"),
+        "darüber hinaus gehend": _("darüber hinaus gehend"),
+        "wertvoll": _("wertvoll"),
+        "Richtung": _("Richtung"),
+        " für 1/n statt n": _(" für 1/n statt n"),
+        " für n": _(" für n"),
+    }
+    innenAussen = {
+        "für innen": _("für innen"),
+        "für außen": _("für außen"),
+        '"für seitlich und gegen Schwächlinge innen"': _(
+            '"für seitlich und gegen Schwächlinge innen"'
+        ),
+        '"gegen seitlich und für Schwächlinge innen"': _(
+            '"gegen seitlich und für Schwächlinge innen"'
+        ),
+        "für außen": _("für außen"),
+    }
+    spaltenNamen = OrderedDict(
+        {
+            "Transzendentalien, Strukturalien, Universum n": _(
+                "Transzendentalien, Strukturalien, Universum n"
+            ),
+            "Galaxie n": _("Galaxie n"),
+            "Galaxie 1/n": _("Galaxie 1/n"),
+            "Transzendentalien, Strukturalien, Universum 1/n": _(
+                "Transzendentalien, Strukturalien, Universum 1/n"
+            ),
+            "Dagegen-Gegen-Transzendentalien, Gegen-Strukturalien, Universum n": _(
+                "Dagegen-Gegen-Transzendentalien, Gegen-Strukturalien, Universum n"
+            ),
+            "neutrale Gegen-Transzendentalien, Gegen-Strukturalien, Universum n": _(
+                "neutrale Gegen-Transzendentalien, Gegen-Strukturalien, Universum n"
+            ),
+            "Richtung-Richtung": _("Richtung-Richtung"),
+        }
+    )
+
+    primRicht = {"Primzahlwirkung (7, Richtung) ": _("Primzahlwirkung (7, Richtung) ")}
+
+    letztEnd = {"] * letztendlich: ": _("] * letztendlich: ")}
+
+    primVielGen = {
+        "Primzahlvielfache, nicht generiert": _("Primzahlvielfache, nicht generiert")
+    }
+    GalOrUniOrFehler = {
+        "Fehler": _("Fehler"),
+        "Universum": _("Universum"),
+        "Galaxie": _("Galaxie"),
+        "Emotion": _("Emotion"),
+        "Strukturgroesse": _("Strukturgroesse"),
+    }
+
+    multipl = {"Multiplikationen": _("Multiplikationen")}
+    notGen = {"Nicht_generiert": _("Nicht_generiert")}
+
+
+class lib4tables:
+    zaehlung = {"Zählung": _("Zählung")}
+    nummerier = {"Nummerierung": _("Nummerierung")}
+    alles = {"alles": _("alles")}
+
+
+class retapy:
+    beschriebenWort = _("beschrieben")
+    nichtsWort = _("nichts")
+    cliout1Saetze = (
+        _('Der Haupt-Parameter "'),
+        _('" existiert hier nicht als Befehl!'),
+        _(" Es ist nur möglich: -"),
+    )
+
+    keineNumWort = _("keinenummerierung")
+    cliout2Saetze = (
+        _('Der Unter-Paramaeter "--'),
+        _('" existiert, aber nicht mit dem Textwert "'),
+        _('". Mögliche Nebenparameter-Textwerte, für diesen Unter-Parameter, sind: "'),
+        _('". Stattdessen gibt keine Nebenparameter-Textwerte.'),
+    )
+    cliout3Saetze = (
+        _('Der Unter-Paramaeter "--'),
+        _('" mit dem Textwert "'),
+        _('" existiert hier nicht als Befehl für Haupt-Parameter'),
+        " -" + hauptForNeben["spalten"],
+        _(" !"),
+        _(" Es ist nur möglich:\n--"),
+        "".join((", --", ausgabeParas["breiten"], " --", ausgabeParas["breite"])),
+        _("\nmit dem Werten dahinter:\n"),
+    )
+    cliout4Saetze = (
+        _('Der Unter-Parameter "--'),
+        _('" existiert hier nicht als Befehl für Haupt-Parameter'),
+        " -" + hauptForNeben["spalten"],
+        _(
+            ", oder dieser Parameter braucht Werte analog wie: \n--unterParameter=Wert1\n"
+        ),
+        _("Es ist nur möglich: --"),
+        ", --" + ausgabeParas["keinenummerierung"],
+    )
+    kombinationenWort = _("kombinationen")
+    cliout5Saetze = (
+        _('Die Kombispalte "'),
+        _('" existiert so nicht als Befehl. Möglich sind die Parameter für '),
+    )
+    cliout6Satz = "".join(
+        (
+            _("kein Unter-Parameter"),
+            "--",
+            kombiMainParas["galaxie"],
+            '= ",',
+            _(", oder"),
+            ', "--',
+            kombiMainParas["universum"],
+            '=", ',
+            _("angegeben für Hauptparameter"),
+            " -" + hauptForNeben["kombination"],
+            _(" oder einen nicht zugehörigen Parameter: "),
+        )
+    )
+    cliout7Saetze = (
+        _("Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein"),
+        _(' Nebenparameter, wie möglicherweise: "'),
+        _('" ausgeführt werden kann. Hauptparameter sind: -'),
+    )
+    # breiteParameterWort = _("breite")
+
+    cliout8SatzVersucheParaH = _("Versuche Parameter -h")
+    cliout9Saetze = (
+        _('Den Neben-Parameter "'),
+        _('" gibt es hier nicht für den Hauptparameter "-'),
+        _('". Oder ein = fehlt dahinter.'),
+        _(" Möglich sind: "),
+    )
+    cliout10Saetze = (
+        _('Den Neben-Parameter "'),
+        _('" gibt es hier nicht für den Hauptparameter "-'),
+        _('". Oder es fehlt ein = dahinter.'),
+    )
+
+
+class nested:
+    galWort = kombiMainParas["galaxie"]
+    uniWort = kombiMainParas["universum"]
+    artWort = ausgabeParas["art"]
+    zeitWort = zeilenParas["zeit"]
+    typWort = zeilenParas["typ"]
+
+
+class retaPrompt:
+    infoDebugAktiv = _("Debug Log aktiviert.")
+    abstandMeldung = (
+        _("der Befehl '")
+        + befehle2["abstand"]
+        + _(
+            "' verlangt mindestens 2 Zahlenangaben, wie '"
+        )
+        + befehle2["abstand"]
+        + " 7 17-25'"
+    )
+    befehleBeenden = {_("ende"), _("exit"), _("quit"), _("q"), _(":q")}
+    befehleWort = {"Befehle": _("Befehle"), "Kurzbefehle": _("Kurzbefehle")}
+    promptModeSatz = _("promptmode vorher: {} , {}")
+    promptModeSatz2 = _("{}{}{} ergibt sich aus '{}' und ergibt danach reta-Befehl:")
+    out1Saetze = (
+        _("Dies ('"),
+        _(
+            "') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+        ),
+    )
+    out2Satz = _("Das ist kein Befehl! -> '{}'")
+    out3Saetze = _(
+        'Wenn im Zähler oder Nenner eine 1 ist, so werden davon oft (nicht immer) keine Vielfacher gebildet.\nFür Brüche "n/1=ganze Zahl" gibt es die gewöhnlichen Befehle für ganze Zahlen.\nDas ist eine Design-Entscheidung, die getroffen worden ist.'
+    )
+    replacements = {
+        befehle2["e"]: befehle2[
+            "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        ],
+        befehle2["G"]: geistWort,
+        befehle2["R"]: befehle2["range"],
+        befehle2["a"]: befehle2["absicht"],
+        befehle2["B"]: befehle2["bewusstsein"],
+        befehle2["E"]: befehle2["emotion"],
+        befehle2["u"]: befehle2["universum"],
+        befehle2["I"]: befehle2["impulse"],
+        befehle2["T"]: befehle2["triebe"],
+        befehle2["t"]: befehle2["thomas"],
+        befehle2["r"]: befehle2["richtung"],
+        befehle2["v"]: befehle2["vielfache"],
+        befehle2["h"]: befehle2["help"],
+        befehle2["w"]: befehle2["teiler"],
+        befehle2["S"]: befehle2["BefehlSpeichernDanach"],
+        befehle2["s"]: befehle2["BefehlSpeichernDavor"],
+        befehle2["l"]: befehle2["BefehlSpeicherungLöschen"],
+        befehle2["o"]: befehle2["BefehlSpeicherungAusgeben"],
+        befehle2["W"]: befehle2["wirklichkeit"],
+    }
+    retaPromptParameter = {
+        "vi": _("vi"),
+        "log": _("log"),
+        "h": _("h"),
+        "help": _("help"),
+        "e": _("e"),
+        "debug": _("debug"),
+        "befehl": _("befehl"),
+    }
+
+    debugLog = _("Debug Log aktiviert.")
+    helptext = "".join(
+        (
+            _(
+                """Erlaube Parameter sind
+            -"""
+            ),
+            retaPromptParameter["vi"],
+            _(
+                """, für vi mode statt emacs mode,
+            -"""
+            ),
+            "language=",
+            _(""",  um eine andere Sprache zu wählen und möglich sind: """),
+            str([s for s in sprachen.keys() if s.strip() != ""])[1:-1],
+            """
+            -""",
+            retaPromptParameter["log"],
+            _(
+                """,  um Logging zu aktivieren,
+            -"""
+            ),
+            retaPromptParameter["debug"],
+            _(
+                """, um Debugging-Log-Ausgabe zu aktivieren. Das ist nur für Entwickler gedacht.
+            -"""
+            ),
+            retaPromptParameter["befehl"],
+            _(
+                """ bewirkt, dass bis zum letzten Programmparameter retaPrompt Befehl nur ein RetaPrompt-Befehl ausgeführt wird.
+            -"""
+            ),
+            retaPromptParameter["e"],
+            _(" bewirkt, dass bei allen Befehlen das '"),
+            befehle2["e"],
+            _("' Kommando bzw. '"),
+            befehle2["keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"],
+            _(
+                "' jedes mal verwendet wird - außer wenn der erste Befehl reta war, weil dieser anders funktioniert "
+            ),
+        )
+    )
+
+    wspeichernWort = _("was speichern>")
+    wloeschenWort = _("was löschen>")
+    reziInfoText = _(
+        'Wenn im Zähler oder Nenner eine 1 ist, so werden davon oft (nicht immer) keine Vielfacher gebildet.\nFür Brüche "n/1=ganze Zahl" gibt es die gewöhnlichen Befehle für ganze Zahlen.\nDas ist eine Design-Entscheidung, die getroffen worden ist.'
+    )
+
+hauptForNeben: dict = {
+    "zeilen": _("zeilen"),
+    "spalten": _("spalten"),
+    "kombination": _("kombination"),
+    "ausgabe": _("ausgabe"),
+    "h": _("h"),
+    "help": _("help"),
+    "debug": _("debug"),
+    "nichts": _("nichts"),
 }
+
+
+mainParaCmds: dict = hauptForNeben
+
+# @dataclass
+class csvFileNames:
+    kombi13 = _("kombi.csv")
+    kombi15 = _("kombi-meta.csv")
+    religion = _("religion.csv")
+    prim = _("primenumbers.csv")
+    bruch15 = _("gebrochen-rational-universum.csv")
+    bruch13 = _("gebrochen-rational-galaxie.csv")
+    bruch7 = _("gebrochen-rational-emotionen.csv")
+    burchGroesse = _("gebrochen-rational-strukturgroesse.csv")
+    kombi_17_13_15 = _("kombi-gedanken17-absichten13-bewusstsein15.csv")
+    kombi_11_15 = _("kombi-meta-systeme.csv")
+    kombi_10_15 = _("kombi-universelle-wirklichkeit.csv")
+    kreis18 = _("kreisVomTyp18.csv")
+    sunMoon = _("sunMoonEtc.csv")
+    meaningOfLife = _("meaningOfLife.csv")
+    dualitaetenTrinities = _("dualism-trinities-etc.csv")
+    bruch7 = _("gebrochen-rational-emotionen.csv")
+    bruchStrukGroesse = _("gebrochen-rational-strukturgroesse.csv")
+
+
+EIGS_N_R = (_("EIGN"), _("EIGR"))
+
+
+class readMeFileNames:
+    reta = _("readme-reta.md")
+    retaPrompt = _("readme-retaPrompt.md")
+    startFiles = _("readme-startFiles.md")
+    developer = _("readme.org")
+
+
+wrongLangSentence = (
+    _("für '-languages=' sind die Paramter-Werte erlaubt: ")
+    + str(tuple(sprachen.values()))[1:-1]
+)
+
+tomDecodedMotivesLang = {"kr": "kr-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv", "vn": "vn-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv", "cn": "cn-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv"}
