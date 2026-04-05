@@ -7,7 +7,7 @@ fn main() {
     let mut state = ProgramState::new(argv);
     parametersToCommandsAndNumbers(&mut state, &i18n);
     eprintln!(
-        "reta multibin shared stricter: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={} newTable={}",
+        "reta multibin line by line: paraMainDict={} paraDict={} dataDict0={} kombi1={} kombi2={} newTable={}",
         state.paraMainDict.len(),
         state.paraDict.len(),
         state.dataDicts[0].len(),

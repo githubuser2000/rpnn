@@ -1,3 +1,1 @@
-pub mod exact_i18n;
-pub mod python_like_store;
-pub mod grundstruk_shared;
+pub mod grundstruk_exact;

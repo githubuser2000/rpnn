@@ -1,18 +1,11 @@
 [package]
-name = "reta_multibin_grundstruk_diffloop"
+name = "grundstruk_special_branch_emulation"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-indexmap = "2"
-
 [lib]
-name = "reta_shared"
+name = "grundstruk_shared"
 path = "src/lib.rs"
-
-[[bin]]
-name = "reta"
-path = "src/bin/reta.rs"
 
 [[bin]]
 name = "grundStrukHtml"

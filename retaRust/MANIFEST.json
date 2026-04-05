@@ -1,25 +1,6 @@
 {
-  "cargo_layout": {
-    "single_package": true,
-    "binaries": [
-      "reta",
-      "grundStrukHtml"
-    ]
-  },
-  "grundstruk_stricter": [
-    "cmp_before",
-    "cmpx",
-    "sorted",
-    "merge_dicts",
-    "traverseHierarchy",
-    "myprint",
-    "grundstruk_html_from_i18n",
-    "python_vs_rust_diff_loop"
-  ],
+  "focus": "grundStrukHtml special branch emulation",
   "wahl15_size": 54,
-  "reta_subset_counts": {
-    "paraNdataMatrix_subset_entries": 120,
-    "kombiParaNdataMatrix": 12,
-    "kombiParaNdataMatrix2": 14
-  }
+  "verified_exact": false,
+  "estimated_steps_remaining_to_exact": "2-4"
 }

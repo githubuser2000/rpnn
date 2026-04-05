@@ -1,193 +1,281 @@
 use crate::shared::exact_i18n::I18nExact;
 
 #[derive(Clone, Debug)]
-pub enum PyNode {
+pub enum Value {
     NoneValue,
-    Dict(Vec<(String, PyNode)>),
+    OrderedDictLike(Vec<(String, Value)>),
 }
 
-pub fn cmp_before(value: &(String, PyNode)) -> (bool, String) {
-    let value = &value.0;
-    let mut is_number: bool = true;
-    let to_sort: String;
+pub fn cmp_before(value: &(String, Value)) -> (bool, String) {
+    let value = value.0.clone();
+    let mut isNumber: bool = true;
+    let toSort: String;
     if value.contains("/") {
-        let a = value.split('/').last().unwrap_or("");
+        let a = value.split("/").last().unwrap_or("").to_string();
         if a.chars().all(|c| c.is_ascii_digit()) {
-            to_sort = a.to_string();
+            toSort = a;
         } else {
-            is_number = false;
-            to_sort = value.to_string();
+            isNumber = false;
+            toSort = value.clone();
         }
     } else if value.chars().all(|c| c.is_ascii_digit()) {
-        to_sort = value.to_string();
+        toSort = value.clone();
     } else {
-        is_number = false;
-        to_sort = value.to_string();
+        isNumber = false;
+        toSort = value.clone();
     }
-    (is_number, to_sort)
+    if !isNumber {
+        return (isNumber, toSort);
+    }
+    return (isNumber, toSort);
 }
 
-pub fn cmpx(erster: &(String, PyNode), zweiter: &(String, PyNode)) -> std::cmp::Ordering {
-    let (is_number1, value1) = cmp_before(erster);
-    let (is_number2, value2) = cmp_before(zweiter);
-
-    if is_number1 && is_number2 {
-        let value1: i64 = value1.parse().unwrap_or(0);
-        let value2: i64 = value2.parse().unwrap_or(0);
+pub fn cmpx(erster: &(String, Value), zweiter: &(String, Value)) -> i64 {
+    let (isNumber1, value1) = cmp_before(erster);
+    let (isNumber2, value2) = cmp_before(zweiter);
+    if isNumber1 && isNumber2 {
+        let value1 = value1.parse::<i64>().unwrap_or(0);
+        let value2 = value2.parse::<i64>().unwrap_or(0);
         if value1 == value2 {
             if erster.0.contains("/") {
-                std::cmp::Ordering::Greater
-            } else if zweiter.0.contains("/") {
-                std::cmp::Ordering::Less
+                return 1;
+            } elif_fake(false) {}
+            if zweiter.0.contains("/") {
+                return -1;
             } else {
-                std::cmp::Ordering::Equal
+                return 0;
             }
-        } else if value1 < value2 {
-            std::cmp::Ordering::Less
         } else {
-            std::cmp::Ordering::Greater
+            return value1 - value2;
         }
-    } else if is_number1 && !is_number2 {
-        std::cmp::Ordering::Greater
-    } else if !is_number1 && is_number2 {
-        std::cmp::Ordering::Less
-    } else if value1 < value2 {
-        std::cmp::Ordering::Less
-    } else if value1 > value2 {
-        std::cmp::Ordering::Greater
+    } else if isNumber1 && !isNumber2 {
+        return 1;
+    } else if !isNumber1 && isNumber2 {
+        return -1;
     } else {
-        std::cmp::Ordering::Equal
+        if value1 < value2 {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 }
 
-pub fn sorted(mut d: Vec<(String, PyNode)>) -> Vec<(String, PyNode)> {
-    d.sort_by(cmpx);
+pub fn sorted(d: Vec<(String, Value)>) -> Vec<(String, Value)> {
+    let mut d = d;
+    d.sort_by(|a, b| {
+        let c = cmpx(a, b);
+        if c < 0 {
+            std::cmp::Ordering::Less
+        } else if c > 0 {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    });
     d
 }
 
-pub fn merge_dicts(dict1: Vec<(String, PyNode)>, dict2: Vec<(String, PyNode)>) -> Vec<(String, PyNode)> {
-    let mut out = dict1.clone();
-    for (key2, value2) in dict2 {
-        let mut found = false;
-        for (key1, value1) in out.iter_mut() {
-            if *key1 == key2 {
-                found = true;
-                match (value1.clone(), value2.clone()) {
-                    (PyNode::Dict(left), PyNode::Dict(right)) => {
-                        *value1 = PyNode::Dict(merge_dicts(left, right));
-                    }
-                    _ => {}
+pub fn ordered_get<'a>(dict: &'a Vec<(String, Value)>, key: &str) -> Option<&'a Value> {
+    for (k, v) in dict {
+        if k == key {
+            return Some(v);
+        }
+    }
+    None
+}
+
+pub fn ordered_set(dict: &mut Vec<(String, Value)>, key: String, value: Value) {
+    for (k, v) in dict.iter_mut() {
+        if *k == key {
+            *v = value;
+            return;
+        }
+    }
+    dict.push((key, value));
+}
+
+pub fn ordered_contains(dict: &Vec<(String, Value)>, key: &str) -> bool {
+    ordered_get(dict, key).is_some()
+}
+
+pub fn merge_dicts(dict1: Vec<(String, Value)>, dict2: Vec<(String, Value)>) -> Vec<(String, Value)> {
+    let mut dict1 = dict1;
+    for (key, value2) in dict2 {
+        if ordered_contains(&dict1, &key) {
+            let current = ordered_get(&dict1, &key).cloned();
+            match (current, value2.clone()) {
+                (Some(Value::OrderedDictLike(d1)), Value::OrderedDictLike(d2)) => {
+                    ordered_set(&mut dict1, key, Value::OrderedDictLike(merge_dicts(d1, d2)));
                 }
+                _ => {}
             }
-        }
-        if !found {
-            out.push((key2, value2));
+        } else {
+            ordered_set(&mut dict1, key, value2);
         }
     }
-    sorted(out)
+    return sorted(dict1);
 }
 
-pub fn traverseHierarchy(liste: &[String], mut thing: Vec<(String, PyNode)>, listenIndex: usize, value: &str) -> Vec<(String, PyNode)> {
-    let knoten = liste[listenIndex].replace("pro", "/");
-
+pub fn traverseHierarchy(liste: Vec<String>, thing: Vec<(String, Value)>, listenIndex: usize, value: &str) -> Vec<(String, Value)> {
+    let mut thing = thing;
+    let mut knoten = liste[listenIndex].clone();
+    knoten = knoten.replace("pro", "/");
     if listenIndex == 0 {
-        for x in value.split(',') {
-            thing.push((x.to_string(), PyNode::NoneValue));
-        }
-        thing = sorted(thing);
+        let newKeys: Vec<String> = value.split(",").map(|x| x.to_string()).collect();
+        let newValues: Vec<Value> = (0..newKeys.len()).map(|_| Value::NoneValue).collect();
+        let zipped: Vec<(String, Value)> = newKeys.into_iter().zip(newValues.into_iter()).collect();
+        thing.extend(sorted(zipped));
     }
-
-    thing = sorted(vec![(knoten.clone(), PyNode::Dict(thing))]);
-
+    let thing2 = vec![(knoten.clone(), Value::OrderedDictLike(thing))];
+    let mut thing = sorted(thing2);
     if liste.len() > listenIndex + 1 {
-        let inner = match thing[0].1.clone() {
-            PyNode::Dict(v) => v,
-            PyNode::NoneValue => vec![],
-        };
-        thing = traverseHierarchy(liste, inner, listenIndex + 1, value);
-        thing = sorted(vec![(knoten, PyNode::Dict(thing))]);
+        thing = traverseHierarchy(liste, thing, listenIndex + 1, value);
     }
-
-    thing
+    return thing;
 }
 
-pub fn myprint(d: Vec<(String, PyNode)>, tiefe: usize, blank: bool, grund_name: &str, out: &mut String) {
-    let iter: Vec<(String, PyNode)> = if tiefe < 2 { d } else { let mut r = d; r.reverse(); r };
-
+pub fn myprint(d: Vec<(String, Value)>, tiefe: usize, blank: bool, grundstrukturen_name0: &str, out: &mut String) {
+    let bereich = d.clone();
+    let iter: Vec<(String, Value)> = if tiefe < 2 { bereich } else { d.into_iter().rev().collect() };
     for (k, v) in iter {
-        let bereich_len = match &v {
-            PyNode::Dict(inner) => inner.len() > 1 || tiefe < 2,
-            PyNode::NoneValue => tiefe < 2,
+        let bereichLen = match &v {
+            Value::OrderedDictLike(inner) => (true && len_items(inner) > 1) || tiefe < 2,
+            Value::NoneValue => tiefe < 2,
         };
-        let listen_vergleich = match &v {
-            PyNode::Dict(inner) => (inner.iter().any(|(_, vv)| !matches!(vv, PyNode::NoneValue)) && inner.len() > 1) || tiefe < 2,
-            PyNode::NoneValue => tiefe < 2,
+        let listenVergleich = match &v {
+            Value::OrderedDictLike(inner) =>
+                (inner.iter().any(|(_, vValue)| !matches!(vValue, Value::NoneValue)) && len_items(inner) > 1) || tiefe < 2,
+            Value::NoneValue => tiefe < 2,
         };
-
-        if bereich_len {
-            out.push_str("<div style=\"white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" >");
+        if bereichLen {
+            out.push_str("".join());
+            out.push_str(
+                "".to_string()
+                .add("<div style="")
+                .add("white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);" ")
+                .add(">")
+                .as_str()
+            );
+        }
+        if matches!(v, Value::NoneValue) {
+            out.push_str(
+                "".to_string()
+                .add("<input type="checkbox"")
+                .add(
+                    if blank {
+                        "".to_string()
+                        .add(" class="ordGru" onchange="toggleP2(this,-10,")
+                        .add("'")
+                        .add("✗")
+                        .add(grundstrukturen_name0)
+                        .add(",")
+                        .add(&k)
+                        .add("');\"")
+                        .add(" id="ordGru")
+                        .add(&k)
+                        .add("" value="")
+                        .add(&k)
+                        .add(""")
+                    } else {
+                        "".to_string()
+                    }.as_str()
+                )
+                .add(">")
+                .as_str()
+            );
         }
 
-        if matches!(v, PyNode::NoneValue) {
-            out.push_str("<input type=\"checkbox\"");
-            if blank {
-                out.push_str(&format!(
-                    " class=\"ordGru\" onchange=\"toggleP2(this,-10,'✗{},{}');\" id=\"ordGru{}\" value=\"{}\"",
-                    grund_name, k, k, k
-                ));
-            }
-            out.push_str(">");
+        if matches!(v, Value::NoneValue) || listenVergleich {
+            let kkk =
+                if matches!(v, Value::NoneValue) {
+                    "".to_string()
+                    .add("<label id="ordGruB")
+                    .add(&k)
+                    .add("">")
+                    .add(&k.replace("_", " "))
+                    .add("</label>")
+                } else {
+                    k.clone()
+                };
+            out.push_str(format!("{} ", kkk).as_str());
         }
-
-        if matches!(v, PyNode::NoneValue) || listen_vergleich {
-            if matches!(v, PyNode::NoneValue) {
-                out.push_str(&format!("<label id=\"ordGruB{}\">{}</label> ", k, k.replace('_', " ")));
-            } else {
-                out.push_str(&format!("{} ", k));
-            }
-        }
-
-        if matches!(v, PyNode::NoneValue) {
+        if matches!(v, Value::NoneValue) {
             out.push_str("</input>");
         }
-
-        if let PyNode::Dict(inner) = v {
-            myprint(inner, tiefe + 1, blank, grund_name, out);
+        if let Value::OrderedDictLike(inner) = v {
+            myprint(inner, tiefe + 1, blank, grundstrukturen_name0, out);
         }
-
-        if bereich_len {
+        if bereichLen {
             out.push_str("</div>");
         }
     }
 }
 
+pub fn len_items(inner: &Vec<(String, Value)>) -> usize {
+    inner.len()
+}
+
+trait FakeJoin {
+    fn join(self) -> String;
+}
+impl FakeJoin for &str {
+    fn join(self) -> String {
+        String::new()
+    }
+}
+
+trait StringAdd {
+    fn add(self, s: &str) -> String;
+}
+impl StringAdd for String {
+    fn add(self, s: &str) -> String {
+        self + s
+    }
+}
+
+pub fn elif_fake(_x: bool) -> bool { false }
+
 pub fn grundstruk_html_from_i18n(i18n: &I18nExact, blank: bool) -> String {
-    let mut wahlNeu: Vec<(String, PyNode)> = sorted(vec![]);
-    for (key0, value) in i18n.wahl15Words.iter() {
-        let key = format!("_{}", key0.trim_start_matches('_'));
-        let mut liste: Vec<String> = key.split('_').filter(|x| !x.is_empty()).map(|x| x.to_string()).collect();
-        let mut thing: Vec<(String, PyNode)> = sorted(vec![]);
-        if !liste.is_empty() {
-            liste.reverse();
-            thing = traverseHierarchy(&liste, thing, 0, value);
+    let mut wahlNeu: Vec<(String, Value)> = sorted(vec![]);
+
+    let mut liste0: Vec<String>;
+    for (key, value) in i18n.wahl15.iter() {
+        let key = "_".to_string() + key;
+        liste0 = key.split("_").filter(|x| !x.is_empty()).map(|x| x.to_string()).collect();
+        let mut thing: Vec<(String, Value)> = sorted(vec![]);
+        if len0(&liste0) > 0 {
+            let reversed_liste: Vec<String> = liste0.into_iter().rev().collect();
+            thing = traverseHierarchy(reversed_liste, thing, 0, value);
             wahlNeu = merge_dicts(thing, wahlNeu);
         }
     }
 
-    let mut wahlNeu2: Vec<(String, PyNode)> = vec![("15".to_string(), PyNode::Dict(sorted(wahlNeu.clone())))];
-    if let Some((_, PyNode::Dict(inner))) = wahlNeu.iter().find(|(k, _)| k == "15").cloned() {
-        wahlNeu2 = merge_dicts(wahlNeu2, sorted(inner));
-    }
+    let mut wahlNeu2: Vec<(String, Value)> = vec![];
+    wahlNeu2.push(("15".to_string(), Value::OrderedDictLike(sorted(wahlNeu.clone()))));
+    let inner15 = match ordered_get(&wahlNeu, "15").cloned() {
+        Some(Value::OrderedDictLike(x)) => x,
+        _ => vec![],
+    };
+    wahlNeu2 = merge_dicts(wahlNeu2, sorted(inner15));
 
     let mut out = String::new();
-    out.push_str(&format!(
-        "<div style=\"white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);\" {}>",
-        if blank { "id='grundstrukturenDiv'" } else { "" }
-    ));
-    myprint(wahlNeu2, 0, blank, &i18n.grundstrukturen_name, &mut out);
-    out.push_str("</div>");
+    out.push_str(
+        "".to_string()
+        .add("<div style="")
+        .add(if blank && false { "display:none;" } else { "" })
+        .add("white-space: normal; border-left: 40px solid rgba(0, 0, 0, .0);" ")
+        .add(if blank { "id='grundstrukturenDiv'" } else { "" })
+        .add(">")
+        .as_str()
+    );
+    myprint(wahlNeu2, 0, blank, &i18n.grundstrukturen_name0, &mut out);
+    out.push_str("</div>
+");
     out
 }
+
+pub fn len0<T>(x: &Vec<T>) -> usize { x.len() }
 
 pub const PYTHON_SOURCE__GRUNDSTRUKHTML: &str = r#"#!/usr/bin/env pypy3
 # -*- coding: utf-8 -*-
