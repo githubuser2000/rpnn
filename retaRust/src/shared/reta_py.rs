@@ -1,9 +1,59 @@
 use indexmap::IndexMap;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use crate::shared::words_py::{Words, PyValue, StoreParameterEntry};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
+
+pub fn dedup_preserve_order_i64(input: Vec<i64>) -> Vec<i64> {
+    let mut seen = BTreeSet::new();
+    let mut out: Vec<i64> = Vec::new();
+    for item in input {
+        if !seen.contains(&item) {
+            seen.insert(item);
+            out.push(item);
+        }
+    }
+    out
+}
+
+
+fn pyvalue_vec_all_bool(values: &[PyValue]) -> bool {
+    !values.is_empty() && values.iter().all(|v| matches!(v, PyValue::Bool(_)))
+}
+
+fn pyvalue_vec_first_is_nested(values: &[PyValue]) -> bool {
+    matches!(values.first(), Some(PyValue::Tuple(_)))
+}
+
+fn pyvalue_vec_to_btreeset_i64(values: &[PyValue]) -> BTreeSet<i64> {
+    let mut out = BTreeSet::new();
+    for v in values {
+        match v {
+            PyValue::Int(n) => {
+                out.insert(*n);
+            }
+            PyValue::Tuple(inner) => {
+                for vv in inner {
+                    if let PyValue::Int(n2) = vv {
+                        out.insert(*n2);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+fn strip_ascii_minus_once_py(txt: &str) -> &str {
+    if let Some(rest) = txt.strip_prefix('-') {
+        rest
+    } else {
+        txt
+    }
+}
+
 
 #[derive(Clone, Debug)]
 pub struct SpaltenTyp {
@@ -285,12 +335,26 @@ impl Program {
 
     fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
         for (i, eineSpaltenArtmitSpaltenNummern) in tupl.iter().enumerate() {
-            let values = Self::pyvalue_list_to_i64_vec(eineSpaltenArtmitSpaltenNummern);
             let befehl = befehlName.unwrap_or("");
             let para = paraValue.unwrap_or("");
 
-            if i == 2 {
-                let gebr_idx = match befehl {
+            let normalized_set = if pyvalue_vec_all_bool(eineSpaltenArtmitSpaltenNummern) {
+                pyvalue_vec_to_btreeset_i64(eineSpaltenArtmitSpaltenNummern)
+            } else if pyvalue_vec_first_is_nested(eineSpaltenArtmitSpaltenNummern) {
+                if let Some(PyValue::Tuple(inner)) = eineSpaltenArtmitSpaltenNummern.first() {
+                    pyvalue_vec_to_btreeset_i64(inner)
+                } else {
+                    BTreeSet::new()
+                }
+            } else {
+                pyvalue_vec_to_btreeset_i64(eineSpaltenArtmitSpaltenNummern)
+            };
+
+            if i == 2
+                && (!eineSpaltenArtmitSpaltenNummern.is_empty()
+                    || Self::is_gebrochen_uni_gal_einzeln_py(befehl))
+            {
+                let target_idx = match befehl {
                     "multiplikationen" => Some(2usize),
                     "gebrochenuniversum" | "gebrochenuniversum2" => Some(5usize),
                     "gebrochengalaxie" | "gebrochengalaxie2" => Some(6usize),
@@ -298,26 +362,28 @@ impl Program {
                     "gebrochengroesse" | "gebrochengroesse2" => Some(10usize),
                     _ => None,
                 };
-                if let Some(target_idx) = gebr_idx {
+                if let Some(target_idx) = target_idx {
+                    let generated = if befehl == "multiplikationen" {
+                        Self::lambda_prim_galax_py(para)
+                    } else {
+                        Self::lambda_gebr_univ_und_galax_py(para)
+                    };
                     if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), target_idx)) {
-                        Self::push_set_entries_exact(target, values.clone());
+                        for v in generated {
+                            target.insert(v);
+                        }
                     }
                     continue;
                 }
-            }
-
-            if para == "beschrieben" && (befehl.contains("prim") || befehl == "multiplikationen") {
+            } else if Self::is_beschrieben_para_py(para) && Self::is_primvielfache_befehl_py(befehl) {
                 if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), 2)) {
                     target.insert(2);
                 }
                 continue;
-            }
-
-            if values.is_empty() {
-                continue;
-            }
-            if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), i)) {
-                Self::push_set_entries_exact(target, values);
+            } else if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), i)) {
+                for v in normalized_set {
+                    target.insert(v);
+                }
             }
         }
     }
@@ -354,17 +420,12 @@ impl Program {
     }
 
     fn ordered_set_to_vec_i64(set_: BTreeSet<i64>) -> Vec<i64> {
-        let mut out: Vec<i64> = set_.into_iter().collect();
-        out.sort();
-        out.dedup();
-        out
+        dedup_preserve_order_i64(set_.into_iter().collect())
     }
 
     fn ordered_set_to_onlyGenerated_py(set_: BTreeSet<i64>) -> Vec<Vec<i64>> {
         let mut out: Vec<Vec<i64>> = Vec::new();
-        let mut flat: Vec<i64> = set_.into_iter().collect();
-        flat.sort();
-        flat.dedup();
+        let flat: Vec<i64> = dedup_preserve_order_i64(set_.into_iter().collect());
         for v in flat {
             out.push(vec![v]);
         }
@@ -407,9 +468,10 @@ impl Program {
                     } else if let Some(eq) = eq {
                         let left = cmd[..eq].to_string();
                         let right = cmd[eq + 1..].to_string();
-                        for mut one in right.split(',').map(|s| s.to_string()) {
+                        for raw_one in right.split(',') {
+                            let mut one = raw_one.to_string();
                             let yes1 = if !one.is_empty() && one.starts_with('-') {
-                                one = one[1..].to_string();
+                                one = strip_ascii_minus_once_py(&one).to_string();
                                 neg == "-"
                             } else {
                                 neg.is_empty()
@@ -553,6 +615,57 @@ impl Program {
         }
         1
     }
+
+    fn lambda_gebr_univ_und_galax_py(para_values: &str) -> BTreeSet<i64> {
+        let mut out = BTreeSet::new();
+        for chosen in para_values.split(',') {
+            let chosen = chosen.trim();
+            if chosen.chars().all(|c| c.is_ascii_digit()) {
+                let value = chosen.parse::<i64>().unwrap_or(0).abs();
+                if value != 0 && value != 1 {
+                    out.insert(value);
+                }
+            }
+        }
+        out
+    }
+
+    fn lambda_prim_galax_py(para_values: &str) -> BTreeSet<i64> {
+        let mut out = BTreeSet::new();
+        for chosen in para_values.split(',') {
+            let chosen = chosen.trim();
+            if chosen.chars().all(|c| c.is_ascii_digit()) {
+                let value = chosen.parse::<i64>().unwrap_or(0).abs();
+                if value != 0 && value != 1 && Self::primCreativity_py(value) == 1 {
+                    out.insert(value);
+                }
+            }
+        }
+        out
+    }
+
+    fn is_gebrochen_uni_gal_einzeln_py(befehl_name: &str) -> bool {
+        matches!(
+            befehl_name,
+            "gebrochenuniversum"
+                | "gebrochenuniversum2"
+                | "gebrochengalaxie"
+                | "gebrochengalaxie2"
+                | "gebrochenemotion"
+                | "gebrochenemotion2"
+                | "gebrochengroesse"
+                | "gebrochengroesse2"
+        )
+    }
+
+    fn is_primvielfache_befehl_py(befehl_name: &str) -> bool {
+        matches!(befehl_name, "primvielfache" | "multiplikationen")
+    }
+
+    fn is_beschrieben_para_py(para_value: &str) -> bool {
+        matches!(para_value, "beschrieben" | "Beschreibung" | "beschr")
+    }
+
 
     fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
         let mut allValues: Vec<BTreeSet<i64>> = (0..12).map(|_| BTreeSet::new()).collect();
@@ -1439,8 +1552,7 @@ impl Program {
             v
         };
 
-        selected_rows.sort();
-        selected_rows.dedup();
+        selected_rows = dedup_preserve_order_i64(selected_rows);
 
         let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
             if relitable[0].is_empty() {
@@ -1451,8 +1563,7 @@ impl Program {
         } else {
             rowsAsNumbers.clone()
         };
-        selected_cols.sort();
-        selected_cols.dedup();
+        selected_cols = dedup_preserve_order_i64(selected_cols);
 
         let mut selected_table: Vec<Vec<String>> = vec![];
         for row_no in selected_rows.iter() {
@@ -1485,7 +1596,7 @@ impl Program {
             let mut max_sub_lines: usize = 1;
             for row in newTable.iter() {
                 for cell in row.iter() {
-                    let lines = if cell.is_empty() { 1 } else { cell.lines().count() };
+                    let lines = if cell.is_empty() { 1 } else { cell.split('\n').count() };
                     if lines > max_sub_lines {
                         max_sub_lines = lines;
                     }
@@ -1502,7 +1613,7 @@ impl Program {
             return vec![txt.to_string()];
         }
         let mut out: Vec<String> = vec![];
-        for part in txt.lines() {
+        for part in txt.split('\n') {
             let mut current = String::new();
             for word in part.split_whitespace() {
                 if current.is_empty() {
@@ -1592,7 +1703,7 @@ impl Program {
                 let mut max_len = 1usize;
                 for row in newTable.iter() {
                     if i < row.len() {
-                        for line in row[i].lines() {
+                        for line in row[i].split('\n') {
                             let len_ = line.chars().count();
                             if len_ > max_len {
                                 max_len = len_;
