@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, BTreeSet};
-use crate::shared::words_py::{Words, PyValue};
+use crate::shared::words_py::{Words, PyValue, StoreParameterEntry};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
@@ -134,6 +134,8 @@ pub struct Program {
     pub textWidth: i64,
     pub ifZeilenSetted: bool,
     pub dataDict: Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
+    pub paraDictGenerated: IndexMap<(String, String), i64>,
+    pub paraDictGenerated4htmlTags: IndexMap<(String, String), i64>,
     pub spaltenTypeNaming: SpaltenTyp,
     pub rowsOfcombi2: Vec<i64>,
     pub onlyGenerated: Vec<Vec<i64>>,
@@ -141,6 +143,7 @@ pub struct Program {
     pub SpaltenVanillaAmount: i64,
     pub CsvTheirsSpalten: IndexMap<i64, Vec<i64>>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
+    pub AllSimpleCommandSpalten: BTreeSet<i64>,
 }
 
 impl Program {
@@ -227,6 +230,8 @@ impl Program {
             textWidth: 0,
             ifZeilenSetted: false,
             dataDict: vec![],
+            paraDictGenerated: IndexMap::new(),
+            paraDictGenerated4htmlTags: IndexMap::new(),
             spaltenTypeNaming: SpaltenTyp::default(),
             rowsOfcombi2: vec![],
             onlyGenerated: vec![],
@@ -234,6 +239,7 @@ impl Program {
             SpaltenVanillaAmount: 0,
             CsvTheirsSpalten: IndexMap::new(),
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
+            AllSimpleCommandSpalten: BTreeSet::new(),
         }
     }
 
@@ -351,6 +357,17 @@ impl Program {
         let mut out: Vec<i64> = set_.into_iter().collect();
         out.sort();
         out.dedup();
+        out
+    }
+
+    fn ordered_set_to_onlyGenerated_py(set_: BTreeSet<i64>) -> Vec<Vec<i64>> {
+        let mut out: Vec<Vec<i64>> = Vec::new();
+        let mut flat: Vec<i64> = set_.into_iter().collect();
+        flat.sort();
+        flat.dedup();
+        for v in flat {
+            out.push(vec![v]);
+        }
         out
     }
 
@@ -516,6 +533,88 @@ impl Program {
         }
     }
 
+
+    fn primCreativity_py(n: i64) -> i64 {
+        if n < 2 {
+            return 0;
+        }
+        if n == 2 || n == 3 {
+            return 1;
+        }
+        if n % 2 == 0 {
+            return 0;
+        }
+        let mut d = 3i64;
+        while d * d <= n {
+            if n % d == 0 {
+                return 0;
+            }
+            d += 2;
+        }
+        1
+    }
+
+    fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
+        let mut allValues: Vec<BTreeSet<i64>> = (0..12).map(|_| BTreeSet::new()).collect();
+        let mut gebrochenSpaltenMaximumPlus1 = 2i64;
+
+        for possibleCommands in words.paraNdataMatrix.iter() {
+            for (i, commandValue) in possibleCommands.datas.iter().enumerate() {
+                for spaltenNummerOderEtc in commandValue {
+                    match spaltenNummerOderEtc {
+                        PyValue::Int(n) => {
+                            allValues[i].insert(*n);
+                            if [5usize, 6usize, 9usize, 10usize].contains(&i) && *n + 1 > gebrochenSpaltenMaximumPlus1 {
+                                gebrochenSpaltenMaximumPlus1 = *n + 1;
+                            }
+                        }
+                        PyValue::Tuple(inner) => {
+                            for vv in inner {
+                                if let PyValue::Int(n) = vv {
+                                    allValues[i].insert(*n);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let allowedPrimNumbersForCommand: Vec<i64> = (2..32)
+            .filter(|num| Self::primCreativity_py(*num) == 1)
+            .collect();
+
+        allValues[2] = allowedPrimNumbersForCommand.into_iter().collect();
+        allValues[3] = words.kombiParaNdataMatrix.keys().cloned().collect();
+        allValues[5] = (2..gebrochenSpaltenMaximumPlus1).collect();
+        allValues[6] = (2..gebrochenSpaltenMaximumPlus1).collect();
+        allValues[8] = words.kombiParaNdataMatrix2.keys().cloned().collect();
+        allValues[9] = (2..gebrochenSpaltenMaximumPlus1).collect();
+        allValues[10] = (2..gebrochenSpaltenMaximumPlus1).collect();
+
+        if self.__invertAlles {
+            let max0 = *allValues[0].iter().max().unwrap_or(&0);
+            let mut inverted = BTreeSet::new();
+            for n in 0..max0 {
+                if !allValues[0].contains(&n) {
+                    inverted.insert(n);
+                }
+            }
+            allValues[0] = inverted;
+            for zahl in 1..11usize {
+                allValues[zahl].clear();
+            }
+        }
+
+        let datas = allValues.into_iter().map(|set| set.into_iter().map(PyValue::Int).collect::<Vec<PyValue>>()).collect::<Vec<Vec<PyValue>>>();
+        StoreParameterEntry {
+            parameterMainNames: vec!["alles".to_string()],
+            parameterNames: vec![],
+            datas,
+        }
+    }
+
     pub fn storeParamtersForColumns(&mut self, words: &Words) {
         self.kombiReverseDict = IndexMap::new();
         for (key, value) in words.kombiParaNdataMatrix.iter() {
@@ -533,14 +632,22 @@ impl Program {
 
         self.paraMainDict = IndexMap::new();
         self.paraDict = IndexMap::new();
-        let mut dataDicts = {
-            let mut x = vec![];
-            for _ in 0..12 { x.push(IndexMap::new()); }
-            x
-        };
+        self.dataDicts = (0..12).map(|_| IndexMap::new()).collect();
+        self.paraDictGenerated = IndexMap::new();
+        self.paraDictGenerated4htmlTags = IndexMap::new();
 
-        for parameterEntry in words.paraNdataMatrix.iter() {
-            let (paraMainDict2, paraDict2, dataDicts2) = self.intoParameterDatatype(
+        let mut paraNdataMatrix = words.paraNdataMatrix.clone();
+        let alles_entry = self.build_alles_entry_python_like(words);
+        self.AllSimpleCommandSpalten = alles_entry.datas.get(0)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|v| if let PyValue::Int(n) = v { Some(n) } else { None })
+            .collect();
+        paraNdataMatrix.push(alles_entry);
+
+        for parameterEntry in paraNdataMatrix.iter() {
+            let into = self.intoParameterDatatype(
                 &parameterEntry.parameterMainNames,
                 &parameterEntry.parameterNames,
                 &parameterEntry.datas,
@@ -548,18 +655,34 @@ impl Program {
             let (paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
                 self.paraMainDict.clone(),
                 self.paraDict.clone(),
-                dataDicts.clone(),
-                paraMainDict2,
-                paraDict2,
-                dataDicts2,
+                self.dataDicts.clone(),
+                into.0,
+                into.1,
+                into.2,
             );
-
             self.paraMainDict = paraMainDict3;
             self.paraDict = paraDict3;
-            dataDicts = dataDicts3;
+            self.dataDicts = dataDicts3;
         }
 
-        self.dataDicts = dataDicts;
+        self.dataDict = self.dataDicts.clone();
+        while self.dataDict.len() < 14 {
+            self.dataDict.push(IndexMap::new());
+        }
+        self.dataDict[3] = IndexMap::new();
+        for (key, value) in words.kombiParaNdataMatrix.iter() {
+            self.dataDict[3].insert(
+                key.to_string(),
+                value.iter().map(|txt| vec![PairStr("kombi".to_string(), txt.clone())]).collect(),
+            );
+        }
+        self.dataDict[8] = IndexMap::new();
+        for (key, value) in words.kombiParaNdataMatrix2.iter() {
+            self.dataDict[8].insert(
+                key.to_string(),
+                value.iter().map(|txt| vec![PairStr("kombi2".to_string(), txt.clone())]).collect(),
+            );
+        }
     }
 
     pub fn intoParameterDatatype(
@@ -573,70 +696,91 @@ impl Program {
         Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
     ) {
         let mut paraMainDict: IndexMap<String, Vec<String>> = IndexMap::new();
-        let mut paraDict: IndexMap<(String, String), Vec<Vec<PyValue>>> = IndexMap::new();
+        for name in parameterMainNames {
+            paraMainDict.insert(name.clone(), parameterNames.clone());
+        }
 
-        for parameterMainName in parameterMainNames {
-            paraMainDict.insert(parameterMainName.clone(), parameterNames.clone());
-            if parameterNames.len() > 0 {
-                for parameterName in parameterNames {
-                    paraDict.insert((parameterMainName.clone(), parameterName.clone()), datas.clone());
-                }
-            } else {
-                paraDict.insert((parameterMainName.clone(), "".to_string()), datas.clone());
+        let mut paraDict: IndexMap<(String, String), Vec<Vec<PyValue>>> = IndexMap::new();
+        for name1 in parameterMainNames {
+            for name2 in parameterNames {
+                paraDict.insert((name1.clone(), name2.clone()), datas.clone());
+            }
+            if parameterNames.len() == 0 {
+                paraDict.insert((name1.clone(), "".to_string()), datas.clone());
             }
         }
 
-        let mut dataDicts: Vec<IndexMap<String, Vec<Vec<PairStr>>>> = vec![];
-        for _ in 0..12 {
-            dataDicts.push(IndexMap::new());
-        }
+        let mut dataDicts: Vec<IndexMap<String, Vec<Vec<PairStr>>>> = (0..12).map(|_| IndexMap::new()).collect();
 
         for (i, d) in datas.iter().enumerate() {
             for spaltenNummerOderEtc in d {
                 let mut into: Vec<PairStr> = vec![];
                 let mut parameterMainNamePerLoop: Vec<String> = vec![];
+                let mut case_: i64 = -1;
+                let mut spaltenNummerOderEtc_local = spaltenNummerOderEtc.clone();
 
                 for parameterMainName in parameterMainNames {
-                    let parameterNames2 =
-                        if parameterNames.len() > 0 { parameterNames.clone() } else { vec!["".to_string()] };
-
-                    for parameterName in parameterNames2 {
-                        into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
-                        if matches!(i, 5 | 6 | 9 | 10) {
+                    let parameterNames_local = if parameterNames.len() > 0 {
+                        parameterNames.clone()
+                    } else {
+                        vec!["".to_string()]
+                    };
+                    for parameterName in parameterNames_local {
+                        if i == 4 && matches!(spaltenNummerOderEtc_local, PyValue::Bool(_)) {
+                            case_ = 1;
+                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                        } else if matches!(i, 5 | 6 | 9 | 10) {
+                            case_ = 2;
+                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                             parameterMainNamePerLoop.push(parameterName.clone());
+                        } else if i == 2 && matches!(spaltenNummerOderEtc_local, PyValue::Str(_)) {
+                            case_ = 2;
+                            parameterMainNamePerLoop.push(parameterName.clone());
+                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                        } else if i == 4 && matches!(spaltenNummerOderEtc_local, PyValue::Tuple(_)) {
+                            case_ = 4;
+                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                        } else {
+                            case_ = 3;
+                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                         }
                     }
                 }
 
-                let case_num =
-                    if i == 4 && matches!(spaltenNummerOderEtc, PyValue::Bool(_)) { 1 }
-                    else if matches!(i, 5 | 6 | 9 | 10) { 2 }
-                    else if i == 4 { 4 }
-                    else { 3 };
-
-                let index1 = if case_num != 1 { i } else { 3 };
-                let index2a: Vec<String>;
-                let intoA: Vec<Vec<PairStr>>;
-
-                if case_num == 1 {
-                    index2a = vec!["('bool', 0)".to_string()];
-                    intoA = vec![into.clone()];
-                } else if case_num == 2 {
-                    if let PyValue::Tuple(inner) = spaltenNummerOderEtc {
-                        index2a = inner.iter().map(|x| format!("{:?}", x)).collect();
-                    } else {
-                        index2a = vec![format!("{:?}", parameterMainNamePerLoop)];
+                let index1 = if case_ != 1 { i } else { 3 };
+                let index2a: Vec<String> = if case_ == 3 {
+                    vec![format!("{:?}", spaltenNummerOderEtc_local)]
+                } else if case_ == 4 {
+                    match &spaltenNummerOderEtc_local {
+                        PyValue::Tuple(inner) => vec![format!("{:?}", inner)],
+                        _ => vec![format!("{:?}", spaltenNummerOderEtc_local)],
                     }
-                    intoA = into.iter().map(|x| vec![x.clone()]).collect();
+                } else if case_ == 1 {
+                    vec!["('bool', 0)".to_string()]
+                } else if case_ == 2 {
+                    vec![format!("{:?}", parameterMainNamePerLoop)]
                 } else {
-                    index2a = vec![format!("{:?}", spaltenNummerOderEtc)];
-                    intoA = vec![into.clone()];
-                }
+                    vec!["None".to_string()]
+                };
 
-                let max_len = if index2a.len() > intoA.len() { index2a.len() } else { intoA.len() };
+                let intoA: Vec<Vec<PairStr>> = if case_ == 2 {
+                    into.iter().map(|x| vec![x.clone()]).collect()
+                } else {
+                    vec![into.clone()]
+                };
+
+                let max_len = std::cmp::max(index2a.len(), intoA.len());
                 for pos in 0..max_len {
-                    let index2 = if pos < index2a.len() { index2a[pos].clone() } else { "None".to_string() };
-                    let into2 = if pos < intoA.len() { intoA[pos].clone() } else { vec![] };
+                    let index2 = if pos < index2a.len() {
+                        index2a[pos].clone()
+                    } else {
+                        format!("{:?}", index2a)
+                    };
+                    let into2 = if pos < intoA.len() {
+                        intoA[pos].clone()
+                    } else {
+                        into.clone()
+                    };
                     let entry = dataDicts[index1].entry(index2).or_insert_with(Vec::new);
                     if !entry.iter().any(|e| e == &into2) {
                         entry.push(into2);
@@ -661,50 +805,119 @@ impl Program {
         IndexMap<(String, String), Vec<Vec<PyValue>>>,
         Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
     ) {
-        let paraMainDict1 =
-            paraMainDict1.into_iter().chain(paraMainDict2.into_iter()).collect::<IndexMap<String, Vec<String>>>();
-        let paraDict1 =
-            paraDict1.into_iter().chain(paraDict2.into_iter()).collect::<IndexMap<(String, String), Vec<Vec<PyValue>>>>();
-        let mut dataDicts3 = dataDicts1.clone();
+        let mut paraMainDict3 = paraMainDict1.clone();
+        for (k, v) in paraMainDict2.iter() {
+            paraMainDict3.insert(k.clone(), v.clone());
+        }
 
-        let max_len = if dataDicts1.len() > dataDicts2.len() { dataDicts1.len() } else { dataDicts2.len() };
+        let mut paraDict3 = paraDict1.clone();
+        for (k, v) in paraDict2.iter() {
+            paraDict3.insert(k.clone(), v.clone());
+        }
+
+        let mut dataDicts3 = dataDicts1.clone();
+        let max_len = if dataDicts1.len() > dataDicts2.len() {
+            dataDicts1.len()
+        } else {
+            dataDicts2.len()
+        };
+
+        while dataDicts3.len() < max_len {
+            dataDicts3.push(IndexMap::new());
+        }
+
         for i in 0..max_len {
             let dict1 = dataDicts1.get(i);
             let dict2 = dataDicts2.get(i);
-            match (dict1, dict2) {
-                (Some(d1), Some(d2)) => {
-                    if dataDicts3[i].keys().len() == 0 {
-                        dataDicts3[i] = d2.clone();
-                    } else {
-                        for (key1, value1) in d1 {
-                            for (key2, value2) in d2 {
-                                if key2 == key1 {
-                                    let entry = dataDicts3[i].entry(key1.clone()).or_insert_with(Vec::new);
-                                    entry.extend(value2.clone());
-                                } else if !dataDicts3[i].contains_key(key2) {
-                                    dataDicts3[i].insert(key2.clone(), value2.clone());
-                                }
-                            }
-                            if !dataDicts3[i].contains_key(key1) {
-                                dataDicts3[i].insert(key1.clone(), value1.clone());
+
+            if dict1.is_some() && dict2.is_some() {
+                let d1 = dict1.unwrap();
+                let d2 = dict2.unwrap();
+                if dataDicts3[i].keys().len() == 0 {
+                    dataDicts3[i] = d2.clone();
+                } else {
+                    for (key1, _value1) in d1.iter() {
+                        for (key2, value2) in d2.iter() {
+                            if key2 == key1 {
+                                let entry = dataDicts3[i].entry(key1.clone()).or_insert_with(Vec::new);
+                                entry.extend(value2.clone());
+                            } else if !dataDicts3[i].contains_key(key2) {
+                                dataDicts3[i].insert(key2.clone(), value2.clone());
                             }
                         }
                     }
                 }
-                (Some(d1), None) => dataDicts3[i] = d1.clone(),
-                (None, Some(d2)) => {
-                    if i >= dataDicts3.len() { dataDicts3.push(d2.clone()); } else { dataDicts3[i] = d2.clone(); }
-                }
-                (None, None) => {}
+            } else if dict1.is_some() && dict2.is_none() {
+                dataDicts3[i] = dict1.unwrap().clone();
+            } else if dict1.is_none() && dict2.is_some() {
+                dataDicts3[i] = dict2.unwrap().clone();
             }
         }
 
-        (paraMainDict1, paraDict1, dataDicts3)
+        (paraMainDict3, paraDict3, dataDicts3)
+    }
+
+    fn help_lines_py(&self) -> Vec<String> {
+        vec![
+            "Hauptprogramm ist reta oder reta.py".to_string(),
+            "Bequemer ist retaPrompt, was es mit Voreinstellungen noch als rp und rpl gibt.".to_string(),
+            "".to_string(),
+            "Bedienungsanleitung:".to_string(),
+            "Es gibt 4 Hauptparameter.".to_string(),
+            "Wichtig: die Nebenparameter muessen direkt hinter dem richtigen Hauptparamter stehen, sonst wirken sie nicht.".to_string(),
+            "".to_string(),
+            "# Hauptparameter".to_string(),
+            "-debug".to_string(),
+            "-zeilen".to_string(),
+            "  --alles".to_string(),
+            "  --zeit=gestern,heute,morgen".to_string(),
+            "  --zaehlung=1,2,3".to_string(),
+            "  --typ=sonne,mond,planet,schwarzesonne,SonneMitMondanteil".to_string(),
+            "  --primzahlen=aussenalle,innenalle,aussenerste,innenerste".to_string(),
+            "  --vielfachevonzahlen=1,2,3".to_string(),
+            "  --primzahlvielfache=1,2,3".to_string(),
+            "  --vorhervonausschnitt=1-5,7-10,14,20".to_string(),
+            "  --vorhervonausschnittteiler".to_string(),
+            "  --nachtraeglichneuabzaehlung=3-6,8".to_string(),
+            "  --nachtraeglichneuabzaehlungvielfache=3-6,8".to_string(),
+            "  --potenzenvonzahlen=2,3".to_string(),
+            "  --oberesmaximum=2000,1500".to_string(),
+            "  --invertieren".to_string(),
+            "-spalten".to_string(),
+            "  --alles".to_string(),
+            "  --breite=30".to_string(),
+            "  --breiten=30,40,70".to_string(),
+            "  --menschliches=...".to_string(),
+            "  --planet=...".to_string(),
+            "  --religionen=...".to_string(),
+            "  --galaxie=...".to_string(),
+            "  --universum=...".to_string(),
+            "  --grundstrukturen=...".to_string(),
+            "  --wirtschaft=...".to_string(),
+            "  --bedeutung=...".to_string(),
+            "  --multiplikationen=...".to_string(),
+            "-kombination".to_string(),
+            "  --galaxie=...".to_string(),
+            "  --universum=...".to_string(),
+            "-ausgabe".to_string(),
+            "  --nocolor".to_string(),
+            "  --art=shell,html,csv,markdown,bbcode".to_string(),
+            "  --onetable".to_string(),
+            "  --spaltenreihenfolgeundnurdiese=3,5,1".to_string(),
+            "  --keineleereninhalte".to_string(),
+            "  --keineueberschriften".to_string(),
+            "  --keinenummerierung".to_string(),
+            "".to_string(),
+            "Umkehrungen: 2-11 -> -2-11, --symbole -> --symbole-, --religionen=sternpolygon -> --religionen=-sternpolygon".to_string(),
+            "Plus-Syntax: 7+1, 9-11+3, 10+0+2+5".to_string(),
+            "v-Syntax: v5, 5,v20-22, -20,v10".to_string(),
+            "Versuche fuer Details die Readme aus Markdown mit einem Markdown-Leseprogramm zu lesen.".to_string(),
+        ]
     }
 
     pub fn helpPage(&mut self) -> bool {
         if self.argvWithoutProgram.iter().any(|a| a == "-h" || a == "-help" || a == "--help") {
-            self.finallyDisplayLines = vec!["help".to_string()];
+            self.finallyDisplayLines = self.help_lines_py();
             return true;
         }
         false
@@ -1009,7 +1222,6 @@ impl Program {
     }
 
     pub fn validate_cli_like_python_for_known_case(&mut self) {
-        self.cliErrors.clear();
 
         let has_zeilen = self.argvWithoutProgram.iter().any(|a| a == "-zeilen");
         let has_spalten = self.argvWithoutProgram.iter().any(|a| a == "-spalten");
@@ -1032,6 +1244,7 @@ impl Program {
 
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
+        let _ = self.load_religion_csv_exact();
         self.htmlOrBBcode = false;
         self.breiteORbreiten = false;
         self.keineleereninhalte = false;
@@ -1041,10 +1254,8 @@ impl Program {
         self.nocolor = false;
         self.outType = "shell".to_string();
         self.breiteHasBeenOnceZero = false;
-        let _ = self.load_religion_csv_exact();
-        self.htmlOrBBcode = false;
 
-        let (paramLines0, rowsAsNumbers0, rowsOfcombi0, spaltenreihenfolgeundnurdiese0, prims1, generRows1) =
+        let (paramLines0, _rowsAsNumbers0, _rowsOfcombi0, spaltenreihenfolgeundnurdiese0, _prims1, _generRows1) =
             self.parametersToCommandsAndNumbers(argv.clone(), "", words);
         let (paramLinesNot0, rowsAsNumbersNot0, rowsOfcombiNot0, _spaltenreihenfolgeundnurdieseNot, prims2, generRows2) =
             self.parametersToCommandsAndNumbers(argv.clone(), "-", words);
@@ -1083,10 +1294,10 @@ impl Program {
         self.getConcat_ones = ones;
 
         if !self.rowsOfcombi.is_empty() {
-            push_unique_string(&mut paramLines, "ka");
+            Self::push_unique_string(&mut paramLines, "ka".to_string());
         }
         if !self.rowsOfcombi2.is_empty() {
-            push_unique_string(&mut paramLines, "ka2");
+            Self::push_unique_string(&mut paramLines, "ka2".to_string());
         }
 
         self.CsvTheirsSpalten = IndexMap::new();
@@ -1100,24 +1311,17 @@ impl Program {
         self.CsvTheirsSpalten.insert(8, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGroe1).cloned().unwrap_or_default()));
         self.CsvTheirsSpalten.insert(9, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGroe1).cloned().unwrap_or_default()));
 
-        self.rowsAsNumbers = if self.rowsAsNumbers.is_empty() { rowsAsNumbers0 } else { self.rowsAsNumbers.clone() };
         self.SpaltenVanillaAmount = self.rowsAsNumbers.len() as i64;
         self.rowsAsNumbersNot = rowsAsNumbersNot0;
         self.rowsOfcombiNot = rowsOfcombiNot0;
         self.spaltenreihenfolgeundnurdiese = spaltenreihenfolgeundnurdiese0;
         self.puniverseprimsNot = prims2;
-        self.puniverseprims = if self.puniverseprims.is_empty() { prims1 } else { self.puniverseprims.clone() };
         self.generRowsNot = generRows2;
-        self.generRows = if self.generRows.is_empty() { generRows1 } else { self.generRows.clone() };
-        if self.rowsOfcombi.is_empty() && !rowsOfcombi0.is_empty() {
-            self.rowsOfcombi = rowsOfcombi0;
-        }
 
         self.setShellRowsAmount();
         self.setShellWidth();
         if self.htmlOrBBcode && !self.breiteORbreiten {
             self.shellRowsAmount = 0;
-            self.breite = 0;
             self.textWidth = 0;
         }
 
@@ -1178,6 +1382,141 @@ impl Program {
 
     pub fn resultingTable(&mut self) -> Vec<Vec<String>> {
         self.__resultingTable.clone()
+    }
+
+    fn onlyThatColumns_py(&self, table: Vec<Vec<String>>, onlyThatColumns: Vec<i64>) -> Vec<Vec<String>> {
+        if onlyThatColumns.len() == 0 {
+            return table;
+        }
+        let mut newTable: Vec<Vec<String>> = vec![];
+        for row in table {
+            let mut newCol: Vec<String> = vec![];
+            for i in onlyThatColumns.iter() {
+                if *i <= 0 {
+                    continue;
+                }
+                let idx = (*i as usize).saturating_sub(1);
+                if idx < row.len() {
+                    newCol.push(row[idx].clone());
+                }
+            }
+            if newCol.len() > 0 {
+                newTable.push(newCol);
+            }
+        }
+        if newTable.len() > 0 { newTable } else { vec![] }
+    }
+
+    fn prepare4out_py(
+        &mut self,
+        _paramLines: Vec<String>,
+        _paramLinesNot: Vec<String>,
+        relitable: Vec<Vec<String>>,
+        rowsAsNumbers: Vec<i64>,
+    ) -> (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) {
+        let mut newTable: Vec<Vec<String>> = vec![];
+        let mut finallyDisplayLines: Vec<String> = vec![];
+        let mut old2newTable: Vec<i64> = vec![];
+
+        if relitable.len() == 0 {
+            return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
+        }
+
+        let mut selected_rows: Vec<i64> = if self.rowRange.len() > 0 {
+            self.rowRange.clone()
+        } else {
+            let mut v = vec![];
+            let start = if self.keineUeberschriften { 1 } else { 0 };
+            let end = relitable.len() as i64;
+            let mut i = start as i64;
+            while i < end {
+                v.push(i + 1);
+                i += 1;
+            }
+            v
+        };
+
+        selected_rows.sort();
+        selected_rows.dedup();
+
+        let mut selected_cols: Vec<i64> = if rowsAsNumbers.len() > 0 {
+            rowsAsNumbers.clone()
+        } else if relitable[0].len() > 0 {
+            (1..=(relitable[0].len() as i64)).collect()
+        } else {
+            vec![]
+        };
+
+        selected_cols.sort();
+        selected_cols.dedup();
+
+        let mut selected_table: Vec<Vec<String>> = vec![];
+        let mut first = true;
+        for row_no in selected_rows.iter() {
+            if *row_no <= 0 {
+                continue;
+            }
+            let idx = (*row_no as usize).saturating_sub(1);
+            if idx >= relitable.len() {
+                continue;
+            }
+            if self.keineUeberschriften && first && idx == 0 {
+                first = false;
+                continue;
+            }
+            first = false;
+            selected_table.push(relitable[idx].clone());
+            old2newTable.push(*row_no);
+        }
+
+        if selected_table.len() == 0 && !self.keineUeberschriften {
+            selected_table = relitable.clone();
+        }
+
+        newTable = self.onlyThatColumns_py(selected_table, selected_cols.clone());
+
+        if newTable.len() == 0 {
+            newTable = relitable.clone();
+        }
+
+        let mut display_row_index: i64 = 1;
+        for row in newTable.iter() {
+            let line = if self.nummeriere {
+                format!("{} {}", display_row_index, row.join(" "))
+            } else {
+                row.join(" ")
+            };
+            let trimmed = line.trim().to_string();
+            if self.keineleereninhalte {
+                let stripped = trimmed.replace('-', "").replace('?', "").trim().to_string();
+                if stripped.is_empty() {
+                    display_row_index += 1;
+                    continue;
+                }
+            }
+            finallyDisplayLines.push(trimmed);
+            display_row_index += 1;
+        }
+
+        let rowsRange: Vec<i64> = if newTable.len() > 0 {
+            (0..(newTable[0].len() as i64)).collect()
+        } else {
+            vec![]
+        };
+        let numlen = finallyDisplayLines.len() as i64;
+        (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
+    }
+
+    fn cliOut_py(
+        &mut self,
+        finallyDisplayLines: Vec<String>,
+        newTable: Vec<Vec<String>>,
+        numlen: i64,
+        _rowsRange: Vec<i64>,
+    ) -> Vec<Vec<String>> {
+        self.finallyDisplayLines = finallyDisplayLines.clone();
+        self.numlen = numlen;
+        newTable
     }
 
     pub fn prepareFinallyDisplayLines(&mut self) {
@@ -1244,12 +1583,46 @@ impl Program {
     }
 
     pub fn workflowEverything(&mut self, argv: Vec<String>, words: &Words) -> Vec<Vec<String>> {
-        let (_RowsLen, _paramLines, _paramLinesNot, relitable, _rowsAsNumbers) =
+        let (RowsLen, paramLines, paramLinesNot, relitable, rowsAsNumbers) =
             self.bringAllImportantBeginThings(argv, words);
 
-        self.tableGenerated = self.newTable || !relitable.is_empty();
-        self.__resultingTable = relitable.clone();
-        self.determineNumlen();
+        self.RowsLen = RowsLen;
+        self.relitable = relitable.clone();
+        self.rowsAsNumbers = rowsAsNumbers.clone();
+
+        if self.helpPage() {
+            self.__resultingTable = vec![];
+            return vec![];
+        }
+
+        if self.cliErrors.len() > 0 {
+            self.__resultingTable = vec![];
+            return vec![];
+        }
+
+        let (finallyDisplayLines, mut newTable, numlen, rowsRange, old2newTable) = self.prepare4out_py(
+            paramLines,
+            paramLinesNot,
+            relitable,
+            rowsAsNumbers,
+        );
+
+        if self.rowsOfcombi.len() > 0 {
+            self.combiTableWorkflow();
+        }
+        if self.rowsOfcombi2.len() > 0 {
+            self.combiTableWorkflow();
+        }
+
+        newTable = self.onlyThatColumns_py(newTable, self.spaltenreihenfolgeundnurdiese.clone());
+        self.newTable = newTable.len() > 0;
+        self.finallyDisplayLines = finallyDisplayLines.clone();
+        self.numlen = numlen;
+        let _old2newTable = old2newTable.clone();
+
+        let out = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, rowsRange);
+        self.tableGenerated = self.newTable || !out.is_empty();
+        self.__resultingTable = out.clone();
         self.addResultingTableToTables();
         self.setOld2Rows();
         self.setNewerTable();
@@ -1260,7 +1633,7 @@ impl Program {
         self.setGeneratedSpaltenParameter();
         self.setAllEquColumns();
         self.setFinallyDisplayTable();
-        relitable
+        out
     }
 
     pub fn combiTableWorkflow(&mut self) {

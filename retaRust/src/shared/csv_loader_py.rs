@@ -2,8 +2,6 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use serde_json::Value;
-
 use crate::shared::reta_py::Program;
 
 #[derive(Clone, Debug)]
@@ -50,8 +48,7 @@ impl Program {
         for row in text.lines() {
             let mut cols: Vec<String> = vec![];
             for cell in row.split(';') {
-                let c = cell.to_string();
-                cols.push(c);
+                cols.push(cell.to_string());
             }
             rows.push(cols);
         }
@@ -86,20 +83,41 @@ impl Program {
             .replace("'", "&#x27;")
     }
 
+    fn extract_mode_value_from_python_jsonish_cell(&self, ccc: &str, mode: &str) -> Option<String> {
+        if !(ccc.starts_with("|{") && ccc.ends_with("}|")) {
+            return None;
+        }
+        let json_text = &ccc[2..ccc.len() - 2];
+        let lookup = if mode.is_empty() { "\"\"".to_string() } else { format!("\"{}\"", mode) };
+        let needle = format!("{}:", lookup);
+        let pos = json_text.find(&needle)?;
+        let rest = &json_text[pos + needle.len()..];
+        let first_quote = rest.find('"')?;
+        let rest = &rest[first_quote + 1..];
+        let mut out = String::new();
+        let mut escaped = false;
+        for ch in rest.chars() {
+            if escaped {
+                out.push(ch);
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                return Some(out);
+            } else {
+                out.push(ch);
+            }
+        }
+        None
+    }
+
     fn decode_cell_exact_py(&self, ccc: &str, mode: &str) -> String {
-        if ccc.starts_with("|{") && ccc.ends_with("}|") {
-            let json_text = &ccc[1..ccc.len()-1];
-            if let Ok(val) = serde_json::from_str::<Value>(json_text) {
-                if let Some(obj) = val.as_object() {
-                    if let Some(found) = obj.get(mode).and_then(|v| v.as_str()) {
-                        return found.to_string();
-                    }
-                    if mode.is_empty() {
-                        if let Some(found) = obj.get("").and_then(|v| v.as_str()) {
-                            return found.to_string();
-                        }
-                    }
-                }
+        if let Some(found) = self.extract_mode_value_from_python_jsonish_cell(ccc, mode) {
+            return found;
+        }
+        if mode.is_empty() {
+            if let Some(found) = self.extract_mode_value_from_python_jsonish_cell(ccc, "") {
+                return found;
             }
         }
         if mode == "html" {
@@ -136,7 +154,7 @@ impl Program {
         }
 
         let change_motives_column = self.change_motives_file_py();
-        if !change_motives_column.is_empty() && change_motives_column != "de" {
+        if !change_motives_column.is_empty() {
             let rows = self.load_csv_rows_semicolon_exact_path(&change_motives_column)?;
             for (i, col) in rows.into_iter().enumerate() {
                 if let Some(first) = col.first() {
