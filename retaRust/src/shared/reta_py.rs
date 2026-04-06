@@ -1010,41 +1010,11 @@ impl Program {
         out
     }
 
-    fn is_zeilen_angabe_py(&self, txt: &str) -> bool {
-        let txt = txt.trim();
-        if txt.is_empty() {
-            return false;
-        }
-        txt.chars().all(|c| {
-            c.is_ascii_digit() || matches!(c, ',' | '-' | '+' | 'v' | 'w')
-        })
-    }
-
     fn parametersCmdWithSomeBereich_py(&self, txt: &str, suffix: &str, neg: &str, keineNegBeruecksichtigung: bool) -> Vec<String> {
         let mut out = vec![];
-        if keineNegBeruecksichtigung {
-            if self.is_zeilen_angabe_py(txt) {
-                out.push(format!("_{}_{}", suffix, txt.trim()));
-            }
-            return out;
-        }
-        for ein_bereich in txt.split(',') {
-            let ein_bereich = ein_bereich.trim();
-            if ein_bereich.is_empty() {
-                continue;
-            }
-            let allowed = (neg.is_empty() && !ein_bereich.starts_with('-'))
-                || (!neg.is_empty() && ein_bereich.starts_with(neg));
-            if !allowed {
-                continue;
-            }
-            let stripped = if !neg.is_empty() && ein_bereich.starts_with(neg) {
-                &ein_bereich[neg.len()..]
-            } else {
-                ein_bereich
-            };
-            if self.is_zeilen_angabe_py(stripped) {
-                out.push(format!("_{}_{}", suffix, stripped));
+        for v in self.parse_simple_numeric_list_py(txt) {
+            if neg.is_empty() || keineNegBeruecksichtigung {
+                out.push(format!("{}{}", v, suffix));
             }
         }
         out
@@ -1493,124 +1463,10 @@ impl Program {
         if newTable.len() > 0 { newTable } else { vec![] }
     }
 
-    fn parse_bereich_to_numbers_py(&self, txt: &str, upper_exclusive: i64) -> BTreeSet<i64> {
-        let mut out = BTreeSet::new();
-        for raw in txt.split(',') {
-            let part = raw.trim();
-            if part.is_empty() {
-                continue;
-            }
-            let mut part = part;
-            if let Some(rest) = part.strip_prefix('v') {
-                part = rest;
-            }
-            if let Some((a, b)) = part.split_once('-') {
-                if let (Ok(start), Ok(end)) = (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
-                    if start <= end {
-                        for v in start..=end {
-                            if v > 0 && v < upper_exclusive {
-                                out.insert(v);
-                            }
-                        }
-                    }
-                }
-            } else if let Ok(v) = part.parse::<i64>() {
-                if v > 0 && v < upper_exclusive {
-                    out.insert(v);
-                }
-            }
-        }
-        out
-    }
-
-    fn teiler_set_py(values: &BTreeSet<i64>) -> BTreeSet<i64> {
-        let mut out = BTreeSet::new();
-        for &n in values {
-            if n <= 0 {
-                continue;
-            }
-            let mut d = 1i64;
-            while d * d <= n {
-                if n % d == 0 {
-                    out.insert(d);
-                    out.insert(n / d);
-                }
-                d += 1;
-            }
-        }
-        out
-    }
-
-    fn filter_original_lines_py(&self, highest_line: i64, param_lines: &[String]) -> BTreeSet<i64> {
-        let mut num_range: BTreeSet<i64> = (1..=highest_line).collect();
-        let effective: BTreeSet<String> = param_lines.iter().cloned().collect();
-        let content_only: BTreeSet<String> = effective.iter().filter(|s| s.as_str() != "ka" && s.as_str() != "ka2").cloned().collect();
-        if !(effective.contains("all") || content_only.is_empty() || !self.ifZeilenSetted) {
-            num_range.clear();
-        }
-
-        let mut if_a = false;
-        let mut a_parts: Vec<String> = vec![];
-        let mut if_w = false;
-        for condition in effective.iter() {
-            if condition.starts_with("_a_") && condition.len() > 3 {
-                if_a = true;
-                a_parts.push(condition[3..].to_string());
-            }
-            if condition.starts_with("_w_") {
-                if_w = true;
-            }
-        }
-        if if_a {
-            let joined = a_parts.join(",");
-            num_range.extend(self.parse_bereich_to_numbers_py(&joined, highest_line + 1));
-            if if_w {
-                let divisors = Self::teiler_set_py(&num_range.clone());
-                num_range.extend(divisors);
-            }
-        }
-
-        let mut n_parts: Vec<String> = vec![];
-        for condition in effective.iter() {
-            if condition.starts_with("_n_") && condition.len() > 3 {
-                n_parts.push(condition[3..].to_string());
-            }
-        }
-        if !n_parts.is_empty() {
-            let joined = n_parts.join(",");
-            let n_set = self.parse_bereich_to_numbers_py(&joined, highest_line + 1);
-            if num_range.is_empty() && !if_a && !effective.contains("all") {
-                num_range = (1..=highest_line).collect();
-            }
-            if !n_set.is_empty() {
-                num_range = num_range.intersection(&n_set).cloned().collect();
-            }
-        }
-
-        let mut zeit_set: BTreeSet<i64> = BTreeSet::new();
-        let mut if_zeit = false;
-        for condition in effective.iter() {
-            match condition.as_str() {
-                "=" => { if_zeit = true; zeit_set.insert(10); }
-                "<" => { if_zeit = true; zeit_set.extend(1..10); }
-                ">" => { if_zeit = true; zeit_set.extend(11..=highest_line); }
-                _ => {}
-            }
-        }
-        if if_zeit {
-            if num_range.is_empty() && !if_a && !effective.contains("all") {
-                num_range = (1..=highest_line).collect();
-            }
-            num_range = num_range.intersection(&zeit_set).cloned().collect();
-        }
-
-        num_range
-    }
-
     fn prepare4out_py(
         &mut self,
-        paramLines: Vec<String>,
-        paramLinesNot: Vec<String>,
+        _paramLines: Vec<String>,
+        _paramLinesNot: Vec<String>,
         relitable: Vec<Vec<String>>,
         rowsAsNumbers: Vec<i64>,
     ) -> (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) {
@@ -1622,61 +1478,59 @@ impl Program {
             return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
         }
 
-        let headingsAmount = relitable.first().map(|r| r.len()).unwrap_or(0) as i64;
-        let rowsRange: Vec<i64> = (0..headingsAmount).collect();
-        let highest_line = std::cmp::max(relitable.len() as i64 - 1, self.hoechsteZeile);
-
-        let mut display_set = self.filter_original_lines_py(highest_line, &paramLines);
-        if !paramLinesNot.is_empty() {
-            let display_not = self.filter_original_lines_py(highest_line, &paramLinesNot);
-            let changed: BTreeSet<i64> = ((1..=highest_line).collect::<BTreeSet<i64>>()
-                .difference(&display_not)
-                .cloned()
-                .collect());
-            if !changed.is_empty() {
-                display_set = display_set.difference(&display_not).cloned().collect();
-            }
-        }
-        if display_set.is_empty() {
-            if self.ifZeilenSetted {
-                display_set.clear();
-            } else {
-                display_set = (0..=highest_line).collect();
-            }
-        }
-        display_set.insert(0);
-
-        let mut display_rows: Vec<i64> = display_set.into_iter().collect();
-        display_rows.sort();
-        let numlen = display_rows.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
-
-        let selected_cols: BTreeSet<i64> = if rowsAsNumbers.is_empty() {
-            (0..headingsAmount).collect()
+        let mut selected_rows: Vec<i64> = if self.rowRange.is_empty() {
+            (0..(relitable.len() as i64)).collect()
         } else {
-            rowsAsNumbers.iter().cloned().collect()
+            self.rowRange.clone()
         };
+        selected_rows = dedup_preserve_order_i64(selected_rows);
+        if !self.keineUeberschriften && !selected_rows.contains(&0) {
+            selected_rows.insert(0, 0);
+        }
 
-        for &u in display_rows.iter() {
-            let idx = u as usize;
+        let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
+            if relitable[0].is_empty() {
+                vec![]
+            } else {
+                (0..(relitable[0].len() as i64)).collect()
+            }
+        } else {
+            rowsAsNumbers.clone()
+        };
+        selected_cols = dedup_preserve_order_i64(selected_cols);
+        let selected_cols_set: BTreeSet<i64> = selected_cols.iter().cloned().collect();
+
+        for row_no in selected_rows.iter() {
+            let idx = *row_no as usize;
             if idx >= relitable.len() {
                 continue;
             }
             let mut new2Lines: Vec<String> = vec![];
             for (t, cell) in relitable[idx].iter().enumerate() {
-                if selected_cols.contains(&(t as i64)) {
+                if selected_cols_set.contains(&(t as i64)) {
                     new2Lines.push(cell.clone());
                 }
             }
-            if !new2Lines.is_empty() {
-                newTable.push(new2Lines);
-                old2newTable.push(u);
-            }
+            newTable.push(new2Lines);
+            old2newTable.push(*row_no);
+        }
+
+        if newTable.is_empty() {
+            newTable = relitable.clone();
+            old2newTable = (0..(relitable.len() as i64)).collect();
         }
 
         finallyDisplayLines = old2newTable.iter().map(|n| n.to_string()).collect();
-        if !finallyDisplayLines.is_empty() {
+        if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
             finallyDisplayLines[0] = "".to_string();
         }
+
+        let rowsRange: Vec<i64> = if newTable.is_empty() {
+            vec![]
+        } else {
+            (0..(newTable[0].len() as i64)).collect()
+        };
+        let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
 

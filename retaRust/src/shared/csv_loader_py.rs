@@ -42,17 +42,57 @@ impl Program {
         fs::read_to_string(self.csv_path(csvFileName))
     }
 
+    fn parse_semicolon_csv_python_like(&self, text: &str) -> Vec<Vec<String>> {
+        let mut rows: Vec<Vec<String>> = vec![];
+        let mut row: Vec<String> = vec![];
+        let mut cell = String::new();
+        let mut chars = text.chars().peekable();
+        let mut in_quotes = false;
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '"' => {
+                    if in_quotes {
+                        if matches!(chars.peek(), Some('"')) {
+                            cell.push('"');
+                            chars.next();
+                        } else {
+                            in_quotes = false;
+                        }
+                    } else {
+                        in_quotes = true;
+                    }
+                }
+                ';' if !in_quotes => {
+                    row.push(std::mem::take(&mut cell));
+                }
+                '\n' if !in_quotes => {
+                    row.push(std::mem::take(&mut cell));
+                    rows.push(std::mem::take(&mut row));
+                }
+                '\r' if !in_quotes => {
+                    if matches!(chars.peek(), Some('\n')) {
+                        chars.next();
+                    }
+                    row.push(std::mem::take(&mut cell));
+                    rows.push(std::mem::take(&mut row));
+                }
+                _ => cell.push(ch),
+            }
+        }
+
+        if !cell.is_empty() || !row.is_empty() || text.ends_with(';') {
+            row.push(cell);
+        }
+        if !row.is_empty() {
+            rows.push(row);
+        }
+        rows
+    }
+
     pub fn load_csv_rows_semicolon_exact_path(&self, csvFileName: &str) -> io::Result<Vec<Vec<String>>> {
         let text = self.load_csv_text_exact_path(csvFileName)?;
-        let mut rows: Vec<Vec<String>> = vec![];
-        for row in text.lines() {
-            let mut cols: Vec<String> = vec![];
-            for cell in row.split(';') {
-                cols.push(cell.to_string());
-            }
-            rows.push(cols);
-        }
-        Ok(rows)
+        Ok(self.parse_semicolon_csv_python_like(&text))
     }
 
     fn language_from_argv_py(&self) -> String {
