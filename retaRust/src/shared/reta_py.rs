@@ -18,43 +18,6 @@ pub fn dedup_preserve_order_i64(input: Vec<i64>) -> Vec<i64> {
 }
 
 
-fn pyvalue_vec_all_bool(values: &[PyValue]) -> bool {
-    !values.is_empty() && values.iter().all(|v| matches!(v, PyValue::Bool(_)))
-}
-
-fn pyvalue_vec_first_is_nested(values: &[PyValue]) -> bool {
-    matches!(values.first(), Some(PyValue::Tuple(_)))
-}
-
-fn pyvalue_vec_to_btreeset_i64(values: &[PyValue]) -> BTreeSet<i64> {
-    let mut out = BTreeSet::new();
-    for v in values {
-        match v {
-            PyValue::Int(n) => {
-                out.insert(*n);
-            }
-            PyValue::Tuple(inner) => {
-                for vv in inner {
-                    if let PyValue::Int(n2) = vv {
-                        out.insert(*n2);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
-fn strip_ascii_minus_once_py(txt: &str) -> &str {
-    if let Some(rest) = txt.strip_prefix('-') {
-        rest
-    } else {
-        txt
-    }
-}
-
-
 #[derive(Clone, Debug)]
 pub struct SpaltenTyp {
     pub ordinary: (usize, usize),
@@ -313,6 +276,7 @@ impl Program {
         for v in values {
             match v {
                 PyValue::Int(n) => out.push(*n),
+                PyValue::Bool(b) => out.push(if *b { 1 } else { 0 }),
                 PyValue::Tuple(inner) => {
                     for v2 in inner {
                         if let PyValue::Int(n2) = v2 {
@@ -326,6 +290,32 @@ impl Program {
         out
     }
 
+    fn parse_python_decimal_csv_exact(para_values: &str) -> Vec<i64> {
+        let mut out = Vec::new();
+        for chosen in para_values.split(',') {
+            if chosen.chars().all(|c| c.is_ascii_digit()) {
+                if let Ok(n) = chosen.parse::<i64>() {
+                    let abs_n = n.abs();
+                    if abs_n != 0 && abs_n != 1 {
+                        out.push(abs_n);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn lambda_gebr_univ_und_galax_py(para_values: &str) -> BTreeSet<i64> {
+        Self::parse_python_decimal_csv_exact(para_values).into_iter().collect()
+    }
+
+    fn lambda_prim_galax_py(para_values: &str) -> BTreeSet<i64> {
+        Self::parse_python_decimal_csv_exact(para_values)
+            .into_iter()
+            .filter(|n| Self::primCreativity_py(*n) == 1)
+            .collect()
+    }
+
     fn parameter_main_name_matches_py(stored: &str, cmd: &str) -> bool {
         stored == cmd
             || stored.contains(&format!("'{}'", cmd))
@@ -334,62 +324,67 @@ impl Program {
     }
 
     fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
-        for (i, eineSpaltenArtmitSpaltenNummern) in tupl.iter().enumerate() {
+        for (i, raw_values) in tupl.iter().enumerate() {
+            let mut normalized_values: Vec<i64> = Vec::new();
+            if !raw_values.is_empty() {
+                match &raw_values[0] {
+                    PyValue::Bool(_) => {
+                        normalized_values = Self::pyvalue_list_to_i64_vec(raw_values);
+                    }
+                    PyValue::Tuple(inner) => {
+                        normalized_values = Self::pyvalue_list_to_i64_vec(inner);
+                    }
+                    _ => {
+                        normalized_values = Self::pyvalue_list_to_i64_vec(raw_values);
+                    }
+                }
+            }
+
             let befehl = befehlName.unwrap_or("");
             let para = paraValue.unwrap_or("");
 
-            let normalized_set = if pyvalue_vec_all_bool(eineSpaltenArtmitSpaltenNummern) {
-                pyvalue_vec_to_btreeset_i64(eineSpaltenArtmitSpaltenNummern)
-            } else if pyvalue_vec_first_is_nested(eineSpaltenArtmitSpaltenNummern) {
-                if let Some(PyValue::Tuple(inner)) = eineSpaltenArtmitSpaltenNummern.first() {
-                    pyvalue_vec_to_btreeset_i64(inner)
-                } else {
-                    BTreeSet::new()
-                }
-            } else {
-                pyvalue_vec_to_btreeset_i64(eineSpaltenArtmitSpaltenNummern)
+            let gebr_idx = match befehl {
+                "multiplikationen" => Some(2usize),
+                "gebrochenuniversum" | "gebrochenuniversum2" => Some(5usize),
+                "gebrochengalaxie" | "gebrochengalaxie2" => Some(6usize),
+                "gebrochenemotion" | "gebrochenemotion2" => Some(9usize),
+                "gebrochengroesse" | "gebrochengroesse2" => Some(10usize),
+                _ => None,
             };
 
-            if i == 2
-                && (!eineSpaltenArtmitSpaltenNummern.is_empty()
-                    || Self::is_gebrochen_uni_gal_einzeln_py(befehl))
-            {
-                let target_idx = match befehl {
-                    "multiplikationen" => Some(2usize),
-                    "gebrochenuniversum" | "gebrochenuniversum2" => Some(5usize),
-                    "gebrochengalaxie" | "gebrochengalaxie2" => Some(6usize),
-                    "gebrochenemotion" | "gebrochenemotion2" => Some(9usize),
-                    "gebrochengroesse" | "gebrochengroesse2" => Some(10usize),
-                    _ => None,
-                };
-                if let Some(target_idx) = target_idx {
+            if i == 2 && (!raw_values.is_empty() || gebr_idx.is_some()) {
+                if let Some(target_idx) = gebr_idx {
                     let generated = if befehl == "multiplikationen" {
                         Self::lambda_prim_galax_py(para)
                     } else {
                         Self::lambda_gebr_univ_und_galax_py(para)
                     };
                     if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), target_idx)) {
-                        for v in generated {
-                            target.insert(v);
-                        }
+                        *target = target.union(&generated).cloned().collect();
                     }
                     continue;
                 }
-            } else if Self::is_beschrieben_para_py(para) && Self::is_primvielfache_befehl_py(befehl) {
+            }
+
+            if para == "beschrieben" && (befehl.contains("prim") || befehl == "multiplikationen") {
                 if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), 2)) {
                     target.insert(2);
                 }
                 continue;
-            } else if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), i)) {
-                for v in normalized_set {
-                    target.insert(v);
-                }
+            }
+
+            if normalized_values.is_empty() {
+                continue;
+            }
+            if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), i)) {
+                Self::push_set_entries_exact(target, normalized_values);
             }
         }
     }
 
     fn spalten_removeDoublesNthenRemoveOneFromAnother_py(&mut self) {
-        for el2_type in 0..12usize {
+        let half_len = self.spaltenArtenKey_SpaltennummernValue.len() / 2;
+        for el2_type in 0..half_len {
             let pos = self.spaltenArtenKey_SpaltennummernValue.get(&(0, el2_type)).cloned().unwrap_or_default();
             let neg = self.spaltenArtenKey_SpaltennummernValue.get(&(1, el2_type)).cloned().unwrap_or_default();
             let mut result = pos.clone();
@@ -398,7 +393,7 @@ impl Program {
             }
             self.spaltenArtenKey_SpaltennummernValue.insert((0, el2_type), result);
         }
-        for el2_type in 0..12usize {
+        for el2_type in 0..half_len {
             let neg = self.spaltenArtenKey_SpaltennummernValue.shift_remove(&(1, el2_type)).unwrap_or_default();
             let mut pos = self.spaltenArtenKey_SpaltennummernValue.get(&(0, el2_type)).cloned().unwrap_or_default();
             for v in neg {
@@ -468,10 +463,9 @@ impl Program {
                     } else if let Some(eq) = eq {
                         let left = cmd[..eq].to_string();
                         let right = cmd[eq + 1..].to_string();
-                        for raw_one in right.split(',') {
-                            let mut one = raw_one.to_string();
+                        for mut one in right.split(',').map(|s| s.to_string()) {
                             let yes1 = if !one.is_empty() && one.starts_with('-') {
-                                one = strip_ascii_minus_once_py(&one).to_string();
+                                one = one[1..].to_string();
                                 neg == "-"
                             } else {
                                 neg.is_empty()
@@ -615,57 +609,6 @@ impl Program {
         }
         1
     }
-
-    fn lambda_gebr_univ_und_galax_py(para_values: &str) -> BTreeSet<i64> {
-        let mut out = BTreeSet::new();
-        for chosen in para_values.split(',') {
-            let chosen = chosen.trim();
-            if chosen.chars().all(|c| c.is_ascii_digit()) {
-                let value = chosen.parse::<i64>().unwrap_or(0).abs();
-                if value != 0 && value != 1 {
-                    out.insert(value);
-                }
-            }
-        }
-        out
-    }
-
-    fn lambda_prim_galax_py(para_values: &str) -> BTreeSet<i64> {
-        let mut out = BTreeSet::new();
-        for chosen in para_values.split(',') {
-            let chosen = chosen.trim();
-            if chosen.chars().all(|c| c.is_ascii_digit()) {
-                let value = chosen.parse::<i64>().unwrap_or(0).abs();
-                if value != 0 && value != 1 && Self::primCreativity_py(value) == 1 {
-                    out.insert(value);
-                }
-            }
-        }
-        out
-    }
-
-    fn is_gebrochen_uni_gal_einzeln_py(befehl_name: &str) -> bool {
-        matches!(
-            befehl_name,
-            "gebrochenuniversum"
-                | "gebrochenuniversum2"
-                | "gebrochengalaxie"
-                | "gebrochengalaxie2"
-                | "gebrochenemotion"
-                | "gebrochenemotion2"
-                | "gebrochengroesse"
-                | "gebrochengroesse2"
-        )
-    }
-
-    fn is_primvielfache_befehl_py(befehl_name: &str) -> bool {
-        matches!(befehl_name, "primvielfache" | "multiplikationen")
-    }
-
-    fn is_beschrieben_para_py(para_value: &str) -> bool {
-        matches!(para_value, "beschrieben" | "Beschreibung" | "beschr")
-    }
-
 
     fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
         let mut allValues: Vec<BTreeSet<i64>> = (0..12).map(|_| BTreeSet::new()).collect();
@@ -1067,11 +1010,41 @@ impl Program {
         out
     }
 
+    fn is_zeilen_angabe_py(&self, txt: &str) -> bool {
+        let txt = txt.trim();
+        if txt.is_empty() {
+            return false;
+        }
+        txt.chars().all(|c| {
+            c.is_ascii_digit() || matches!(c, ',' | '-' | '+' | 'v' | 'w')
+        })
+    }
+
     fn parametersCmdWithSomeBereich_py(&self, txt: &str, suffix: &str, neg: &str, keineNegBeruecksichtigung: bool) -> Vec<String> {
         let mut out = vec![];
-        for v in self.parse_simple_numeric_list_py(txt) {
-            if neg.is_empty() || keineNegBeruecksichtigung {
-                out.push(format!("{}{}", v, suffix));
+        if keineNegBeruecksichtigung {
+            if self.is_zeilen_angabe_py(txt) {
+                out.push(format!("_{}_{}", suffix, txt.trim()));
+            }
+            return out;
+        }
+        for ein_bereich in txt.split(',') {
+            let ein_bereich = ein_bereich.trim();
+            if ein_bereich.is_empty() {
+                continue;
+            }
+            let allowed = (neg.is_empty() && !ein_bereich.starts_with('-'))
+                || (!neg.is_empty() && ein_bereich.starts_with(neg));
+            if !allowed {
+                continue;
+            }
+            let stripped = if !neg.is_empty() && ein_bereich.starts_with(neg) {
+                &ein_bereich[neg.len()..]
+            } else {
+                ein_bereich
+            };
+            if self.is_zeilen_angabe_py(stripped) {
+                out.push(format!("_{}_{}", suffix, stripped));
             }
         }
         out
@@ -1508,7 +1481,7 @@ impl Program {
                 if *i <= 0 {
                     continue;
                 }
-                let idx = (*i as usize).saturating_sub(1);
+                let idx = (*i - 1) as usize;
                 if idx < row.len() {
                     newCol.push(row[idx].clone());
                 }
@@ -1520,10 +1493,124 @@ impl Program {
         if newTable.len() > 0 { newTable } else { vec![] }
     }
 
+    fn parse_bereich_to_numbers_py(&self, txt: &str, upper_exclusive: i64) -> BTreeSet<i64> {
+        let mut out = BTreeSet::new();
+        for raw in txt.split(',') {
+            let part = raw.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let mut part = part;
+            if let Some(rest) = part.strip_prefix('v') {
+                part = rest;
+            }
+            if let Some((a, b)) = part.split_once('-') {
+                if let (Ok(start), Ok(end)) = (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
+                    if start <= end {
+                        for v in start..=end {
+                            if v > 0 && v < upper_exclusive {
+                                out.insert(v);
+                            }
+                        }
+                    }
+                }
+            } else if let Ok(v) = part.parse::<i64>() {
+                if v > 0 && v < upper_exclusive {
+                    out.insert(v);
+                }
+            }
+        }
+        out
+    }
+
+    fn teiler_set_py(values: &BTreeSet<i64>) -> BTreeSet<i64> {
+        let mut out = BTreeSet::new();
+        for &n in values {
+            if n <= 0 {
+                continue;
+            }
+            let mut d = 1i64;
+            while d * d <= n {
+                if n % d == 0 {
+                    out.insert(d);
+                    out.insert(n / d);
+                }
+                d += 1;
+            }
+        }
+        out
+    }
+
+    fn filter_original_lines_py(&self, highest_line: i64, param_lines: &[String]) -> BTreeSet<i64> {
+        let mut num_range: BTreeSet<i64> = (1..=highest_line).collect();
+        let effective: BTreeSet<String> = param_lines.iter().cloned().collect();
+        let content_only: BTreeSet<String> = effective.iter().filter(|s| s.as_str() != "ka" && s.as_str() != "ka2").cloned().collect();
+        if !(effective.contains("all") || content_only.is_empty() || !self.ifZeilenSetted) {
+            num_range.clear();
+        }
+
+        let mut if_a = false;
+        let mut a_parts: Vec<String> = vec![];
+        let mut if_w = false;
+        for condition in effective.iter() {
+            if condition.starts_with("_a_") && condition.len() > 3 {
+                if_a = true;
+                a_parts.push(condition[3..].to_string());
+            }
+            if condition.starts_with("_w_") {
+                if_w = true;
+            }
+        }
+        if if_a {
+            let joined = a_parts.join(",");
+            num_range.extend(self.parse_bereich_to_numbers_py(&joined, highest_line + 1));
+            if if_w {
+                let divisors = Self::teiler_set_py(&num_range.clone());
+                num_range.extend(divisors);
+            }
+        }
+
+        let mut n_parts: Vec<String> = vec![];
+        for condition in effective.iter() {
+            if condition.starts_with("_n_") && condition.len() > 3 {
+                n_parts.push(condition[3..].to_string());
+            }
+        }
+        if !n_parts.is_empty() {
+            let joined = n_parts.join(",");
+            let n_set = self.parse_bereich_to_numbers_py(&joined, highest_line + 1);
+            if num_range.is_empty() && !if_a && !effective.contains("all") {
+                num_range = (1..=highest_line).collect();
+            }
+            if !n_set.is_empty() {
+                num_range = num_range.intersection(&n_set).cloned().collect();
+            }
+        }
+
+        let mut zeit_set: BTreeSet<i64> = BTreeSet::new();
+        let mut if_zeit = false;
+        for condition in effective.iter() {
+            match condition.as_str() {
+                "=" => { if_zeit = true; zeit_set.insert(10); }
+                "<" => { if_zeit = true; zeit_set.extend(1..10); }
+                ">" => { if_zeit = true; zeit_set.extend(11..=highest_line); }
+                _ => {}
+            }
+        }
+        if if_zeit {
+            if num_range.is_empty() && !if_a && !effective.contains("all") {
+                num_range = (1..=highest_line).collect();
+            }
+            num_range = num_range.intersection(&zeit_set).cloned().collect();
+        }
+
+        num_range
+    }
+
     fn prepare4out_py(
         &mut self,
-        _paramLines: Vec<String>,
-        _paramLinesNot: Vec<String>,
+        paramLines: Vec<String>,
+        paramLinesNot: Vec<String>,
         relitable: Vec<Vec<String>>,
         rowsAsNumbers: Vec<i64>,
     ) -> (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) {
@@ -1535,76 +1622,61 @@ impl Program {
             return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
         }
 
-        let mut selected_rows: Vec<i64> = if self.rowRange.is_empty() {
-            let mut v = vec![];
-            if !self.keineUeberschriften {
-                v.push(0);
-            }
-            for i in 1..(relitable.len() as i64) {
-                v.push(i);
-            }
-            v
-        } else {
-            let mut v = self.rowRange.clone();
-            if !self.keineUeberschriften {
-                v.insert(0, 0);
-            }
-            v
-        };
+        let headingsAmount = relitable.first().map(|r| r.len()).unwrap_or(0) as i64;
+        let rowsRange: Vec<i64> = (0..headingsAmount).collect();
+        let highest_line = std::cmp::max(relitable.len() as i64 - 1, self.hoechsteZeile);
 
-        selected_rows = dedup_preserve_order_i64(selected_rows);
-
-        let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
-            if relitable[0].is_empty() {
-                vec![]
+        let mut display_set = self.filter_original_lines_py(highest_line, &paramLines);
+        if !paramLinesNot.is_empty() {
+            let display_not = self.filter_original_lines_py(highest_line, &paramLinesNot);
+            let changed: BTreeSet<i64> = ((1..=highest_line).collect::<BTreeSet<i64>>()
+                .difference(&display_not)
+                .cloned()
+                .collect());
+            if !changed.is_empty() {
+                display_set = display_set.difference(&display_not).cloned().collect();
+            }
+        }
+        if display_set.is_empty() {
+            if self.ifZeilenSetted {
+                display_set.clear();
             } else {
-                (1..=(relitable[0].len() as i64)).collect()
+                display_set = (0..=highest_line).collect();
             }
-        } else {
-            rowsAsNumbers.clone()
-        };
-        selected_cols = dedup_preserve_order_i64(selected_cols);
+        }
+        display_set.insert(0);
 
-        let mut selected_table: Vec<Vec<String>> = vec![];
-        for row_no in selected_rows.iter() {
-            let idx = *row_no as usize;
+        let mut display_rows: Vec<i64> = display_set.into_iter().collect();
+        display_rows.sort();
+        let numlen = display_rows.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
+
+        let selected_cols: BTreeSet<i64> = if rowsAsNumbers.is_empty() {
+            (0..headingsAmount).collect()
+        } else {
+            rowsAsNumbers.iter().cloned().collect()
+        };
+
+        for &u in display_rows.iter() {
+            let idx = u as usize;
             if idx >= relitable.len() {
                 continue;
             }
-            selected_table.push(relitable[idx].clone());
-            old2newTable.push(*row_no);
-        }
-
-        if selected_table.is_empty() {
-            selected_table = relitable.clone();
-            old2newTable = (0..(relitable.len() as i64)).collect();
-        }
-
-        newTable = self.onlyThatColumns_py(selected_table, selected_cols.clone());
-        if newTable.is_empty() {
-            newTable = relitable.clone();
+            let mut new2Lines: Vec<String> = vec![];
+            for (t, cell) in relitable[idx].iter().enumerate() {
+                if selected_cols.contains(&(t as i64)) {
+                    new2Lines.push(cell.clone());
+                }
+            }
+            if !new2Lines.is_empty() {
+                newTable.push(new2Lines);
+                old2newTable.push(u);
+            }
         }
 
         finallyDisplayLines = old2newTable.iter().map(|n| n.to_string()).collect();
-        if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
+        if !finallyDisplayLines.is_empty() {
             finallyDisplayLines[0] = "".to_string();
         }
-
-        let rowsRange: Vec<i64> = if newTable.is_empty() {
-            vec![]
-        } else {
-            let mut max_sub_lines: usize = 1;
-            for row in newTable.iter() {
-                for cell in row.iter() {
-                    let lines = if cell.is_empty() { 1 } else { cell.split('\n').count() };
-                    if lines > max_sub_lines {
-                        max_sub_lines = lines;
-                    }
-                }
-            }
-            (0..(max_sub_lines as i64)).collect()
-        };
-        let numlen = finallyDisplayLines.len() as i64;
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
 
@@ -1703,7 +1775,7 @@ impl Program {
                 let mut max_len = 1usize;
                 for row in newTable.iter() {
                     if i < row.len() {
-                        for line in row[i].split('\n') {
+                        for line in row[i].lines() {
                             let len_ = line.chars().count();
                             if len_ > max_len {
                                 max_len = len_;
