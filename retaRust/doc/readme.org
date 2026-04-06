@@ -1,0 +1,308 @@
+:PROPERTIES:
+:ID:       b9a1580b-5dbb-4e54-b3d7-6fa53c7008c2
+:END:
+#+title: ReTa und ReTaPrompt readme in Emacs Org Mode - Entwickler-Notizen
+
+#+CAPTION: R10-Symbole
+#+NAME:   fig:R10-Symbole
+[[./symbole.png]]
+** viele Programmier-Notizen aus altem Selfblog zusammen-gefasst :programmieren:dev:development:reta:features:bugs:csv:debugging:refactoring:@Programmieren:
+:PROPERTIES:
+:CLOSED: [2022-11-17T18:20]
+:EXPORT_DATE: [2022-11-17T18:20]
+:EXPORT_FILE_NAME: 2
+:EXPORT_HUGO_WEIGHT: -2
+:draft: false
+:EXPORT_OPTIONS: toc:5.
+:END:
+*** 1. ReTa-Content-Baustellen
+**** Was sollte baldigst anstehen
+***** wegen höheren Organisationen <50, bis 49:
++ Stimmungen
++ Wahrnehmung als Geist
++ Organisationen 37 bis 49 vervollständigen, was diese sind und wofür diese sind.
++ und auch Spalten 1/5 und 1/6 bis 49 höher werden lassen
++ Prinzipien
+***** neu machen
++ M-Teilchen-P über:
+  + Kombinationen
+  + Brüche und damit 1/n
+***** bisher zu sehr vernachlässigt
++ Verhalten (11)
++ Modus (8)
++ Eigs 1/n
+***** alles ungewöhlichere (weniger wichtig)
++ Organisationen der Art n/m, wie 2/3 wären mittlerweile relevant herauszufinden
+  + Dadurch weiß ich besser, welchen Grad Wichtigkeit das n/m hat.
++ a und u n/m sollte ich noch mal anschauen: nicht höheres neues, nur das alte wieder überprüfen
++ Gefühle n/m
++ Alle Brucherweiterungen, überall, also nicht nur bei n/m, sondern auch bei n und 1/n bei allen Grundstrukturen
++ Ich müsste mal die gebrochen-rationalen Gefühle probieren zu machen.
+  Das würde mir gut woanders weiterhelfen.
+***** noch mal überprüfen (weniger wichtig)
++ höherer Geist n und 1/n
++ Kombinationen und n/m
++ Sicherheitsgrad höherer Absichten noch mal neu (habe ich schon unzählige Male neu gemacht.)
+***** unwichtiges
++ Ich könnte erweitern aus welchen Dingen ich noch bestehe, der höheren Art, wie höhere Gefühle und Impulse, etc. Denn das gabs vorher nicht.
+*** 2. Feature Ideen
++ automatische Generierung meiner merkwürdigen Versionsnummern-Vergabe
++ rp könnte VariablenVergabe unterstützen für ZahlenBereiche und Zeichenketten
+  (habe dazu aber eher nicht so den Bedarf)
++ mehrere Befehle hintereinander ermöglichen durch Semikolon getrennt, wie in der Schnell: in rp und bei AutoComplete
+  (bessere wäre die integrative modulare Unterstützung einer Skriptsprache, gleich besser Python)
++ Shell-Möglichkeiten, wie Pipelining und dann mit Shellbefehl abfangen, mit dem Befehl shell und dann gute Syntax ...
+  (bessere wäre die integrative modulare Unterstützung einer Skriptsprache, gleich besser Python)
++ in reta.py, dass einige Komponenten nicht mehrfach gebaut werden, bei mehrfachem reta aufruf programmieren
++ Dass man für Zeilenangaben die eigenen reta Python Funktionen aus den zentralen libs verwenden darf.
+  Aber nur bei mulpri bzw. p
+  (eher nicht notwendig)
++ Ich sollte mal überlegen, nur mal überlegen, wie ich alles vollkommen anders architektonisch designen würde, wenn ich noch mal von vorn beginnen würde: Denn das alles ist im Verlauf entstanden, wo vorher noch nicht bekannt war, was für Inhalte in welcher Struktur kommen werden! Also noch mal alles neu denken! Das dann aber nutzen, um nicht alles anders zu machen, sondern für feine kleinere Designänderungen und ggf. Architekturänderungen und ggf. Refactoring.
++ kein Feature, sondern nur für mich kurzfristig wichtig:
+  + ts index signaturen gehen so:
+    interface dict {
+        [key: string]: string;
+    }
+  + also für Klassen und Objekte und Maps sind Objekte: also das interace als Typ angeben
+  + oder sowas
+  interface Options {
+    [key: string]: string | number | boolean;
+    timeout: number;
+  }
+
++ Testing und Debugging Notes statt Feature-Ideen
+  + üall noch Testen üall in html wo brüche sind: Brucherweiterung von Universum dabei: ja nein, z.B. bei 2:=14/7 oder 7:=21/3
++ Weitere Farbschemen, wenigstens konzeptionalisieren: Aber eigentlich dürfte das Einprogrammieren nicht so das große Ding sein.
++ Dass man in der html per Parameter Spalten über Checkboxen vorselektieren kann.
++ Reziproke und n/m für w Befehl ermöglichen
+  (habe dazu aber eher nicht so den Bedarf)
++ andere Primzahlbedeutungen, außer 28 bis 32 (=Art des Geites, z.B. Gefühl oder Energie), der anderen Reihen auch hinzufügen
+  + z.B. 17 bis 25, dass alle Pro-Innen-Primzahl-Organisationen immer auch so etwas wie einerseits ein Innenministerium sind, als auch eine Organisation des Verdeckten
++ Filtern wie die HTML: Dafür ein System ausdenken: Refactoring und Neuprogrammierung des ganzen Systems zur Filterung von Zeilen
+  (Obwohl es so wie es ist IMHO genügend ist.)
++ SQL like Relationen, z.B. 2:1, d.h. 3 Spalten, und auch alles wie bei SQL, d.h. z.B. n Spalten nach oben/unten: bei z.B. Abstand 1: Gegenspieler. Warum nicht gleich eine SQL (like) Sprache übernehmen, statt das Rad neu zu erfinden!
+  + rp Syntax "u6|7" z.B. für kombiniertes mathematisches Objekt der Vektor
+  (habe dazu aber eher nicht so den Bedarf)
++ alle Features von retaPrompt und der von reta ausgegebenen html bei beiden haben, weil nicht ganz beide ganz alles von beiden können, sondern nur fast: was fehlt da eigentlich noch? Aufgabe: herausfinden, was noch ungleich ist: detailliert austesten
++ Nein: Syntax highlighting: hä? Kann das eigentlich die Lib für AutoComplete ? Müssten doch nur Shell Sonderzeichen sein...
++ Was denn nun?: dinge bei zsh abschauen: was kann zsh alles?
++ schöneres UTF: Ideen? Keine! Smilies, Symbole für irgendwas, mhhh....
++ Kurzform für Zeile und Spalte einführen, statt die langen Befehlsketten immer.
++ Kurzform 1|2|3 für Kombinationen, aber:
+  + dafür muss das reta überhaupt erstmal als Feature beherrschen
+  + dafür sollte ich den Code vorher besser so haben, dass ich lieber Numpy Matritzen verwenden
+    + denn sonst baut das auf altem Code auf und wann verwende ich endlich das schnellere Numpy für alle Matritzen?
+  (habe dazu aber eher nicht so den Bedarf)
++ Die Spaltennummer direkt als Zahl wählen können. (ist das so eine gute Idee?)
++ neues Farbschema: für html aber besser nur: primzahlen pro außen und pro innen und ggf. dessen vielfacher; Farbschema mit durch 3 teilbarem außerdem
+  + Farbschema der Helligkeiten aus welchen Primzahlen welche Zahl besteht
+  + Um bessere Farben für die html zu finden, sollte ich einen screenshot davon machen und diesen mit gimp so bearbeiten, dass ich exakt eine Farbe in eine andere ändere. In Gimp kann ich viele Farben ausprobieren.
++ retaPrompt skriptingfähig machen: nein, das muss nicht bald sein
+  (Nein, das ist Unsinn, das rp bereits geskriptet ist und damit in anderes Python eingebunden werden kann. Das bedeutet, rp ist bereits skriptingfähig.)
+**** 2.1. Multilingual: fast bereits erledigt
++ ts multilingual: ach, ich muss doch einfach nur zentral alle Text-Zeichenketten haushalten: das geht schnell zu programmieren! Dann mache ich das damit allen Übersetzern damit am einfachsten! Mehr muss nicht sein.
++ mit AI csvs übersetzen
++ "Mache mir eine Datenstruktur, in der nur alle diese strings drin auf die Art gespeichert sind, dass man mit dem python tool babel diese strings auch mit anderen strings für andere sprachen befüllen kann und programmiere mir, dass diese Datenstruktur aus nur diesen strings, die strings der einen großen Datenstruktur befüllt, sodass sie im einfachen Fall letztlich die gleiche Datenstruktur sein wird, nachdem sie wieder mit den strings befüllt wurde, die sie eigentlich ursprünglich hatte."
+****  2.2. minder wichtig, aber geht schnell:
++ refactoring: viel zu ändern, aber geht schnell: bei rp: statt viele if's für einzelne Befehle: merge der dicts und sets mit schnittmenge der befehle bilden, wo dicts auf funktionen oder so zeigen, und dann diese funktionen zu einer sogenannten komposition bauen bla1().bla2().bla3() und diese komposition dann ausführen: elegantere feinere Lösung, die auch schneller läuft
+  aber eigentlich nicht so wichtig
+  + Weitere Farbschemen, wenigstens konzeptionalisieren: Aber eigentlich dürfte das Einprogrammieren nicht so das große Ding sein.
+  + Ich sollte aber das gesamte Design in ReTa ändern, von der Kombinierbarkeit der Zeilenangaben und das so machen, wie in der html. Dazu muss ich mir aber geduldig ein neues Design überlegen, das durchdacht genug ist, das alles so perfekt kombiniert werden kann, wie bei SQL-Sprachen und nicht so unflexibel, wie es bisher immer war.
+  + Erst nachdem ich das neu designt habe, sollte ich das mit der besseren Kombinierbarkeit von v und w nicht in rp, sondern reta umsetzen:
+    1. Weil das so sehr viel besser geht,
+    2. weil es anders nur ein Verschieben von Problemen ist und
+    3. weil grundsätzliches Neudesign auch wichtiger ist und eigentlich nicht ewig Zeit beanspruchen dürfte: Es ist nicht hochkomplex.
+  + nein: +html zstd pro Spalte: sukkzessiv mit zentraler lib aber dennoch pro zelle komprimiert: so wie mehrere dateien auch zusammen verschlüsselt werden können, ohne dass die Kompression wieder von vorn beginnen muss: spart platz insgesamt.+
+  + --nocolor auch für html und bbcode für deren Tag als option umsetzen
+    besser gleich: regexen von allen, das man alles regexn könnte
+  + Dass man bei Kombinationen filtern kann nach nur bestimmten Zahlen, dazu und hinweg - am Besten mit den bisherigeen allen Filtermethoden, den Bereichsangaben, aber auch für Brüche dann ja wohl - das aber vorher detailliert und umfangreich und lang genug vorher planen!
+  + KI die höheren antik griechischen Symbolnamen fortsetzen lassen und dann in die csv rein schreiben: also nur content
+  + retaPrompt Befehl meta und damit auch konkret und praktisch theoretisch .... also all das das zu diesem gewissen algorithmus gehört
+    erstmalig hat mehrfach dieser Befehl eine zusätzliche Änderung an der Ausgabe
+    Bsp was mehrfach heißt:
+    meta "6 ist z.B. 1/12" und "konkret konkret 24 ist 6"
+    eigentlich brauche ich das für mich nicht zu programmieren, aber dürfte nicht so aufwändig sein
+    soll aber besser auch für alle rationalen Zahlen gehen ... mhh - Das könnte aufwändiger werden, zu implementieren
+**** 2.3. aus reta.py
++ kombinationen sortiert ausgeben und als Hierarchiebaum den Zahlenkombinationen entlang
++ kombinationen filterbar machen, dass nicht alle kombinationen bei einer Zahl immer angezeigt werden
++ neues Farbschema: für html aber besser nur: primzahlen pro außen und pro innen und ggf. dessen vielfacher; Farbschema mit durch 3 teilbarem außerdem
++ Viele Routinen schreiben, die Codeteile immer dann überspringen, wenn man weiß, dass sie nicht benötigt werden, zur Geschwindigkeitssteigerung
++ Ctrl+C kontrollierter abbrechen lassen!
++ Pytest verwenden wegen Geschwindigkeitstests.
++ In einigen GenerierungsSpalten werden Teile aus der Reli dings kopiert, was unnötig ist.
+  Außerem, dass dann die relitable ganz geklont werden muss. Und die Einzelsachen
+  müssten nur selbst geklont werden und mehr nicht.
++ Immer dann wenn ich die ganze relitable matrix deepcopy geklont habe, hätte ich das gar nicht tun müssen, da ich einfach nur die werte, die ich vorher raus genommen habe, einfach nur per copy oder deepcopy hätte nur rausnehmen müssen
++ Ich muss bei vielen Funktionen noch den Funktionskopf, Quellcode hier dokumentieren
++ vim: iIaAoOjJ mit Registern arbeiten wegen Löschen ohne ausschneiden
++ Die Geschwindigkeitsteigerungen entstehn meist durch anschließndes Zusammenfügen zu einer dann festen Größe.
++ py datei erstellen, die dafür da ist datenstrukturen für die js zu bilden, die für die Zeilenangelegenheiten da sind, so dass die js die nicht jedes Mal berechnen muss.
++ Ich müsste wirklich noch total überall schauen und zu jedem Punkt im Forum zu gleichförmiges-Polygon-Religionen
+**** 2.4. eher Luxus, aber nett, fancy und cool
++ auf Basis des Bereich-Regex generieren lassen: AutoComplete für alle ZahlenBereiche für mindestens immer stückweise 2 felder (was dann komisch aussieht, weils nicht das Ganze ist), wodurch bei Zahlen 0-9 bereits 100 und dann mehr ZeichenKombis möglich sind, aber was solls: Könnte machbar sein. Wird aber ein wenig umständliches hin und her: Aber nicht so super viele Codezeilen: vielleicht schaffbar an 3 Tagen. Der schaut dann immer in die Zukunft im ganzen langen Zahlenbereich von nur 1+1 Zeichen. Sieht dann merkwürdig aus, aber das könnte gehen. Der Regex generiert das dann, dadurch dass ich einen Brutforce mit begrenzten Zeichen auf ihn werfe. Ansich eigentlich eine coole Idee finde ich, das so zu lösen.
+  + ist ein wenig schwieriger, aber nicht super viel Code - machbar
+*** 3. Feature - Geschwindigkeit
++ numpy:
+  + machen dass b-baum oder hashtabelle von numpy verwendet werden: testen welche Lösung schneller ist
+    + b-baum ist besser für umfangreiche operationen - hastabelle ist besser für suchen und selektiven datenzugriff
+  + mit del alte matritzen in python besser löschen, um ram zu sparen
+  + zwar sind matritzen mit gleicher textlänge schneller, aber RAM zu verschleudern muss nicht sein
+    + Später kann ich immer noch die Matrix umbauen, dass sie keinen variblen Text oder bei mehr Dimensionen teilweise gleich langen text annimmt
+  + pandas für numpy matritzen verwenden: numpy ist bei Gigabyte Daten 10 mal schneller für Text
+  + Eigentlich ist es am Einfachsten, wenn ich mit Python einlese und dann zu Pandas rüber reiche, aber nein: einfach KI fragen! einfach!
+  + Programmiertes Slicing, das keines deshalb ist, meines Codes durch Numpy Slicing ersetzen, da das dann ja auch schneller funktioniert damit
+  + Syntax von Numpy vs. Python Matritzen ist fast gleich und wenn nicht kann mich die KI gut unterstützen
+    + numpy slicing und indexing möglichkeiten sind enorm
+    + numpy unterstützt broadcasts, was eigentlich einfach die numerischen Tabellenoperationen auf normalerweise Zahlen wären: alles geht viel schneller
+    + mit numpy kann man super einfach spalten zugreifen und ich brauchte da nicht meinen schwierigen umsortier algo um so darauf zuzugreifen
+  + wie kann das sein, dass pandas doppelt oder dreifach so lange braucht, wenn pandas doch etwa die gleichen numpy matritzen von numpy verwendet? Dann müsste doch beides etwa gleich schnell sein
+    + Pandas verwendet zwar NumPy-Arrays als Grundlage, aber es fügt eine Reihe von zusätzlichen Funktionen und Datenstrukturen hinzu, die die Leistung beeinträchtigen können
+    + Indexierung, Datentypen,
+    + In den von dir durchgeführten Benchmarks wurde eine Pandas-Datenframe mit 10.000 Spalten und 10.000 Zeilen verwendet. In diesem Fall ist der Geschwindigkeitsunterschied zwischen Pandas und NumPy besonders groß, da das Indexieren und das Umwandeln von Datentypen einen großen Teil der Gesamtzeit ausmachen.
+    + Wenn du die Leistung von Pandas verbessern möchtest, kannst du folgende Maßnahmen ergreifen:
+      + Verwende eine kleinere Datenmenge: Je größer die Datenmenge, desto größer ist der Geschwindigkeitsunterschied zwischen Pandas und NumPy.
+      + Verwende einen einzelnen Datentyp: Wenn deine Daten nur einen Datentyp enthalten, kannst du das Umwandeln von Datentypen vermeiden.
+      + Verwende die richtigen Funktionen und Datenstrukturen: Pandas bietet eine Reihe von Funktionen und Datenstrukturen, die für bestimmte Aufgaben optimiert sind.
+  + Numpy ist 10 mal schneller für meine aufgabe aus 600x200x10x100 Buchstaben und pandas 3 mal schneller ungefähr
+    + Eine pessimistische Schätzung der Geschwindigkeitssteigerung für reta ist 20% insgesamt
+  + Gründe für die Implementierung
+    + ... Geschwindigkeitssteigerung - klar
+    + pandas kann verwendet werden, wenn ich als Feature solche Operationen wie mit SQL einbauen möchte, z.B. wenn ich Zahlenabstände einbeziehen möchte in Operationen
+    + die schön in Klartext lesbaren csv Dateien lägen mit pandas in performanter lesbarer form vor und speicherplatzschonender
+    + darauf basierende Implementierungen müsste ich nicht mehrfach programmieren, wenn der Unterbau durch Pandas und Numpy geändert wird. Darauf basiert:
+      + diese SQL-ähnlichen Relationen Operationen - wie beschrieben
+      + reta Feature für selektiveres Wählen von Kombinierten Dingen - das ich vor 2 Jahren plante, aber nie implementierte
+      + neue Programmierung der Methode zum CLI-Text-Ausgeben von allem: der Code soll aus Parametern jedes mal gebaut werden und dann als neu zusammen gestellter Code ausgeführt werden, anstelle dass alles so super kompliziert ist und damit langsam ausgeführt wird, aufgrund ständiger if und etc. abfragen in vielen schleifen. Die würden weg fallen, wenn die Ausgabefunktion zu Code erstmal immer jeweils gebaut werden würde.
+  + Ich kann die Verwendung von Pandas in der angefangenen Programmierung von vor 2 Jahren behalten, wenn ich die Matrix bzw. den Tensor zwischen pypy3 und python mit pipes in sekundenbruchteilen hin und her verschiebe. (pypy3 kann numpy, aber nicht pandas)
+
++  Wo ist Verbesserung der Geschwindigkeit möglich:
++ bei der Ausgabe
++ Parallelisierung
++ dass nach neuer Eingabeaufforderung nicht alles neu gelesen werden muss
++ binäres Datenbank-Format, statt csv, besser über Pandas, das Numpy Datenstrukturen verwendet und für DBs ein binäres Format zur Verfügung hat
++ Ich bin sehr wohl sehr gut mit Rekursiver Programmierung vertraut. Ich hatte so etwas mehr als genug im Studium.
+
+Sollte ich es irgendwann fertigstellen die Matritzen mit Numpy Matritzen ersetzt zu haben,
+dann wäre der nächste Schritt die CLI Ausgaben der Tabellen auf Meta-Programmierung umzustellen.
+Das wird ReTa sehr beschleunigen, weil nach Code-Analyse dort die hauptsächlichen Geschwindigkeitseinbußen zu finden sind.
+Ich brauche also ein Programm, das Quelltext baut, der die Tabelle dann ausgeben soll. Das ist Meta-Programmierung.
+Dieser Quelltext hat dann weniger Code und Bedingungsabfragen und ist weniger komplex.
+Die bisherige Programmfunktion zur Ausgabe ist einziges Chaos. Aber ich verstehe sie.
+
+Danach erst macht es Sinn alles zu Parallelisieren.
+Ich sehe nicht ein, etwas zu parallelisieren, das selbst noch deutlich ordentlicher werden könnte.
+Das wäre sonst umständlich und mehr Mehrarbeit. Alles muss in der richtigen Reihenfolge programmiert werden, sodass man sich nicht zu viel Mehrarbeit aufhalst.
+
+Das alles hat aber unterster niedrigste Priorität, denn dabei geht es nur um Geschwindigkeitsvorteile und die sind momentan unwichtig. Aber irgendwann müsste das schon noch gemacht werden. Was solls. ReTa soll doch nur so eine Art Proof-of-Work sein. Es soll voll alles können, aber richtig ordentlich darf das dann jemand anderes machen, mit mehr und besserer Dokumentation: Einfach Arbeitsteilung. Ich mache das Ernste und jemand anders ist der Codemonkey, der End-User-Programme baut, die bestenfalls für den DAU optimal sind.
+
+Der darf dann der Super-Programmierer sein, der den besten Code schreibt, den jeder lesen kann und der hochoptimiert ist und super refactored, mit tollen Features, eben für Endanwender, mit Clean-Code, Parallelisierung, mit wenig notwendiger Dokumentation, weil alles für Enduser optimiert und mit dennoch mit viel ausreichender Dokumentation. Dafür darf der Codemonkey gerne die komplexeste komplizierteste Programmiersprache verwenden, denn er braucht das und ihm gefällt das. Der darf gerne auf einfachere Programmiersprachen herabschauen. Ich habe jedenfalls nur begrenzte Lebenszeit.
+
+Deshalb programmiere ich ReTa als Proof-of-Work, als ein Programm, das dennoch aber alles können soll und gut können soll. Es soll aber kein Programmiertechnisches Meisterwerk sein, weil ich wichtigere Prioritäten habe, als mich um super Code zu kümmern. Bei mir muss es um Inhalte gehen. Auf der einen Seite programmiere ich ReTa aber auch viel für mich und für meine Anforderungen, wenn ich es gebrauchen muss.
+
+Was ansonsten noch für deutlich fernere Zukunft noch für RetaPrompt gebrauchbar ist, wäre Skriptingfähigkeit. Dann kann man Skripten, mit einer Schleife oder Rekursion, welche Zeilennummern man möchte und was einem sonst noch so einfällt. Dann kann man Variablen verwenden und wiederverwenden, usw.
+
+Irgendjemand kann sich vielleicht noch eine eigene SQL-ähnliche Syntax einfallen lassen, wenn es darum gehen soll, diese Tabellen wie SQL Tabellen zu verschachteln.
+*** 4. Feature: Mathe
++ z.B. ggT & kgV
+Vielfacher einer Zahl für einen Bereich
+Distanzen einer Zahl zu einem Bereich
+Dabei unterscheiden zwischen pro-außen und pro-innen Primzahlen
+
+Überlegen, ob sich rp etwas merken soll und was das sein sollte.
+Vielleicht alles zu vorigem Kommando, sodass man einen Modus wählen könnte, in welchem man Teile abwählen und anwählen kann.
+Befehl-Teile in Variablen speichern und diese Variablen abrufen.
+Beliebige Substitutionen
+
+ascii art und emoticons in cli
+scriptingfähigkeit, statt nur den python befehl
+wozu? unnötig! oder?
+
+Verzeichnisbaum von den Reta-Paramtern durchwandern, so wie man Ordner in Dateisystemen durchwandern kann.
+Und den Baum der anderen Hierarchieordnung der Grundstrukuren, anders als die der ReTa-Parameter selbst.
+
+mit einem Zeichen wie "+" könnte ich vorwärts scrollen als neue Befehlseingabe für weitere Tabellenansichten.
+
+Bei größeren Tabellenansichten wäre eine Schnellscrollfunktion in 2 Richtungen nicht schlecht für die CLI.
+
+EDIT:
+Nutzen von Skriptingfähigkeit:
+z.B. beliebig geskriptete Zeilennummern, z.B.: alle modulo 24 + pro außen primzahlen, alle primzahlen auf dem primzahlkreuz über der 7.
+
+EDIT:
+In ReTA-Prompt anfangs texten, dass gerade vi-mode oder emacs-mode aktiv ist.
+*** 5. Überlegungen
++ Meine Stabilität Policy ist eine Schande
+       https://doc.pypy.org/en/latest/cpython_differences.html
+  + endlich mal unit tests machen
+  + große funktionen in mehrere kleinere verwandeln.
+  + gute lib für unit tests nehmen, pytest soll gut sein
+  + bis zu Punkten mit exit() gehen und so eine volle Ausgabe davon machen
+  + diese Ausgabe für pypy3 und python3 vergleichen
+  + sortieren, stufenweise weiter machen
+
++ Vielleicht könnte oder sollte ich aspektorientierte Programmierung für die Textausgabe von ReTa verwenden, sofern Python das kann, weil die Klassen-Methode davon ein einziges wildes Durcheinander ist, aber ich bin mir unschlüssig, wie ich das besser mache, ohne zu viele Redundanzen zu erzeugen. Aber es funktioniert doch alles bestens. Wieso sollte ich also Refactoren?
++ Permanentes Erweitern der Matrix ist doch Perfomance-Unsinn. Ich sollte die Matrix von Anfang an in der richtigen Größe haben.
+
+Außerdem sollte ich mir richtig lange Zeit nehmen, das überhaupt einzuprogrammieren, wegen der Zeit und weil das nicht eilt und weil es eigentlich auch nicht so super wichtig ist.
+
+Aber meine Tabelle wird immer größer und es wird dadurch langsamer.
+
+Ich mache es mir am Einfachsten, wenn ich die Matrix richtig groß mache.
+Ich kann sie schon als reine Numpy Matrix mit fester Stringgröße einstellen, weil diese dann ja wieder einfach mit Panda verwendbar ist. Das sollte ich aber austesten, auch wenn das sicher wäre.
+
+Ich sollte das in großen Zeitabständen programmieren, weil die Priorität mittelmäßig ist.
+
+Same typed matrix of same sized strings = faster
+
+Ähnlich wie strArr = numpy.empty(10, dtype='s256')
++ Es gäbe da einige Methoden ReTa zu beschleunigen.
+Ich denke, ich werde keine davon umsetzen, auch wenn es teilweise alles sehr langsam geworden ist.
+Am besten wäre es, wenn ich alles neu in Rust schreiben würde und alle Designfehler nicht mehr machen würde und von vornherein Parallelisierung nur als Möglichkeit einbeziehe, es doch nicht objektorientiert, sondern prozedural zu programmieren.
+Das ist jedoch die Zeit nicht wert. Mir fehlt dazu die Lebenszeit.
+Ich will doch am Ende Zeit sparen, aber wenn ich das alles neu programmieren würde, hätte ich einen viel größeren Zeitverlust.
+
+Man soll angeblich Python deutlich beschleunigen können, wenn man sehr geschickt und schlau ist.
+Es gäbe da einiges, das ich tun könnte, um es bei Python zu belassen und dennoch ausreichend zu beschleunigen:
++ Listen und Matritzen von Numpy verwenden
++ Pandas verwenden und dadurch auf manche meiner Algorithmen verzichten, und Pandas nutzt bereits sowieso Numpy Matritzen
++ Parallelisierung durch mehr Prozesse der gleichen ausführbaren Datei
+
+Aber auch dazu fehlt mir die Zeit und das alles würde mir mehr Zeit kosten, als dass es mir insgesamt einen Zeitvorteil bringt.
+
+Ansonsten müsste mein ReTa Programm sowieso grundlegend refactored werden, und entschlackt werden und so umdesigned werden, dass es das Gleiche tut, aber das programmiertechnische Design einfacher ist. Z.B. sollte ich die Klassen und Objekte wieder zu Prozeduren machen, dass alles prozedural, statt objektorientiert, funktioniert.
+
+Und dann hätte ich bereits schon längst überhaupt Unit-Test-Prozeduren schreiben sollen, was ich nie tat.
+
+Dass ich ReTa nun in einem halbwegs schlechten Zustand hinterlassen muss, schmerzt mich ein wenig. Es tut aber eigentlich, was es soll. Und das ist das Wichtigste.
+Für mich als Programmierer ist es aber unbefriedigend, wenn ich ein Programm gut verbessern kann, aber ich mich selbst davon abhalten muss, aus Vernunft. Aus Vernunft muss ich etwas hinterlassen, das ich perfekter hätte machen können. Das macht keinen Spaß.
+
+Eigentlich hatte ich die Hoffnung eingeplant, irgendwann Programmierer bezahlen zu können, die dann die Arbeit erledigen, für die man mich nicht braucht, sondern die sich nur um Technisches kümmern. Wenn ich viel phantasieren und träumen würde, dann passiert das vielleicht in meiner Phantasie, aber die Realität ist davon besonders weit entfernt; heute noch entfernter, als vor Jahren.
++  statt csv und normale Matritzen:
+
+pandas binärformat, das csv ersetzt, welches für matrizen numpy verwendet.
+Dann kann ich auch gleich pandas matrix funktionen verwenden, die wie sql funktionieren.
+Ich hätte das gleich so machen sollen, aber ich konnte nicht wissen, wie riesig reta wird.
+
+Sollte ich das umsetzen wollen, dann sollte ich unbedingt einen neuen eigenen Branch dafür anlegen, komme was wolle.
+
+*** 6. Refacturing
++ Aus Objektorientiertem Prozedurales machen, es sei denn es ist besser wie es war in wenigen Fällen.
++ Vorher planen, viel Durchdenken.
++ Oder statische Klassen, statt Instanzen verwenden.
++ Aufhören damit, weg machen: mehrfache Art gleichzeitig Variablen zu übergeben und zu referenzieren: Das ist liederlich, unordentlich.
++ Vielleicht mal besser doch Clean Code umsetzen, obwohl mir das den Spaß wegnimmt.
++ builder pattern für ausprinten und code builden aus code, statt selbst geschrieben
++ Neudesign in reli ts der funktion des Ausgrauens: Fokus: lesbarer Code
++ Dokumentation in der ts welche Variable genau wohl was macht und in die Funktionsköpfe schreiben, was die Fkt tut
++ viele Nummern Statusse in der ts durch lesbare Enums und map dicts mit strings als keys verwenden für die lesbarkeit - könnte es aber langsamer machen - naja
++ in rp sollte ich mit dem builder pattern die befehlsabfolge hintereinader zusammen bauen lassen - wäre eleganter
++ in rp gibt es viele ftk hintereinander mit vielen gleichen paramtern argumenten: daraus sollte ich eine Klasse mit dieser Methode bauen, damit die Variablenzuweisung nicht so redundant häufig ist
++ genauso in reta.py mit den Hinzufügungen vieler Sonder-Spalten, die generiert werden: daraus eine Klasse bauen, um die Redundanzen weg zu bekommen.
++ Fkt für die 4 n/m Befehle sind redundanter Code und sollten in eine Fkt oder neue Klasse rein.
+*** 7. Typescript
+**** Allgemeines
++ Alles zusammen gleichzeitig refactoren und dabei gleichzeitig Unit-Tests einbauen.
+  + Unit-Tests mit einem leichtgewichtigen Framework dazu
+  + gleichzeitig moderne Typescript-Fähigkeiten und Programmierkonzepte dazu verwenden und diese zuvor recherchieren, welche neuesten es für Typescript dafür gibt!
++  Mehrsprachigkeit

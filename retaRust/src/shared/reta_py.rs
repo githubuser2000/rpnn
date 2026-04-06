@@ -1,8 +1,68 @@
 use indexmap::IndexMap;
+use std::collections::{BTreeMap, BTreeSet};
 use crate::shared::words_py::{Words, PyValue};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
+
+#[derive(Clone, Debug)]
+pub struct SpaltenTyp {
+    pub ordinary: (usize, usize),
+    pub generated1: (usize, usize),
+    pub concat1: (usize, usize),
+    pub kombi1: (usize, usize),
+    pub boolAndTupleSet1: (usize, usize),
+    pub gebroUni1: (usize, usize),
+    pub gebrGal1: (usize, usize),
+    pub generated2: (usize, usize),
+    pub kombi2: (usize, usize),
+    pub gebrEmo1: (usize, usize),
+    pub gebrGroe1: (usize, usize),
+    pub metakonkret: (usize, usize),
+    pub ordinaryNot: (usize, usize),
+    pub generate1dNot: (usize, usize),
+    pub concat1Not: (usize, usize),
+    pub kombi1Not: (usize, usize),
+    pub boolAndTupleSet1Not: (usize, usize),
+    pub gebroUni1Not: (usize, usize),
+    pub gebrGal1Not: (usize, usize),
+    pub generated2Not: (usize, usize),
+    pub kombi2Not: (usize, usize),
+    pub gebrEmo1Not: (usize, usize),
+    pub gebrGroe1Not: (usize, usize),
+    pub metakonkretNot: (usize, usize),
+}
+
+impl Default for SpaltenTyp {
+    fn default() -> Self {
+        Self {
+            ordinary: (0, 0),
+            generated1: (0, 1),
+            concat1: (0, 2),
+            kombi1: (0, 3),
+            boolAndTupleSet1: (0, 4),
+            gebroUni1: (0, 5),
+            gebrGal1: (0, 6),
+            generated2: (0, 7),
+            kombi2: (0, 8),
+            gebrEmo1: (0, 9),
+            gebrGroe1: (0, 10),
+            metakonkret: (0, 11),
+            ordinaryNot: (1, 0),
+            generate1dNot: (1, 1),
+            concat1Not: (1, 2),
+            kombi1Not: (1, 3),
+            boolAndTupleSet1Not: (1, 4),
+            gebroUni1Not: (1, 5),
+            gebrGal1Not: (1, 6),
+            generated2Not: (1, 7),
+            kombi2Not: (1, 8),
+            gebrEmo1Not: (1, 9),
+            gebrGroe1Not: (1, 10),
+            metakonkretNot: (1, 11),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -51,6 +111,36 @@ pub struct Program {
     pub allEquColumns: Vec<i64>,
     pub finallyDisplayTable: Vec<Vec<String>>,
     pub rowsRangeLen: i64,
+    pub mainParaCmds: IndexMap<String, i64>,
+    pub bigParamaeter: Vec<String>,
+    pub __willBeOverwritten_rowsOfcombi: Vec<Vec<String>>,
+    pub obZeilenBereicheAngegeben: bool,
+    pub breiteHasBeenOnceZero: bool,
+    pub breiteORbreiten: bool,
+    pub spaltenreihenfolgeundnurdiese: Vec<i64>,
+    pub puniverseprims: Vec<i64>,
+    pub puniverseprimsNot: Vec<i64>,
+    pub generRows: Vec<i64>,
+    pub generRowsNot: Vec<i64>,
+    pub rowsAsNumbersNot: Vec<i64>,
+    pub rowsOfcombiNot: Vec<Vec<String>>,
+    pub htmlOrBBcode: bool,
+    pub keineleereninhalte: bool,
+    pub keineUeberschriften: bool,
+    pub nummeriere: bool,
+    pub oneTable: bool,
+    pub nocolor: bool,
+    pub outType: String,
+    pub textWidth: i64,
+    pub ifZeilenSetted: bool,
+    pub dataDict: Vec<IndexMap<String, Vec<Vec<PairStr>>>>,
+    pub spaltenTypeNaming: SpaltenTyp,
+    pub rowsOfcombi2: Vec<i64>,
+    pub onlyGenerated: Vec<Vec<i64>>,
+    pub getConcat_ones: Vec<i64>,
+    pub SpaltenVanillaAmount: i64,
+    pub CsvTheirsSpalten: IndexMap<i64, Vec<i64>>,
+    pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
 }
 
 impl Program {
@@ -114,42 +204,302 @@ impl Program {
             allEquColumns: vec![],
             finallyDisplayTable: vec![],
             rowsRangeLen: 0,
+            mainParaCmds: IndexMap::new(),
+            bigParamaeter: vec![],
+            __willBeOverwritten_rowsOfcombi: vec![],
+            obZeilenBereicheAngegeben: false,
+            breiteHasBeenOnceZero: false,
+            breiteORbreiten: false,
+            spaltenreihenfolgeundnurdiese: vec![],
+            puniverseprims: vec![],
+            puniverseprimsNot: vec![],
+            generRows: vec![],
+            generRowsNot: vec![],
+            rowsAsNumbersNot: vec![],
+            rowsOfcombiNot: vec![],
+            htmlOrBBcode: false,
+            keineleereninhalte: false,
+            keineUeberschriften: false,
+            nummeriere: true,
+            oneTable: false,
+            nocolor: false,
+            outType: "shell".to_string(),
+            textWidth: 0,
+            ifZeilenSetted: false,
+            dataDict: vec![],
+            spaltenTypeNaming: SpaltenTyp::default(),
+            rowsOfcombi2: vec![],
+            onlyGenerated: vec![],
+            getConcat_ones: vec![],
+            SpaltenVanillaAmount: 0,
+            CsvTheirsSpalten: IndexMap::new(),
+            spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
         }
     }
 
-    pub fn produceAllSpaltenNumbers(&mut self) -> Vec<i64> {
-        let mut spaltenNumbers: Vec<i64> = vec![];
-        for key in self.dataDicts[0].keys() {
-            let cleaned = key
-                .replace("Int(", "")
-                .replace(")", "")
-                .replace("PyValue::", "")
-                .trim()
-                .to_string();
-            if let Ok(v) = cleaned.parse::<i64>() {
-                spaltenNumbers.push(v);
+    pub fn init_spalten_arten_python_like(&mut self) {
+        self.spaltenArtenKey_SpaltennummernValue.clear();
+        for neg in 0..=1usize {
+            for i in 0..12usize {
+                self.spaltenArtenKey_SpaltennummernValue.insert((neg, i), BTreeSet::new());
             }
         }
-        spaltenNumbers.sort();
-        spaltenNumbers.dedup();
-        self.spaltenNumbers = spaltenNumbers.clone();
-        spaltenNumbers
     }
 
-    pub fn breiteBreitenSysArgvPara(&mut self, argv: Vec<String>) {
-        self.breite = 0;
-        self.breiten = vec![];
-        for arg in argv {
-            if let Some(tail) = arg.strip_prefix("--breite=") {
-                self.breite = tail.parse::<i64>().unwrap_or(0);
-            }
-            if let Some(tail) = arg.strip_prefix("--breiten=") {
-                self.breiten = tail
-                    .split(',')
-                    .filter_map(|x| x.parse::<i64>().ok())
-                    .collect::<Vec<i64>>();
+    fn push_set_entries_exact(set_: &mut BTreeSet<i64>, values: Vec<i64>) {
+        for v in values {
+            set_.insert(v);
+        }
+    }
+
+    fn pyvalue_list_to_i64_vec(values: &Vec<PyValue>) -> Vec<i64> {
+        let mut out = vec![];
+        for v in values {
+            match v {
+                PyValue::Int(n) => out.push(*n),
+                PyValue::Tuple(inner) => {
+                    for v2 in inner {
+                        if let PyValue::Int(n2) = v2 {
+                            out.push(*n2);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
+        out
+    }
+
+    fn parameter_main_name_matches_py(stored: &str, cmd: &str) -> bool {
+        stored == cmd
+            || stored.contains(&format!("'{}'", cmd))
+            || stored.contains(&format!("[\"{}\"]", cmd))
+            || stored.contains(cmd)
+    }
+
+    fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
+        for (i, eineSpaltenArtmitSpaltenNummern) in tupl.iter().enumerate() {
+            let values = Self::pyvalue_list_to_i64_vec(eineSpaltenArtmitSpaltenNummern);
+            let befehl = befehlName.unwrap_or("");
+            let para = paraValue.unwrap_or("");
+
+            if i == 2 {
+                let gebr_idx = match befehl {
+                    "multiplikationen" => Some(2usize),
+                    "gebrochenuniversum" | "gebrochenuniversum2" => Some(5usize),
+                    "gebrochengalaxie" | "gebrochengalaxie2" => Some(6usize),
+                    "gebrochenemotion" | "gebrochenemotion2" => Some(9usize),
+                    "gebrochengroesse" | "gebrochengroesse2" => Some(10usize),
+                    _ => None,
+                };
+                if let Some(target_idx) = gebr_idx {
+                    if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), target_idx)) {
+                        Self::push_set_entries_exact(target, values.clone());
+                    }
+                    continue;
+                }
+            }
+
+            if para == "beschrieben" && (befehl.contains("prim") || befehl == "multiplikationen") {
+                if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), 2)) {
+                    target.insert(2);
+                }
+                continue;
+            }
+
+            if values.is_empty() {
+                continue;
+            }
+            if let Some(target) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&(neg.len(), i)) {
+                Self::push_set_entries_exact(target, values);
+            }
+        }
+    }
+
+    fn spalten_removeDoublesNthenRemoveOneFromAnother_py(&mut self) {
+        for el2_type in 0..12usize {
+            let pos = self.spaltenArtenKey_SpaltennummernValue.get(&(0, el2_type)).cloned().unwrap_or_default();
+            let neg = self.spaltenArtenKey_SpaltennummernValue.get(&(1, el2_type)).cloned().unwrap_or_default();
+            let mut result = pos.clone();
+            for v in pos.intersection(&neg) {
+                result.remove(v);
+            }
+            self.spaltenArtenKey_SpaltennummernValue.insert((0, el2_type), result);
+        }
+        for el2_type in 0..12usize {
+            let neg = self.spaltenArtenKey_SpaltennummernValue.shift_remove(&(1, el2_type)).unwrap_or_default();
+            let mut pos = self.spaltenArtenKey_SpaltennummernValue.get(&(0, el2_type)).cloned().unwrap_or_default();
+            for v in neg {
+                pos.remove(&v);
+            }
+            self.spaltenArtenKey_SpaltennummernValue.insert((0, el2_type), pos);
+        }
+    }
+
+    fn deleteDoublesInSets_py(&self, pos: Vec<String>, neg: Vec<String>) -> (Vec<String>, Vec<String>) {
+        let negset: BTreeSet<String> = neg.iter().cloned().collect();
+        let mut pos2 = Vec::new();
+        for p in pos {
+            if !negset.contains(&p) {
+                pos2.push(p);
+            }
+        }
+        (pos2, neg)
+    }
+
+    fn ordered_set_to_vec_i64(set_: BTreeSet<i64>) -> Vec<i64> {
+        let mut out: Vec<i64> = set_.into_iter().collect();
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    pub fn produceAllSpaltenNumbers(&mut self, neg: &str) -> Vec<i64> {
+        if self.spaltenArtenKey_SpaltennummernValue.is_empty() {
+            self.init_spalten_arten_python_like();
+        }
+        self.mainParaCmds.clear();
+        self.mainParaCmds.insert("zeilen".to_string(), 0);
+        self.mainParaCmds.insert("spalten".to_string(), 1);
+        self.mainParaCmds.insert("kombination".to_string(), 2);
+        self.mainParaCmds.insert("ausgabe".to_string(), 3);
+        self.mainParaCmds.insert("debug".to_string(), -1);
+        self.mainParaCmds.insert("h".to_string(), -1);
+        self.mainParaCmds.insert("help".to_string(), -1);
+
+        let mut last_main_cmd: i64 = -1;
+        for mut cmd in self.argvWithoutProgram.clone() {
+            if cmd.len() > 1 && cmd.starts_with('-') && !cmd.starts_with("--") {
+                let plain = cmd[1..].to_string();
+                if let Some(v) = self.mainParaCmds.get(&plain) {
+                    last_main_cmd = *v;
+                } else if plain == "nichts" || plain == "nothing" {
+                } else if neg.is_empty() {
+                    self.cliErrors.push(format!(
+                        "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: \"{}\" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
+                        cmd
+                    ));
+                }
+            } else if cmd.starts_with("--") {
+                if last_main_cmd == 1 {
+                    cmd = cmd[2..].to_string();
+                    let eq = cmd.find('=');
+                    if self.breiteBreitenSysArgvPara(&cmd, neg) {
+                    } else if cmd == "keinenummerierung" && neg.is_empty() {
+                        self.nummeriere = false;
+                    } else if let Some(eq) = eq {
+                        let left = cmd[..eq].to_string();
+                        let right = cmd[eq + 1..].to_string();
+                        for mut one in right.split(',').map(|s| s.to_string()) {
+                            let yes1 = if !one.is_empty() && one.starts_with('-') {
+                                one = one[1..].to_string();
+                                neg == "-"
+                            } else {
+                                neg.is_empty()
+                            };
+                            if yes1 {
+                                if let Some(tupl) = self.paraDict.get(&(left.clone(), one.clone())).cloned() {
+                                    self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                } else {
+                                    for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
+                                        if Self::parameter_main_name_matches_py(&k1, &left) && k2 == one {
+                                            self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if neg.is_empty() {
+                        for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
+                            if Self::parameter_main_name_matches_py(&k1, &cmd) && k2.is_empty() {
+                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if neg.is_empty() {
+            self.produceAllSpaltenNumbers("-");
+            self.spalten_removeDoublesNthenRemoveOneFromAnother_py();
+        }
+
+        let spalten_numbers = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&(0, 0))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.spaltenNumbers = spalten_numbers.clone();
+        self.rowsAsNumbers = spalten_numbers.clone();
+        self.generRows = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&(0, 1))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.puniverseprims = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&(0, 2))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.rowsOfcombi2 = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&(0, 8))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        self.onlyGenerated = Self::ordered_set_to_onlyGenerated_py(
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&(0, 4))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        spalten_numbers
+    }
+
+    pub fn breiteBreitenSysArgvPara(&mut self, cmd: &str, neg: &str) -> bool {
+        if let Some(tail) = cmd.strip_prefix("breite=") {
+            self.setShellRowsAmount();
+            if self.breiteHasBeenOnceZero {
+                self.shellRowsAmount = 0;
+                self.textWidth = 0;
+                self.breiteORbreiten = true;
+                return true;
+            }
+            if tail.chars().all(|c| c.is_ascii_digit()) {
+                let mut breite = tail.parse::<i64>().unwrap_or(0).abs();
+                if breite == 0 {
+                    self.breiteHasBeenOnceZero = true;
+                    self.shellRowsAmount = 0;
+                } else if self.shellRowsAmount > 7 && breite > self.shellRowsAmount - 7 {
+                    breite = self.shellRowsAmount - 7;
+                }
+                if neg.is_empty() {
+                    self.breite = breite;
+                    if breite > self.textWidth {
+                        self.textWidth = breite;
+                    }
+                }
+                self.breiteORbreiten = true;
+            }
+            return true;
+        }
+        if let Some(tail) = cmd.strip_prefix("breiten=") {
+            if neg.is_empty() {
+                self.breiten = vec![];
+                for breite in tail.split(',') {
+                    if breite.trim().chars().all(|c| c.is_ascii_digit()) {
+                        self.breiten.push(breite.trim().parse::<i64>().unwrap_or(0));
+                        self.breiteORbreiten = true;
+                    }
+                }
+            }
+            return true;
+        }
+        false
     }
 
     pub fn setShellRowsAmount(&mut self) {
@@ -369,59 +719,258 @@ impl Program {
         }
     }
 
-    pub fn parametersToCommandsAndNumbers(&mut self, words: &Words) {
-        self.storeParamtersForColumns(words);
-        self.collect_side_paras_from_argv();
-        let mut lastParameterType = "".to_string();
-
-        for token in self.argvWithoutProgram.clone() {
-            if token.starts_with("-") && !token.starts_with("--") {
-                lastParameterType = token[1..].to_string();
+    fn parse_simple_numeric_list_py(&self, txt: &str) -> Vec<i64> {
+        let mut out = vec![];
+        for part in txt.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
                 continue;
             }
+            if let Some((a, b)) = part.split_once('-') {
+                if let (Ok(start), Ok(end)) = (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
+                    if start <= end {
+                        for v in start..=end {
+                            out.push(v);
+                        }
+                    }
+                }
+            } else if let Ok(v) = part.parse::<i64>() {
+                out.push(v);
+            }
+        }
+        out
+    }
 
-            if token.starts_with("--") {
-                let cmd = token[2..].to_string();
+    fn parametersCmdWithSomeBereich_py(&self, txt: &str, suffix: &str, neg: &str, keineNegBeruecksichtigung: bool) -> Vec<String> {
+        let mut out = vec![];
+        for v in self.parse_simple_numeric_list_py(txt) {
+            if neg.is_empty() || keineNegBeruecksichtigung {
+                out.push(format!("{}{}", v, suffix));
+            }
+        }
+        out
+    }
 
-                if lastParameterType == "spalten" {
-                    if let Some(eq) = cmd.find('=') {
-                        let main = cmd[..eq].to_string();
-                        let right = cmd[eq + 1..].to_string();
+    fn push_unique_string(target: &mut Vec<String>, value: String) {
+        if !target.contains(&value) {
+            target.push(value);
+        }
+    }
 
+    pub fn parametersToCommandsAndNumbers(&mut self, argv: Vec<String>, neg: &str, _words: &Words) -> (Vec<String>, Vec<i64>, Vec<Vec<String>>, Vec<i64>, Vec<i64>, Vec<i64>) {
+        let mut paramLines: Vec<String> = vec![];
+        if argv.len() == 1 && neg.is_empty() {
+            self.cliErrors.push("Versuche Parameter -h".to_string());
+        }
+        let rowsAsNumbers: Vec<i64> = vec![];
+        let rowsOfcombi: Vec<Vec<String>> = vec![];
+        let mut spaltenreihenfolgeundnurdiese: Vec<i64> = vec![];
+        let puniverseprims_only: Vec<i64> = vec![];
+        let generRows: Vec<i64> = vec![];
+        self.bigParamaeter.clear();
+        self.__willBeOverwritten_rowsOfcombi.clear();
+
+        for arg in argv.into_iter().skip(1) {
+            if arg.is_empty() || !arg.starts_with('-') {
+                continue;
+            }
+            if arg.starts_with("--") && !self.bigParamaeter.is_empty() && self.bigParamaeter.last().map(|s| s == "zeilen").unwrap_or(false) {
+                let sub = &arg[2..];
+                if sub == "alles" && neg.is_empty() {
+                    Self::push_unique_string(&mut paramLines, "all".to_string());
+                    self.obZeilenBereicheAngegeben = true;
+                } else if sub == "alles" && !neg.is_empty() {
+                } else if let Some(tail) = sub.strip_prefix("zeit=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for subpara in tail.split(',') {
+                        let subpara = subpara.trim();
+                        if subpara == format!("{}heute", neg) {
+                            Self::push_unique_string(&mut paramLines, "=".to_string());
+                        } else if subpara == format!("{}gestern", neg) {
+                            Self::push_unique_string(&mut paramLines, "<".to_string());
+                        } else if subpara == format!("{}morgen", neg) {
+                            Self::push_unique_string(&mut paramLines, ">".to_string());
+                        }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("zaehlung=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for value in self.parametersCmdWithSomeBereich_py(tail, "n", "", true) {
+                            Self::push_unique_string(&mut paramLines, value);
+                        }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("hoehemaximal=") {
+                    if tail.trim().chars().all(|c| c.is_ascii_digit()) {
+                        self.textWidth = tail.trim().parse::<i64>().unwrap_or(self.textWidth);
+                    }
+                } else if let Some(tail) = sub.strip_prefix("typ=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for word in tail.split(',') {
+                        let word = word.trim();
+                        if word == format!("{}sonne", neg) { Self::push_unique_string(&mut paramLines, "sonne".to_string()); }
+                        else if word == format!("{}schwarzesonne", neg) { Self::push_unique_string(&mut paramLines, "schwarzesonne".to_string()); }
+                        else if word == format!("{}planet", neg) { Self::push_unique_string(&mut paramLines, "planet".to_string()); }
+                        else if word == format!("{}mond", neg) { Self::push_unique_string(&mut paramLines, "mond".to_string()); }
+                        else if word == format!("{}SonneMitMondanteil", neg) { Self::push_unique_string(&mut paramLines, "SonneMitMondanteil".to_string()); }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("primzahlen=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for word in tail.split(',') {
+                        let word = word.trim();
+                        if word == format!("{}aussenerste", neg) { Self::push_unique_string(&mut paramLines, "aussenerste".to_string()); }
+                        else if word == format!("{}innenerste", neg) { Self::push_unique_string(&mut paramLines, "innenerste".to_string()); }
+                        else if word == format!("{}aussenalle", neg) { Self::push_unique_string(&mut paramLines, "aussenalle".to_string()); }
+                        else if word == format!("{}innenalle", neg) { Self::push_unique_string(&mut paramLines, "innenalle".to_string()); }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("potenzenvonzahlen=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for value in self.parametersCmdWithSomeBereich_py(tail, "^", neg, false) {
+                        Self::push_unique_string(&mut paramLines, value);
+                    }
+                } else if let Some(tail) = sub.strip_prefix("vielfachevonzahlen=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for value in self.parametersCmdWithSomeBereich_py(tail, "b", neg, true) {
+                            Self::push_unique_string(&mut paramLines, value);
+                        }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("primzahlvielfache=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for zahl in self.parse_simple_numeric_list_py(tail) {
+                            Self::push_unique_string(&mut paramLines, format!("{}p", zahl));
+                        }
+                    }
+                } else if self.oberesMaximum(&arg) {
+                } else if sub == "invertieren" {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for value in self.parametersCmdWithSomeBereich_py("1", "i", neg, true) {
+                            Self::push_unique_string(&mut paramLines, value);
+                        }
+                    }
+                } else if sub == "vorhervonausschnittteiler" {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for value in self.parametersCmdWithSomeBereich_py("1", "w", neg, true) {
+                            Self::push_unique_string(&mut paramLines, value);
+                        }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("vorhervonausschnitt=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    if neg.is_empty() {
+                        for value in self.parametersCmdWithSomeBereich_py(tail, "a", neg, true) {
+                            Self::push_unique_string(&mut paramLines, value);
+                        }
+                    }
+                } else if let Some(tail) = sub.strip_prefix("nachtraeglichneuabzaehlungvielfache=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for value in self.parametersCmdWithSomeBereich_py(tail, "y", neg, false) {
+                        Self::push_unique_string(&mut paramLines, value);
+                    }
+                } else if let Some(tail) = sub.strip_prefix("nachtraeglichneuabzaehlung=") {
+                    self.obZeilenBereicheAngegeben = true;
+                    for value in self.parametersCmdWithSomeBereich_py(tail, "z", neg, false) {
+                        Self::push_unique_string(&mut paramLines, value);
+                    }
+                } else if !neg.is_empty() {
+                    self.cliErrors.push(format!("{} ist kein gueltiger Nebenparameter fuer -zeilen", arg));
+                }
+            } else if arg.starts_with("--") && !self.bigParamaeter.is_empty() && self.bigParamaeter.last().map(|s| s == "ausgabe").unwrap_or(false) {
+                let sub = &arg[2..];
+                if self.breiteBreitenSysArgvPara(sub, neg) {
+                } else if sub == "keineueberschriften" {
+                    self.keineUeberschriften = true;
+                } else if sub == "keinenummerierung" {
+                    self.nummeriere = false;
+                } else if sub == "keineleereninhalte" {
+                    self.keineleereninhalte = true;
+                } else if let Some(tail) = sub.strip_prefix("spaltenreihenfolgeundnurdiese=") {
+                    spaltenreihenfolgeundnurdiese = self.parse_simple_numeric_list_py(tail);
+                    self.spaltenreihenfolgeundnurdiese = spaltenreihenfolgeundnurdiese.clone();
+                } else if let Some(outputtype) = sub.strip_prefix("art=") {
+                    let breiteIstNull = "breite=0".to_string();
+                    self.outType = outputtype.to_string();
+                    if outputtype == "shell" {
+                    } else if outputtype == "nichts" {
+                    } else if outputtype == "csv" {
+                        self.oneTable = true;
+                        self.breiteBreitenSysArgvPara(&breiteIstNull, "");
+                    } else if outputtype == "bbcode" {
+                        self.htmlOrBBcode = true;
+                    } else if outputtype == "html" {
+                        self.htmlOrBBcode = true;
+                    } else if outputtype == "emacs" {
+                        self.oneTable = true;
+                        self.breiteBreitenSysArgvPara(&breiteIstNull, "");
+                    } else if outputtype == "markdown" {
+                        self.oneTable = true;
+                        self.breiteBreitenSysArgvPara(&breiteIstNull, "");
+                    }
+                } else if (sub == "nocolor" || sub == "justtext") && neg.is_empty() {
+                    self.nocolor = true;
+                } else if (sub == "endlessscreen" || sub == "endless" || sub == "dontwrap" || sub == "onetable") && neg.is_empty() {
+                    self.oneTable = true;
+                } else if neg.is_empty() {
+                    self.cliErrors.push(format!("{} ist kein gueltiger Nebenparameter fuer -ausgabe", arg));
+                }
+            } else if arg.starts_with("--") && !self.bigParamaeter.is_empty() && self.bigParamaeter.last().map(|s| s == "kombination").unwrap_or(false) {
+                let sub = &arg[2..];
+                if let Some((left, right)) = sub.split_once('=') {
+                    if left == "galaxie" {
                         for single in right.split(',') {
-                            if self.paraDict.contains_key(&(main.clone(), single.to_string())) {
-                                self.newTable = true;
+                            if let Some(v) = self.kombiReverseDict.get(single) {
+                                self.__willBeOverwritten_rowsOfcombi.push(vec![v.to_string(), single.to_string()]);
                             }
                         }
-                    } else if self.paraDict.contains_key(&(cmd.clone(), "".to_string()))
-                        || self.paraMainDict.contains_key(&cmd)
-                    {
-                        self.newTable = true;
-                    }
-                } else if lastParameterType == "kombi" {
-                    if let Some(eq) = cmd.find('=') {
-                        let left = cmd[..eq].to_string();
-                        let right = cmd[eq + 1..].to_string();
-
-                        if left == "galaxie" {
-                            for single in right.split(',') {
-                                if self.kombiReverseDict.contains_key(single) {
-                                    self.newTable = true;
-                                }
-                            }
-                        } else if left == "universum" {
-                            for single in right.split(',') {
-                                if self.kombiReverseDict2.contains_key(single) {
-                                    self.newTable = true;
-                                }
+                    } else if left == "universum" {
+                        for single in right.split(',') {
+                            if let Some(v) = self.kombiReverseDict2.get(single) {
+                                self.__willBeOverwritten_rowsOfcombi.push(vec![v.to_string(), single.to_string()]);
                             }
                         }
                     }
-                } else if cmd == "alles" {
-                    self.allesParameters += 1;
+                }
+            } else if arg.starts_with("--") && !self.bigParamaeter.is_empty() && self.bigParamaeter.last().map(|s| s == "spalten").unwrap_or(false) {
+                let sub = &arg[2..];
+                if self.breiteBreitenSysArgvPara(sub, neg) {
+                } else if sub == "keinenummerierung" && neg.is_empty() {
+                    self.nummeriere = false;
+                }
+            } else {
+                let cmd = arg[1..].to_string();
+                if cmd == "zeilen" || cmd == "spalten" || cmd == "kombination" || cmd == "ausgabe" {
+                    self.bigParamaeter.push(cmd);
+                } else if cmd == "debug" {
+                } else if cmd == "h" || cmd == "help" {
+                    if neg.is_empty() {
+                        self.helpPage();
+                    }
+                } else if cmd.starts_with("sprache=") {
+                    let lang = cmd[8..].to_string();
+                    let known = ["de", "en", "cn", "kr", "vn"];
+                    if !known.contains(&lang.as_str()) && neg.is_empty() {
+                        self.cliErrors.push("wrongLangSentence".to_string());
+                    }
+                } else if neg.is_empty() {
+                    self.cliErrors.push(format!(
+                        "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie moeglicherweise: \"-{}\" ausgefuehrt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
+                        cmd
+                    ));
                 }
             }
         }
+
+        if !self.oneTable {
+            self.setShellRowsAmount();
+            self.textWidth = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
+                self.textWidth
+            } else {
+                self.shellRowsAmount - 7
+            };
+        }
+        self.ifZeilenSetted = self.obZeilenBereicheAngegeben;
+        (paramLines, rowsAsNumbers, self.__willBeOverwritten_rowsOfcombi.clone(), spaltenreihenfolgeundnurdiese, puniverseprims_only, generRows)
     }
 
     pub fn propInfoLog(&mut self, txt: &str) {
@@ -448,6 +997,17 @@ impl Program {
         self.ifZeilenSetToInf = self.rowRange.len() == 0;
     }
 
+    fn init_dataDict_and_spaltenTypeNaming_python_like(&mut self) {
+        self.dataDict = {
+            let mut x = vec![];
+            for _ in 0..14 {
+                x.push(IndexMap::new());
+            }
+            x
+        };
+        self.spaltenTypeNaming = SpaltenTyp::default();
+    }
+
     pub fn validate_cli_like_python_for_known_case(&mut self) {
         self.cliErrors.clear();
 
@@ -472,19 +1032,102 @@ impl Program {
 
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
+        self.htmlOrBBcode = false;
+        self.breiteORbreiten = false;
+        self.keineleereninhalte = false;
+        self.keineUeberschriften = false;
+        self.nummeriere = true;
+        self.oneTable = false;
+        self.nocolor = false;
+        self.outType = "shell".to_string();
+        self.breiteHasBeenOnceZero = false;
         let _ = self.load_religion_csv_exact();
-        self.breiteBreitenSysArgvPara(self.argvWithoutProgram.clone());
+        self.htmlOrBBcode = false;
+
+        let (paramLines0, rowsAsNumbers0, rowsOfcombi0, spaltenreihenfolgeundnurdiese0, prims1, generRows1) =
+            self.parametersToCommandsAndNumbers(argv.clone(), "", words);
+        let (paramLinesNot0, rowsAsNumbersNot0, rowsOfcombiNot0, _spaltenreihenfolgeundnurdieseNot, prims2, generRows2) =
+            self.parametersToCommandsAndNumbers(argv.clone(), "-", words);
+
+        self.init_dataDict_and_spaltenTypeNaming_python_like();
+        self.init_spalten_arten_python_like();
+        self.storeParamtersForColumns(words);
+        self.produceAllSpaltenNumbers("");
+
+        let (mut paramLines, paramLinesNot) = self.deleteDoublesInSets_py(paramLines0, paramLinesNot0);
+
+        self.rowsAsNumbers = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.ordinary).cloned().unwrap_or_default(),
+        );
+        self.generRows = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.generated1).cloned().unwrap_or_default(),
+        );
+        self.puniverseprims = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.concat1).cloned().unwrap_or_default(),
+        );
+        self.rowsOfcombi = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.kombi1).cloned().unwrap_or_default(),
+        ).into_iter().map(|v| vec![v.to_string()]).collect();
+        self.rowsOfcombi2 = Self::ordered_set_to_vec_i64(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.kombi2).cloned().unwrap_or_default(),
+        );
+        self.onlyGenerated = Self::ordered_set_to_onlyGenerated_py(
+            self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.boolAndTupleSet1).cloned().unwrap_or_default(),
+        );
+        let mut ones = vec![];
+        for a in self.onlyGenerated.clone() {
+            if a.len() == 1 {
+                ones.extend(a);
+            }
+        }
+        self.getConcat_ones = ones;
+
+        if !self.rowsOfcombi.is_empty() {
+            push_unique_string(&mut paramLines, "ka");
+        }
+        if !self.rowsOfcombi2.is_empty() {
+            push_unique_string(&mut paramLines, "ka2");
+        }
+
+        self.CsvTheirsSpalten = IndexMap::new();
+        self.CsvTheirsSpalten.insert(1, self.puniverseprims.clone());
+        self.CsvTheirsSpalten.insert(2, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGal1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(3, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGal1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(4, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebroUni1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(5, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebroUni1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(6, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrEmo1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(7, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrEmo1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(8, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGroe1).cloned().unwrap_or_default()));
+        self.CsvTheirsSpalten.insert(9, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGroe1).cloned().unwrap_or_default()));
+
+        self.rowsAsNumbers = if self.rowsAsNumbers.is_empty() { rowsAsNumbers0 } else { self.rowsAsNumbers.clone() };
+        self.SpaltenVanillaAmount = self.rowsAsNumbers.len() as i64;
+        self.rowsAsNumbersNot = rowsAsNumbersNot0;
+        self.rowsOfcombiNot = rowsOfcombiNot0;
+        self.spaltenreihenfolgeundnurdiese = spaltenreihenfolgeundnurdiese0;
+        self.puniverseprimsNot = prims2;
+        self.puniverseprims = if self.puniverseprims.is_empty() { prims1 } else { self.puniverseprims.clone() };
+        self.generRowsNot = generRows2;
+        self.generRows = if self.generRows.is_empty() { generRows1 } else { self.generRows.clone() };
+        if self.rowsOfcombi.is_empty() && !rowsOfcombi0.is_empty() {
+            self.rowsOfcombi = rowsOfcombi0;
+        }
+
         self.setShellRowsAmount();
         self.setShellWidth();
-        self.parametersToCommandsAndNumbers(words);
-        self.produceAllSpaltenNumbers();
+        if self.htmlOrBBcode && !self.breiteORbreiten {
+            self.shellRowsAmount = 0;
+            self.breite = 0;
+            self.textWidth = 0;
+        }
+
         self.setRowRangeFromArgv();
         self.setIfZeilenSetToInf();
         self.helpPage();
         self.validate_cli_like_python_for_known_case();
         self.allImportantBeginThingsDone = true;
 
-        (self.RowsLen, vec![], vec![], self.relitable.clone(), self.rowsAsNumbers.clone())
+        (self.RowsLen, paramLines, paramLinesNot, self.relitable.clone(), self.rowsAsNumbers.clone())
     }
 
     pub fn oberesMaximumArg(&mut self, arg: &str) -> (Vec<i64>, bool) {
@@ -604,7 +1247,7 @@ impl Program {
         let (_RowsLen, _paramLines, _paramLinesNot, relitable, _rowsAsNumbers) =
             self.bringAllImportantBeginThings(argv, words);
 
-        self.tableGenerated = self.newTable;
+        self.tableGenerated = self.newTable || !relitable.is_empty();
         self.__resultingTable = relitable.clone();
         self.determineNumlen();
         self.addResultingTableToTables();
@@ -641,7 +1284,7 @@ impl Program {
 
     pub fn snapshot(&self) -> String {
         format!(
-            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?} resultingTableRows={} allesParameters={} spaltenNumbers={} ifPrint={} rowRangeLen={} shellRowsAmount={} shellWidth={} finallyDisplayLines={} ifZeilenSetToInf={} tables={} numlen={} old2Rows={} newerTable={} finallyDisplayLinesByChunks={} rowsOfcombi={} oldRows={} newerRows={} oldTable={} generatedSpaltenParameter={} allEquColumns={} finallyDisplayTable={}",
+            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?} resultingTableRows={} allesParameters={} spaltenNumbers={} ifPrint={} rowRangeLen={} shellRowsAmount={} shellWidth={} finallyDisplayLines={} ifZeilenSetToInf={} tables={} numlen={} old2Rows={} newerTable={} finallyDisplayLinesByChunks={} rowsOfcombi={} oldRows={} newerRows={} oldTable={} generatedSpaltenParameter={} allEquColumns={} finallyDisplayTable={} bigParamaeter={:?} obZeilenBereicheAngegeben={} breiteHasBeenOnceZero={} breiteORbreiten={} spaltenreihenfolgeundnurdiese={:?} puniverseprims={} generRows={} rowsAsNumbersNot={} rowsOfcombiNot={} htmlOrBBcode={} spaltenArtenKeys={}",
             self.paraMainDict.len(),
             self.paraDict.len(),
             self.dataDicts[0].len(),
@@ -678,7 +1321,18 @@ impl Program {
             self.oldTable.len(),
             self.generatedSpaltenParameter.len(),
             self.allEquColumns.len(),
-            self.finallyDisplayTable.len()
+            self.finallyDisplayTable.len(),
+            self.bigParamaeter,
+            self.obZeilenBereicheAngegeben,
+            self.breiteHasBeenOnceZero,
+            self.breiteORbreiten,
+            self.spaltenreihenfolgeundnurdiese,
+            self.puniverseprims.len(),
+            self.generRows.len(),
+            self.rowsAsNumbersNot.len(),
+            self.rowsOfcombiNot.len(),
+            self.htmlOrBBcode,
+            self.spaltenArtenKey_SpaltennummernValue.len()
         )
     }
 }
