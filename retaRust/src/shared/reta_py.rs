@@ -1418,20 +1418,23 @@ impl Program {
         let mut finallyDisplayLines: Vec<String> = vec![];
         let mut old2newTable: Vec<i64> = vec![];
 
-        if relitable.len() == 0 {
+        if relitable.is_empty() {
             return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
         }
 
-        let mut selected_rows: Vec<i64> = if self.rowRange.len() > 0 {
-            self.rowRange.clone()
-        } else {
+        let mut selected_rows: Vec<i64> = if self.rowRange.is_empty() {
             let mut v = vec![];
-            let start = if self.keineUeberschriften { 1 } else { 0 };
-            let end = relitable.len() as i64;
-            let mut i = start as i64;
-            while i < end {
-                v.push(i + 1);
-                i += 1;
+            if !self.keineUeberschriften {
+                v.push(0);
+            }
+            for i in 1..(relitable.len() as i64) {
+                v.push(i);
+            }
+            v
+        } else {
+            let mut v = self.rowRange.clone();
+            if !self.keineUeberschriften {
+                v.insert(0, 0);
             }
             v
         };
@@ -1439,72 +1442,117 @@ impl Program {
         selected_rows.sort();
         selected_rows.dedup();
 
-        let mut selected_cols: Vec<i64> = if rowsAsNumbers.len() > 0 {
-            rowsAsNumbers.clone()
-        } else if relitable[0].len() > 0 {
-            (1..=(relitable[0].len() as i64)).collect()
+        let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
+            if relitable[0].is_empty() {
+                vec![]
+            } else {
+                (1..=(relitable[0].len() as i64)).collect()
+            }
         } else {
-            vec![]
+            rowsAsNumbers.clone()
         };
-
         selected_cols.sort();
         selected_cols.dedup();
 
         let mut selected_table: Vec<Vec<String>> = vec![];
-        let mut first = true;
         for row_no in selected_rows.iter() {
-            if *row_no <= 0 {
-                continue;
-            }
-            let idx = (*row_no as usize).saturating_sub(1);
+            let idx = *row_no as usize;
             if idx >= relitable.len() {
                 continue;
             }
-            if self.keineUeberschriften && first && idx == 0 {
-                first = false;
-                continue;
-            }
-            first = false;
             selected_table.push(relitable[idx].clone());
             old2newTable.push(*row_no);
         }
 
-        if selected_table.len() == 0 && !self.keineUeberschriften {
+        if selected_table.is_empty() {
             selected_table = relitable.clone();
+            old2newTable = (0..(relitable.len() as i64)).collect();
         }
 
         newTable = self.onlyThatColumns_py(selected_table, selected_cols.clone());
-
-        if newTable.len() == 0 {
+        if newTable.is_empty() {
             newTable = relitable.clone();
         }
 
-        let mut display_row_index: i64 = 1;
-        for row in newTable.iter() {
-            let line = if self.nummeriere {
-                format!("{} {}", display_row_index, row.join(" "))
-            } else {
-                row.join(" ")
-            };
-            let trimmed = line.trim().to_string();
-            if self.keineleereninhalte {
-                let stripped = trimmed.replace('-', "").replace('?', "").trim().to_string();
-                if stripped.is_empty() {
-                    display_row_index += 1;
-                    continue;
-                }
-            }
-            finallyDisplayLines.push(trimmed);
-            display_row_index += 1;
+        finallyDisplayLines = old2newTable.iter().map(|n| n.to_string()).collect();
+        if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
+            finallyDisplayLines[0] = "".to_string();
         }
 
-        let rowsRange: Vec<i64> = if newTable.len() > 0 {
-            (0..(newTable[0].len() as i64)).collect()
-        } else {
+        let rowsRange: Vec<i64> = if newTable.is_empty() {
             vec![]
+        } else {
+            let mut max_sub_lines: usize = 1;
+            for row in newTable.iter() {
+                for cell in row.iter() {
+                    let lines = if cell.is_empty() { 1 } else { cell.lines().count() };
+                    if lines > max_sub_lines {
+                        max_sub_lines = lines;
+                    }
+                }
+            }
+            (0..(max_sub_lines as i64)).collect()
         };
         let numlen = finallyDisplayLines.len() as i64;
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
+    }
+
+    fn wrap_text_py(txt: &str, width: usize) -> Vec<String> {
+        if width == 0 {
+            return vec![txt.to_string()];
+        }
+        let mut out: Vec<String> = vec![];
+        for part in txt.lines() {
+            let mut current = String::new();
+            for word in part.split_whitespace() {
+                if current.is_empty() {
+                    if word.chars().count() <= width {
+                        current.push_str(word);
+                    } else {
+                        let chars: Vec<char> = word.chars().collect();
+                        let mut start = 0usize;
+                        while start < chars.len() {
+                            let end = std::cmp::min(start + width, chars.len());
+                            out.push(chars[start..end].iter().collect());
+                            start = end;
+                        }
+                    }
+                } else if current.chars().count() + 1 + word.chars().count() <= width {
+                    current.push(' ');
+                    current.push_str(word);
+                } else {
+                    out.push(current);
+                    current = String::new();
+                    if word.chars().count() <= width {
+                        current.push_str(word);
+                    } else {
+                        let chars: Vec<char> = word.chars().collect();
+                        let mut start = 0usize;
+                        while start < chars.len() {
+                            let end = std::cmp::min(start + width, chars.len());
+                            let piece: String = chars[start..end].iter().collect();
+                            if end < chars.len() {
+                                out.push(piece);
+                            } else {
+                                current = piece;
+                            }
+                            start = end;
+                        }
+                    }
+                }
+            }
+            if !current.is_empty() {
+                out.push(current);
+            }
+            if part.is_empty() {
+                out.push(String::new());
+            }
+        }
+        if out.is_empty() {
+            vec![String::new()]
+        } else {
+            out
+        }
     }
 
     fn cliOut_py(
@@ -1514,7 +1562,101 @@ impl Program {
         numlen: i64,
         _rowsRange: Vec<i64>,
     ) -> Vec<Vec<String>> {
-        self.finallyDisplayLines = finallyDisplayLines.clone();
+        let mut out_lines: Vec<String> = vec![];
+        if newTable.is_empty() {
+            self.finallyDisplayLines = out_lines.clone();
+            self.numlen = numlen;
+            return newTable;
+        }
+
+        let mut col_count = 0usize;
+        for row in newTable.iter() {
+            if row.len() > col_count {
+                col_count = row.len();
+            }
+        }
+
+        let mut widths: Vec<usize> = vec![0; col_count];
+        for i in 0..col_count {
+            let forced = if i < self.breiten.len() {
+                self.breiten[i]
+            } else {
+                self.breite
+            };
+            if forced > 0 {
+                widths[i] = forced as usize;
+            }
+        }
+        for (i, w) in widths.iter_mut().enumerate() {
+            if *w == 0 {
+                let mut max_len = 1usize;
+                for row in newTable.iter() {
+                    if i < row.len() {
+                        for line in row[i].lines() {
+                            let len_ = line.chars().count();
+                            if len_ > max_len {
+                                max_len = len_;
+                            }
+                        }
+                    }
+                }
+                *w = std::cmp::min(std::cmp::max(max_len, 12usize), 32usize);
+            }
+        }
+
+        let num_prefix_width = if self.nummeriere {
+            finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
+        } else {
+            0usize
+        };
+
+        for (row_idx, row) in newTable.iter().enumerate() {
+            let mut wrapped_cells: Vec<Vec<String>> = vec![];
+            let mut max_sub = 1usize;
+            for i in 0..col_count {
+                let cell = if i < row.len() { row[i].as_str() } else { "" };
+                let wrapped = Self::wrap_text_py(cell, widths[i]);
+                if wrapped.len() > max_sub {
+                    max_sub = wrapped.len();
+                }
+                wrapped_cells.push(wrapped);
+            }
+
+            let mut should_skip_row = false;
+            if self.keineleereninhalte {
+                let joined: String = row.join(" ");
+                let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                if stripped.is_empty() {
+                    should_skip_row = true;
+                }
+            }
+            if should_skip_row {
+                continue;
+            }
+
+            for sub_idx in 0..max_sub {
+                let mut line = String::new();
+                if self.nummeriere {
+                    let label = if sub_idx == 0 {
+                        finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+                    line.push_str(&format!("{:>width$} ", label, width=num_prefix_width));
+                }
+                for i in 0..col_count {
+                    let part = wrapped_cells[i].get(sub_idx).cloned().unwrap_or_default();
+                    if i + 1 == col_count {
+                        line.push_str(&part);
+                    } else {
+                        line.push_str(&format!("{:<width$} ", part, width=widths[i]));
+                    }
+                }
+                out_lines.push(line.trim_end().to_string());
+            }
+        }
+
+        self.finallyDisplayLines = out_lines.clone();
         self.numlen = numlen;
         newTable
     }
