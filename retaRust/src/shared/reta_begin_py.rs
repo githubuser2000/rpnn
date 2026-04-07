@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
+use crate::shared::reta_generators_inventory_py::{GENERATED2_SPECS, BOOL_AND_TUPLE_SET1_SPECS, METAKONKRET_SPECS};
 
 impl Program {
     pub(crate) fn help_lines_py(&self) -> Vec<String> {
@@ -440,6 +441,42 @@ impl Program {
             }
         }
         self.getConcat_ones = ones;
+
+        let selected_generated2 = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.generated2)
+            .cloned()
+            .unwrap_or_default();
+        self.generated2Codes = if selected_generated2.is_empty() {
+            vec![]
+        } else {
+            let mut generated2Codes: Vec<String> = vec![];
+            for spec in GENERATED2_SPECS {
+                if !generated2Codes.iter().any(|v| v == spec.code) {
+                    generated2Codes.push(spec.code.to_string());
+                }
+            }
+            generated2Codes
+        };
+
+        let selected_boolAndTupleSet1 = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.boolAndTupleSet1)
+            .cloned()
+            .unwrap_or_default();
+        self.boolAndTupleSet1Options = BOOL_AND_TUPLE_SET1_SPECS
+            .iter()
+            .filter(|spec| selected_boolAndTupleSet1.contains(&spec.col_a))
+            .map(|spec| if spec.col_a >= 0 { Some(spec.col_a) } else { None })
+            .collect();
+
+        let selected_metakonkret = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.metakonkret)
+            .cloned()
+            .unwrap_or_default();
+        self.metakonkretPairs = METAKONKRET_SPECS
+            .iter()
+            .filter(|spec| selected_metakonkret.contains(&spec.col_a))
+            .map(|spec| (spec.col_a, spec.col_b))
+            .collect();
 
         if !self.rowsOfcombi.is_empty() {
             Self::push_unique_string(&mut paramLines, "ka".to_string());

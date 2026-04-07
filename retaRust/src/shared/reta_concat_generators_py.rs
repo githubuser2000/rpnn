@@ -81,6 +81,66 @@ impl Program {
         GENERATED1_SPECS.iter().map(|spec| (spec.col_a, spec.col_b)).collect()
     }
 
+
+    fn nicht_leere_teile_join_py(&self, teile: Vec<String>, sep: &str) -> String {
+        let mut neu: Vec<String> = vec![];
+        for teil in teile {
+            if !teil.trim().is_empty() {
+                neu.push(teil);
+            }
+        }
+        neu.join(sep)
+    }
+
+    fn modalTextByDistance_py(&self, distanceFromLine: i64) -> String {
+        match distanceFromLine.abs() {
+            0 => "sehr: ".to_string(),
+            1 => "überdurchschnittlich: ".to_string(),
+            2 => "mittelstark überdurchschnittlich: ".to_string(),
+            3 => "mittelleicht überdurchschnittlich: ".to_string(),
+            _ => "sehr leicht überdurchschnittlich: ".to_string(),
+        }
+    }
+
+    fn generated2_code_heading_py(&self, code: &str) -> String {
+        for spec in GENERATED2_SPECS {
+            if spec.code == code {
+                return format!("{} {}", spec.main_name, spec.parameter_name);
+            }
+        }
+        code.to_string()
+    }
+
+    fn generated2_code_source_columns_py(&self, code: &str) -> (usize, usize) {
+        match code {
+            "primMotivStern" => (10, 5),
+            "primStrukStern" => (5, 10),
+            "primMotivGleichf" => (42, 131),
+            "primStrukGleichf" => (131, 42),
+            "primMotivSternGebr" => (138, 202),
+            "primStrukSternGebr" => (202, 138),
+            "primMotivGleichfGebr" => (44, 56),
+            "primStrukGleichfGebr" => (56, 44),
+            "PrimCSV" => {
+                let first = self.CsvTheirsSpalten.get(&1).and_then(|v| v.first()).copied().unwrap_or(19);
+                (first as usize, first as usize)
+            }
+            _ => (10, 5),
+        }
+    }
+
+    fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
+        match metavariable {
+            2 => ("Meta", "Konkret"),
+            3 => ("Theorie", "Praxis"),
+            4 => ("Management", "verändernd"),
+            5 => ("ganzheitlich", "darüber_hinausgehend"),
+            6 => ("Unternehmung_Geschäft", "wertvoll"),
+            7 => ("Beherrschen", "Richtung"),
+            _ => ("Meta", "Konkret"),
+        }
+    }
+
     fn generierte_spalte_meta_name_py(&self, spaltenNummer: i64) -> String {
         if let Some(meta) = self.dataDict.get(0) {
             if let Some(eintrag) = meta.get(&spaltenNummer.to_string()) {
@@ -608,33 +668,199 @@ impl Program {
         concatCSVspalten
     }
 
-    pub fn concatModallogik(&mut self, _rowsAsNumbers: &mut Vec<i64>) {
-        let _conceptsRowsSetOfTuple = self.generated1_pairs_exact_py();
-        // Architekturhaken jetzt korrekt gesetzt: generated1-Paare bleiben als exakte Python-Referenz erhalten.
-        // Die volle Zellenlogik aus lib4tables_concat.py ist noch nicht vollständig in Rust gezogen.
+    pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
+        let conceptsRowsSetOfTuple2 = self.generated1_pairs_exact_py();
+        for concept in conceptsRowsSetOfTuple2 {
+            if !(rowsAsNumbers.contains(&concept.0) || rowsAsNumbers.contains(&concept.1)) {
+                continue;
+            }
+            let concept0 = concept.0 as usize;
+            let concept1 = concept.1 as usize;
+            let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+            let mut into: Vec<String> = vec![];
+            for i in 0..self.relitable.len() {
+                if i == 0 {
+                    into.push(format!("Modallogik {}", self.generierte_spalte_meta_name_py(concept.0)));
+                    continue;
+                }
+                let fill_ = if conditionNvs1perN { self.zellenwert_py(i, 197) } else { self.zellenwert_py(i, 4) };
+                let mut teile: Vec<String> = vec![];
+                for distanceFromLine in -4i64..=4i64 {
+                    let i_with_a_distance = i as i64 + distanceFromLine;
+                    if i_with_a_distance <= 0 {
+                        continue;
+                    }
+                    let vielfacher = i_with_a_distance as usize;
+                    if vielfacher == 0 || vielfacher >= self.relitable.len() {
+                        continue;
+                    }
+                    if i % vielfacher != 0 && vielfacher % i != 0 {
+                        continue;
+                    }
+                    let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
+                        self.zellenwert_py(vielfacher, concept0)
+                    } else {
+                        self.zellenwert_py(vielfacher, concept1)
+                    };
+                    if intoItsContent.trim().is_empty() {
+                        continue;
+                    }
+                    let modal_a = self.zellenwert_py(vielfacher, 97);
+                    let modal_b = self.zellenwert_py(vielfacher, 98);
+                    let modal_c = self.zellenwert_py(vielfacher, 42);
+                    let modal_operatoren = self.nicht_leere_teile_join_py(vec![modal_a, modal_b, modal_c], " ");
+                    let prefix = self.modalTextByDistance_py(distanceFromLine);
+                    let eintrag = self.nicht_leere_teile_join_py(vec![prefix, modal_operatoren, intoItsContent], "");
+                    if !eintrag.trim().is_empty() {
+                        teile.push(eintrag);
+                    }
+                }
+                if !teile.is_empty() && !fill_.trim().is_empty() {
+                    teile.push(format!("alles nur bezogen auf {}", fill_));
+                }
+                into.push(self.nicht_leere_teile_join_py(teile, " | "));
+            }
+            let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
+            Self::push_unique_i64_py(rowsAsNumbers, spalte);
+        }
     }
 
-    pub fn concat1RowPrimUniverse2(&mut self, _rowsAsNumbers: &mut Vec<i64>) {
-        let _aktive_codes: Vec<&str> = GENERATED2_SPECS
-            .iter()
-            .filter(|spec| self.hat_generated2_code_py(spec.code))
-            .map(|spec| spec.code)
-            .collect();
-        // Der exakte generated2-Dispatch ist jetzt im Rust-Zustand verankert.
-        // Die Vollportierung des Python-Zellaufbaus folgt noch.
+    pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
+        let mut generatedBefehle: Vec<String> = self.generated2Codes.clone();
+        if generatedBefehle.is_empty() {
+            generatedBefehle = GENERATED2_SPECS.iter().map(|spec| spec.code.to_string()).collect();
+        }
+        for code in generatedBefehle {
+            if code == "primzahlkreuzprocontra" {
+                continue;
+            }
+            let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
+            let heading = self.generated2_code_heading_py(&code);
+            let mut into: Vec<String> = vec![];
+            for i in 0..self.relitable.len() {
+                if i == 0 {
+                    into.push(heading.clone());
+                    continue;
+                }
+                let mut teile: Vec<String> = vec![];
+                for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
+                    let basis = if primAmount % 2 == 0 {
+                        self.zellenwert_py(prim as usize, col_b)
+                    } else {
+                        self.zellenwert_py(prim as usize, col_a)
+                    };
+                    if basis.trim().is_empty() {
+                        continue;
+                    }
+                    if primAmount > 1 {
+                        teile.push(format!("{} * {}", primAmount, basis));
+                    } else {
+                        teile.push(basis);
+                    }
+                }
+                if teile.is_empty() {
+                    into.push(String::new());
+                } else {
+                    into.push(self.nicht_leere_teile_join_py(teile, " + "));
+                }
+            }
+            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+            Self::push_unique_i64_py(rowsAsNumbers, spalte);
+        }
     }
 
-    pub fn concat1PrimzahlkreuzProContra(&mut self, _rowsAsNumbers: &mut Vec<i64>) {
+    pub fn concat1PrimzahlkreuzProContra(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !self.hat_generated2_code_py("primzahlkreuzprocontra") {
             return;
         }
-        // Der exakte Trigger aus generated2 ist jetzt korrekt angebunden.
-        // Die volle Python-Berechnung pro/contra wird noch separat nachgezogen.
+        let mut into_pro: Vec<String> = vec![];
+        let mut into_contra: Vec<String> = vec![];
+        for i in 0..self.relitable.len() {
+            if i == 0 {
+                into_pro.push("Primzahlkreuz pro".to_string());
+                into_contra.push("Primzahlkreuz contra".to_string());
+                continue;
+            }
+            let mut pro: Vec<String> = vec![];
+            let mut contra: Vec<String> = vec![];
+            for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
+                let strukturalie = self.zellenwert_py(prim as usize, 5);
+                let reziproke = self.zellenwert_py(prim as usize, 131);
+                let basis_pro = if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(prim) { strukturalie.clone() } else { reziproke.clone() };
+                let basis_contra = if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(prim) { reziproke } else { strukturalie };
+                if !basis_pro.trim().is_empty() {
+                    if primAmount > 1 { pro.push(format!("{} * {}", primAmount, basis_pro)); } else { pro.push(basis_pro); }
+                }
+                if !basis_contra.trim().is_empty() {
+                    if primAmount > 1 { contra.push(format!("{} * {}", primAmount, basis_contra)); } else { contra.push(basis_contra); }
+                }
+            }
+            into_pro.push(self.nicht_leere_teile_join_py(pro, " | "));
+            into_contra.push(self.nicht_leere_teile_join_py(contra, " | "));
+        }
+        let spalte_pro = self.fuege_spalte_hinzu_py(into_pro, "Primzahlkreuz pro");
+        let spalte_contra = self.fuege_spalte_hinzu_py(into_contra, "Primzahlkreuz contra");
+        Self::push_unique_i64_py(rowsAsNumbers, spalte_pro);
+        Self::push_unique_i64_py(rowsAsNumbers, spalte_contra);
     }
 
-    pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, _rowsAsNumbers: &mut Vec<i64>) {
-        let _geordnetePaare = self.metakonkret_pairs_exact_py();
-        // Wrapper jetzt mit exakten Python-Paaren verdrahtet.
+    pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
+        let geordnetePaare = self.metakonkret_pairs_exact_py();
+        for paar in geordnetePaare {
+            let metavariable = paar.0;
+            let lower1greater2both3 = if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 };
+            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, metavariable, lower1greater2both3);
+        }
+    }
+
+    pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
+        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
+        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 { vec![0, 1] } else if lower1greater2both3 == 1 { vec![0] } else if lower1greater2both3 == 2 { vec![1] } else { vec![] };
+        for ifInvers in 0..=1 {
+            let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
+            for bothRows in bothRowsListe.iter() {
+                let mut into: Vec<String> = vec![];
+                for i in 0..self.relitable.len() {
+                    if i == 0 {
+                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
+                        into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
+                        continue;
+                    }
+                    if i < 2 {
+                        into.push(String::new());
+                        continue;
+                    }
+                    let mut neue2KoordNeue2Vorwoerter: Vec<String> = vec![];
+                    let mut moreAndLess = (i as i64, i as i64);
+                    let mut newCol = transzendentalienSpalten.0;
+                    let mut zaehler = 0usize;
+                    while zaehler < 6 {
+                        zaehler += 1;
+                        if moreAndLess.0 <= 0 && moreAndLess.1 <= 0 {
+                            break;
+                        }
+                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
+                        let text = self.zellenwert_py(moreAndLess.0.max(1) as usize, newCol);
+                        if !text.trim().is_empty() {
+                            neue2KoordNeue2Vorwoerter.push(format!("{}-{} ({})", praefix, text, moreAndLess.0.max(1)));
+                        }
+                        if newCol == transzendentalienSpalten.0 {
+                            newCol = transzendentalienSpalten.1;
+                            moreAndLess.0 /= metavariable.max(1);
+                        } else {
+                            newCol = transzendentalienSpalten.0;
+                            moreAndLess.0 *= metavariable.max(1);
+                            if moreAndLess.0 as usize >= self.relitable.len() {
+                                break;
+                            }
+                        }
+                    }
+                    into.push(self.nicht_leere_teile_join_py(neue2KoordNeue2Vorwoerter, " | "));
+                }
+                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, konkret_name));
+                Self::push_unique_i64_py(rowsAsNumbers, spalte);
+            }
+        }
     }
 
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
@@ -674,27 +900,31 @@ impl Program {
         let gebr_groe_n = self.CsvTheirsSpalten.get(&8).cloned().unwrap_or_default();
         let gebr_groe_1n = self.CsvTheirsSpalten.get(&9).cloned().unwrap_or_default();
 
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, concat1_selection, 1);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_gal_n, 2);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_gal_1n, 3);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_uni_n, 4);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_uni_1n, 5);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_emo_n, 6);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_emo_1n, 7);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_groe_n, 8);
-        let _ = self.readConcatCsv(&mut self.rowsAsNumbers, gebr_groe_1n, 9);
+        let mut rowsAsNumbers = std::mem::take(&mut self.rowsAsNumbers);
 
-        self.concatVervielfacheZeile(&mut self.rowsAsNumbers);
-        self.concatModallogik(&mut self.rowsAsNumbers);
-        self.concatPrimCreativityType(&mut self.rowsAsNumbers);
-        self.concatGleichheitFreiheitDominieren(&mut self.rowsAsNumbers);
-        self.concatGeistEmotionEnergieMaterieTopologie(&mut self.rowsAsNumbers);
-        self.concatMondExponzierenLogarithmusTyp(&mut self.rowsAsNumbers);
-        self.concat1RowPrimUniverse2(&mut self.rowsAsNumbers);
-        self.concat1PrimzahlkreuzProContra(&mut self.rowsAsNumbers);
-        self.concatLovePolygon(&mut self.rowsAsNumbers);
-        self.spalteFuerGegenInnenAussenSeitlichPrim(&mut self.rowsAsNumbers);
-        self.spalteMetaKontretTheorieAbstrakt_etc_1(&mut self.rowsAsNumbers);
-        self.createSpalteGestirn(&mut self.rowsAsNumbers);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, concat1_selection, 1);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_gal_n, 2);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_gal_1n, 3);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_uni_n, 4);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_uni_1n, 5);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_emo_n, 6);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_emo_1n, 7);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_groe_n, 8);
+        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_groe_1n, 9);
+
+        self.concatVervielfacheZeile(&mut rowsAsNumbers);
+        self.concatModallogik(&mut rowsAsNumbers);
+        self.concatPrimCreativityType(&mut rowsAsNumbers);
+        self.concatGleichheitFreiheitDominieren(&mut rowsAsNumbers);
+        self.concatGeistEmotionEnergieMaterieTopologie(&mut rowsAsNumbers);
+        self.concatMondExponzierenLogarithmusTyp(&mut rowsAsNumbers);
+        self.concat1RowPrimUniverse2(&mut rowsAsNumbers);
+        self.concat1PrimzahlkreuzProContra(&mut rowsAsNumbers);
+        self.concatLovePolygon(&mut rowsAsNumbers);
+        self.spalteFuerGegenInnenAussenSeitlichPrim(&mut rowsAsNumbers);
+        self.spalteMetaKontretTheorieAbstrakt_etc_1(&mut rowsAsNumbers);
+        self.createSpalteGestirn(&mut rowsAsNumbers);
+
+        self.rowsAsNumbers = rowsAsNumbers;
     }
 }

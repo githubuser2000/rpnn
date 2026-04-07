@@ -155,6 +155,9 @@ pub struct Program {
     pub getConcat_ones: Vec<i64>,
     pub SpaltenVanillaAmount: i64,
     pub CsvTheirsSpalten: IndexMap<i64, Vec<i64>>,
+    pub generated2Codes: Vec<String>,
+    pub boolAndTupleSet1Options: Vec<Option<i64>>,
+    pub metakonkretPairs: Vec<(i64, i64)>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
     pub AllSimpleCommandSpalten: BTreeSet<i64>,
 }
@@ -251,6 +254,9 @@ impl Program {
             getConcat_ones: vec![],
             SpaltenVanillaAmount: 0,
             CsvTheirsSpalten: IndexMap::new(),
+            generated2Codes: vec![],
+            boolAndTupleSet1Options: vec![],
+            metakonkretPairs: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
             AllSimpleCommandSpalten: BTreeSet::new(),
         }
