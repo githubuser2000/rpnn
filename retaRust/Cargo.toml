@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 indexmap = "2"
-hypher = { version = "0.1.7", default-features = false, features = ["german", "english"] }
+hypher = { version = "0.1.7", default-features = false, features = ["german"] }
 
 [lib]
 name = "reta_shared"

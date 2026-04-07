@@ -76,16 +76,31 @@ impl Program {
         let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
+    fn hypher_lang_py(_word: &str) -> Lang {
+        Lang::German
+    }
 
-
-
-    fn hypher_lang_py(word: &str) -> Lang {
-        let lower = word.to_lowercase();
-        if lower.contains("ä") || lower.contains("ö") || lower.contains("ü") || lower.contains("ß") {
-            Lang::German
-        } else {
-            Lang::German
+    fn hard_split_long_word_py(word: &str, width: usize) -> Vec<String> {
+        if width <= 1 {
+            return word.chars().map(|c| c.to_string()).collect();
         }
+
+        let chars: Vec<char> = word.chars().collect();
+        let mut out: Vec<String> = Vec::new();
+        let mut i = 0usize;
+        while i < chars.len() {
+            let remaining = chars.len() - i;
+            if remaining <= width {
+                out.push(chars[i..].iter().collect());
+                break;
+            }
+            let take = width - 1;
+            let mut s: String = chars[i..i + take].iter().collect();
+            s.push('-');
+            out.push(s);
+            i += take;
+        }
+        out
     }
 
     fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
@@ -94,74 +109,47 @@ impl Program {
         }
 
         let lang = Self::hypher_lang_py(word);
-        let joined = hyphenate(word, lang).join("-");
-        let syllables: Vec<&str> = if joined.contains('-') {
-            joined.split('-').collect()
-        } else {
-            vec![word]
-        };
+        let syllables: Vec<String> = hyphenate(word, lang)
+            .map(|s| s.to_string())
+            .collect();
+
+        if syllables.is_empty() {
+            return Self::hard_split_long_word_py(word, width);
+        }
 
         let mut out: Vec<String> = Vec::new();
         let mut current = String::new();
-        let cap = width.saturating_sub(1);
 
         for (idx, syl) in syllables.iter().enumerate() {
             let is_last = idx + 1 == syllables.len();
-            let add_len = syl.chars().count();
-            let hyphen_cost = if is_last { 0 } else { 1 };
+            let syl_len = syl.chars().count();
+            let current_len = current.chars().count();
+            let reserve_for_hyphen = if is_last { 0usize } else { 1usize };
+
             if current.is_empty() {
-                if add_len + hyphen_cost <= width {
-                    current.push_str(syl);
-                    if !is_last {
-                        current.push('-');
-                    }
-                } else {
-                    let chars: Vec<char> = syl.chars().collect();
-                    let mut start = 0usize;
-                    while start < chars.len() {
-                        let end = std::cmp::min(start + cap, chars.len());
-                        let mut piece: String = chars[start..end].iter().collect();
-                        if end < chars.len() || !is_last {
-                            piece.push('-');
-                        }
-                        out.push(piece);
-                        start = end;
-                    }
+                if syl_len >= width {
+                    return Self::hard_split_long_word_py(word, width);
                 }
-            } else if current.chars().count() + add_len + hyphen_cost <= width {
                 current.push_str(syl);
-                if !is_last {
-                    current.push('-');
-                }
+                continue;
+            }
+
+            if current_len + syl_len + reserve_for_hyphen <= width {
+                current.push_str(syl);
             } else {
-                out.push(current);
-                current = String::new();
-                if add_len + hyphen_cost <= width {
-                    current.push_str(syl);
-                    if !is_last {
-                        current.push('-');
-                    }
-                } else {
-                    let chars: Vec<char> = syl.chars().collect();
-                    let mut start = 0usize;
-                    while start < chars.len() {
-                        let end = std::cmp::min(start + cap, chars.len());
-                        let mut piece: String = chars[start..end].iter().collect();
-                        if end < chars.len() || !is_last {
-                            piece.push('-');
-                        }
-                        out.push(piece);
-                        start = end;
-                    }
-                }
+                let mut piece = current;
+                piece.push('-');
+                out.push(piece);
+                current = syl.clone();
             }
         }
 
         if !current.is_empty() {
             out.push(current);
         }
+
         if out.is_empty() {
-            vec![word.to_string()]
+            Self::hard_split_long_word_py(word, width)
         } else {
             out
         }
@@ -216,13 +204,19 @@ impl Program {
 
 
 
-    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool) -> &'static str {
+    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
         }
         let n = row_number.unwrap_or(0);
         if n <= 0 {
             return "";
+        }
+        if rest {
+            if n % 2 == 0 {
+                return "[47m[30m";
+            }
+            return "[40m[37m";
         }
         if n == 1 {
             return "[100m[37m";
@@ -242,11 +236,17 @@ impl Program {
         "[43m[30m"
     }
 
-    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool) -> String {
+    pub(crate) fn styled_shell_text_py(
+        text: &str,
+        row_number: Option<i64>,
+        is_header: bool,
+        rest: bool,
+        nocolor: bool,
+    ) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
         }
-        let style = Self::shell_style_py(row_number, is_header);
+        let style = Self::shell_style_py(row_number, is_header, rest);
         if style.is_empty() {
             text.to_string()
         } else {
@@ -393,17 +393,16 @@ impl Program {
 
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
                         let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
-                        let rendered = if abs_i + 1 == chunk_end {
-                            format!("{:<width$}", part, width = widths[abs_i])
-                        } else {
-                            format!("{:<width$} ", part, width = widths[abs_i])
-                        };
+                        let is_rest_fill = !is_header && wrapped_cells[local_i].get(sub_idx).is_none();
+                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
                             is_header,
+                            is_rest_fill,
                             self.nocolor,
                         ));
+                        line.push(' ');
                     }
 
                     one_chunk_lines.push(line.trim_end().to_string());
