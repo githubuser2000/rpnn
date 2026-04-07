@@ -193,7 +193,7 @@ impl Program {
             ],
             sideParas: vec![],
             allesParameters: 0,
-            __runAlles: true,
+            __runAlles: false,
             __invertAlles: false,
             __resultingTable: vec![],
             rowsAsNumbers: vec![],

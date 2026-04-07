@@ -72,6 +72,10 @@ impl Program {
         self.runDone = true;
     }
 
-    pub fn runAllesLikePythonInit(&mut self, words: &Words) {
+    pub fn runAllesLikePythonInit(&mut self, _words: &Words) {
+        self.__runAlles = false;
+        self.runDone = false;
+        self.allImportantBeginThingsDone = false;
+        self.tableGenerated = false;
     }
 }

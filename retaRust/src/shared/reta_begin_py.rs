@@ -523,6 +523,6 @@ impl Program {
     }
 
     pub fn invertAlles(&mut self) {
-
-}
+        self.__invertAlles = true;
+    }
 }
