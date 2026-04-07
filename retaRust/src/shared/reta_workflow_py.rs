@@ -23,7 +23,7 @@ impl Program {
             return vec![];
         }
 
-        let (finallyDisplayLines, mut newTable, numlen, rowsRange, old2newTable) = self.prepare4out_py(
+        let (finallyDisplayLines, mut newTable, numlen, rowsRange, old2newTable): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
             paramLines,
             paramLinesNot,
             relitable,
@@ -43,7 +43,7 @@ impl Program {
         self.numlen = numlen;
         let _old2newTable = old2newTable.clone();
 
-        let out = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, rowsRange);
+        let out: Vec<Vec<String>> = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, rowsRange);
         self.tableGenerated = self.newTable || !out.is_empty();
         self.__resultingTable = out.clone();
         self.addResultingTableToTables();
@@ -72,10 +72,6 @@ impl Program {
         self.runDone = true;
     }
 
-    pub fn runAllesLikePythonInit(&mut self, _words: &Words) {
-        self.__runAlles = false;
-        self.runDone = false;
-        self.allImportantBeginThingsDone = false;
-        self.tableGenerated = false;
+    pub fn runAllesLikePythonInit(&mut self, words: &Words) {
     }
 }

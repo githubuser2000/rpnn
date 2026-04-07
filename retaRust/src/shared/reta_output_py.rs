@@ -136,41 +136,66 @@ impl Program {
 
 
 
-    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool) -> &'static str {
+    fn prim_fak_py(mut n: i64) -> Vec<i64> {
+        let mut faktoren: Vec<i64> = vec![];
+        while n > 1 {
+            let mut i = 2_i64;
+            let mut gefunden = false;
+            let mut p = n;
+            while i * i <= n && !gefunden {
+                if n % i == 0 {
+                    gefunden = true;
+                    p = i;
+                } else {
+                    i += 1;
+                }
+            }
+            faktoren.push(p);
+            n /= p;
+        }
+        faktoren
+    }
+
+    fn moon_number_is_py(num: i64) -> bool {
+        if num < 2 { return false; }
+        for i in 2..num {
+            let one_result = (num as f64).powf(1.0 / i as f64);
+            if (one_result.round() * 100000.0 - (one_result * 100000.0).round()).abs() < 0.5 {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
         }
-        let n = row_number.unwrap_or(0);
-        if n <= 0 {
-            return "";
+        let num = row_number.unwrap_or(0);
+        if num == 0 {
+            return "[41m[30m[4m";
+        } else if rest {
+            if num % 2 == 0 { "[47m[30m" } else { "[40m[37m" }
+        } else if Self::moon_number_is_py(num) {
+            if num % 2 == 0 { "[106m[30m" } else { "[46m[30m" }
+        } else if Self::prim_fak_py(num).len() == 1 {
+            if num % 2 == 0 { "[103m[30m[1m" } else { "[43m[30m" }
+        } else if num % 2 == 0 {
+            "[47m[30m"
+        } else {
+            "[100m[37m"
         }
-        if n == 1 {
-            return "[100m[37m";
-        }
-        if n == 2 {
-            return "[103m[30m[1m";
-        }
-        if n % 9 == 0 {
-            return "[46m[30m";
-        }
-        if n % 8 == 0 || n % 4 == 0 {
-            return "[106m[30m";
-        }
-        if n % 6 == 0 {
-            return "[47m[30m";
-        }
-        "[43m[30m"
     }
 
-    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool) -> String {
+    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool, rest: bool) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
         }
-        let style = Self::shell_style_py(row_number, is_header);
+        let style = Self::shell_style_py(row_number, is_header, rest);
         if style.is_empty() {
             text.to_string()
         } else {
-            format!("{}{}[0m", style, text)
+            format!("{}{}[0m[0m", style, text)
         }
     }
 
@@ -303,30 +328,29 @@ impl Program {
                     let mut line = String::new();
 
                     if self.nummeriere {
-                        let label = if sub_idx == 0 {
-                            finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
-                        } else {
-                            String::new()
-                        };
-                        line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
+                        let numeric_label = finallyDisplayLines.get(row_idx).cloned().unwrap_or_default();
+                        let marker = if !is_header && row_number.unwrap_or(0) >= 5 { "█" } else { " " };
+                        line.push_str(marker);
+                        let label = if sub_idx == 0 { numeric_label } else { String::new() };
+                        line.push_str(&format!("{:<width$} ", label, width = num_prefix_width));
                     }
 
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
                         let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
-                        let rendered = if abs_i + 1 == chunk_end {
-                            format!("{:<width$}", part, width = widths[abs_i])
-                        } else {
-                            format!("{:<width$} ", part, width = widths[abs_i])
-                        };
+                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
                             is_header,
                             self.nocolor,
+                            false,
                         ));
+                        if abs_i + 1 != chunk_end {
+                            line.push(' ');
+                        }
                     }
 
-                    one_chunk_lines.push(line.trim_end().to_string());
+                    one_chunk_lines.push(line.to_string());
                 }
             }
 

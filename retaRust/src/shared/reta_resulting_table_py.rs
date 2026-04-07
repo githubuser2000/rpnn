@@ -9,7 +9,7 @@ impl Program {
         self.__resultingTable.clone()
     }
 
-    pub(crate) fn onlyThatColumns_py(&self, table: Vec<Vec<String>>, onlyThatColumns: Vec<i64>) -> Vec<Vec<String>> {
+    pub fn onlyThatColumns_py(&self, table: Vec<Vec<String>>, onlyThatColumns: Vec<i64>) -> Vec<Vec<String>> {
         if onlyThatColumns.len() == 0 {
             return table;
         }
