@@ -71,9 +71,10 @@ impl Program {
         if !self.generated1Pairs.is_empty() {
             return self.generated1Pairs.clone();
         }
+        let gener_rows: BTreeSet<i64> = self.generRows.iter().copied().collect();
         GENERATED1_SPECS
             .iter()
-            .filter(|spec| self.generRows.contains(&spec.col_a) || self.generRows.contains(&spec.col_b))
+            .filter(|spec| gener_rows.contains(&spec.col_a) || gener_rows.contains(&spec.col_b))
             .map(|spec| (spec.col_a, spec.col_b))
             .collect()
     }
@@ -488,6 +489,9 @@ impl Program {
     }
 
     pub fn spalteFuerGegenInnenAussenSeitlichPrim(&mut self, rowsAsNumbers: &mut Vec<i64>) {
+        if self.boolAndTupleSet1Options_exact_py().is_empty() {
+            return;
+        }
         fn prim_answer(oldPrimAmounts: i64, primAmounts: i64, i: i64) -> String {
             if i > 3 {
                 if primAmounts != oldPrimAmounts {
@@ -510,13 +514,7 @@ impl Program {
             }
         }
 
-        let mut extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
-        if !extraSpalten.iter().any(|v| v.is_none()) {
-            extraSpalten.push(None);
-        }
-        if extraSpalten.is_empty() {
-            extraSpalten = vec![Some(10), Some(5), None, Some(10), Some(42), Some(131), Some(138), Some(202), None];
-        }
+        let extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
         let mut vergangenheit: Vec<String> = vec![];
         for kk in extraSpalten {
             let mut zeilenInhalte: Vec<String> = vec![];
@@ -665,58 +663,169 @@ impl Program {
         concatCSVspalten
     }
 
+    fn getModaloperatorsPerLineCoordinates_py(&self, lineWeAreAt: usize) -> (usize, usize, usize) {
+        let modalMainOperatorZeile = lineWeAreAt;
+        let amountModaloperators = lineWeAreAt.saturating_sub(1);
+        let modalOpElseOperatorsZeilenBegin = lineWeAreAt + 1;
+        let modalOpElseOperatorsZeilenEnd = lineWeAreAt + amountModaloperators + 1;
+        (modalMainOperatorZeile, modalOpElseOperatorsZeilenBegin, modalOpElseOperatorsZeilenEnd)
+    }
+
+    fn getModaloperatorsPerLineCells_py(&self, relitable: &Vec<Vec<String>>, lineWeAreAt: usize) -> Vec<String> {
+        let coords = self.getModaloperatorsPerLineCoordinates_py(lineWeAreAt);
+        let mut modaloperators: Vec<String> = vec![];
+        if let Some(row) = relitable.get(coords.0) {
+            if let Some(v) = row.get(97) { modaloperators.push(v.clone()); }
+            if let Some(v) = row.get(98) { modaloperators.push(v.clone()); }
+        }
+        for coord in coords.1..coords.2 {
+            if let Some(v) = relitable.get(coord).and_then(|row| row.get(42)) {
+                modaloperators.push(v.clone());
+            }
+        }
+        modaloperators
+    }
+
+    fn modal_text_by_distance_exact_py(&self, distanceFromLine: i64) -> &'static str {
+        match distanceFromLine.abs() {
+            2 => "mittelstark überdurchschnittlich: ",
+            1 => "überdurchschnittlich: ",
+            3 => "mittelleicht überdurchschnittlich: ",
+            0 => "sehr: ",
+            _ => "sehr leicht überdurchschnittlich: ",
+        }
+    }
+
+    fn modal_replace_zuerst_zweites_py(&self, txt: String) -> String {
+        txt.replace("intrinsisch", "zuerst").replace("extrinsisch", "als zweites")
+    }
+
     pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let conceptsRowsSetOfTuple2 = self.generated1_pairs_exact_py();
+        if conceptsRowsSetOfTuple2.is_empty() {
+            return;
+        }
+        let reliTableCopy = self.relitable.clone();
+        let distances: [i64; 9] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+
+        #[derive(Clone, Default)]
+        struct ModalEntryPy {
+            i_origS: Vec<usize>,
+            modalS: Vec<Vec<String>>,
+            vervielfachter: Vec<usize>,
+        }
+
         for concept in conceptsRowsSetOfTuple2 {
-            if !(rowsAsNumbers.contains(&concept.0) || rowsAsNumbers.contains(&concept.1)) {
-                continue;
-            }
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
-            let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
-            let mut into: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            let mut into: Vec<String> = vec![String::new(); reliTableCopy.len()];
+            let mut einMalVorkommen: Vec<usize> = vec![];
+
+            for (i, cols) in reliTableCopy.iter().enumerate() {
                 if i == 0 {
-                    into.push(format!("Modallogik {}", self.generierte_spalte_meta_name_py(concept.0)));
-                    continue;
-                }
-                let fill_ = if conditionNvs1perN { self.zellenwert_py(i, 197) } else { self.zellenwert_py(i, 4) };
-                let mut teile: Vec<String> = vec![];
-                for distanceFromLine in -4i64..=4i64 {
-                    let i_with_a_distance = i as i64 + distanceFromLine;
-                    if i_with_a_distance <= 0 {
-                        continue;
-                    }
-                    let vielfacher = i_with_a_distance as usize;
-                    if vielfacher == 0 || vielfacher >= self.relitable.len() {
-                        continue;
-                    }
-                    if i % vielfacher != 0 && vielfacher % i != 0 {
-                        continue;
-                    }
-                    let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                        self.zellenwert_py(vielfacher, concept0)
-                    } else {
-                        self.zellenwert_py(vielfacher, concept1)
-                    };
-                    if intoItsContent.trim().is_empty() {
-                        continue;
-                    }
-                    let modal_a = self.zellenwert_py(vielfacher, 97);
-                    let modal_b = self.zellenwert_py(vielfacher, 98);
-                    let modal_c = self.zellenwert_py(vielfacher, 42);
-                    let modal_operatoren = self.nicht_leere_teile_join_py(vec![modal_a, modal_b, modal_c], " ");
-                    let prefix = self.modalTextByDistance_py(distanceFromLine);
-                    let eintrag = self.nicht_leere_teile_join_py(vec![prefix, modal_operatoren, intoItsContent], "");
-                    if !eintrag.trim().is_empty() {
-                        teile.push(eintrag);
+                    into[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
+                } else if cols.get(concept0).map(|s| !s.trim().is_empty()).unwrap_or(false) {
+                    if !einMalVorkommen.contains(&i) {
+                        einMalVorkommen.push(i);
                     }
                 }
-                if !teile.is_empty() && !fill_.trim().is_empty() {
-                    teile.push(format!("alles nur bezogen auf {}", fill_));
-                }
-                into.push(self.nicht_leere_teile_join_py(teile, " | "));
             }
+
+            let mut vorkommenVielfacher: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
+            for &einVorkommen in &einMalVorkommen {
+                let mut vielfacher = 1usize;
+                let mut ergebnis = vielfacher * einVorkommen;
+                vorkommenVielfacher.entry(ergebnis).or_default().push((einVorkommen, vielfacher));
+                while ergebnis < reliTableCopy.len() {
+                    vielfacher += 1;
+                    ergebnis = vielfacher * einVorkommen;
+                    vorkommenVielfacher.entry(ergebnis).or_default().push((einVorkommen, vielfacher));
+                }
+            }
+
+            let mut vorkommenVielfacher_B: BTreeMap<usize, BTreeMap<i64, ModalEntryPy>> = BTreeMap::new();
+            for i in 1..reliTableCopy.len() {
+                for &distanceFromLine in &distances {
+                    let i_with_a_distance_i64 = i as i64 + distanceFromLine;
+                    if i_with_a_distance_i64 < 0 {
+                        continue;
+                    }
+                    let i_with_a_distance = i_with_a_distance_i64 as usize;
+                    let Some(couples) = vorkommenVielfacher.get(&i_with_a_distance) else {
+                        continue;
+                    };
+                    let mut modalOperatorEnEn: Vec<Vec<String>> = vec![];
+                    let mut Orginal_i_mehrere: Vec<usize> = vec![];
+                    let mut vervielFachter: Vec<usize> = vec![];
+                    for &(vorkommen, vielfacher) in couples {
+                        modalOperatorEnEn.push(self.getModaloperatorsPerLineCells_py(&reliTableCopy, vielfacher));
+                        vervielFachter.push(vorkommen);
+                        Orginal_i_mehrere.push(i_with_a_distance);
+                    }
+                    let entry = vorkommenVielfacher_B.entry(i).or_default().entry(distanceFromLine).or_default();
+                    let mut new_i_origS = Orginal_i_mehrere;
+                    new_i_origS.extend(entry.i_origS.clone());
+                    let mut new_modalS = modalOperatorEnEn;
+                    new_modalS.extend(entry.modalS.clone());
+                    let mut new_vervielfachter = vervielFachter;
+                    new_vervielfachter.extend(entry.vervielfachter.clone());
+                    entry.i_origS = new_i_origS;
+                    entry.modalS = new_modalS;
+                    entry.vervielfachter = new_vervielfachter;
+                }
+            }
+
+            for i in 1..reliTableCopy.len() {
+                for &distanceFromLine in &distances {
+                    let Some(entry_by_dist) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) else {
+                        continue;
+                    };
+                    for (modalOperatoren, &vervielfachter) in entry_by_dist.modalS.iter().zip(entry_by_dist.vervielfachter.iter()) {
+                        let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
+                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
+                        } else {
+                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
+                        };
+                        if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
+                            continue;
+                        }
+                        let basis_content = if reliTableCopy.get(1).and_then(|r| r.get(97)).map(|s| s == &modalOperatoren[0]).unwrap_or(false) {
+                            intoItsContent.clone()
+                        } else {
+                            self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
+                        };
+                        into[i].push_str(self.modal_text_by_distance_exact_py(distanceFromLine));
+                        into[i].push_str(&modalOperatoren[0]);
+                        into[i].push(' ');
+                        into[i].push_str(&basis_content);
+                        into[i].push(' ');
+                        into[i].push_str(&modalOperatoren[1]);
+                        if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
+                            into[i].push_str(", nicht: ");
+                            into[i].push_str(&modalOperatoren[2..].join(", "));
+                            into[i].push_str(" (das alles nicht): ");
+                            let c0 = reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
+                            into[i].push_str(&self.modal_replace_zuerst_zweites_py(c0));
+                        }
+                        into[i].push_str(" | ");
+                    }
+                }
+                let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+                let fill_ = if conditionNvs1perN {
+                    reliTableCopy.get(i).and_then(|r| r.get(197)).cloned().unwrap_or_default()
+                } else {
+                    reliTableCopy.get(i).and_then(|r| r.get(4)).cloned().unwrap_or_default()
+                };
+                if !into[i].is_empty() {
+                    if into[i].ends_with(" | ") {
+                        let new_len = into[i].len().saturating_sub(3);
+                        into[i].truncate(new_len);
+                    }
+                    into[i].push_str(" | Alles nur bezogen auf die selbe Strukturgröße einer ");
+                    into[i].push_str(&fill_);
+                }
+            }
+
             let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }

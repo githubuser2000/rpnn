@@ -272,32 +272,43 @@ impl Program {
             return newTable;
         }
 
-        let mut widths: Vec<usize> = vec![8; col_count];
-        let explicit_widths = self.breite > 0 || !self.breiten.is_empty();
-        if explicit_widths {
+        let mut max_cell_text_len: Vec<usize> = vec![0; col_count];
+        for row in &newTable {
             for i in 0..col_count {
-                let forced = if i < self.breiten.len() {
-                    self.breiten[i]
-                } else {
-                    self.breite
-                };
-                if forced > 0 {
-                    widths[i] = forced as usize;
-                }
-            }
-        } else {
-            for i in 0..col_count {
-                let mut natural = 8usize;
-                for row in &newTable {
-                    if let Some(cell) = row.get(i) {
-                        let max_line = cell.split('\n').map(|s| s.chars().count()).max().unwrap_or(0);
-                        if max_line > natural {
-                            natural = max_line;
+                if let Some(cell) = row.get(i) {
+                    for part in cell.split('\n') {
+                        let text_len = part.chars().count();
+                        if text_len > max_cell_text_len[i] {
+                            max_cell_text_len[i] = text_len;
                         }
                     }
                 }
-                widths[i] = natural.min(24).max(8);
             }
+        }
+
+        let default_text_width = if self.textWidth > 0 {
+            self.textWidth as usize
+        } else {
+            21usize
+        };
+
+        let mut widths: Vec<usize> = vec![0; col_count];
+        for i in 0..col_count {
+            let certaintextwidth = if i < self.breiten.len() && self.breiten[i] > 0 {
+                self.breiten[i] as usize
+            } else if self.breite > 0 {
+                self.breite as usize
+            } else {
+                default_text_width
+            };
+            widths[i] = if certaintextwidth > max_cell_text_len[i]
+                || (certaintextwidth == 0 && !self.htmlOrBBcode)
+            {
+                max_cell_text_len[i]
+            } else {
+                certaintextwidth
+            }
+            .max(1);
         }
 
         let num_prefix_width = if self.nummeriere {
@@ -306,74 +317,71 @@ impl Program {
             0usize
         };
 
-        let detected_shell_width = if self.shellWidth > 0 {
-            self.shellWidth as usize
-        } else {
+        let runtime_shell_width = {
             let detected = Self::detect_terminal_columns_py();
-            if detected > 0 {
-                detected as usize
-            } else if self.textWidth > 0 {
-                self.textWidth as usize
-            } else {
-                80usize
-            }
+            if detected > 0 { detected as usize } else { 0usize }
         };
-        let chunk_budget = detected_shell_width.max(21usize);
+        let detected_shell_width = std::cmp::max(self.shellWidth.max(0) as usize, runtime_shell_width);
+        let chunk_budget = if detected_shell_width > 0 {
+            detected_shell_width
+        } else if self.textWidth > 0 {
+            self.textWidth as usize
+        } else {
+            80usize
+        }.max(21usize);
 
         let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
-        if !explicit_widths {
-            let separators = col_count.saturating_sub(1) + left_prefix;
-            let mut total: usize = widths.iter().sum::<usize>() + separators;
-            while total > chunk_budget {
-                let mut changed = false;
-                let mut idx = 0usize;
-                let mut best = 0usize;
-                for (i, width) in widths.iter().enumerate() {
-                    if *width > 8 && *width >= best {
-                        best = *width;
-                        idx = i;
-                    }
-                }
-                if best > 8 {
-                    widths[idx] -= 1;
-                    total = total.saturating_sub(1);
-                    changed = true;
-                }
-                if !changed { break; }
-            }
-        }
 
         let mut chunks: Vec<(usize, usize)> = vec![];
-        let mut start_col = 0usize;
-        while start_col < col_count {
-            let mut used = left_prefix;
-            let mut end_col = start_col;
+        let all_cols_total = left_prefix
+            + widths.iter().sum::<usize>()
+            + col_count.saturating_sub(1);
+        if all_cols_total <= chunk_budget {
+            chunks.push((0usize, col_count));
+        } else {
+            let mut start_col = 0usize;
+            while start_col < col_count {
+                let mut used = left_prefix;
+                let mut end_col = start_col;
 
-            while end_col < col_count {
-                let add = if end_col == start_col {
-                    widths[end_col]
-                } else {
-                    1 + widths[end_col]
-                };
+                while end_col < col_count {
+                    let add = if end_col == start_col {
+                        widths[end_col]
+                    } else {
+                        1 + widths[end_col]
+                    };
 
-                if end_col > start_col && used + add > chunk_budget {
-                    break;
+                    if end_col > start_col && used + add > chunk_budget {
+                        break;
+                    }
+                    used += add;
+                    end_col += 1;
                 }
-                used += add;
-                end_col += 1;
-            }
 
-            if end_col == start_col {
-                end_col += 1;
+                if end_col == start_col {
+                    end_col += 1;
+                }
+                chunks.push((start_col, end_col));
+                start_col = end_col;
             }
-            chunks.push((start_col, end_col));
-            start_col = end_col;
         }
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
         for (chunk_start, chunk_end) in chunks.iter().cloned() {
             let mut one_chunk_lines: Vec<String> = vec![];
+            let mut widths_for_chunk = widths.clone();
+            if chunk_end > chunk_start {
+                let used_without_last = left_prefix
+                    + (chunk_start..chunk_end - 1)
+                        .map(|i| widths_for_chunk[i] + 1)
+                        .sum::<usize>();
+                let last_idx = chunk_end - 1;
+                if chunk_budget > used_without_last {
+                    widths_for_chunk[last_idx] = widths_for_chunk[last_idx]
+                        .max(chunk_budget.saturating_sub(used_without_last));
+                }
+            }
 
             for (row_idx, row) in newTable.iter().enumerate() {
                 let mut wrapped_cells: Vec<Vec<String>> = vec![];
@@ -381,7 +389,7 @@ impl Program {
 
                 for i in chunk_start..chunk_end {
                     let cell = if i < row.len() { row[i].as_str() } else { "" };
-                    let wrapped = Self::wrap_text_py(cell, widths[i]);
+                    let wrapped = Self::wrap_text_py(cell, widths_for_chunk[i]);
                     max_sub = max_sub.max(wrapped.len());
                     wrapped_cells.push(wrapped);
                 }
@@ -422,9 +430,9 @@ impl Program {
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
                         let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
                         let rendered = if abs_i + 1 == chunk_end {
-                            format!("{:<width$}", part, width = widths[abs_i])
+                            format!("{:<width$}", part, width = widths_for_chunk[abs_i])
                         } else {
-                            format!("{:<width$} ", part, width = widths[abs_i])
+                            format!("{:<width$} ", part, width = widths_for_chunk[abs_i])
                         };
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
