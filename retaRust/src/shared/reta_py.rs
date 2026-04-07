@@ -1592,6 +1592,46 @@ impl Program {
         }
     }
 
+
+
+    fn shell_style_py(row_number: Option<i64>, is_header: bool) -> &'static str {
+        if is_header {
+            return "[41m[30m[4m";
+        }
+        let n = row_number.unwrap_or(0);
+        if n <= 0 {
+            return "";
+        }
+        if n == 1 {
+            return "[100m[37m";
+        }
+        if n == 2 {
+            return "[103m[30m[1m";
+        }
+        if n % 9 == 0 {
+            return "[46m[30m";
+        }
+        if n % 8 == 0 || n % 4 == 0 {
+            return "[106m[30m";
+        }
+        if n % 6 == 0 {
+            return "[47m[30m";
+        }
+        "[43m[30m"
+    }
+
+    fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool) -> String {
+        if nocolor || text.is_empty() {
+            return text.to_string();
+        }
+        let style = Self::shell_style_py(row_number, is_header);
+        if style.is_empty() {
+            text.to_string()
+        } else {
+            format!("{}{}[0m", style, text)
+        }
+    }
+
     fn cliOut_py(
         &mut self,
         finallyDisplayLines: Vec<String>,
@@ -1603,6 +1643,7 @@ impl Program {
         if newTable.is_empty() {
             self.finallyDisplayLines = out_lines.clone();
             self.numlen = numlen;
+            self.finallyDisplayLinesByChunks = vec![];
             return newTable;
         }
 
@@ -1647,52 +1688,120 @@ impl Program {
             0usize
         };
 
-        for (row_idx, row) in newTable.iter().enumerate() {
-            let mut wrapped_cells: Vec<Vec<String>> = vec![];
-            let mut max_sub = 1usize;
-            for i in 0..col_count {
-                let cell = if i < row.len() { row[i].as_str() } else { "" };
-                let wrapped = Self::wrap_text_py(cell, widths[i]);
-                if wrapped.len() > max_sub {
-                    max_sub = wrapped.len();
-                }
-                wrapped_cells.push(wrapped);
-            }
+        let chunk_budget: usize = if self.shellWidth > 0 {
+            self.shellWidth as usize
+        } else if self.textWidth > 0 {
+            self.textWidth as usize
+        } else {
+            0usize
+        };
 
-            let mut should_skip_row = false;
-            if self.keineleereninhalte {
-                let joined: String = row.join(" ");
-                let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                if stripped.is_empty() {
-                    should_skip_row = true;
-                }
-            }
-            if should_skip_row {
-                continue;
-            }
-
-            for sub_idx in 0..max_sub {
-                let mut line = String::new();
-                if self.nummeriere {
-                    let label = if sub_idx == 0 {
-                        finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
-                    } else {
-                        String::new()
-                    };
-                    line.push_str(&format!("{:>width$} ", label, width=num_prefix_width));
-                }
+        let mut chunks: Vec<(usize, usize)> = vec![];
+        if col_count > 0 {
+            if chunk_budget == 0 {
                 for i in 0..col_count {
-                    let part = wrapped_cells[i].get(sub_idx).cloned().unwrap_or_default();
-                    if i + 1 == col_count {
-                        line.push_str(&part);
-                    } else {
-                        line.push_str(&format!("{:<width$} ", part, width=widths[i]));
-                    }
+                    chunks.push((i, i + 1));
                 }
-                out_lines.push(line.trim_end().to_string());
+            } else {
+                let mut start_col = 0usize;
+                let mut current_width = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
+                let mut end_col = 0usize;
+
+                for i in 0..col_count {
+                    let add_width = if end_col == start_col {
+                        widths[i]
+                    } else {
+                        1 + widths[i]
+                    };
+                    let projected = current_width + add_width;
+                    if end_col > start_col && projected > chunk_budget {
+                        chunks.push((start_col, end_col));
+                        start_col = i;
+                        end_col = i;
+                        current_width = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
+                    }
+                    current_width += if end_col == start_col { widths[i] } else { 1 + widths[i] };
+                    end_col = i + 1;
+                }
+                if end_col > start_col {
+                    chunks.push((start_col, end_col));
+                }
             }
         }
 
+        let mut chunked_lines: Vec<Vec<String>> = vec![];
+
+        for (chunk_start, chunk_end) in chunks.iter().cloned() {
+            let mut one_chunk_lines: Vec<String> = vec![];
+
+            for (row_idx, row) in newTable.iter().enumerate() {
+                let mut wrapped_cells: Vec<Vec<String>> = vec![];
+                let mut max_sub = 1usize;
+                for i in chunk_start..chunk_end {
+                    let cell = if i < row.len() { row[i].as_str() } else { "" };
+                    let wrapped = Self::wrap_text_py(cell, widths[i]);
+                    if wrapped.len() > max_sub {
+                        max_sub = wrapped.len();
+                    }
+                    wrapped_cells.push(wrapped);
+                }
+
+                let mut should_skip_row = false;
+                if self.keineleereninhalte {
+                    let mut joined_parts: Vec<String> = vec![];
+                    for i in chunk_start..chunk_end {
+                        if i < row.len() {
+                            joined_parts.push(row[i].clone());
+                        }
+                    }
+                    let joined = joined_parts.join(" ");
+                    let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                    if stripped.is_empty() {
+                        should_skip_row = true;
+                    }
+                }
+                if should_skip_row {
+                    continue;
+                }
+
+                for sub_idx in 0..max_sub {
+                    let mut line = String::new();
+                    if self.nummeriere {
+                        let label = if sub_idx == 0 {
+                            finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
+                        } else {
+                            String::new()
+                        };
+                        line.push_str(&format!("{:>width$} ", label, width=num_prefix_width));
+                    }
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+
+                    for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
+                        let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
+                        let rendered = if abs_i + 1 == chunk_end {
+                            format!("{:<width$}", part, width=widths[abs_i])
+                        } else {
+                            format!("{:<width$} ", part, width=widths[abs_i])
+                        };
+                        line.push_str(&Self::styled_shell_text_py(
+                            &rendered,
+                            row_number,
+                            is_header,
+                            self.nocolor,
+                        ));
+                    }
+                    one_chunk_lines.push(line.trim_end().to_string());
+                }
+            }
+
+            chunked_lines.push(one_chunk_lines.clone());
+            out_lines.extend(one_chunk_lines);
+        }
+
+        self.finallyDisplayLinesByChunks = chunked_lines;
         self.finallyDisplayLines = out_lines.clone();
         self.numlen = numlen;
         newTable
