@@ -582,11 +582,40 @@ impl Program {
         }
     }
 
-    pub fn setShellWidth(&mut self) {
-        self.shellWidth = 0;
+    fn detect_terminal_columns_py() -> i64 {
         if let Ok(v) = std::env::var("COLUMNS") {
-            self.shellWidth = v.parse::<i64>().unwrap_or(0);
+            if let Ok(n) = v.trim().parse::<i64>() {
+                if n > 0 {
+                    return n;
+                }
+            }
         }
+
+        let try_cmd = |cmd: &str| -> Option<i64> {
+            let output = std::process::Command::new("sh")
+                .arg("-lc")
+                .arg(cmd)
+                .output()
+                .ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            let txt = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let n = txt.parse::<i64>().ok()?;
+            if n > 0 { Some(n) } else { None }
+        };
+
+        if let Some(n) = try_cmd("stty size < /dev/tty 2>/dev/null | awk '{print $2}'") {
+            return n;
+        }
+        if let Some(n) = try_cmd("tput cols 2>/dev/null") {
+            return n;
+        }
+        0
+    }
+
+    pub fn setShellWidth(&mut self) {
+        self.shellWidth = Self::detect_terminal_columns_py();
     }
 
 
@@ -1632,6 +1661,7 @@ impl Program {
         }
     }
 
+
     fn cliOut_py(
         &mut self,
         finallyDisplayLines: Vec<String>,
@@ -1647,14 +1677,18 @@ impl Program {
             return newTable;
         }
 
-        let mut col_count = 0usize;
-        for row in newTable.iter() {
-            if row.len() > col_count {
-                col_count = row.len();
-            }
+        let col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
+        if col_count == 0 {
+            self.finallyDisplayLines = out_lines.clone();
+            self.numlen = numlen;
+            self.finallyDisplayLinesByChunks = vec![];
+            return newTable;
         }
 
-        let mut widths: Vec<usize> = vec![0; col_count];
+        // Python-like default shell width behavior:
+        // without explicit --breite / --breiten, columns start at width 21.
+        // Only explicit width arguments should override this.
+        let mut widths: Vec<usize> = vec![21; col_count];
         for i in 0..col_count {
             let forced = if i < self.breiten.len() {
                 self.breiten[i]
@@ -1665,22 +1699,6 @@ impl Program {
                 widths[i] = forced as usize;
             }
         }
-        for (i, w) in widths.iter_mut().enumerate() {
-            if *w == 0 {
-                let mut max_len = 1usize;
-                for row in newTable.iter() {
-                    if i < row.len() {
-                        for line in row[i].lines() {
-                            let len_ = line.chars().count();
-                            if len_ > max_len {
-                                max_len = len_;
-                            }
-                        }
-                    }
-                }
-                *w = std::cmp::min(std::cmp::max(max_len, 12usize), 32usize);
-            }
-        }
 
         let num_prefix_width = if self.nummeriere {
             finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
@@ -1688,45 +1706,47 @@ impl Program {
             0usize
         };
 
-        let chunk_budget: usize = if self.shellWidth > 0 {
+        let detected_shell_width = if self.shellWidth > 0 {
             self.shellWidth as usize
-        } else if self.textWidth > 0 {
-            self.textWidth as usize
         } else {
-            0usize
+            let detected = Self::detect_terminal_columns_py();
+            if detected > 0 {
+                detected as usize
+            } else if self.textWidth > 0 {
+                self.textWidth as usize
+            } else {
+                80usize
+            }
         };
+        let chunk_budget = detected_shell_width.max(21usize);
+
+        let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
 
         let mut chunks: Vec<(usize, usize)> = vec![];
-        if col_count > 0 {
-            if chunk_budget == 0 {
-                for i in 0..col_count {
-                    chunks.push((i, i + 1));
-                }
-            } else {
-                let mut start_col = 0usize;
-                let mut current_width = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
-                let mut end_col = 0usize;
+        let mut start_col = 0usize;
+        while start_col < col_count {
+            let mut used = left_prefix;
+            let mut end_col = start_col;
 
-                for i in 0..col_count {
-                    let add_width = if end_col == start_col {
-                        widths[i]
-                    } else {
-                        1 + widths[i]
-                    };
-                    let projected = current_width + add_width;
-                    if end_col > start_col && projected > chunk_budget {
-                        chunks.push((start_col, end_col));
-                        start_col = i;
-                        end_col = i;
-                        current_width = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
-                    }
-                    current_width += if end_col == start_col { widths[i] } else { 1 + widths[i] };
-                    end_col = i + 1;
+            while end_col < col_count {
+                let add = if end_col == start_col {
+                    widths[end_col]
+                } else {
+                    1 + widths[end_col]
+                };
+
+                if end_col > start_col && used + add > chunk_budget {
+                    break;
                 }
-                if end_col > start_col {
-                    chunks.push((start_col, end_col));
-                }
+                used += add;
+                end_col += 1;
             }
+
+            if end_col == start_col {
+                end_col += 1;
+            }
+            chunks.push((start_col, end_col));
+            start_col = end_col;
         }
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
@@ -1737,24 +1757,21 @@ impl Program {
             for (row_idx, row) in newTable.iter().enumerate() {
                 let mut wrapped_cells: Vec<Vec<String>> = vec![];
                 let mut max_sub = 1usize;
+
                 for i in chunk_start..chunk_end {
                     let cell = if i < row.len() { row[i].as_str() } else { "" };
                     let wrapped = Self::wrap_text_py(cell, widths[i]);
-                    if wrapped.len() > max_sub {
-                        max_sub = wrapped.len();
-                    }
+                    max_sub = max_sub.max(wrapped.len());
                     wrapped_cells.push(wrapped);
                 }
 
                 let mut should_skip_row = false;
                 if self.keineleereninhalte {
-                    let mut joined_parts: Vec<String> = vec![];
-                    for i in chunk_start..chunk_end {
-                        if i < row.len() {
-                            joined_parts.push(row[i].clone());
-                        }
-                    }
-                    let joined = joined_parts.join(" ");
+                    let joined = (chunk_start..chunk_end)
+                        .filter_map(|i| row.get(i))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(" ");
                     let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
                     if stripped.is_empty() {
                         should_skip_row = true;
@@ -1764,27 +1781,29 @@ impl Program {
                     continue;
                 }
 
+                let row_number = finallyDisplayLines
+                    .get(row_idx)
+                    .and_then(|s| s.trim().parse::<i64>().ok());
+                let is_header = row_number.is_none();
+
                 for sub_idx in 0..max_sub {
                     let mut line = String::new();
+
                     if self.nummeriere {
                         let label = if sub_idx == 0 {
                             finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
                         } else {
                             String::new()
                         };
-                        line.push_str(&format!("{:>width$} ", label, width=num_prefix_width));
+                        line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
                     }
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    let is_header = row_number.is_none();
 
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
                         let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
                         let rendered = if abs_i + 1 == chunk_end {
-                            format!("{:<width$}", part, width=widths[abs_i])
+                            format!("{:<width$}", part, width = widths[abs_i])
                         } else {
-                            format!("{:<width$} ", part, width=widths[abs_i])
+                            format!("{:<width$} ", part, width = widths[abs_i])
                         };
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
@@ -1793,6 +1812,7 @@ impl Program {
                             self.nocolor,
                         ));
                     }
+
                     one_chunk_lines.push(line.trim_end().to_string());
                 }
             }
