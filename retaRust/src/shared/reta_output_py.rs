@@ -1,6 +1,5 @@
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use hypher::{hyphenate, Lang};
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
@@ -109,23 +108,20 @@ impl Program {
             return vec![word.to_string()];
         }
 
-        // reta-Python darf hier niemals abstürzen. Die Rust-Portierung muss deshalb
-        // jeden Hyphenierungsfehler hart abfangen und notfalls stumpf trennen.
-        // hypher 0.1.7 kann ohne alloc bei langen oder ungünstigen Wörtern panicen.
-        if word.len() >= 45 {
+        // hypher 0.1.7 panics for words longer than 45 bytes when alloc is disabled.
+        // Python reta does not have that hard limit, so we must fall back instead of panicking.
+        if word.len() > 45 {
             return Self::hard_split_long_word_py(word, width);
         }
 
         let lang = Self::hypher_lang_py(word);
-        let syllables_result = catch_unwind(AssertUnwindSafe(|| {
-            hyphenate(word, lang)
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-        }));
-        let syllables: Vec<String> = match syllables_result {
-            Ok(v) if !v.is_empty() => v,
-            _ => return Self::hard_split_long_word_py(word, width),
-        };
+        let syllables: Vec<String> = hyphenate(word, lang)
+            .map(|s| s.to_string())
+            .collect();
+
+        if syllables.is_empty() {
+            return Self::hard_split_long_word_py(word, width);
+        }
 
         let mut out: Vec<String> = Vec::new();
         let mut current = String::new();
@@ -276,18 +272,31 @@ impl Program {
             return newTable;
         }
 
-        // Python-like default shell width behavior:
-        // without explicit --breite / --breiten, columns start at width 21.
-        // Only explicit width arguments should override this.
-        let mut widths: Vec<usize> = vec![21; col_count];
-        for i in 0..col_count {
-            let forced = if i < self.breiten.len() {
-                self.breiten[i]
-            } else {
-                self.breite
-            };
-            if forced > 0 {
-                widths[i] = forced as usize;
+        let mut widths: Vec<usize> = vec![8; col_count];
+        let explicit_widths = self.breite > 0 || !self.breiten.is_empty();
+        if explicit_widths {
+            for i in 0..col_count {
+                let forced = if i < self.breiten.len() {
+                    self.breiten[i]
+                } else {
+                    self.breite
+                };
+                if forced > 0 {
+                    widths[i] = forced as usize;
+                }
+            }
+        } else {
+            for i in 0..col_count {
+                let mut natural = 8usize;
+                for row in &newTable {
+                    if let Some(cell) = row.get(i) {
+                        let max_line = cell.split('\n').map(|s| s.chars().count()).max().unwrap_or(0);
+                        if max_line > natural {
+                            natural = max_line;
+                        }
+                    }
+                }
+                widths[i] = natural.min(24).max(8);
             }
         }
 
@@ -312,6 +321,27 @@ impl Program {
         let chunk_budget = detected_shell_width.max(21usize);
 
         let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
+        if !explicit_widths {
+            let separators = col_count.saturating_sub(1) + left_prefix;
+            let mut total: usize = widths.iter().sum::<usize>() + separators;
+            while total > chunk_budget {
+                let mut changed = false;
+                let mut idx = 0usize;
+                let mut best = 0usize;
+                for (i, width) in widths.iter().enumerate() {
+                    if *width > 8 && *width >= best {
+                        best = *width;
+                        idx = i;
+                    }
+                }
+                if best > 8 {
+                    widths[idx] -= 1;
+                    total = total.saturating_sub(1);
+                    changed = true;
+                }
+                if !changed { break; }
+            }
+        }
 
         let mut chunks: Vec<(usize, usize)> = vec![];
         let mut start_col = 0usize;

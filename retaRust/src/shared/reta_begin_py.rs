@@ -370,6 +370,90 @@ impl Program {
         self.spaltenTypeNaming = SpaltenTyp::default();
     }
 
+
+
+    fn token_matches_parameter_entry_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
+        let norm = |s: &str| s.to_lowercase().replace("_", "").replace("-", "").replace("/", "");
+        let main = norm(main_name);
+        let sub = norm(sub_name);
+        entry.parameterMainNames.iter().any(|m| norm(m) == main)
+            && entry.parameterNames.iter().any(|n| norm(n) == sub)
+    }
+
+    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<Option<i64>>, Vec<String>, Vec<(i64, i64)>) {
+        let mut generated1_pairs: Vec<(i64, i64)> = vec![];
+        let mut bool_and_tuple_set1: Vec<Option<i64>> = vec![];
+        let mut generated2_codes: Vec<String> = vec![];
+        let mut metakonkret_pairs: Vec<(i64, i64)> = vec![];
+
+        for token in &self.sideParas {
+            let Some(rest) = token.strip_prefix("--") else { continue; };
+            let Some((main_name, sub_values)) = rest.split_once('=') else { continue; };
+            for sub_name in sub_values.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                for entry in &words.paraNdataMatrix {
+                    if !Self::token_matches_parameter_entry_py(entry, main_name, sub_name) {
+                        continue;
+                    }
+                    if let Some(datas1) = entry.datas.get(1) {
+                        for value in datas1 {
+                            if let PyValue::Tuple(inner) = value {
+                                if inner.len() == 2 {
+                                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                                        let pair = (*a, *b);
+                                        if !generated1_pairs.contains(&pair) { generated1_pairs.push(pair); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if let Some(datas4) = entry.datas.get(4) {
+                        for value in datas4 {
+                            match value {
+                                PyValue::Tuple(inner) => {
+                                    if let Some(PyValue::Int(a)) = inner.first() {
+                                        let v = Some(*a);
+                                        if !bool_and_tuple_set1.contains(&v) { bool_and_tuple_set1.push(v); }
+                                    } else if !bool_and_tuple_set1.contains(&None) {
+                                        bool_and_tuple_set1.push(None);
+                                    }
+                                }
+                                PyValue::Bool(_) => {
+                                    if !bool_and_tuple_set1.contains(&None) { bool_and_tuple_set1.push(None); }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    if let Some(datas7) = entry.datas.get(7) {
+                        if !datas7.is_empty() {
+                            for spec in GENERATED2_SPECS {
+                                let main_ok = entry.parameterMainNames.iter().any(|m| m == spec.main_name);
+                                let sub_ok = entry.parameterNames.iter().any(|n| n == spec.parameter_name);
+                                if main_ok && sub_ok && !generated2_codes.iter().any(|c| c == spec.code) {
+                                    generated2_codes.push(spec.code.to_string());
+                                }
+                            }
+                        }
+                    }
+                    if let Some(datas11) = entry.datas.get(11) {
+                        for value in datas11 {
+                            if let PyValue::Tuple(inner) = value {
+                                if inner.len() == 2 {
+                                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                                        let pair = (*a, *b);
+                                        if !metakonkret_pairs.contains(&pair) { metakonkret_pairs.push(pair); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (generated1_pairs, bool_and_tuple_set1, generated2_codes, metakonkret_pairs)
+    }
+
     pub fn validate_cli_like_python_for_known_case(&mut self) {
 
         let has_zeilen = self.argvWithoutProgram.iter().any(|a| a == "-zeilen");
@@ -442,43 +526,50 @@ impl Program {
         }
         self.getConcat_ones = ones;
 
+        let (exact_generated1_pairs, exact_bool_and_tuple_set1, exact_generated2_codes, exact_metakonkret_pairs) =
+            self.parse_exact_generator_selections_from_words_py(words);
+        self.generated1Pairs = exact_generated1_pairs;
+
         let selected_generated2 = self.spaltenArtenKey_SpaltennummernValue
             .get(&self.spaltenTypeNaming.generated2)
             .cloned()
             .unwrap_or_default();
-        self.generated2Codes = if selected_generated2.is_empty() {
-            vec![]
+        self.generated2Codes = if !exact_generated2_codes.is_empty() {
+            exact_generated2_codes
         } else {
-            let mut generated2Codes: Vec<String> = vec![];
-            for spec in GENERATED2_SPECS {
-                if self.argvWithoutProgram.iter().any(|arg| arg.contains(spec.parameter_name))
-                    && !generated2Codes.iter().any(|v| v == spec.code)
-                {
-                    generated2Codes.push(spec.code.to_string());
-                }
-            }
-            generated2Codes
+            let _ = selected_generated2;
+            vec![]
         };
 
         let selected_boolAndTupleSet1 = self.spaltenArtenKey_SpaltennummernValue
             .get(&self.spaltenTypeNaming.boolAndTupleSet1)
             .cloned()
             .unwrap_or_default();
-        self.boolAndTupleSet1Options = BOOL_AND_TUPLE_SET1_SPECS
-            .iter()
-            .filter(|spec| selected_boolAndTupleSet1.contains(&spec.col_a))
-            .map(|spec| if spec.col_a >= 0 { Some(spec.col_a) } else { None })
-            .collect();
+        self.boolAndTupleSet1Options = if !exact_bool_and_tuple_set1.is_empty() {
+            exact_bool_and_tuple_set1
+        } else if selected_boolAndTupleSet1.is_empty() {
+            vec![]
+        } else {
+            BOOL_AND_TUPLE_SET1_SPECS
+                .iter()
+                .filter(|spec| spec.col_a >= 0 && selected_boolAndTupleSet1.contains(&spec.col_a))
+                .map(|spec| Some(spec.col_a))
+                .collect()
+        };
 
         let selected_metakonkret = self.spaltenArtenKey_SpaltennummernValue
             .get(&self.spaltenTypeNaming.metakonkret)
             .cloned()
             .unwrap_or_default();
-        self.metakonkretPairs = METAKONKRET_SPECS
-            .iter()
-            .filter(|spec| selected_metakonkret.contains(&spec.col_a))
-            .map(|spec| (spec.col_a, spec.col_b))
-            .collect();
+        self.metakonkretPairs = if !exact_metakonkret_pairs.is_empty() {
+            exact_metakonkret_pairs
+        } else {
+            METAKONKRET_SPECS
+                .iter()
+                .filter(|spec| selected_metakonkret.contains(&spec.col_a))
+                .map(|spec| (spec.col_a, spec.col_b))
+                .collect()
+        };
 
         if !self.rowsOfcombi.is_empty() {
             Self::push_unique_string(&mut paramLines, "ka".to_string());
