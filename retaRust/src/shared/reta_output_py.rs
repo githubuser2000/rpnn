@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use hypher::{hyphenate, Lang};
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
@@ -108,14 +109,23 @@ impl Program {
             return vec![word.to_string()];
         }
 
-        let lang = Self::hypher_lang_py(word);
-        let syllables: Vec<String> = hyphenate(word, lang)
-            .map(|s| s.to_string())
-            .collect();
-
-        if syllables.is_empty() {
+        // reta-Python darf hier niemals abstürzen. Die Rust-Portierung muss deshalb
+        // jeden Hyphenierungsfehler hart abfangen und notfalls stumpf trennen.
+        // hypher 0.1.7 kann ohne alloc bei langen oder ungünstigen Wörtern panicen.
+        if word.len() >= 45 {
             return Self::hard_split_long_word_py(word, width);
         }
+
+        let lang = Self::hypher_lang_py(word);
+        let syllables_result = catch_unwind(AssertUnwindSafe(|| {
+            hyphenate(word, lang)
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+        }));
+        let syllables: Vec<String> = match syllables_result {
+            Ok(v) if !v.is_empty() => v,
+            _ => return Self::hard_split_long_word_py(word, width),
+        };
 
         let mut out: Vec<String> = Vec::new();
         let mut current = String::new();
@@ -204,44 +214,7 @@ impl Program {
 
 
 
-    fn moon_number_is_py(n: i64) -> bool {
-        if n < 2 {
-            return false;
-        }
-        for i in 2..n {
-            let one_result = (n as f64).powf(1.0 / i as f64);
-            if (one_result.round() * 100000.0).round() == (one_result * 100000.0).round() {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn prim_fak_len_py(n: i64) -> usize {
-        if n <= 1 {
-            return 0;
-        }
-        let mut faktoren: Vec<i64> = Vec::new();
-        let mut z = n;
-        while z > 1 {
-            let mut i = 2i64;
-            let mut gefunden = false;
-            let mut p = z;
-            while i * i <= n && !gefunden {
-                if z % i == 0 {
-                    gefunden = true;
-                    p = i;
-                } else {
-                    i += 1;
-                }
-            }
-            faktoren.push(p);
-            z /= p;
-        }
-        faktoren.len()
-    }
-
-    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
+    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
         }
@@ -249,39 +222,33 @@ impl Program {
         if n <= 0 {
             return "";
         }
-        if rest {
-            if n % 2 == 0 {
-                return "[47m[30m";
-            }
-            return "[40m[37m";
+        if n == 1 {
+            return "[100m[37m";
         }
-        if Self::moon_number_is_py(n) {
-            if n % 2 == 0 {
-                return "[106m[30m";
-            }
+        if n == 2 {
+            return "[103m[30m[1m";
+        }
+        if n % 9 == 0 {
             return "[46m[30m";
         }
-        if Self::prim_fak_len_py(n) == 1 {
-            if n % 2 == 0 {
-                return "[103m[30m[1m";
-            }
-            return "[43m[30m";
+        if n % 8 == 0 || n % 4 == 0 {
+            return "[106m[30m";
         }
-        if n % 2 == 0 {
+        if n % 6 == 0 {
             return "[47m[30m";
         }
-        "[100m[37m"
+        "[43m[30m"
     }
 
-    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, rest: bool, nocolor: bool) -> String {
+    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
         }
-        let style = Self::shell_style_py(row_number, is_header, rest);
+        let style = Self::shell_style_py(row_number, is_header);
         if style.is_empty() {
             text.to_string()
         } else {
-            format!("{}{}[0m[0m", style, text)
+            format!("{}{}[0m", style, text)
         }
     }
 
@@ -419,35 +386,25 @@ impl Program {
                         } else {
                             String::new()
                         };
-                        let prefix = if is_header {
-                            " ".to_string()
-                        } else if chunk_start > 0 {
-                            "█".to_string()
-                        } else {
-                            " ".to_string()
-                        };
-                        line.push_str(&prefix);
                         line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
                     }
 
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
-                        let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
-                        let part = maybe_part.clone().unwrap_or_default();
-                        let is_rest = maybe_part.is_none();
-                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
+                        let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
+                        let rendered = if abs_i + 1 == chunk_end {
+                            format!("{:<width$}", part, width = widths[abs_i])
+                        } else {
+                            format!("{:<width$} ", part, width = widths[abs_i])
+                        };
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
                             is_header,
-                            is_rest,
                             self.nocolor,
                         ));
-                        if abs_i + 1 != chunk_end {
-                            line.push(' ');
-                        }
                     }
 
-                    one_chunk_lines.push(line);
+                    one_chunk_lines.push(line.trim_end().to_string());
                 }
             }
 

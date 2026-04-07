@@ -451,7 +451,9 @@ impl Program {
         } else {
             let mut generated2Codes: Vec<String> = vec![];
             for spec in GENERATED2_SPECS {
-                if !generated2Codes.iter().any(|v| v == spec.code) {
+                if self.argvWithoutProgram.iter().any(|arg| arg.contains(spec.parameter_name))
+                    && !generated2Codes.iter().any(|v| v == spec.code)
+                {
                     generated2Codes.push(spec.code.to_string());
                 }
             }

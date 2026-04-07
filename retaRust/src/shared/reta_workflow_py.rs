@@ -12,6 +12,7 @@ impl Program {
         self.RowsLen = RowsLen;
         self.relitable = relitable.clone();
         self.rowsAsNumbers = rowsAsNumbers.clone();
+        self.apply_concat_generators_py();
 
         if self.helpPage() {
             self.__resultingTable = vec![];
@@ -26,8 +27,8 @@ impl Program {
         let (finallyDisplayLines, mut newTable, numlen, rowsRange, old2newTable): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
             paramLines,
             paramLinesNot,
-            relitable,
-            rowsAsNumbers,
+            self.relitable.clone(),
+            self.rowsAsNumbers.clone(),
         );
 
         if self.rowsOfcombi.len() > 0 {

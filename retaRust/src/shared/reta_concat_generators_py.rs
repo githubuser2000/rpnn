@@ -61,26 +61,45 @@ impl Program {
     }
 
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
-        if !self.boolAndTupleSet1Options.is_empty() {
-            return self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect();
-        }
-        BOOL_AND_TUPLE_SET1_SPECS
+        self.boolAndTupleSet1Options
             .iter()
-            .map(|spec| if spec.col_a >= 0 { Some(spec.col_a as usize) } else { None })
+            .map(|v| v.map(|x| x as usize))
             .collect()
     }
 
     fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
-        if !self.metakonkretPairs.is_empty() {
-            return self.metakonkretPairs.clone();
-        }
-        METAKONKRET_SPECS.iter().map(|spec| (spec.col_a, spec.col_b)).collect()
+        self.metakonkretPairs.clone()
     }
 
     fn generated1_pairs_exact_py(&self) -> Vec<(i64, i64)> {
-        GENERATED1_SPECS.iter().map(|spec| (spec.col_a, spec.col_b)).collect()
+        GENERATED1_SPECS
+            .iter()
+            .filter(|spec| self.generRows.contains(&spec.col_a) || self.generRows.contains(&spec.col_b))
+            .map(|spec| (spec.col_a, spec.col_b))
+            .collect()
     }
 
+    fn generated1_heading_exact_py(&self, concept: (i64, i64)) -> String {
+        match concept {
+            (38, 39) => "Generiert: nach innen: gut, lieb, böse, schlecht, aufmüpfig".to_string(),
+            _ => {
+                if let Some(spec) = GENERATED1_SPECS.iter().find(|spec| spec.col_a == concept.0 && spec.col_b == concept.1) {
+                    let parameter = spec.parameter_name.replace('_', " ");
+                    format!("Generiert: {}", parameter)
+                } else {
+                    format!("Generiert: {}", self.generierte_spalte_meta_name_py(concept.0))
+                }
+            }
+        }
+    }
+
+    fn modallogik_basiszeile_exact_py(&self, i: usize, conditionNvs1perN: bool) -> String {
+        if conditionNvs1perN {
+            self.zellenwert_py(i, 197)
+        } else {
+            self.zellenwert_py(i, 4)
+        }
+    }
 
     fn nicht_leere_teile_join_py(&self, teile: Vec<String>, sep: &str) -> String {
         let mut neu: Vec<String> = vec![];
@@ -514,11 +533,11 @@ impl Program {
         }
 
         let mut extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
+        if extraSpalten.is_empty() {
+            return;
+        }
         if !extraSpalten.iter().any(|v| v.is_none()) {
             extraSpalten.push(None);
-        }
-        if extraSpalten.is_empty() {
-            extraSpalten = vec![Some(10), Some(5), None, Some(10), Some(42), Some(131), Some(138), Some(202), None];
         }
         let mut vergangenheit: Vec<String> = vec![];
         for kk in extraSpalten {
@@ -670,44 +689,63 @@ impl Program {
 
     pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let conceptsRowsSetOfTuple2 = self.generated1_pairs_exact_py();
+        let relitable_snapshot = self.relitable.clone();
         for concept in conceptsRowsSetOfTuple2 {
-            if !(rowsAsNumbers.contains(&concept.0) || rowsAsNumbers.contains(&concept.1)) {
-                continue;
-            }
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
             let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
             let mut into: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            for i in 0..relitable_snapshot.len() {
                 if i == 0 {
-                    into.push(format!("Modallogik {}", self.generierte_spalte_meta_name_py(concept.0)));
+                    into.push(self.generated1_heading_exact_py(concept));
                     continue;
                 }
-                let fill_ = if conditionNvs1perN { self.zellenwert_py(i, 197) } else { self.zellenwert_py(i, 4) };
+                let fill_ = self.modallogik_basiszeile_exact_py(i, conditionNvs1perN);
+                if fill_.trim().is_empty() {
+                    into.push(String::new());
+                    continue;
+                }
                 let mut teile: Vec<String> = vec![];
                 for distanceFromLine in -4i64..=4i64 {
                     let i_with_a_distance = i as i64 + distanceFromLine;
                     if i_with_a_distance <= 0 {
                         continue;
                     }
-                    let vielfacher = i_with_a_distance as usize;
-                    if vielfacher == 0 || vielfacher >= self.relitable.len() {
-                        continue;
-                    }
-                    if i % vielfacher != 0 && vielfacher % i != 0 {
+                    let candidate = i_with_a_distance as usize;
+                    if candidate == 0 || candidate >= relitable_snapshot.len() {
                         continue;
                     }
                     let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                        self.zellenwert_py(vielfacher, concept0)
+                        relitable_snapshot
+                            .get(candidate)
+                            .and_then(|row| row.get(concept0))
+                            .cloned()
+                            .unwrap_or_default()
                     } else {
-                        self.zellenwert_py(vielfacher, concept1)
+                        relitable_snapshot
+                            .get(candidate)
+                            .and_then(|row| row.get(concept1))
+                            .cloned()
+                            .unwrap_or_default()
                     };
                     if intoItsContent.trim().is_empty() {
                         continue;
                     }
-                    let modal_a = self.zellenwert_py(vielfacher, 97);
-                    let modal_b = self.zellenwert_py(vielfacher, 98);
-                    let modal_c = self.zellenwert_py(vielfacher, 42);
+                    let modal_a = relitable_snapshot
+                        .get(candidate)
+                        .and_then(|row| row.get(97))
+                        .cloned()
+                        .unwrap_or_default();
+                    let modal_b = relitable_snapshot
+                        .get(candidate)
+                        .and_then(|row| row.get(98))
+                        .cloned()
+                        .unwrap_or_default();
+                    let modal_c = relitable_snapshot
+                        .get(candidate)
+                        .and_then(|row| row.get(42))
+                        .cloned()
+                        .unwrap_or_default();
                     let modal_operatoren = self.nicht_leere_teile_join_py(vec![modal_a, modal_b, modal_c], " ");
                     let prefix = self.modalTextByDistance_py(distanceFromLine);
                     let eintrag = self.nicht_leere_teile_join_py(vec![prefix, modal_operatoren, intoItsContent], "");
@@ -715,20 +753,21 @@ impl Program {
                         teile.push(eintrag);
                     }
                 }
-                if !teile.is_empty() && !fill_.trim().is_empty() {
-                    teile.push(format!("alles nur bezogen auf {}", fill_));
+                if !teile.is_empty() {
+                    teile.push(format!("Alles nur bezogen auf die selbe Strukturgröße einer {}", fill_));
                 }
                 into.push(self.nicht_leere_teile_join_py(teile, " | "));
             }
-            let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
+            let heading = self.generated1_heading_exact_py(concept);
+            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
 
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let mut generatedBefehle: Vec<String> = self.generated2Codes.clone();
+        let generatedBefehle: Vec<String> = self.generated2Codes.clone();
         if generatedBefehle.is_empty() {
-            generatedBefehle = GENERATED2_SPECS.iter().map(|spec| spec.code.to_string()).collect();
+            return;
         }
         for code in generatedBefehle {
             if code == "primzahlkreuzprocontra" {
