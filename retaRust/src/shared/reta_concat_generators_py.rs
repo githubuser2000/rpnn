@@ -1,19 +1,10 @@
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::shared::reta_program_types::Program;
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
-fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
-    }
-    a.abs()
-}
-
 impl Program {
-
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
         if !target.contains(&value) {
             target.push(value);
@@ -36,18 +27,6 @@ impl Program {
             self.relitable[zeile].resize(spalte + 1, String::new());
         }
         self.relitable[zeile][spalte] = wert;
-    }
-
-    fn generator_row_end_py(&self) -> usize {
-        if self.relitable.is_empty() {
-            return 0;
-        }
-        let letztes = self.relitable.len().saturating_sub(1) as i64;
-        if self.lastLineNumber > 0 {
-            std::cmp::min(self.lastLineNumber, letztes) as usize
-        } else {
-            letztes as usize
-        }
     }
 
     fn fuege_spalte_hinzu_py(&mut self, zeilenInhalte: Vec<String>, meta_name: &str) -> i64 {
@@ -111,6 +90,16 @@ impl Program {
         neu.join(sep)
     }
 
+    fn generator_row_end_py(&self) -> usize {
+        if self.relitable.is_empty() {
+            return 0;
+        }
+        if self.hoechsteZeile > 0 {
+            return std::cmp::min(self.hoechsteZeile as usize, self.relitable.len().saturating_sub(1));
+        }
+        self.relitable.len().saturating_sub(1)
+    }
+
     fn modalTextByDistance_py(&self, distanceFromLine: i64) -> String {
         match distanceFromLine.abs() {
             0 => "sehr: ".to_string(),
@@ -150,42 +139,14 @@ impl Program {
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
         match metavariable {
-            2 => ("Meta", "Konkretes"),
+            2 => ("Meta", "Konkret"),
             3 => ("Theorie", "Praxis"),
             4 => ("Management", "verändernd"),
-            5 => ("ganzheitlich", "darüber hinaus gehend"),
-            6 => ("Verwertung, Unternehmung, Geschäft", "wertvoll"),
-            7 => ("regieren, beherrschen", "Richtung"),
-            _ => ("Meta", "Konkretes"),
+            5 => ("ganzheitlich", "darüber_hinausgehend"),
+            6 => ("Unternehmung_Geschäft", "wertvoll"),
+            7 => ("Beherrschen", "Richtung"),
+            _ => ("Meta", "Konkret"),
         }
-    }
-
-    fn meta_or_what_pairs_py(&self, metavariable: i64) -> ((&'static str, &'static str), (&'static str, &'static str)) {
-        match metavariable {
-            2 => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
-            3 => (("Theorie-Thema: ", "Praxis: "), ("Theorie-", "Praxis-")),
-            4 => (("Planungs-Thema: ", "Umsetzungs-Thema: "), ("Planung-", "Umsetzung-")),
-            5 => (("Anlass-Thema: ", "Wirkungs-Thema: "), ("Anlass-", "wirkung-")),
-            6 => (("Kraft-Gebung: ", "Verstärkungs-Thema: "), ("Kraft-geben-", "Verstärkung-")),
-            7 => (("Beherrschung: ", "Richtung-Thema: "), ("beherrschend-", "Richtung-")),
-            _ => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
-        }
-    }
-
-    fn make_vorwort_py(&self, wiederholungen: usize, vorworte2: (&'static str, &'static str), less1ormore2: usize) -> String {
-        let basis = if less1ormore2 == 1 { vorworte2.0 } else { vorworte2.1 };
-        basis.repeat(wiederholungen.max(1))
-    }
-
-    fn meta_ueberschrift_py(&self, bothRows: i64, metavariable: i64, ifInvers: i64) -> String {
-        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
-        let mut txt = if bothRows == 0 { meta_name.to_string() } else { konkret_name.to_string() };
-        if ifInvers == 1 {
-            txt.push_str(" für 1/n statt n");
-        } else {
-            txt.push_str(" für n");
-        }
-        txt
     }
 
     fn generierte_spalte_meta_name_py(&self, spaltenNummer: i64) -> String {
@@ -383,7 +344,7 @@ impl Program {
     pub fn concatLovePolygon(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&9) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             let a = self.zellenwert_py(i, 8);
             if !a.trim().is_empty() {
                 zeilenInhalte.push(format!("{} der eigenen Strukturgröße ({}) auf dich bei gleichförmigen Polygonen", a, self.zellenwert_py(i, 4)));
@@ -398,7 +359,7 @@ impl Program {
     pub fn concatGleichheitFreiheitDominieren(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&132) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string());
             } else {
@@ -412,7 +373,7 @@ impl Program {
     pub fn concatGeistEmotionEnergieMaterieTopologie(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&242) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string());
             } else {
@@ -426,7 +387,7 @@ impl Program {
     pub fn concatPrimCreativityType(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             let primCreativityType = self.primCreativity_exact_py(i as i64);
             let wert = if i == 0 {
                 "Evolutions-Züchtungs-Kreativität".to_string()
@@ -450,7 +411,7 @@ impl Program {
         let hardcodedCouple = [(44usize, "Mond-Typ eines Sternpolygons"), (56usize, "Mond-Typ eines gleichförmigen Polygons")];
         for (rownum, rowheading) in hardcodedCouple {
             let mut zeilenInhalte: Vec<String> = vec![];
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 let moonTypesOf1Num = self.moonNumber(i as i64);
                 if i == 0 {
                     zeilenInhalte.push(rowheading.to_string());
@@ -487,52 +448,66 @@ impl Program {
     }
 
     pub fn concatVervielfacheZeile(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let spaltenToVervielfache: Vec<usize> = rowsAsNumbers.iter().copied().filter(|n| *n == 90 || *n == 19).map(|n| n as usize).collect();
+        let spaltenToVervielfache: BTreeSet<usize> = rowsAsNumbers
+            .iter()
+            .copied()
+            .filter(|n| *n == 90 || *n == 19)
+            .map(|n| n as usize)
+            .collect();
+        let row_end = self.generator_row_end_py();
         for s in spaltenToVervielfache {
             let mut store: BTreeMap<(usize, usize), String> = BTreeMap::new();
-            for z in 2..=self.generator_row_end_py() {
+            for z in 2..=row_end {
                 let content = self.zellenwert_py(z, s);
                 if !content.trim().is_empty() {
                     store.insert((z, s), content);
                 }
             }
             let mut multis: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-            for ((ursprungsZeile, _), _content) in store.iter() {
+            for ((ursprungs_zeile, _), _content) in store.iter() {
                 let mut vielfacher = 1usize;
-                let mut ergebnis = vielfacher * *ursprungsZeile;
-                multis.entry(ergebnis).or_default().push(*ursprungsZeile);
-                while ergebnis <= self.generator_row_end_py() {
+                let mut ergebnis = vielfacher * *ursprungs_zeile;
+                multis.entry(ergebnis).or_default().push(*ursprungs_zeile);
+                while ergebnis < self.relitable.len() {
                     vielfacher += 1;
-                    ergebnis = vielfacher * *ursprungsZeile;
-                    multis.entry(ergebnis).or_default().push(*ursprungsZeile);
+                    ergebnis = vielfacher * *ursprungs_zeile;
+                    multis.entry(ergebnis).or_default().push(*ursprungs_zeile);
                 }
             }
-            for z in 2..=self.generator_row_end_py() {
+            for z in 2..=row_end {
                 let mut xx = false;
                 let mut teile: Vec<String> = if !self.zellenwert_py(z, s).trim().is_empty() {
                     vec![self.zellenwert_py(z, s), " | ".to_string()]
                 } else {
                     vec![String::new()]
                 };
-                if let Some(ursZeilen) = multis.get(&z) {
-                    for UrZeile in ursZeilen {
-                        let basis = store.get(&(*UrZeile, s)).cloned().unwrap_or_default();
+                if let Some(urs_zeilen) = multis.get(&z) {
+                    for ur_zeile in urs_zeilen {
+                        let basis = store.get(&(*ur_zeile, s)).cloned().unwrap_or_default();
                         let aktuell = teile.join("");
-                        if *UrZeile != z && aktuell != basis && format!("{} | ", aktuell) != basis && !basis.is_empty() {
-                            xx = true;
-                            teile.push(basis);
-                            teile.push(" | ".to_string());
+                        let aktuell_mit_sep = {
+                            let mut a = teile.clone();
+                            a.push(" | ".to_string());
+                            a.join("")
+                        };
+                        if *ur_zeile != z
+                            && aktuell != basis
+                            && aktuell_mit_sep != basis
+                        {
+                            if !basis.is_empty() {
+                                xx = true;
+                                teile.push(basis);
+                                teile.push(" | ".to_string());
+                            }
                         }
                     }
                 }
-                let endwert = if xx && !teile.is_empty() {
-                    let mut x = teile.join("");
-                    if x.ends_with(" | ") { x.truncate(x.len()-3); }
-                    x
+                let neuer_wert = if xx && teile.last().map(|s| s == " | ").unwrap_or(false) {
+                    teile[..teile.len().saturating_sub(1)].join("")
                 } else {
                     teile.join("")
                 };
-                self.setze_zellenwert_py(z, s, endwert);
+                self.setze_zellenwert_py(z, s, neuer_wert);
             }
         }
     }
@@ -570,7 +545,7 @@ impl Program {
             let mut primAmounts = 0i64;
             let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 let mut into = if i != 0 {
                     vec![String::new()]
                 } else {
@@ -756,6 +731,7 @@ impl Program {
         }
         let reliTableCopy = self.relitable.clone();
         let distances: [i64; 9] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+        let row_end = std::cmp::min(self.generator_row_end_py(), reliTableCopy.len().saturating_sub(1));
 
         #[derive(Clone, Default)]
         struct ModalEntryPy {
@@ -767,12 +743,12 @@ impl Program {
         for concept in conceptsRowsSetOfTuple2 {
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
-            let mut into: Vec<String> = vec![String::new(); reliTableCopy.len()];
+            let mut into: Vec<Vec<String>> = vec![vec![String::new()]; reliTableCopy.len()];
             let mut einMalVorkommen: Vec<usize> = vec![];
 
             for (i, cols) in reliTableCopy.iter().enumerate() {
                 if i == 0 {
-                    into[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
+                    into[i] = vec!["Generiert: ".to_string(), cols.get(concept0).cloned().unwrap_or_default()];
                 } else if cols.get(concept0).map(|s| !s.trim().is_empty()).unwrap_or(false) {
                     if !einMalVorkommen.contains(&i) {
                         einMalVorkommen.push(i);
@@ -793,90 +769,79 @@ impl Program {
             }
 
             let mut vorkommenVielfacher_B: BTreeMap<usize, BTreeMap<i64, ModalEntryPy>> = BTreeMap::new();
-            for i in 1..reliTableCopy.len() {
-                for &distanceFromLine in &distances {
-                    let i_with_a_distance_i64 = i as i64 + distanceFromLine;
-                    if i_with_a_distance_i64 < 0 {
-                        continue;
+            for i in 1..=row_end {
+                for distanceFromLine in distances {
+                    let i_with_a_distance = i as i64 + distanceFromLine;
+                    if i_with_a_distance < 0 { continue; }
+                    let key = i_with_a_distance as usize;
+                    if let Some(couples) = vorkommenVielfacher.get(&key) {
+                        let entry = vorkommenVielfacher_B.entry(i).or_default().entry(distanceFromLine).or_default();
+                        for &(vorkommen, vielfacher) in couples {
+                            entry.modalS.push(self.getModaloperatorsPerLineCells_py(&reliTableCopy, vielfacher));
+                            entry.vervielfachter.push(vorkommen);
+                            entry.i_origS.push(key);
+                        }
                     }
-                    let i_with_a_distance = i_with_a_distance_i64 as usize;
-                    let Some(couples) = vorkommenVielfacher.get(&i_with_a_distance) else {
-                        continue;
-                    };
-                    let mut modalOperatorEnEn: Vec<Vec<String>> = vec![];
-                    let mut Orginal_i_mehrere: Vec<usize> = vec![];
-                    let mut vervielFachter: Vec<usize> = vec![];
-                    for &(vorkommen, vielfacher) in couples {
-                        modalOperatorEnEn.push(self.getModaloperatorsPerLineCells_py(&reliTableCopy, vielfacher));
-                        vervielFachter.push(vorkommen);
-                        Orginal_i_mehrere.push(i_with_a_distance);
-                    }
-                    let entry = vorkommenVielfacher_B.entry(i).or_default().entry(distanceFromLine).or_default();
-                    let mut new_i_origS = Orginal_i_mehrere;
-                    new_i_origS.extend(entry.i_origS.clone());
-                    let mut new_modalS = modalOperatorEnEn;
-                    new_modalS.extend(entry.modalS.clone());
-                    let mut new_vervielfachter = vervielFachter;
-                    new_vervielfachter.extend(entry.vervielfachter.clone());
-                    entry.i_origS = new_i_origS;
-                    entry.modalS = new_modalS;
-                    entry.vervielfachter = new_vervielfachter;
                 }
             }
 
-            for i in 1..reliTableCopy.len() {
-                for &distanceFromLine in &distances {
-                    let Some(entry_by_dist) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) else {
-                        continue;
-                    };
-                    for (modalOperatoren, &vervielfachter) in entry_by_dist.modalS.iter().zip(entry_by_dist.vervielfachter.iter()) {
-                        let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
-                        } else {
-                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
-                        };
-                        if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
-                            continue;
+            let mut conditionNvs1perN = false;
+            for i in 1..=row_end {
+                for distanceFromLine in distances {
+                    if let Some(distance_entry) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) {
+                        for (modalOperatoren, vervielfachter) in distance_entry.modalS.iter().zip(distance_entry.vervielfachter.iter()) {
+                            let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
+                                reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
+                            } else {
+                                reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
+                            };
+                            let mut parts: Vec<String> = vec![
+                                self.modal_text_by_distance_exact_py(distanceFromLine).to_string(),
+                                modalOperatoren.get(0).cloned().unwrap_or_default(),
+                                " ".to_string(),
+                            ];
+                            let content = if modalOperatoren.get(0).cloned().unwrap_or_default() == reliTableCopy.get(1).and_then(|r| r.get(97)).cloned().unwrap_or_default() {
+                                intoItsContent.clone()
+                            } else {
+                                self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
+                            };
+                            parts.push(content);
+                            parts.push(" ".to_string());
+                            parts.push(modalOperatoren.get(1).cloned().unwrap_or_default());
+                            if modalOperatoren.len() > 2 && distanceFromLine.abs() % 2 == 1 {
+                                parts.push(", nicht: ".to_string());
+                                parts.push(modalOperatoren[2..].join(", "));
+                                parts.push(" (das alles nicht): ".to_string());
+                                let basis = reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
+                                parts.push(self.modal_replace_zuerst_zweites_py(basis));
+                            }
+                            parts.push(" | ".to_string());
+                            into[i].extend(parts);
                         }
-                        let basis_content = if reliTableCopy.get(1).and_then(|r| r.get(97)).map(|s| s == &modalOperatoren[0]).unwrap_or(false) {
-                            intoItsContent.clone()
-                        } else {
-                            self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
-                        };
-                        into[i].push_str(self.modal_text_by_distance_exact_py(distanceFromLine));
-                        into[i].push_str(&modalOperatoren[0]);
-                        into[i].push(' ');
-                        into[i].push_str(&basis_content);
-                        into[i].push(' ');
-                        into[i].push_str(&modalOperatoren[1]);
-                        if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
-                            into[i].push_str(", nicht: ");
-                            into[i].push_str(&modalOperatoren[2..].join(", "));
-                            into[i].push_str(" (das alles nicht): ");
-                            let c0 = reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
-                            into[i].push_str(&self.modal_replace_zuerst_zweites_py(c0));
-                        }
-                        into[i].push_str(" | ");
                     }
                 }
-                let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+                conditionNvs1perN = matches!(concept0, 62 | 63 | 358..=367 | 371..=374);
                 let fill_ = if conditionNvs1perN {
                     reliTableCopy.get(i).and_then(|r| r.get(197)).cloned().unwrap_or_default()
                 } else {
                     reliTableCopy.get(i).and_then(|r| r.get(4)).cloned().unwrap_or_default()
                 };
-                if !into[i].is_empty() {
-                    if into[i].ends_with(" | ") {
-                        let new_len = into[i].len().saturating_sub(3);
-                        into[i].truncate(new_len);
-                    }
-                    into[i].push_str(" | Alles nur bezogen auf die selbe Strukturgröße einer ");
-                    into[i].push_str(&fill_);
+                if into[i] != vec![String::new()] {
+                    into[i].push("alles nur bezogen auf: ".to_string());
+                    into[i].push(fill_);
                 }
             }
 
-            let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
-            Self::push_unique_i64_py(rowsAsNumbers, spalte);
+            for w in 0..=row_end {
+                let mut content = into[w].join("");
+                if content.ends_with(" | ") {
+                    content.truncate(content.len().saturating_sub(3));
+                }
+                self.relitable[w].push(content);
+            }
+            let neue_spalte = self.relitable.get(0).map(|r| r.len().saturating_sub(1) as i64).unwrap_or(0);
+            Self::push_unique_i64_py(rowsAsNumbers, neue_spalte);
+            self.generatedSpaltenParameter.push(format!("{} / {}", concept0, concept1));
         }
     }
 
@@ -892,7 +857,7 @@ impl Program {
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
             let heading = self.generated2_code_heading_py(&code);
             let mut into: Vec<String> = vec![];
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 if i == 0 {
                     into.push(heading.clone());
                     continue;
@@ -930,7 +895,7 @@ impl Program {
         }
         let mut into_pro: Vec<String> = vec![];
         let mut into_contra: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 into_pro.push("Primzahlkreuz pro".to_string());
                 into_contra.push("Primzahlkreuz contra".to_string());
@@ -969,120 +934,51 @@ impl Program {
     }
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
-        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 {
-            vec![0, 1]
-        } else if lower1greater2both3 == 1 {
-            vec![0]
-        } else if lower1greater2both3 == 2 {
-            vec![1]
-        } else {
-            vec![]
-        };
-        let struktAndInversSpalten = (5usize, 131usize);
-
+        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
+        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 { vec![0, 1] } else if lower1greater2both3 == 1 { vec![0] } else if lower1greater2both3 == 2 { vec![1] } else { vec![] };
         for ifInvers in 0..=1 {
-            let transzendentalienSpalten = if ifInvers == 0 {
-                struktAndInversSpalten
-            } else {
-                (struktAndInversSpalten.1, struktAndInversSpalten.0)
-            };
-            for bothRows in bothRowsListe.iter().copied() {
-                if !self.relitable.is_empty() {
-                    let ueberschrift = self.meta_ueberschrift_py(bothRows, metavariable, ifInvers);
-                    self.relitable[0].push(ueberschrift);
-                }
-                if self.relitable.len() > 1 {
-                    self.relitable[1].push(String::new());
-                }
-                let neue_spalte = self.relitable.first().map(|r| r.len().saturating_sub(1) as i64).unwrap_or(0);
-                Self::push_unique_i64_py(rowsAsNumbers, neue_spalte);
-
-                let metaOrWhat = self.meta_or_what_pairs_py(metavariable);
-
-                for i in 2..=self.generator_row_end_py() {
-                    let mut moreAndLessGanz: Option<i64> = Some(i as i64);
-                    let mut moreAndLessFracNum: Option<i64> = Some(1);
-                    let mut moreAndLessFracDen: Option<i64> = Some(i as i64);
+            let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
+            for bothRows in bothRowsListe.iter() {
+                let mut into: Vec<String> = vec![];
+                for i in 0..self.relitable.len() {
+                    if i == 0 {
+                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
+                        into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
+                        continue;
+                    }
+                    if i < 2 {
+                        into.push(String::new());
+                        continue;
+                    }
+                    let mut neue2KoordNeue2Vorwoerter: Vec<String> = vec![];
+                    let mut moreAndLess = (i as i64, i as i64);
                     let mut newCol = transzendentalienSpalten.0;
-                    let mut neue2KoordNeue2Vorwoerter: Vec<(Option<i64>, Option<(i64, i64)>, usize, String, String)> = vec![];
-                    let mut gebr_seen: BTreeSet<(i64, i64)> = BTreeSet::new();
-
-                    loop {
-                        let vorworte2 = if neue2KoordNeue2Vorwoerter.is_empty() { metaOrWhat.0 } else { metaOrWhat.1 };
-                        let vorwort1 = self.make_vorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 1);
-                        let vorwort2 = self.make_vorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 2);
-                        let frac = match (moreAndLessFracNum, moreAndLessFracDen) {
-                            (Some(n), Some(d)) if d != 0 => Some((n, d)),
-                            _ => None,
-                        };
-                        neue2KoordNeue2Vorwoerter.push((moreAndLessGanz, frac, newCol, vorwort1, vorwort2));
-
-                        let nextCol = if newCol == transzendentalienSpalten.1 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 };
-                        let nextGanz = moreAndLessGanz.and_then(|v| {
-                            let mul = v.saturating_mul(metavariable.max(1));
-                            if mul < self.relitable.len() as i64 { Some(mul) } else { None }
-                        });
-                        let mut nextFrac = None;
-                        if let (Some(n), Some(d)) = (moreAndLessFracNum, moreAndLessFracDen) {
-                            if d < 100 && d > 0 {
-                                let (nn, dd) = if nextCol == if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 } {
-                                    (metavariable.max(1), d)
-                                } else {
-                                    (n, d.saturating_mul(metavariable.max(1)))
-                                };
-                                if dd > 0 {
-                                    let g = gcd_i64(nn.abs(), dd.abs()).max(1);
-                                    let key = (nn / g, dd / g);
-                                    if !gebr_seen.contains(&key) && (key.1 as f64) > 0.01 {
-                                        gebr_seen.insert(key);
-                                        nextFrac = Some(key);
-                                    }
-                                }
-                            }
-                        }
-                        newCol = nextCol;
-                        moreAndLessGanz = nextGanz;
-                        if let Some((n,d)) = nextFrac {
-                            moreAndLessFracNum = Some(n);
-                            moreAndLessFracDen = Some(d);
-                        } else {
-                            moreAndLessFracNum = None;
-                            moreAndLessFracDen = None;
-                        }
-                        if moreAndLessGanz.is_none() && moreAndLessFracNum.is_none() {
+                    let mut zaehler = 0usize;
+                    while zaehler < 6 {
+                        zaehler += 1;
+                        if moreAndLess.0 <= 0 && moreAndLess.1 <= 0 {
                             break;
                         }
-                    }
-
-                    let mut intoList: Vec<String> = vec![];
-                    let mut thema = String::new();
-                    for vier in neue2KoordNeue2Vorwoerter.iter().take(neue2KoordNeue2Vorwoerter.len().saturating_sub(1)) {
-                        if bothRows == 0 {
-                            if let Some(ganz) = vier.0 {
-                                let text = self.zellenwert_py(ganz as usize, vier.2);
-                                if text.trim().len() > 3 {
-                                    intoList.push(format!("{}{}{} ({})", vier.3, thema, text, ganz));
-                                }
-                            }
+                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
+                        let text = self.zellenwert_py(moreAndLess.0.max(1) as usize, newCol);
+                        if !text.trim().is_empty() {
+                            neue2KoordNeue2Vorwoerter.push(format!("{}-{} ({})", praefix, text, moreAndLess.0.max(1)));
+                        }
+                        if newCol == transzendentalienSpalten.0 {
+                            newCol = transzendentalienSpalten.1;
+                            moreAndLess.0 /= metavariable.max(1);
                         } else {
-                            if let Some((n,d)) = vier.1 {
-                                let idx = if d == 1 { n } else { -1 };
-                                if idx > 0 {
-                                    let text = self.zellenwert_py(idx as usize, vier.2);
-                                    if text.trim().len() > 3 {
-                                        let prefix = if vier.2 != if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 } && d != 1 { "1/" } else { "" };
-                                        intoList.push(format!("{}{}{} ({}{}{}/{})", vier.4, thema, text, prefix, "", n, d));
-                                    }
-                                }
+                            newCol = transzendentalienSpalten.0;
+                            moreAndLess.0 *= metavariable.max(1);
+                            if moreAndLess.0 as usize >= self.relitable.len() {
+                                break;
                             }
                         }
-                        if bothRows == 0 && !intoList.is_empty() {
-                            thema = "".to_string();
-                        }
                     }
-                    let neuer_zelleninhalt = self.nicht_leere_teile_join_py(intoList, " | ");
-                    self.relitable[i].push(neuer_zelleninhalt);
+                    into.push(self.nicht_leere_teile_join_py(neue2KoordNeue2Vorwoerter, " | "));
                 }
+                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, konkret_name));
+                Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
     }
@@ -1090,7 +986,7 @@ impl Program {
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Gestirn".to_string());
                 continue;
