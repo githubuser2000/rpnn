@@ -90,7 +90,6 @@ pub struct Program {
     pub allImportantBeginThingsDone: bool,
     pub runDone: bool,
     pub hoechsteZeile: i64,
-    pub lastLineNumber: i64,
     pub tableGenerated: bool,
     pub relitable: Vec<Vec<String>>,
     pub RowsLen: i64,
@@ -162,6 +161,7 @@ pub struct Program {
     pub metakonkretPairs: Vec<(i64, i64)>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
     pub AllSimpleCommandSpalten: BTreeSet<i64>,
+    pub lastLineNumber: i64,
 }
 
 impl Program {
@@ -182,8 +182,8 @@ impl Program {
             newTable: false,
             allImportantBeginThingsDone: false,
             runDone: false,
-            hoechsteZeile: 0,
             lastLineNumber: 0,
+            hoechsteZeile: 0,
             tableGenerated: false,
             relitable: vec![],
             RowsLen: 0,

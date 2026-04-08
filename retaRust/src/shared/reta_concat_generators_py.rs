@@ -5,6 +5,18 @@ use crate::shared::reta_program_types::Program;
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 impl Program {
+    fn generator_row_end_py(&self) -> usize {
+        if self.relitable.is_empty() {
+            return 0;
+        }
+        let last_relitable = self.relitable.len().saturating_sub(1) as i64;
+        if self.lastLineNumber > 0 {
+            std::cmp::min(self.lastLineNumber, last_relitable) as usize
+        } else {
+            last_relitable as usize
+        }
+    }
+
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
         if !target.contains(&value) {
             target.push(value);
@@ -97,19 +109,6 @@ impl Program {
             2 => "mittelstark überdurchschnittlich: ".to_string(),
             3 => "mittelleicht überdurchschnittlich: ".to_string(),
             _ => "sehr leicht überdurchschnittlich: ".to_string(),
-        }
-    }
-
-
-    fn generator_row_end_py(&self) -> usize {
-        if self.relitable.is_empty() {
-            return 0;
-        }
-        let last_relitable = self.relitable.len().saturating_sub(1) as i64;
-        if self.lastLineNumber > 0 {
-            std::cmp::min(self.lastLineNumber, last_relitable) as usize
-        } else {
-            last_relitable as usize
         }
     }
 
@@ -347,7 +346,7 @@ impl Program {
     pub fn concatLovePolygon(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&9) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             let a = self.zellenwert_py(i, 8);
             if !a.trim().is_empty() {
                 zeilenInhalte.push(format!("{} der eigenen Strukturgröße ({}) auf dich bei gleichförmigen Polygonen", a, self.zellenwert_py(i, 4)));
@@ -362,7 +361,7 @@ impl Program {
     pub fn concatGleichheitFreiheitDominieren(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&132) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string());
             } else {
@@ -376,7 +375,7 @@ impl Program {
     pub fn concatGeistEmotionEnergieMaterieTopologie(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&242) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string());
             } else {
@@ -390,7 +389,7 @@ impl Program {
     pub fn concatPrimCreativityType(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             let primCreativityType = self.primCreativity_exact_py(i as i64);
             let wert = if i == 0 {
                 "Evolutions-Züchtungs-Kreativität".to_string()
@@ -414,7 +413,7 @@ impl Program {
         let hardcodedCouple = [(44usize, "Mond-Typ eines Sternpolygons"), (56usize, "Mond-Typ eines gleichförmigen Polygons")];
         for (rownum, rowheading) in hardcodedCouple {
             let mut zeilenInhalte: Vec<String> = vec![];
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 let moonTypesOf1Num = self.moonNumber(i as i64);
                 if i == 0 {
                     zeilenInhalte.push(rowheading.to_string());
@@ -454,7 +453,7 @@ impl Program {
         let spaltenToVervielfache: Vec<usize> = rowsAsNumbers.iter().copied().filter(|n| *n == 90 || *n == 19).map(|n| n as usize).collect();
         for s in spaltenToVervielfache {
             let mut store: BTreeMap<(usize, usize), String> = BTreeMap::new();
-            for z in 2..=self.generator_row_end_py() {
+            for z in 2..self.relitable.len() {
                 let content = self.zellenwert_py(z, s);
                 if !content.trim().is_empty() {
                     store.insert((z, s), content);
@@ -465,13 +464,13 @@ impl Program {
                 let mut vielfacher = 1usize;
                 let mut ergebnis = vielfacher * *ursprungsZeile;
                 multis.entry(ergebnis).or_default().push(*ursprungsZeile);
-                while ergebnis <= self.generator_row_end_py() {
+                while ergebnis < self.relitable.len() {
                     vielfacher += 1;
                     ergebnis = vielfacher * *ursprungsZeile;
                     multis.entry(ergebnis).or_default().push(*ursprungsZeile);
                 }
             }
-            for z in 2..=self.generator_row_end_py() {
+            for z in 2..self.relitable.len() {
                 let mut xx = false;
                 let mut teile: Vec<String> = if !self.zellenwert_py(z, s).trim().is_empty() {
                     vec![self.zellenwert_py(z, s), " | ".to_string()]
@@ -534,7 +533,7 @@ impl Program {
             let mut primAmounts = 0i64;
             let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 let mut into = if i != 0 {
                     vec![String::new()]
                 } else {
@@ -856,7 +855,7 @@ impl Program {
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
             let heading = self.generated2_code_heading_py(&code);
             let mut into: Vec<String> = vec![];
-            for i in 0..=self.generator_row_end_py() {
+            for i in 0..self.relitable.len() {
                 if i == 0 {
                     into.push(heading.clone());
                     continue;
@@ -894,7 +893,7 @@ impl Program {
         }
         let mut into_pro: Vec<String> = vec![];
         let mut into_contra: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 into_pro.push("Primzahlkreuz pro".to_string());
                 into_contra.push("Primzahlkreuz contra".to_string());
@@ -939,7 +938,7 @@ impl Program {
             let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
             for bothRows in bothRowsListe.iter() {
                 let mut into: Vec<String> = vec![];
-                for i in 0..=self.generator_row_end_py() {
+                for i in 0..self.relitable.len() {
                     if i == 0 {
                         let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
                         into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
@@ -985,7 +984,7 @@ impl Program {
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..=self.generator_row_end_py() {
+        for i in 0..self.relitable.len() {
             if i == 0 {
                 zeilenInhalte.push("Gestirn".to_string());
                 continue;
