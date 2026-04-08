@@ -108,12 +108,6 @@ impl Program {
             return vec![word.to_string()];
         }
 
-        // hypher 0.1.7 panics for words longer than 45 bytes when alloc is disabled.
-        // Python reta does not have that hard limit, so we must fall back instead of panicking.
-        if word.len() > 45 {
-            return Self::hard_split_long_word_py(word, width);
-        }
-
         let lang = Self::hypher_lang_py(word);
         let syllables: Vec<String> = hyphenate(word, lang)
             .map(|s| s.to_string())
@@ -210,7 +204,44 @@ impl Program {
 
 
 
-    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool) -> &'static str {
+    fn moon_number_is_py(n: i64) -> bool {
+        if n < 2 {
+            return false;
+        }
+        for i in 2..n {
+            let one_result = (n as f64).powf(1.0 / i as f64);
+            if (one_result.round() * 100000.0).round() == (one_result * 100000.0).round() {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn prim_fak_len_py(n: i64) -> usize {
+        if n <= 1 {
+            return 0;
+        }
+        let mut faktoren: Vec<i64> = Vec::new();
+        let mut z = n;
+        while z > 1 {
+            let mut i = 2i64;
+            let mut gefunden = false;
+            let mut p = z;
+            while i * i <= n && !gefunden {
+                if z % i == 0 {
+                    gefunden = true;
+                    p = i;
+                } else {
+                    i += 1;
+                }
+            }
+            faktoren.push(p);
+            z /= p;
+        }
+        faktoren.len()
+    }
+
+    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
         }
@@ -218,33 +249,39 @@ impl Program {
         if n <= 0 {
             return "";
         }
-        if n == 1 {
-            return "[100m[37m";
+        if rest {
+            if n % 2 == 0 {
+                return "[47m[30m";
+            }
+            return "[40m[37m";
         }
-        if n == 2 {
-            return "[103m[30m[1m";
-        }
-        if n % 9 == 0 {
+        if Self::moon_number_is_py(n) {
+            if n % 2 == 0 {
+                return "[106m[30m";
+            }
             return "[46m[30m";
         }
-        if n % 8 == 0 || n % 4 == 0 {
-            return "[106m[30m";
+        if Self::prim_fak_len_py(n) == 1 {
+            if n % 2 == 0 {
+                return "[103m[30m[1m";
+            }
+            return "[43m[30m";
         }
-        if n % 6 == 0 {
+        if n % 2 == 0 {
             return "[47m[30m";
         }
-        "[43m[30m"
+        "[100m[37m"
     }
 
-    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, nocolor: bool) -> String {
+    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, rest: bool, nocolor: bool) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
         }
-        let style = Self::shell_style_py(row_number, is_header);
+        let style = Self::shell_style_py(row_number, is_header, rest);
         if style.is_empty() {
             text.to_string()
         } else {
-            format!("{}{}[0m", style, text)
+            format!("{}{}[0m[0m", style, text)
         }
     }
 
@@ -272,43 +309,19 @@ impl Program {
             return newTable;
         }
 
-        let mut max_cell_text_len: Vec<usize> = vec![0; col_count];
-        for row in &newTable {
-            for i in 0..col_count {
-                if let Some(cell) = row.get(i) {
-                    for part in cell.split('\n') {
-                        let text_len = part.chars().count();
-                        if text_len > max_cell_text_len[i] {
-                            max_cell_text_len[i] = text_len;
-                        }
-                    }
-                }
-            }
-        }
-
-        let default_text_width = if self.textWidth > 0 {
-            self.textWidth as usize
-        } else {
-            21usize
-        };
-
-        let mut widths: Vec<usize> = vec![0; col_count];
+        // Python-like default shell width behavior:
+        // without explicit --breite / --breiten, columns start at width 21.
+        // Only explicit width arguments should override this.
+        let mut widths: Vec<usize> = vec![21; col_count];
         for i in 0..col_count {
-            let certaintextwidth = if i < self.breiten.len() && self.breiten[i] > 0 {
-                self.breiten[i] as usize
-            } else if self.breite > 0 {
-                self.breite as usize
+            let forced = if i < self.breiten.len() {
+                self.breiten[i]
             } else {
-                default_text_width
+                self.breite
             };
-            widths[i] = if certaintextwidth > max_cell_text_len[i]
-                || (certaintextwidth == 0 && !self.htmlOrBBcode)
-            {
-                max_cell_text_len[i]
-            } else {
-                certaintextwidth
+            if forced > 0 {
+                widths[i] = forced as usize;
             }
-            .max(1);
         }
 
         let num_prefix_width = if self.nummeriere {
@@ -317,71 +330,53 @@ impl Program {
             0usize
         };
 
-        let runtime_shell_width = {
-            let detected = Self::detect_terminal_columns_py();
-            if detected > 0 { detected as usize } else { 0usize }
-        };
-        let detected_shell_width = std::cmp::max(self.shellWidth.max(0) as usize, runtime_shell_width);
-        let chunk_budget = if detected_shell_width > 0 {
-            detected_shell_width
-        } else if self.textWidth > 0 {
-            self.textWidth as usize
+        let detected_shell_width = if self.shellWidth > 0 {
+            self.shellWidth as usize
         } else {
-            80usize
-        }.max(21usize);
+            let detected = Self::detect_terminal_columns_py();
+            if detected > 0 {
+                detected as usize
+            } else if self.textWidth > 0 {
+                self.textWidth as usize
+            } else {
+                80usize
+            }
+        };
+        let chunk_budget = detected_shell_width.max(21usize);
 
         let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
 
         let mut chunks: Vec<(usize, usize)> = vec![];
-        let all_cols_total = left_prefix
-            + widths.iter().sum::<usize>()
-            + col_count.saturating_sub(1);
-        if all_cols_total <= chunk_budget {
-            chunks.push((0usize, col_count));
-        } else {
-            let mut start_col = 0usize;
-            while start_col < col_count {
-                let mut used = left_prefix;
-                let mut end_col = start_col;
+        let mut start_col = 0usize;
+        while start_col < col_count {
+            let mut used = left_prefix;
+            let mut end_col = start_col;
 
-                while end_col < col_count {
-                    let add = if end_col == start_col {
-                        widths[end_col]
-                    } else {
-                        1 + widths[end_col]
-                    };
+            while end_col < col_count {
+                let add = if end_col == start_col {
+                    widths[end_col]
+                } else {
+                    1 + widths[end_col]
+                };
 
-                    if end_col > start_col && used + add > chunk_budget {
-                        break;
-                    }
-                    used += add;
-                    end_col += 1;
+                if end_col > start_col && used + add > chunk_budget {
+                    break;
                 }
-
-                if end_col == start_col {
-                    end_col += 1;
-                }
-                chunks.push((start_col, end_col));
-                start_col = end_col;
+                used += add;
+                end_col += 1;
             }
+
+            if end_col == start_col {
+                end_col += 1;
+            }
+            chunks.push((start_col, end_col));
+            start_col = end_col;
         }
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
         for (chunk_start, chunk_end) in chunks.iter().cloned() {
             let mut one_chunk_lines: Vec<String> = vec![];
-            let mut widths_for_chunk = widths.clone();
-            if chunk_end > chunk_start {
-                let used_without_last = left_prefix
-                    + (chunk_start..chunk_end - 1)
-                        .map(|i| widths_for_chunk[i] + 1)
-                        .sum::<usize>();
-                let last_idx = chunk_end - 1;
-                if chunk_budget > used_without_last {
-                    widths_for_chunk[last_idx] = widths_for_chunk[last_idx]
-                        .max(chunk_budget.saturating_sub(used_without_last));
-                }
-            }
 
             for (row_idx, row) in newTable.iter().enumerate() {
                 let mut wrapped_cells: Vec<Vec<String>> = vec![];
@@ -389,7 +384,7 @@ impl Program {
 
                 for i in chunk_start..chunk_end {
                     let cell = if i < row.len() { row[i].as_str() } else { "" };
-                    let wrapped = Self::wrap_text_py(cell, widths_for_chunk[i]);
+                    let wrapped = Self::wrap_text_py(cell, widths[i]);
                     max_sub = max_sub.max(wrapped.len());
                     wrapped_cells.push(wrapped);
                 }
@@ -424,25 +419,35 @@ impl Program {
                         } else {
                             String::new()
                         };
+                        let prefix = if is_header {
+                            " ".to_string()
+                        } else if chunk_start > 0 {
+                            "█".to_string()
+                        } else {
+                            " ".to_string()
+                        };
+                        line.push_str(&prefix);
                         line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
                     }
 
                     for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
-                        let part = wrapped_cells[local_i].get(sub_idx).cloned().unwrap_or_default();
-                        let rendered = if abs_i + 1 == chunk_end {
-                            format!("{:<width$}", part, width = widths_for_chunk[abs_i])
-                        } else {
-                            format!("{:<width$} ", part, width = widths_for_chunk[abs_i])
-                        };
+                        let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
+                        let part = maybe_part.clone().unwrap_or_default();
+                        let is_rest = maybe_part.is_none();
+                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
                             is_header,
+                            is_rest,
                             self.nocolor,
                         ));
+                        if abs_i + 1 != chunk_end {
+                            line.push(' ');
+                        }
                     }
 
-                    one_chunk_lines.push(line.trim_end().to_string());
+                    one_chunk_lines.push(line);
                 }
             }
 
