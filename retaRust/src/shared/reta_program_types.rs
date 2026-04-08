@@ -182,7 +182,6 @@ impl Program {
             newTable: false,
             allImportantBeginThingsDone: false,
             runDone: false,
-            lastLineNumber: 0,
             hoechsteZeile: 0,
             tableGenerated: false,
             relitable: vec![],
@@ -263,6 +262,7 @@ impl Program {
             metakonkretPairs: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
             AllSimpleCommandSpalten: BTreeSet::new(),
+            lastLineNumber: 0,
         }
     }
 
