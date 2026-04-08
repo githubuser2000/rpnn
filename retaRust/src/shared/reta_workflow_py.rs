@@ -12,6 +12,20 @@ impl Program {
         self.RowsLen = RowsLen;
         self.relitable = relitable.clone();
         self.rowsAsNumbers = rowsAsNumbers.clone();
+
+        let (finallyDisplayLinesEarly, _newTableEarly, _numlenEarly, _rowsRangeEarly, _old2newTableEarly): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
+            paramLines.clone(),
+            paramLinesNot.clone(),
+            self.relitable.clone(),
+            self.rowsAsNumbers.clone(),
+        );
+        let mut zeilenlisteEarly: Vec<i64> = finallyDisplayLinesEarly
+            .iter()
+            .filter_map(|s| s.trim().parse::<i64>().ok())
+            .collect();
+        zeilenlisteEarly.sort();
+        self.lastLineNumber = zeilenlisteEarly.last().copied().unwrap_or(0);
+
         self.apply_concat_generators_py();
 
         if self.helpPage() {
