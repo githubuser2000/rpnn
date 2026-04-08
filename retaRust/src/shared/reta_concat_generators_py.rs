@@ -1,21 +1,18 @@
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::shared::reta_program_types::Program;
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
-impl Program {
-    fn generator_row_end_py(&self) -> usize {
-        if self.relitable.is_empty() {
-            return 0;
-        }
-        let last_relitable = self.relitable.len().saturating_sub(1) as i64;
-        if self.lastLineNumber > 0 {
-            std::cmp::min(self.lastLineNumber, last_relitable) as usize
-        } else {
-            last_relitable as usize
-        }
+fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
     }
+    a.abs()
+}
+
+impl Program {
 
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
         if !target.contains(&value) {
@@ -39,6 +36,18 @@ impl Program {
             self.relitable[zeile].resize(spalte + 1, String::new());
         }
         self.relitable[zeile][spalte] = wert;
+    }
+
+    fn generator_row_end_py(&self) -> usize {
+        if self.relitable.is_empty() {
+            return 0;
+        }
+        let letztes = self.relitable.len().saturating_sub(1) as i64;
+        if self.lastLineNumber > 0 {
+            std::cmp::min(self.lastLineNumber, letztes) as usize
+        } else {
+            letztes as usize
+        }
     }
 
     fn fuege_spalte_hinzu_py(&mut self, zeilenInhalte: Vec<String>, meta_name: &str) -> i64 {
@@ -141,14 +150,42 @@ impl Program {
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
         match metavariable {
-            2 => ("Meta", "Konkret"),
+            2 => ("Meta", "Konkretes"),
             3 => ("Theorie", "Praxis"),
             4 => ("Management", "verändernd"),
-            5 => ("ganzheitlich", "darüber_hinausgehend"),
-            6 => ("Unternehmung_Geschäft", "wertvoll"),
-            7 => ("Beherrschen", "Richtung"),
-            _ => ("Meta", "Konkret"),
+            5 => ("ganzheitlich", "darüber hinaus gehend"),
+            6 => ("Verwertung, Unternehmung, Geschäft", "wertvoll"),
+            7 => ("regieren, beherrschen", "Richtung"),
+            _ => ("Meta", "Konkretes"),
         }
+    }
+
+    fn meta_or_what_pairs_py(&self, metavariable: i64) -> ((&'static str, &'static str), (&'static str, &'static str)) {
+        match metavariable {
+            2 => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+            3 => (("Theorie-Thema: ", "Praxis: "), ("Theorie-", "Praxis-")),
+            4 => (("Planungs-Thema: ", "Umsetzungs-Thema: "), ("Planung-", "Umsetzung-")),
+            5 => (("Anlass-Thema: ", "Wirkungs-Thema: "), ("Anlass-", "wirkung-")),
+            6 => (("Kraft-Gebung: ", "Verstärkungs-Thema: "), ("Kraft-geben-", "Verstärkung-")),
+            7 => (("Beherrschung: ", "Richtung-Thema: "), ("beherrschend-", "Richtung-")),
+            _ => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+        }
+    }
+
+    fn make_vorwort_py(&self, wiederholungen: usize, vorworte2: (&'static str, &'static str), less1ormore2: usize) -> String {
+        let basis = if less1ormore2 == 1 { vorworte2.0 } else { vorworte2.1 };
+        basis.repeat(wiederholungen.max(1))
+    }
+
+    fn meta_ueberschrift_py(&self, bothRows: i64, metavariable: i64, ifInvers: i64) -> String {
+        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
+        let mut txt = if bothRows == 0 { meta_name.to_string() } else { konkret_name.to_string() };
+        if ifInvers == 1 {
+            txt.push_str(" für 1/n statt n");
+        } else {
+            txt.push_str(" für n");
+        }
+        txt
     }
 
     fn generierte_spalte_meta_name_py(&self, spaltenNummer: i64) -> String {
@@ -346,7 +383,7 @@ impl Program {
     pub fn concatLovePolygon(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&9) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             let a = self.zellenwert_py(i, 8);
             if !a.trim().is_empty() {
                 zeilenInhalte.push(format!("{} der eigenen Strukturgröße ({}) auf dich bei gleichförmigen Polygonen", a, self.zellenwert_py(i, 4)));
@@ -361,7 +398,7 @@ impl Program {
     pub fn concatGleichheitFreiheitDominieren(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&132) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             if i == 0 {
                 zeilenInhalte.push("Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string());
             } else {
@@ -375,7 +412,7 @@ impl Program {
     pub fn concatGeistEmotionEnergieMaterieTopologie(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&242) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             if i == 0 {
                 zeilenInhalte.push("Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string());
             } else {
@@ -389,7 +426,7 @@ impl Program {
     pub fn concatPrimCreativityType(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             let primCreativityType = self.primCreativity_exact_py(i as i64);
             let wert = if i == 0 {
                 "Evolutions-Züchtungs-Kreativität".to_string()
@@ -413,7 +450,7 @@ impl Program {
         let hardcodedCouple = [(44usize, "Mond-Typ eines Sternpolygons"), (56usize, "Mond-Typ eines gleichförmigen Polygons")];
         for (rownum, rowheading) in hardcodedCouple {
             let mut zeilenInhalte: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            for i in 0..=self.generator_row_end_py() {
                 let moonTypesOf1Num = self.moonNumber(i as i64);
                 if i == 0 {
                     zeilenInhalte.push(rowheading.to_string());
@@ -453,7 +490,7 @@ impl Program {
         let spaltenToVervielfache: Vec<usize> = rowsAsNumbers.iter().copied().filter(|n| *n == 90 || *n == 19).map(|n| n as usize).collect();
         for s in spaltenToVervielfache {
             let mut store: BTreeMap<(usize, usize), String> = BTreeMap::new();
-            for z in 2..self.relitable.len() {
+            for z in 2..=self.generator_row_end_py() {
                 let content = self.zellenwert_py(z, s);
                 if !content.trim().is_empty() {
                     store.insert((z, s), content);
@@ -464,13 +501,13 @@ impl Program {
                 let mut vielfacher = 1usize;
                 let mut ergebnis = vielfacher * *ursprungsZeile;
                 multis.entry(ergebnis).or_default().push(*ursprungsZeile);
-                while ergebnis < self.relitable.len() {
+                while ergebnis <= self.generator_row_end_py() {
                     vielfacher += 1;
                     ergebnis = vielfacher * *ursprungsZeile;
                     multis.entry(ergebnis).or_default().push(*ursprungsZeile);
                 }
             }
-            for z in 2..self.relitable.len() {
+            for z in 2..=self.generator_row_end_py() {
                 let mut xx = false;
                 let mut teile: Vec<String> = if !self.zellenwert_py(z, s).trim().is_empty() {
                     vec![self.zellenwert_py(z, s), " | ".to_string()]
@@ -533,7 +570,7 @@ impl Program {
             let mut primAmounts = 0i64;
             let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
-            for i in 0..self.relitable.len() {
+            for i in 0..=self.generator_row_end_py() {
                 let mut into = if i != 0 {
                     vec![String::new()]
                 } else {
@@ -855,7 +892,7 @@ impl Program {
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
             let heading = self.generated2_code_heading_py(&code);
             let mut into: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            for i in 0..=self.generator_row_end_py() {
                 if i == 0 {
                     into.push(heading.clone());
                     continue;
@@ -893,7 +930,7 @@ impl Program {
         }
         let mut into_pro: Vec<String> = vec![];
         let mut into_contra: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             if i == 0 {
                 into_pro.push("Primzahlkreuz pro".to_string());
                 into_contra.push("Primzahlkreuz contra".to_string());
@@ -932,51 +969,120 @@ impl Program {
     }
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
-        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
-        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 { vec![0, 1] } else if lower1greater2both3 == 1 { vec![0] } else if lower1greater2both3 == 2 { vec![1] } else { vec![] };
+        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 {
+            vec![0, 1]
+        } else if lower1greater2both3 == 1 {
+            vec![0]
+        } else if lower1greater2both3 == 2 {
+            vec![1]
+        } else {
+            vec![]
+        };
+        let struktAndInversSpalten = (5usize, 131usize);
+
         for ifInvers in 0..=1 {
-            let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
-            for bothRows in bothRowsListe.iter() {
-                let mut into: Vec<String> = vec![];
-                for i in 0..self.relitable.len() {
-                    if i == 0 {
-                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
-                        into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
-                        continue;
-                    }
-                    if i < 2 {
-                        into.push(String::new());
-                        continue;
-                    }
-                    let mut neue2KoordNeue2Vorwoerter: Vec<String> = vec![];
-                    let mut moreAndLess = (i as i64, i as i64);
+            let transzendentalienSpalten = if ifInvers == 0 {
+                struktAndInversSpalten
+            } else {
+                (struktAndInversSpalten.1, struktAndInversSpalten.0)
+            };
+            for bothRows in bothRowsListe.iter().copied() {
+                if !self.relitable.is_empty() {
+                    let ueberschrift = self.meta_ueberschrift_py(bothRows, metavariable, ifInvers);
+                    self.relitable[0].push(ueberschrift);
+                }
+                if self.relitable.len() > 1 {
+                    self.relitable[1].push(String::new());
+                }
+                let neue_spalte = self.relitable.first().map(|r| r.len().saturating_sub(1) as i64).unwrap_or(0);
+                Self::push_unique_i64_py(rowsAsNumbers, neue_spalte);
+
+                let metaOrWhat = self.meta_or_what_pairs_py(metavariable);
+
+                for i in 2..=self.generator_row_end_py() {
+                    let mut moreAndLessGanz: Option<i64> = Some(i as i64);
+                    let mut moreAndLessFracNum: Option<i64> = Some(1);
+                    let mut moreAndLessFracDen: Option<i64> = Some(i as i64);
                     let mut newCol = transzendentalienSpalten.0;
-                    let mut zaehler = 0usize;
-                    while zaehler < 6 {
-                        zaehler += 1;
-                        if moreAndLess.0 <= 0 && moreAndLess.1 <= 0 {
-                            break;
-                        }
-                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
-                        let text = self.zellenwert_py(moreAndLess.0.max(1) as usize, newCol);
-                        if !text.trim().is_empty() {
-                            neue2KoordNeue2Vorwoerter.push(format!("{}-{} ({})", praefix, text, moreAndLess.0.max(1)));
-                        }
-                        if newCol == transzendentalienSpalten.0 {
-                            newCol = transzendentalienSpalten.1;
-                            moreAndLess.0 /= metavariable.max(1);
-                        } else {
-                            newCol = transzendentalienSpalten.0;
-                            moreAndLess.0 *= metavariable.max(1);
-                            if moreAndLess.0 as usize >= self.relitable.len() {
-                                break;
+                    let mut neue2KoordNeue2Vorwoerter: Vec<(Option<i64>, Option<(i64, i64)>, usize, String, String)> = vec![];
+                    let mut gebr_seen: BTreeSet<(i64, i64)> = BTreeSet::new();
+
+                    loop {
+                        let vorworte2 = if neue2KoordNeue2Vorwoerter.is_empty() { metaOrWhat.0 } else { metaOrWhat.1 };
+                        let vorwort1 = self.make_vorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 1);
+                        let vorwort2 = self.make_vorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 2);
+                        let frac = match (moreAndLessFracNum, moreAndLessFracDen) {
+                            (Some(n), Some(d)) if d != 0 => Some((n, d)),
+                            _ => None,
+                        };
+                        neue2KoordNeue2Vorwoerter.push((moreAndLessGanz, frac, newCol, vorwort1, vorwort2));
+
+                        let nextCol = if newCol == transzendentalienSpalten.1 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 };
+                        let nextGanz = moreAndLessGanz.and_then(|v| {
+                            let mul = v.saturating_mul(metavariable.max(1));
+                            if mul < self.relitable.len() as i64 { Some(mul) } else { None }
+                        });
+                        let mut nextFrac = None;
+                        if let (Some(n), Some(d)) = (moreAndLessFracNum, moreAndLessFracDen) {
+                            if d < 100 && d > 0 {
+                                let (nn, dd) = if nextCol == if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 } {
+                                    (metavariable.max(1), d)
+                                } else {
+                                    (n, d.saturating_mul(metavariable.max(1)))
+                                };
+                                if dd > 0 {
+                                    let g = gcd_i64(nn.abs(), dd.abs()).max(1);
+                                    let key = (nn / g, dd / g);
+                                    if !gebr_seen.contains(&key) && (key.1 as f64) > 0.01 {
+                                        gebr_seen.insert(key);
+                                        nextFrac = Some(key);
+                                    }
+                                }
                             }
                         }
+                        newCol = nextCol;
+                        moreAndLessGanz = nextGanz;
+                        if let Some((n,d)) = nextFrac {
+                            moreAndLessFracNum = Some(n);
+                            moreAndLessFracDen = Some(d);
+                        } else {
+                            moreAndLessFracNum = None;
+                            moreAndLessFracDen = None;
+                        }
+                        if moreAndLessGanz.is_none() && moreAndLessFracNum.is_none() {
+                            break;
+                        }
                     }
-                    into.push(self.nicht_leere_teile_join_py(neue2KoordNeue2Vorwoerter, " | "));
+
+                    let mut intoList: Vec<String> = vec![];
+                    let mut thema = String::new();
+                    for vier in neue2KoordNeue2Vorwoerter.iter().take(neue2KoordNeue2Vorwoerter.len().saturating_sub(1)) {
+                        if bothRows == 0 {
+                            if let Some(ganz) = vier.0 {
+                                let text = self.zellenwert_py(ganz as usize, vier.2);
+                                if text.trim().len() > 3 {
+                                    intoList.push(format!("{}{}{} ({})", vier.3, thema, text, ganz));
+                                }
+                            }
+                        } else {
+                            if let Some((n,d)) = vier.1 {
+                                let idx = if d == 1 { n } else { -1 };
+                                if idx > 0 {
+                                    let text = self.zellenwert_py(idx as usize, vier.2);
+                                    if text.trim().len() > 3 {
+                                        let prefix = if vier.2 != if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 } && d != 1 { "1/" } else { "" };
+                                        intoList.push(format!("{}{}{} ({}{}{}/{})", vier.4, thema, text, prefix, "", n, d));
+                                    }
+                                }
+                            }
+                        }
+                        if bothRows == 0 && !intoList.is_empty() {
+                            thema = "".to_string();
+                        }
+                    }
+                    let neuer_zelleninhalt = self.nicht_leere_teile_join_py(intoList, " | ");
+                    self.relitable[i].push(neuer_zelleninhalt);
                 }
-                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, konkret_name));
-                Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
     }
@@ -984,7 +1090,7 @@ impl Program {
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        for i in 0..=self.generator_row_end_py() {
             if i == 0 {
                 zeilenInhalte.push("Gestirn".to_string());
                 continue;
