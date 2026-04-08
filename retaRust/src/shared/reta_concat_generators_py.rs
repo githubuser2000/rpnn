@@ -67,6 +67,16 @@ impl Program {
         self.metakonkretPairs.clone()
     }
 
+    fn generator_row_end_py(&self) -> usize {
+        self.relitable.len().saturating_sub(1)
+    }
+
+    fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
+        let mut zahl = if spaltenWahl { 1.0 / zahl } else { zahl };
+        zahl = zahl.fract().abs();
+        zahl < 0.00001 || zahl > 0.99999
+    }
+
     fn generated1_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         if !self.generated1Pairs.is_empty() {
             return self.generated1Pairs.clone();
@@ -88,16 +98,6 @@ impl Program {
             }
         }
         neu.join(sep)
-    }
-
-    fn generator_row_end_py(&self) -> usize {
-        if self.relitable.is_empty() {
-            return 0;
-        }
-        if self.hoechsteZeile > 0 {
-            return std::cmp::min(self.hoechsteZeile as usize, self.relitable.len().saturating_sub(1));
-        }
-        self.relitable.len().saturating_sub(1)
     }
 
     fn modalTextByDistance_py(&self, distanceFromLine: i64) -> String {
@@ -139,13 +139,13 @@ impl Program {
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
         match metavariable {
-            2 => ("Meta", "Konkret"),
+            2 => ("Meta", "Konkretes"),
             3 => ("Theorie", "Praxis"),
-            4 => ("Management", "verändernd"),
-            5 => ("ganzheitlich", "darüber_hinausgehend"),
-            6 => ("Unternehmung_Geschäft", "wertvoll"),
-            7 => ("Beherrschen", "Richtung"),
-            _ => ("Meta", "Konkret"),
+            4 => ("Planung", "Umsetzung"),
+            5 => ("Anlass", "Wirkung"),
+            6 => ("Kraft-Gebung", "Verstärkung"),
+            7 => ("Beherrschung", "Richtung"),
+            _ => ("Meta", "Konkretes"),
         }
     }
 
@@ -359,7 +359,8 @@ impl Program {
     pub fn concatGleichheitFreiheitDominieren(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&132) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        let row_end = self.generator_row_end_py();
+        for i in 0..=row_end {
             if i == 0 {
                 zeilenInhalte.push("Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string());
             } else {
@@ -373,7 +374,8 @@ impl Program {
     pub fn concatGeistEmotionEnergieMaterieTopologie(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&242) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        let row_end = self.generator_row_end_py();
+        for i in 0..=row_end {
             if i == 0 {
                 zeilenInhalte.push("Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string());
             } else {
@@ -411,7 +413,8 @@ impl Program {
         let hardcodedCouple = [(44usize, "Mond-Typ eines Sternpolygons"), (56usize, "Mond-Typ eines gleichförmigen Polygons")];
         for (rownum, rowheading) in hardcodedCouple {
             let mut zeilenInhalte: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            let row_end = self.generator_row_end_py();
+            for i in 0..=row_end {
                 let moonTypesOf1Num = self.moonNumber(i as i64);
                 if i == 0 {
                     zeilenInhalte.push(rowheading.to_string());
@@ -448,7 +451,7 @@ impl Program {
     }
 
     pub fn concatVervielfacheZeile(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let spaltenToVervielfache: BTreeSet<usize> = rowsAsNumbers
+        let spaltenToVervielfache: Vec<usize> = rowsAsNumbers
             .iter()
             .copied()
             .filter(|n| *n == 90 || *n == 19)
@@ -464,37 +467,49 @@ impl Program {
                 }
             }
             let mut multis: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-            for ((ursprungs_zeile, _), _content) in store.iter() {
+            for ((ursprungsZeile, _), _content) in store.iter() {
                 let mut vielfacher = 1usize;
-                let mut ergebnis = vielfacher * *ursprungs_zeile;
-                multis.entry(ergebnis).or_default().push(*ursprungs_zeile);
+                let mut ergebnis = vielfacher * *ursprungsZeile;
+                multis.entry(ergebnis).or_default().push(*ursprungsZeile);
                 while ergebnis < self.relitable.len() {
                     vielfacher += 1;
-                    ergebnis = vielfacher * *ursprungs_zeile;
-                    multis.entry(ergebnis).or_default().push(*ursprungs_zeile);
+                    ergebnis = vielfacher * *ursprungsZeile;
+                    multis.entry(ergebnis).or_default().push(*ursprungsZeile);
                 }
             }
             for z in 2..=row_end {
                 let mut xx = false;
                 let mut teile: Vec<String> = if !self.zellenwert_py(z, s).trim().is_empty() {
-                    vec![self.zellenwert_py(z, s), " | ".to_string()]
+                    if self.outType == "html" {
+                        vec!["<li>".to_string(), self.zellenwert_py(z, s), "</li>".to_string()]
+                    } else if self.outType == "bbcode" {
+                        vec!["[*]".to_string(), self.zellenwert_py(z, s)]
+                    } else {
+                        vec![self.zellenwert_py(z, s), " | ".to_string()]
+                    }
                 } else {
-                    vec![String::new()]
+                    vec![self.zellenwert_py(z, s)]
                 };
-                if let Some(urs_zeilen) = multis.get(&z) {
-                    for ur_zeile in urs_zeilen {
-                        let basis = store.get(&(*ur_zeile, s)).cloned().unwrap_or_default();
+
+                if let Some(ursZeilen) = multis.get(&z) {
+                    for UrZeile in ursZeilen {
+                        let basis = store.get(&(*UrZeile, s)).cloned().unwrap_or_default();
                         let aktuell = teile.join("");
-                        let aktuell_mit_sep = {
-                            let mut a = teile.clone();
-                            a.push(" | ".to_string());
-                            a.join("")
-                        };
-                        if *ur_zeile != z
+                        if *UrZeile != z
                             && aktuell != basis
-                            && aktuell_mit_sep != basis
+                            && format!("{} | ", aktuell) != basis
+                            && format!("<li>{}</li>", aktuell) != basis
+                            && format!("[*]{}", aktuell) != basis
+                            && !basis.is_empty()
                         {
-                            if !basis.is_empty() {
+                            if self.outType == "html" {
+                                teile.push("<li>".to_string());
+                                teile.push(basis);
+                                teile.push("</li>".to_string());
+                            } else if self.outType == "bbcode" {
+                                teile.push("[*]".to_string());
+                                teile.push(basis);
+                            } else {
                                 xx = true;
                                 teile.push(basis);
                                 teile.push(" | ".to_string());
@@ -502,12 +517,23 @@ impl Program {
                         }
                     }
                 }
-                let neuer_wert = if xx && teile.last().map(|s| s == " | ").unwrap_or(false) {
-                    teile[..teile.len().saturating_sub(1)].join("")
+                if self.outType == "html" {
+                    teile.insert(0, "<ul>".to_string());
+                    teile.push("</ul>".to_string());
+                } else if self.outType == "bbcode" {
+                    teile.insert(0, "[list]".to_string());
+                    teile.push("[/list]".to_string());
+                }
+                let endwert = if xx && !teile.is_empty() {
+                    let mut x = teile.join("");
+                    if x.ends_with(" | ") {
+                        x.truncate(x.len() - 3);
+                    }
+                    x
                 } else {
                     teile.join("")
                 };
-                self.setze_zellenwert_py(z, s, neuer_wert);
+                self.setze_zellenwert_py(z, s, endwert);
             }
         }
     }
@@ -545,7 +571,8 @@ impl Program {
             let mut primAmounts = 0i64;
             let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
-            for i in 0..self.relitable.len() {
+            let row_end = self.generator_row_end_py();
+            for i in 0..=row_end {
                 let mut into = if i != 0 {
                     vec![String::new()]
                 } else {
@@ -731,7 +758,6 @@ impl Program {
         }
         let reliTableCopy = self.relitable.clone();
         let distances: [i64; 9] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
-        let row_end = std::cmp::min(self.generator_row_end_py(), reliTableCopy.len().saturating_sub(1));
 
         #[derive(Clone, Default)]
         struct ModalEntryPy {
@@ -743,12 +769,12 @@ impl Program {
         for concept in conceptsRowsSetOfTuple2 {
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
-            let mut into: Vec<Vec<String>> = vec![vec![String::new()]; reliTableCopy.len()];
+            let mut into: Vec<String> = vec![String::new(); reliTableCopy.len()];
             let mut einMalVorkommen: Vec<usize> = vec![];
 
             for (i, cols) in reliTableCopy.iter().enumerate() {
                 if i == 0 {
-                    into[i] = vec!["Generiert: ".to_string(), cols.get(concept0).cloned().unwrap_or_default()];
+                    into[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
                 } else if cols.get(concept0).map(|s| !s.trim().is_empty()).unwrap_or(false) {
                     if !einMalVorkommen.contains(&i) {
                         einMalVorkommen.push(i);
@@ -769,79 +795,91 @@ impl Program {
             }
 
             let mut vorkommenVielfacher_B: BTreeMap<usize, BTreeMap<i64, ModalEntryPy>> = BTreeMap::new();
+            let row_end = self.generator_row_end_py();
             for i in 1..=row_end {
-                for distanceFromLine in distances {
-                    let i_with_a_distance = i as i64 + distanceFromLine;
-                    if i_with_a_distance < 0 { continue; }
-                    let key = i_with_a_distance as usize;
-                    if let Some(couples) = vorkommenVielfacher.get(&key) {
-                        let entry = vorkommenVielfacher_B.entry(i).or_default().entry(distanceFromLine).or_default();
-                        for &(vorkommen, vielfacher) in couples {
-                            entry.modalS.push(self.getModaloperatorsPerLineCells_py(&reliTableCopy, vielfacher));
-                            entry.vervielfachter.push(vorkommen);
-                            entry.i_origS.push(key);
-                        }
+                for &distanceFromLine in &distances {
+                    let i_with_a_distance_i64 = i as i64 + distanceFromLine;
+                    if i_with_a_distance_i64 < 0 {
+                        continue;
                     }
+                    let i_with_a_distance = i_with_a_distance_i64 as usize;
+                    let Some(couples) = vorkommenVielfacher.get(&i_with_a_distance) else {
+                        continue;
+                    };
+                    let mut modalOperatorEnEn: Vec<Vec<String>> = vec![];
+                    let mut Orginal_i_mehrere: Vec<usize> = vec![];
+                    let mut vervielFachter: Vec<usize> = vec![];
+                    for &(vorkommen, vielfacher) in couples {
+                        modalOperatorEnEn.push(self.getModaloperatorsPerLineCells_py(&reliTableCopy, vielfacher));
+                        vervielFachter.push(vorkommen);
+                        Orginal_i_mehrere.push(i_with_a_distance);
+                    }
+                    let entry = vorkommenVielfacher_B.entry(i).or_default().entry(distanceFromLine).or_default();
+                    let mut new_i_origS = Orginal_i_mehrere;
+                    new_i_origS.extend(entry.i_origS.clone());
+                    let mut new_modalS = modalOperatorEnEn;
+                    new_modalS.extend(entry.modalS.clone());
+                    let mut new_vervielfachter = vervielFachter;
+                    new_vervielfachter.extend(entry.vervielfachter.clone());
+                    entry.i_origS = new_i_origS;
+                    entry.modalS = new_modalS;
+                    entry.vervielfachter = new_vervielfachter;
                 }
             }
 
-            let mut conditionNvs1perN = false;
             for i in 1..=row_end {
-                for distanceFromLine in distances {
-                    if let Some(distance_entry) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) {
-                        for (modalOperatoren, vervielfachter) in distance_entry.modalS.iter().zip(distance_entry.vervielfachter.iter()) {
-                            let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                                reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
-                            } else {
-                                reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
-                            };
-                            let mut parts: Vec<String> = vec![
-                                self.modal_text_by_distance_exact_py(distanceFromLine).to_string(),
-                                modalOperatoren.get(0).cloned().unwrap_or_default(),
-                                " ".to_string(),
-                            ];
-                            let content = if modalOperatoren.get(0).cloned().unwrap_or_default() == reliTableCopy.get(1).and_then(|r| r.get(97)).cloned().unwrap_or_default() {
-                                intoItsContent.clone()
-                            } else {
-                                self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
-                            };
-                            parts.push(content);
-                            parts.push(" ".to_string());
-                            parts.push(modalOperatoren.get(1).cloned().unwrap_or_default());
-                            if modalOperatoren.len() > 2 && distanceFromLine.abs() % 2 == 1 {
-                                parts.push(", nicht: ".to_string());
-                                parts.push(modalOperatoren[2..].join(", "));
-                                parts.push(" (das alles nicht): ".to_string());
-                                let basis = reliTableCopy.get(*vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
-                                parts.push(self.modal_replace_zuerst_zweites_py(basis));
-                            }
-                            parts.push(" | ".to_string());
-                            into[i].extend(parts);
+                for &distanceFromLine in &distances {
+                    let Some(entry_by_dist) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) else {
+                        continue;
+                    };
+                    for (modalOperatoren, &vervielfachter) in entry_by_dist.modalS.iter().zip(entry_by_dist.vervielfachter.iter()) {
+                        let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
+                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
+                        } else {
+                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
+                        };
+                        if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
+                            continue;
                         }
+                        let basis_content = if reliTableCopy.get(1).and_then(|r| r.get(97)).map(|s| s == &modalOperatoren[0]).unwrap_or(false) {
+                            intoItsContent.clone()
+                        } else {
+                            self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
+                        };
+                        into[i].push_str(self.modal_text_by_distance_exact_py(distanceFromLine));
+                        into[i].push_str(&modalOperatoren[0]);
+                        into[i].push(' ');
+                        into[i].push_str(&basis_content);
+                        into[i].push(' ');
+                        into[i].push_str(&modalOperatoren[1]);
+                        if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
+                            into[i].push_str(", nicht: ");
+                            into[i].push_str(&modalOperatoren[2..].join(", "));
+                            into[i].push_str(" (das alles nicht): ");
+                            let c0 = reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
+                            into[i].push_str(&self.modal_replace_zuerst_zweites_py(c0));
+                        }
+                        into[i].push_str(" | ");
                     }
                 }
-                conditionNvs1perN = matches!(concept0, 62 | 63 | 358..=367 | 371..=374);
+                let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
                 let fill_ = if conditionNvs1perN {
                     reliTableCopy.get(i).and_then(|r| r.get(197)).cloned().unwrap_or_default()
                 } else {
                     reliTableCopy.get(i).and_then(|r| r.get(4)).cloned().unwrap_or_default()
                 };
-                if into[i] != vec![String::new()] {
-                    into[i].push("alles nur bezogen auf: ".to_string());
-                    into[i].push(fill_);
+                if !into[i].is_empty() {
+                    if into[i].ends_with(" | ") {
+                        let new_len = into[i].len().saturating_sub(3);
+                        into[i].truncate(new_len);
+                    }
+                    into[i].push_str(" | Alles nur bezogen auf die selbe Strukturgröße einer ");
+                    into[i].push_str(&fill_);
                 }
             }
 
-            for w in 0..=row_end {
-                let mut content = into[w].join("");
-                if content.ends_with(" | ") {
-                    content.truncate(content.len().saturating_sub(3));
-                }
-                self.relitable[w].push(content);
-            }
-            let neue_spalte = self.relitable.get(0).map(|r| r.len().saturating_sub(1) as i64).unwrap_or(0);
-            Self::push_unique_i64_py(rowsAsNumbers, neue_spalte);
-            self.generatedSpaltenParameter.push(format!("{} / {}", concept0, concept1));
+            let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
+            Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
 
@@ -857,7 +895,8 @@ impl Program {
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
             let heading = self.generated2_code_heading_py(&code);
             let mut into: Vec<String> = vec![];
-            for i in 0..self.relitable.len() {
+            let row_end = self.generator_row_end_py();
+            for i in 0..=row_end {
                 if i == 0 {
                     into.push(heading.clone());
                     continue;
@@ -895,7 +934,8 @@ impl Program {
         }
         let mut into_pro: Vec<String> = vec![];
         let mut into_contra: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        let row_end = self.generator_row_end_py();
+        for i in 0..=row_end {
             if i == 0 {
                 into_pro.push("Primzahlkreuz pro".to_string());
                 into_contra.push("Primzahlkreuz contra".to_string());
@@ -940,10 +980,12 @@ impl Program {
             let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
             for bothRows in bothRowsListe.iter() {
                 let mut into: Vec<String> = vec![];
-                for i in 0..self.relitable.len() {
+                let row_end = self.generator_row_end_py();
+            for i in 0..=row_end {
                     if i == 0 {
                         let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
-                        into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
+                        let suffix = if ifInvers == 0 { "für n" } else { "für 1/n statt n" };
+                        into.push(format!("{} {}", praefix, suffix));
                         continue;
                     }
                     if i < 2 {
@@ -986,7 +1028,8 @@ impl Program {
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
+        let row_end = self.generator_row_end_py();
+        for i in 0..=row_end {
             if i == 0 {
                 zeilenInhalte.push("Gestirn".to_string());
                 continue;
