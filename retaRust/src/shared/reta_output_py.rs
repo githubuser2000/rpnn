@@ -103,57 +103,65 @@ impl Program {
         out
     }
 
-    fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
-        if width <= 1 || word.chars().count() <= width {
-            return vec![word.to_string()];
-        }
+fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
+    if width <= 1 || word.chars().count() <= width {
+        return vec![word.to_string()];
+    }
 
-        let lang = Self::hypher_lang_py(word);
-        let syllables: Vec<String> = hyphenate(word, lang)
-            .map(|s| s.to_string())
-            .collect();
+    // hypher panics for long words when alloc is disabled.
+    // Keep display behavior unchanged for normal words and
+    // hard-split only in the panic case.
+    if word.len() > 45 {
+        return Self::hard_split_long_word_py(word, width);
+    }
 
-        if syllables.is_empty() {
-            return Self::hard_split_long_word_py(word, width);
-        }
+    let lang = Self::hypher_lang_py(word);
+    let syllables: Vec<String> = hyphenate(word, lang)
+        .map(|s| s.to_string())
+        .collect();
 
-        let mut out: Vec<String> = Vec::new();
-        let mut current = String::new();
+    if syllables.is_empty() {
+        return Self::hard_split_long_word_py(word, width);
+    }
 
-        for (idx, syl) in syllables.iter().enumerate() {
-            let is_last = idx + 1 == syllables.len();
-            let syl_len = syl.chars().count();
-            let current_len = current.chars().count();
-            let reserve_for_hyphen = if is_last { 0usize } else { 1usize };
+    let mut out: Vec<String> = Vec::new();
+    let mut current = String::new();
 
-            if current.is_empty() {
-                if syl_len >= width {
-                    return Self::hard_split_long_word_py(word, width);
-                }
-                current.push_str(syl);
-                continue;
+    for (idx, syl) in syllables.iter().enumerate() {
+        let is_last = idx + 1 == syllables.len();
+        let syl_len = syl.chars().count();
+        let current_len = current.chars().count();
+        let reserve_for_hyphen = if is_last { 0usize } else { 1usize };
+
+        if current.is_empty() {
+            if syl_len >= width {
+                return Self::hard_split_long_word_py(word, width);
             }
-
-            if current_len + syl_len + reserve_for_hyphen <= width {
-                current.push_str(syl);
-            } else {
-                let mut piece = current;
-                piece.push('-');
-                out.push(piece);
-                current = syl.clone();
-            }
+            current.push_str(syl);
+            continue;
         }
 
-        if !current.is_empty() {
-            out.push(current);
-        }
-
-        if out.is_empty() {
-            Self::hard_split_long_word_py(word, width)
+        if current_len + syl_len + reserve_for_hyphen <= width {
+            current.push_str(syl);
         } else {
-            out
+            let mut piece = current;
+            piece.push('-');
+            out.push(piece);
+            current = syl.clone();
         }
     }
+
+    if !current.is_empty() {
+        out.push(current);
+    }
+
+    if out.is_empty() {
+        Self::hard_split_long_word_py(word, width)
+    } else {
+        out
+    }
+}
+
 
     pub(crate) fn wrap_text_py(txt: &str, width: usize) -> Vec<String> {
         if width == 0 {
