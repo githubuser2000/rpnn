@@ -4,6 +4,73 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::shared::reta_program_types::Program;
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct FractionPy {
+    numerator: i64,
+    denominator: i64,
+}
+
+impl FractionPy {
+    fn new(numerator: i64, denominator: i64) -> Option<Self> {
+        if denominator == 0 {
+            return None;
+        }
+        let mut n = numerator;
+        let mut d = denominator;
+        if d < 0 {
+            n = -n;
+            d = -d;
+        }
+        let g = gcd_i64_py(n.abs(), d.abs()).max(1);
+        Some(Self { numerator: n / g, denominator: d / g })
+    }
+
+    fn from_int(value: i64) -> Self {
+        Self { numerator: value, denominator: 1 }
+    }
+
+    fn is_integer(&self) -> bool {
+        self.denominator == 1
+    }
+
+    fn as_i64(&self) -> Option<i64> {
+        if self.is_integer() { Some(self.numerator) } else { None }
+    }
+
+    fn reciprocal(&self) -> Option<Self> {
+        if self.numerator == 0 {
+            None
+        } else {
+            Self::new(self.denominator, self.numerator)
+        }
+    }
+
+    fn mul_int(&self, value: i64) -> Option<Self> {
+        Self::new(self.numerator * value, self.denominator)
+    }
+
+    fn div_int(&self, value: i64) -> Option<Self> {
+        if value == 0 {
+            None
+        } else {
+            Self::new(self.numerator, self.denominator * value)
+        }
+    }
+
+    fn value_f64(&self) -> f64 {
+        self.numerator as f64 / self.denominator as f64
+    }
+}
+
+fn gcd_i64_py(mut a: i64, mut b: i64) -> i64 {
+    while b != 0 {
+        let r = a % b;
+        a = b;
+        b = r;
+    }
+    a.abs()
+}
+
 impl Program {
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
         if !target.contains(&value) {
@@ -129,14 +196,95 @@ impl Program {
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
         match metavariable {
-            2 => ("Meta", "Konkret"),
+            2 => ("Meta", "Konkretes"),
             3 => ("Theorie", "Praxis"),
             4 => ("Management", "verändernd"),
-            5 => ("ganzheitlich", "darüber_hinausgehend"),
-            6 => ("Unternehmung_Geschäft", "wertvoll"),
-            7 => ("Beherrschen", "Richtung"),
-            _ => ("Meta", "Konkret"),
+            5 => ("ganzheitlich", "darüber hinaus gehend"),
+            6 => ("Verwertung, Unternehmung, Geschäft", "wertvoll"),
+            7 => ("regieren, beherrschen", "Richtung"),
+            _ => ("Meta", "Konkretes"),
         }
+    }
+
+    fn meta_or_what_pairs_py(&self, metavariable: i64) -> ((&'static str, &'static str), (&'static str, &'static str)) {
+        match metavariable {
+            2 => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+            3 => (("Theorie-Thema: ", "Praxis: "), ("Theorie-", "Praxis-")),
+            4 => (("Planungs-Thema: ", "Umsetzungs-Thema: "), ("Planung-", "Umsetzung-")),
+            5 => (("Anlass-Thema: ", "Wirkungs-Thema: "), ("Anlass-", "wirkung-")),
+            6 => (("Kraft-Gebung: ", "Verstärkungs-Thema: "), ("Kraft-geben-", "Verstärkung-")),
+            7 => (("Beherrschung: ", "Richtung-Thema: "), ("beherrschend-", "Richtung-")),
+            _ => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+        }
+    }
+
+    fn makeVorwort_py(&self, wiederholungen: usize, vorworte2: (&'static str, &'static str), less1ormore2: usize) -> String {
+        let basis = if less1ormore2 == 1 { vorworte2.0 } else { vorworte2.1 };
+        if wiederholungen > 1 {
+            basis.repeat(wiederholungen)
+        } else {
+            basis.to_string()
+        }
+    }
+
+    fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: &FractionPy, spaltenWahl: bool) -> bool {
+        let wert = if spaltenWahl {
+            if let Some(r) = zahl.reciprocal() { r } else { return false; }
+        } else {
+            zahl.clone()
+        };
+        wert.denominator == 1
+    }
+
+    fn meta_ueberschrift_py(&self, bothRows: i64, metavariable: i64, ifInvers: i64) -> String {
+        let basis = if bothRows == 0 {
+            match metavariable {
+                2 => "Meta",
+                3 => "Theorie",
+                4 => "Management",
+                5 => "ganzheitlich",
+                6 => "Verwertung, Unternehmung, Geschäft",
+                7 => "regieren, beherrschen",
+                _ => "Meta",
+            }
+        } else {
+            match metavariable {
+                2 => "Konkretes",
+                3 => "Praxis",
+                4 => "verändernd",
+                5 => "darüber hinaus gehend",
+                6 => "wertvoll",
+                7 => "Richtung",
+                _ => "Konkretes",
+            }
+        };
+        if ifInvers == 1 {
+            format!("{} für 1/n statt n", basis)
+        } else {
+            format!("{} für n", basis)
+        }
+    }
+
+    fn load_gebr_univ_table_py(&self) -> Vec<Vec<String>> {
+        self.load_csv_rows_semicolon_exact_path("gebrochen-rational-universum.csv").unwrap_or_default()
+    }
+
+    fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(&self, koord: &FractionPy, n_and_invers_spalten: (usize, usize), gebr_table: &Vec<Vec<String>>) -> String {
+        if koord.denominator == 0 || koord.numerator == 0 {
+            return String::new();
+        }
+        if koord.denominator > 100 || koord.numerator > 100 {
+            return String::new();
+        }
+        if koord.numerator == 1 {
+            return self.zellenwert_py(koord.denominator as usize, n_and_invers_spalten.1);
+        }
+        if koord.denominator == 1 {
+            return self.zellenwert_py(koord.numerator as usize, n_and_invers_spalten.0);
+        }
+        let r = (koord.numerator - 1) as usize;
+        let c = (koord.denominator - 1) as usize;
+        gebr_table.get(r).and_then(|row| row.get(c)).cloned().unwrap_or_default()
     }
 
     fn generierte_spalte_meta_name_py(&self, spaltenNummer: i64) -> String {
@@ -912,59 +1060,143 @@ impl Program {
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let geordnetePaare = self.metakonkret_pairs_exact_py();
+        let gebr_univ_table = if geordnetePaare.is_empty() {
+            vec![]
+        } else {
+            self.load_gebr_univ_table_py()
+        };
         for paar in geordnetePaare {
-            let metavariable = paar.0;
             let lower1greater2both3 = if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 };
-            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, metavariable, lower1greater2both3);
+            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, paar.0, lower1greater2both3, &gebr_univ_table);
         }
     }
 
-    pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
-        let (meta_name, konkret_name) = self.meta_prefixes_py(metavariable);
-        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 { vec![0, 1] } else if lower1greater2both3 == 1 { vec![0] } else if lower1greater2both3 == 2 { vec![1] } else { vec![] };
-        for ifInvers in 0..=1 {
-            let transzendentalienSpalten = if ifInvers == 0 { (5usize, 131usize) } else { (131usize, 5usize) };
-            for bothRows in bothRowsListe.iter() {
-                let mut into: Vec<String> = vec![];
-                for i in 0..self.relitable.len() {
-                    if i == 0 {
-                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
-                        into.push(format!("{} {}", praefix, self.zellenwert_py(0, transzendentalienSpalten.0)));
-                        continue;
-                    }
-                    if i < 2 {
-                        into.push(String::new());
-                        continue;
-                    }
-                    let mut neue2KoordNeue2Vorwoerter: Vec<String> = vec![];
-                    let mut moreAndLess = (i as i64, i as i64);
-                    let mut newCol = transzendentalienSpalten.0;
-                    let mut zaehler = 0usize;
-                    while zaehler < 6 {
-                        zaehler += 1;
-                        if moreAndLess.0 <= 0 && moreAndLess.1 <= 0 {
-                            break;
-                        }
-                        let praefix = if *bothRows == 0 { meta_name } else { konkret_name };
-                        let text = self.zellenwert_py(moreAndLess.0.max(1) as usize, newCol);
-                        if !text.trim().is_empty() {
-                            neue2KoordNeue2Vorwoerter.push(format!("{}-{} ({})", praefix, text, moreAndLess.0.max(1)));
-                        }
-                        if newCol == transzendentalienSpalten.0 {
-                            newCol = transzendentalienSpalten.1;
-                            moreAndLess.0 /= metavariable.max(1);
+    pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64, gebr_univ_table: &Vec<Vec<String>>) {
+        let both_rows_liste: Vec<i64> = if lower1greater2both3 == 3 {
+            vec![0, 1]
+        } else if lower1greater2both3 == 1 {
+            vec![0]
+        } else if lower1greater2both3 == 2 {
+            vec![1]
+        } else {
+            vec![]
+        };
+        let strukt_and_invers_spalten: (usize, usize) = (5usize, 131usize);
+
+        for ifInvers in 0..=1i64 {
+            let transzendentalienSpalten = if ifInvers == 0 {
+                strukt_and_invers_spalten
+            } else {
+                (strukt_and_invers_spalten.1, strukt_and_invers_spalten.0)
+            };
+
+            for bothRows in both_rows_liste.iter().copied() {
+                let spalten_nummer = self.relitable.first().map(|row| row.len()).unwrap_or(0) as i64;
+                Self::push_unique_i64_py(rowsAsNumbers, spalten_nummer);
+                self.generatedSpaltenParameter.push(self.meta_ueberschrift_py(bothRows, metavariable, ifInvers));
+                if !self.relitable.is_empty() {
+                    let header = self.meta_ueberschrift_py(bothRows, metavariable, ifInvers);
+                    self.relitable[0].push(header);
+                }
+                if self.relitable.len() > 1 {
+                    self.relitable[1].push(String::new());
+                }
+                for row_idx in 2..self.relitable.len() {
+                    let mut gebr_rat_etwa_schon_mal_dabei_gewesen: BTreeSet<FractionPy> = BTreeSet::new();
+                    let selected_trans_spalte = if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 };
+                    let mut more_and_less_a: Option<i64> = Some(row_idx as i64);
+                    let mut more_and_less_b: Option<FractionPy> = Some(FractionPy::from_int(row_idx as i64));
+                    let mut new_col: usize = transzendentalienSpalten.0;
+                    let mut neue2KoordNeue2Vorwoerter: Vec<(Option<i64>, Option<FractionPy>, usize, String, String)> = vec![];
+
+                    while !(more_and_less_a.is_none() && more_and_less_b.is_none()) {
+                        let switched_col = if new_col == transzendentalienSpalten.1 {
+                            transzendentalienSpalten.0
                         } else {
-                            newCol = transzendentalienSpalten.0;
-                            moreAndLess.0 *= metavariable.max(1);
-                            if moreAndLess.0 as usize >= self.relitable.len() {
-                                break;
+                            transzendentalienSpalten.1
+                        };
+                        new_col = switched_col;
+
+                        let a = more_and_less_a.and_then(|v| {
+                            let mulresult = v.saturating_mul(metavariable);
+                            if mulresult >= 0 && (mulresult as usize) < self.relitable.len() {
+                                Some(mulresult)
+                            } else {
+                                None
+                            }
+                        });
+
+                        let mut b: Option<FractionPy> = None;
+                        if let Some(current_b) = more_and_less_b.clone() {
+                            let wert = current_b.value_f64();
+                            if wert < 100.0 && wert > 0.01 {
+                                let basis_b = if new_col == selected_trans_spalte && current_b.denominator == 1 {
+                                    current_b.reciprocal().unwrap_or(current_b.clone())
+                                } else {
+                                    current_b.clone()
+                                };
+                                b = if self.spalteMetaKonkretAbstrakt_isGanzZahlig_py(&basis_b, false) {
+                                    FractionPy::new(metavariable, basis_b.numerator)
+                                } else {
+                                    basis_b.reciprocal().and_then(|r| r.div_int(metavariable))
+                                };
                             }
                         }
+                        if let Some(fr) = b.clone() {
+                            if gebr_rat_etwa_schon_mal_dabei_gewesen.contains(&fr) {
+                                b = None;
+                            } else {
+                                gebr_rat_etwa_schon_mal_dabei_gewesen.insert(fr);
+                            }
+                        }
+                        more_and_less_a = a;
+                        more_and_less_b = b.clone();
+
+                        let vorworte2 = if neue2KoordNeue2Vorwoerter.is_empty() {
+                            self.meta_or_what_pairs_py(metavariable).0
+                        } else {
+                            self.meta_or_what_pairs_py(metavariable).1
+                        };
+                        let vorwort1 = self.makeVorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 1);
+                        let vorwort2 = self.makeVorwort_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 2);
+                        neue2KoordNeue2Vorwoerter.push((more_and_less_a, more_and_less_b.clone(), new_col, vorwort1, vorwort2));
                     }
-                    into.push(self.nicht_leere_teile_join_py(neue2KoordNeue2Vorwoerter, " | "));
+
+                    let mut into_list: Vec<String> = vec![];
+                    let mut thema = String::new();
+                    let limit = neue2KoordNeue2Vorwoerter.len().saturating_sub(1);
+                    for vier in neue2KoordNeue2Vorwoerter.iter().take(limit) {
+                        if bothRows == 0 {
+                            if let Some(zeile) = vier.0 {
+                                let cell = self.zellenwert_py(zeile as usize, vier.2);
+                                if cell.trim().len() > 3 {
+                                    let prefix = if vier.2 != selected_trans_spalte && vier.1.as_ref().and_then(|f| f.as_i64()) != Some(1) { "1/" } else { "" };
+                                    into_list.push(format!("{}{}{} ({}{})", vier.3, thema, cell, prefix, zeile));
+                                }
+                            }
+                        } else if let Some(fr) = vier.1.clone() {
+                            if fr.is_integer() {
+                                if let Some(zeile) = fr.as_i64() {
+                                    let cell = self.zellenwert_py(zeile as usize, vier.2);
+                                    if cell.trim().len() > 3 {
+                                        let prefix = if vier.2 != selected_trans_spalte && zeile != 1 { "1/" } else { "" };
+                                        into_list.push(format!("{}{}{} ({}{})", vier.4, thema, cell, prefix, zeile));
+                                    }
+                                }
+                            } else {
+                                let gebr = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(&fr, strukt_and_invers_spalten, gebr_univ_table);
+                                if gebr.trim().len() > 3 {
+                                    let den = if fr.denominator > 1 { format!("/{}", fr.denominator) } else { String::new() };
+                                    into_list.push(format!("{}{}{} ({}{})", vier.4, thema, gebr, fr.numerator, den));
+                                }
+                            }
+                        }
+                        thema = "Thema: ".to_string();
+                    }
+
+                    let neuer_zelleninhalt = self.nicht_leere_teile_join_py(into_list, " | ");
+                    self.relitable[row_idx].push(neuer_zelleninhalt);
                 }
-                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, konkret_name));
-                Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
     }
