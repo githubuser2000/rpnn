@@ -241,6 +241,34 @@ impl Program {
         faktoren.len()
     }
 
+    fn zeile_which_zaehlung_py(zeile: i64) -> i64 {
+        if zeile <= 0 {
+            return 0;
+        }
+
+        // Bitgenaue Ableitung aus Python:
+        // setZaehlungen():
+        //   isMoon startet bei True
+        //   bei jedem Übergang wasMoon == True && isMoon == False
+        //   wird die nächste Zählung begonnen
+        //
+        // moonNumber(i)[0] != []  <=> perfekte Potenz > 1
+        let mut zaehlung = 0i64;
+        let mut is_moon = true;
+
+        for i in 1..=zeile {
+            let was_moon = is_moon;
+            let moon_now = Self::moon_number_is_py(i);
+            is_moon = moon_now;
+
+            if was_moon && !is_moon {
+                zaehlung += 1;
+            }
+        }
+
+        zaehlung
+    }
+
     pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
@@ -421,8 +449,12 @@ impl Program {
                         };
                         let prefix = if is_header {
                             " ".to_string()
-                        } else if chunk_start > 0 {
-                            "█".to_string()
+                        } else if let Some(n) = row_number {
+                            if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
+                                "█".to_string()
+                            } else {
+                                " ".to_string()
+                            }
                         } else {
                             " ".to_string()
                         };
