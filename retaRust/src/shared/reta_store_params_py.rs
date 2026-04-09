@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
-use crate::shared::reta_program_types::{PairStr, Program};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
