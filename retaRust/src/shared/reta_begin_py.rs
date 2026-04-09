@@ -438,8 +438,15 @@ impl Program {
     }
 
     fn entry_matches_main_and_sub_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
-        entry.parameterMainNames.iter().any(|candidate| candidate == main_name)
-            && entry.parameterNames.iter().any(|candidate| candidate == sub_name)
+        let main_matches = entry
+            .parameterMainNames
+            .iter()
+            .any(|candidate| Self::parameter_main_name_matches_py(candidate, main_name));
+        let sub_matches = entry.parameterNames.iter().any(|candidate| {
+            candidate == sub_name
+                || candidate.eq_ignore_ascii_case(sub_name)
+        });
+        main_matches && sub_matches
     }
 
     fn push_unique_generated2_selection_py(target: &mut Vec<Generated2Selection>, value: Generated2Selection) {
