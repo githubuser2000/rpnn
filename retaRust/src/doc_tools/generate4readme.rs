@@ -158,15 +158,15 @@ Secondary parameters start with 2 minus --.
 
     * --all
     * --time=
-        * \"yesterday\"
+        * "yesterday"
             means religions 1-9
-        * \"today\"
+        * "today"
             means only religion 10
-        * \"tomorrow\"
+        * "tomorrow"
             means religions > 10
-        * \"yesterday,today,tomorrow\"
+        * "yesterday,today,tomorrow"
             means religion 1-10 and higher than 10,
-        * \"-yesterday,-today,-tomorrow\"
+        * "-yesterday,-today,-tomorrow"
             to substract
     * --counting=
         * 1,2,3,4,5,...
@@ -183,14 +183,14 @@ Secondary parameters start with 2 minus --.
     * --thisrangebefore=
         * 1-5,7-10,14,20
     * --thisrangebeforedividers
-        * causes that the divisors of all numbers, which result from the specification of \"--beforefromsection=\", are added additionally
+        * causes that the divisors of all numbers, which result from the specification of "--beforefromsection=", are added additionally
         * e.g. 12 becomes: 2,3,4,6,12
     * --retrospectiverecount=
         * 3-6,8
-        * For this the result rows are recounted. If lines \"5 to 7\" were previously determined and line 2 is now selected with this, it would be line 6.
+        * For this the result rows are recounted. If lines "5 to 7" were previously determined and line 2 is now selected with this, it would be line 6.
     * ---retrospectiverecountmultiples=
         * 3-6,8
-        * For this the result lines are counted again. If lines \"5 to 8\" were determined before and now line 2 is chosen with this, this would be line 6.8, because recounting lines \"5 to 8\" results in lines \"1 to 4\". Of these, every second line is 2 and 4. Calculated back to lines \"5 to 8\", these are lines 6 and 8.
+        * For this the result lines are counted again. If lines "5 to 8" were determined before and now line 2 is chosen with this, this would be line 6.8, because recounting lines "5 to 8" results in lines "1 to 4". Of these, every second line is 2 and 4. Calculated back to lines "5 to 8", these are lines 6 and 8.
     * --potenciesofnumbers=
         * 2,3
     * --uppermaximum
@@ -230,15 +230,15 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
 
     * --alles
     * --zeit=
-        * \"gestern\"
+        * "gestern"
             bedeutet Religionen 1-9
-        * \"heute\"
+        * "heute"
             bedeutet nur Religion 10
-        * \"morgen\"
+        * "morgen"
             bedeutet Religionen > 10
-        * \"gestern,heute,morgen\"
+        * "gestern,heute,morgen"
             bedeutet Religion 1-10 und höher als 10,
-        * \"-gestern,-heute,-morgen\"
+        * "-gestern,-heute,-morgen"
             zum Abziehen
     * --zaehlung=
         * 1,2,3,4,5,...
@@ -255,14 +255,14 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
     * --vorhervonausschnitt=
         * 1-5,7-10,14,20
     * --vorhervonausschnittteiler
-        * bewirkt, dass die Teiler aller Zahlen, die sich aus der Angabe von \"--vorhervonausschnitt=\" ergeben, zusätzlich dazu kommen
+        * bewirkt, dass die Teiler aller Zahlen, die sich aus der Angabe von "--vorhervonausschnitt=" ergeben, zusätzlich dazu kommen
         * z.B. wird aus 12: 2,3,4,6,12
     * --nachtraeglichneuabzaehlung=
         * 3-6,8
-        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen \"5 bis 7\" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6.
+        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen "5 bis 7" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6.
     * --nachtraeglichneuabzaehlungvielfache=
         * 3-6,8
-        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen \"5 bis 8\" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6,8, denn bei Neuzählung der Zeilen \"5 bis 8\" ergeben sich Zeilen \"1 bis 4\". Davon ist jeder zweite Zeile 2 und 4. Zurückgerechnet auf Zeilen \"5 bis 8\" sind das Zeilen 6 und 8.
+        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen "5 bis 8" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6,8, denn bei Neuzählung der Zeilen "5 bis 8" ergeben sich Zeilen "1 bis 4". Davon ist jeder zweite Zeile 2 und 4. Zurückgerechnet auf Zeilen "5 bis 8" sind das Zeilen 6 und 8.
     * --potenzenvonzahlen=
         * 2,3
     * --oberesmaximum=
