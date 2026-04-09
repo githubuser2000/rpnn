@@ -6,6 +6,56 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::shared::reta_program_types::{Generated2Selection, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct PyFrac {
+    numerator: i64,
+    denominator: i64,
+}
+
+fn gcd_i64_py(mut a: i64, mut b: i64) -> i64 {
+    a = a.abs();
+    b = b.abs();
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    if a == 0 { 1 } else { a }
+}
+
+impl PyFrac {
+    fn new(numerator: i64, denominator: i64) -> Option<Self> {
+        if denominator == 0 || numerator == 0 {
+            return None;
+        }
+        let mut n = numerator;
+        let mut d = denominator;
+        if d < 0 {
+            n = -n;
+            d = -d;
+        }
+        let g = gcd_i64_py(n, d);
+        Some(Self { numerator: n / g, denominator: d / g })
+    }
+
+    fn mul(self, other: Self) -> Option<Self> {
+        Self::new(self.numerator * other.numerator, self.denominator * other.denominator)
+    }
+
+    fn div(self, other: Self) -> Option<Self> {
+        Self::new(self.numerator * other.denominator, self.denominator * other.numerator)
+    }
+
+    fn recip(self) -> Option<Self> {
+        Self::new(self.denominator, self.numerator)
+    }
+
+    fn is_integer(self) -> bool {
+        self.denominator == 1
+    }
+}
+
 impl Program {
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
         if !target.contains(&value) {
@@ -166,6 +216,273 @@ impl Program {
             "primMotivGleichfGebr" => Some((1, "gleichförmige Polygone", vec![0, 1, 2], true)),
             "primStrukGleichfGebr" => Some((1, "gleichförmige Polygone", vec![1, 2, 3], true)),
             _ => None,
+        }
+    }
+
+    fn py_frac_from_f64_key_exact(value: f64) -> Option<PyFrac> {
+        let rounded = value.round();
+        if (value - rounded).abs() < 0.00001 {
+            return PyFrac::new(rounded as i64, 1);
+        }
+        None
+    }
+
+    fn csv_fraction_table_name_py(&self, concatTable: i64) -> Option<&'static str> {
+        match concatTable {
+            1 => Some("primenumbers.csv"),
+            2 => Some("gebrochen-rational-universum.csv"),
+            3 => Some("gebrochen-rational-galaxie.csv"),
+            4 => Some("gebrochen-rational-universum.csv"),
+            5 => Some("gebrochen-rational-galaxie.csv"),
+            _ => None,
+        }
+    }
+
+    fn get_all_brueche_py(&self, table: &Vec<Vec<String>>) -> BTreeSet<PyFrac> {
+        let mut menge = BTreeSet::new();
+        for (i, row) in table.iter().enumerate().skip(1) {
+            for (k, cell) in row.iter().enumerate().skip(1) {
+                if cell.trim().len() > 3 {
+                    if let Some(frac) = PyFrac::new((i + 1) as i64, (k + 1) as i64) {
+                        if frac.denominator != 1 && frac.numerator != 1 {
+                            menge.insert(frac);
+                        }
+                    }
+                }
+            }
+        }
+        menge
+    }
+
+    fn convert_set_of_paaren_to_dict_mul_py(
+        &self,
+        paare_set: &BTreeSet<(PyFrac, PyFrac)>,
+        gleichf: bool,
+        limit: usize,
+    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut result: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+        for paar in paare_set.iter().copied() {
+            let Some(prod) = paar.0.mul(paar.1) else { continue; };
+            let key = if gleichf {
+                let Some(inv) = prod.recip() else { continue; };
+                if !inv.is_integer() { continue; }
+                inv.numerator as usize
+            } else {
+                if !prod.is_integer() { continue; }
+                prod.numerator as usize
+            };
+            if key <= limit {
+                result.entry(key).or_default().insert(paar);
+            }
+        }
+        result.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
+    }
+
+    fn convert_fractions_to_dict_mul_py(
+        &self,
+        fracs: &BTreeSet<PyFrac>,
+        fracs2: &BTreeSet<PyFrac>,
+        gleichf: bool,
+        limit: usize,
+    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut result: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+        if !gleichf {
+            for frac in fracs.iter().copied() {
+                for zusatz_mul in 1..=limit {
+                    let Some(f2) = PyFrac::new(frac.denominator * zusatz_mul as i64, 1) else { continue; };
+                    let paar = (frac, f2);
+                    let Some(prod) = paar.0.mul(paar.1) else { continue; };
+                    if !prod.is_integer() { continue; }
+                    let key = prod.numerator as usize;
+                    if key > limit { break; }
+                    result.entry(key).or_default().insert(paar);
+                }
+            }
+            for frac in fracs.iter().copied() {
+                for zusatz_mul in (1..=limit).rev() {
+                    let Some(faktor) = PyFrac::new(frac.denominator, zusatz_mul as i64) else { continue; };
+                    if fracs2.contains(&faktor) || faktor.numerator == 1 {
+                        let paar = (frac, faktor);
+                        let Some(prod) = paar.0.mul(paar.1) else { continue; };
+                        if !prod.is_integer() { continue; }
+                        let key = prod.numerator as usize;
+                        if key > limit { break; }
+                        result.entry(key).or_default().insert(paar);
+                    }
+                }
+            }
+        } else {
+            for frac in fracs.iter().copied() {
+                for zusatz_div in 1..=limit {
+                    let Some(f2) = PyFrac::new(1, frac.numerator * zusatz_div as i64) else { continue; };
+                    let paar = (frac, f2);
+                    let Some(prod) = paar.0.mul(paar.1) else { continue; };
+                    let Some(inv) = prod.recip() else { continue; };
+                    if !inv.is_integer() { continue; }
+                    let key = inv.numerator as usize;
+                    if key > limit { break; }
+                    result.entry(key).or_default().insert(paar);
+                }
+            }
+            for frac in fracs.iter().copied() {
+                for zusatz_div in 1..=limit {
+                    let Some(recip) = frac.recip() else { continue; };
+                    let Some(faktor) = recip.div(PyFrac::new(zusatz_div as i64, 1).unwrap()) else { continue; };
+                    if fracs2.contains(&faktor) || faktor.numerator == 1 {
+                        let paar = (frac, faktor);
+                        let Some(prod) = paar.0.mul(paar.1) else { continue; };
+                        let Some(inv) = prod.recip() else { continue; };
+                        if !inv.is_integer() { continue; }
+                        let key = inv.numerator as usize;
+                        if key > limit { break; }
+                        result.entry(key).or_default().insert(paar);
+                    }
+                }
+            }
+        }
+        result.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
+    }
+
+    fn combine_dicts_pairs_py(
+        &self,
+        a: BTreeMap<usize, Vec<(PyFrac, PyFrac)>>,
+        b: BTreeMap<usize, Vec<(PyFrac, PyFrac)>>,
+    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut e: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+        for (k, vals) in a.into_iter().chain(b.into_iter()) {
+            for mut v in vals {
+                if v.1 < v.0 {
+                    v = (v.1, v.0);
+                }
+                e.entry(k).or_default().insert(v);
+            }
+        }
+        e.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
+    }
+
+    fn find_all_brueche_and_their_combinations_py(
+        &self,
+        limit: usize,
+    ) -> BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeMap<usize, Vec<(PyFrac, PyFrac)>>>>> {
+        let uni_name = self.csv_fraction_table_name_py(2).unwrap();
+        let gal_name = self.csv_fraction_table_name_py(3).unwrap();
+        let uni_table = self.load_csv_rows_semicolon_exact_path(uni_name).unwrap_or_default();
+        let gal_table = self.load_csv_rows_semicolon_exact_path(gal_name).unwrap_or_default();
+        let brueche_uni = self.get_all_brueche_py(&uni_table);
+        let brueche_gal = self.get_all_brueche_py(&gal_table);
+        let mut gebr_rat_all_combis: BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeSet<(PyFrac, PyFrac)>>>> = BTreeMap::new();
+        for k in ["UniUni", "UniGal", "GalUni", "GalGal"] {
+            let mut poly = BTreeMap::new();
+            for p in ["stern", "gleichf"] {
+                let mut md = BTreeMap::new();
+                md.insert("mul".to_string(), BTreeSet::new());
+                md.insert("div".to_string(), BTreeSet::new());
+                poly.insert(p.to_string(), md);
+            }
+            gebr_rat_all_combis.insert(k.to_string(), poly);
+        }
+        let combos = [
+            (&brueche_gal, &brueche_gal, "GalGal"),
+            (&brueche_gal, &brueche_uni, "GalUni"),
+            (&brueche_uni, &brueche_gal, "UniGal"),
+            (&brueche_uni, &brueche_uni, "UniUni"),
+        ];
+        for (br1, br2, key) in combos {
+            for &f1 in br1 {
+                for &f2 in br2 {
+                    if f1 == f2 { continue; }
+                    if let Some(prod) = f1.mul(f2) {
+                        if prod.is_integer() {
+                            gebr_rat_all_combis.get_mut(key).unwrap().get_mut("stern").unwrap().get_mut("mul").unwrap().insert((f1, f2));
+                        }
+                        if let Some(inv) = prod.recip() {
+                            if inv.is_integer() {
+                                gebr_rat_all_combis.get_mut(key).unwrap().get_mut("gleichf").unwrap().get_mut("mul").unwrap().insert((f1, f2));
+                            }
+                        }
+                    }
+                    if let Some(div) = f1.div(f2) {
+                        if div.is_integer() {
+                            gebr_rat_all_combis.get_mut(key).unwrap().get_mut("stern").unwrap().get_mut("div").unwrap().insert((f1, f2));
+                        }
+                        if let Some(inv_div) = div.recip() {
+                            if inv_div.is_integer() {
+                                gebr_rat_all_combis.get_mut(key).unwrap().get_mut("gleichf").unwrap().get_mut("div").unwrap().insert((f1, f2));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let mut alle: BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeMap<usize, Vec<(PyFrac, PyFrac)>>>>> = BTreeMap::new();
+        for key in ["UniUni", "UniGal", "GalUni", "GalGal"] {
+            let mut poly_map = BTreeMap::new();
+            for poly in ["stern", "gleichf"] {
+                let gleichf = poly == "gleichf";
+                let set_mul = gebr_rat_all_combis[key][poly]["mul"].clone();
+                let mut md = BTreeMap::new();
+                let (fr1, fr2) = match key {
+                    "UniUni" => (&brueche_uni, &brueche_uni),
+                    "UniGal" => (&brueche_uni, &brueche_gal),
+                    "GalUni" => (&brueche_gal, &brueche_uni),
+                    _ => (&brueche_gal, &brueche_gal),
+                };
+                md.insert("mul".to_string(), self.combine_dicts_pairs_py(
+                    self.convert_set_of_paaren_to_dict_mul_py(&set_mul, gleichf, limit),
+                    self.convert_fractions_to_dict_mul_py(fr1, fr2, gleichf, limit),
+                ));
+                md.insert("div".to_string(), BTreeMap::new());
+                poly_map.insert(poly.to_string(), md);
+            }
+            alle.insert(key.to_string(), poly_map);
+        }
+        alle
+    }
+
+    fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+        &self,
+        koord: PyFrac,
+        n_and_invers_spalten: (usize, usize),
+        gebr_table: &Vec<Vec<String>>,
+        is_not_universe: bool,
+    ) -> Option<String> {
+        let is_universe = !is_not_universe;
+        if koord.denominator == 0 || koord.numerator == 0 {
+            return Some(String::new());
+        } else if koord.denominator > 100 || koord.numerator > 100 {
+            return None;
+        } else if koord.numerator == 1 {
+            let idx = koord.denominator as usize;
+            let base = self.zellenwert_py(idx, n_and_invers_spalten.1);
+            if base.trim().len() > 3 {
+                if is_universe {
+                    let extra = self.zellenwert_py(idx, 201);
+                    let sep = if extra.trim().len() > 2 {
+                        if self.outType == "html" { "<br>" } else { "; " }
+                    } else { "" };
+                    return Some(format!("{} (1/{}){}{}", base, koord.denominator, sep, extra));
+                }
+                return Some(base);
+            }
+            return Some(String::new());
+        } else if koord.denominator == 1 {
+            let idx = koord.numerator as usize;
+            let base = self.zellenwert_py(idx, n_and_invers_spalten.0);
+            if base.trim().len() > 3 {
+                if is_universe {
+                    let extra = self.zellenwert_py(idx, 198);
+                    let sep = if extra.trim().len() > 2 {
+                        if self.outType == "html" { "<br>" } else { "; " }
+                    } else { "" };
+                    return Some(format!("{} ({}){}{}", base, koord.numerator, sep, extra));
+                }
+                return Some(base);
+            }
+            return Some(String::new());
+        } else {
+            let r = (koord.numerator - 1) as usize;
+            let c = (koord.denominator - 1) as usize;
+            return gebr_table.get(r).and_then(|row| row.get(c)).cloned().or(Some(String::new()));
         }
     }
 
@@ -1026,7 +1343,9 @@ impl Program {
         let relitableCopy = self.relitable.clone();
         let row_end = self.generator_row_end_py();
         let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
+        let kombi_namen2 = ["GalGal", "GalUni", "UniGal", "UniUni"];
         let poly_namen = ["Sternpolygone", "gleichförmige Polygone"];
+        let poly_keys = ["stern", "gleichf"];
 
         let mut requested_coords: BTreeSet<(usize, usize, bool)> = BTreeSet::new();
         let mut wants_primcsv = false;
@@ -1080,57 +1399,129 @@ impl Program {
             }
         }
 
-        for is_gebr in [false, true] {
-            for poly_idx in 0..=1usize {
-                for kombi_idx in 0..=3usize {
-                    if !requested_coords.contains(&(poly_idx, kombi_idx, is_gebr)) {
+        let alle_fraction_ergebnisse2 = self.find_all_brueche_and_their_combinations_py(row_end);
+        let gal_or_uni_n_or_invers = [
+            (hard_coded_couple, hard_coded_couple),
+            (hard_coded_couple, transzendentalien_nrezi),
+            (transzendentalien_nrezi, hard_coded_couple),
+            (transzendentalien_nrezi, transzendentalien_nrezi),
+        ];
+        let uni_csv = self
+            .csv_fraction_table_name_py(2)
+            .and_then(|n| self.load_csv_rows_semicolon_exact_path(n).ok())
+            .unwrap_or_default();
+        let gal_csv = self
+            .csv_fraction_table_name_py(3)
+            .and_then(|n| self.load_csv_rows_semicolon_exact_path(n).ok())
+            .unwrap_or_default();
+
+        let mut kombis_all: [Vec<((String, String), (String, String), (String, String), (String, String))>; 2] = [vec![], vec![]];
+        for zwei in 0..=1usize {
+            for i in 0..self.relitable.len() {
+                kombis_all[zwei].push((
+                    (motivation[zwei][i].clone(), motivation[zwei][i].clone()),
+                    (motivation[zwei][i].clone(), transzendentalien[zwei][i].clone()),
+                    (transzendentalien[zwei][i].clone(), motivation[zwei][i].clone()),
+                    (transzendentalien[zwei][i].clone(), transzendentalien[zwei][i].clone()),
+                ));
+            }
+        }
+
+        for brr in 0..=1usize {
+            for zwei in 0..=1usize {
+                for null_bis_drei in 0..=3usize {
+                    if !requested_coords.contains(&(zwei, null_bis_drei, brr == 1)) {
                         continue;
                     }
-                    let mut heading = format!(
-                        "generierte Multiplikationen {} {}",
-                        poly_namen[poly_idx],
-                        kombi_namen[kombi_idx]
+                    let ganz_oder_gebr = if brr == 0 { "" } else { ", mit Faktoren aus gebrochen-rationalen Zahlen" };
+                    let heading = format!(
+                        "generierte Multiplikationen {} {}{}",
+                        poly_namen[zwei],
+                        kombi_namen[null_bis_drei],
+                        ganz_oder_gebr,
                     );
-                    if is_gebr {
-                        heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
-                    }
-
                     let mut into: Vec<String> = vec![heading.clone()];
                     for i in 1..=row_end {
-                        let multipless = self.primMultiple_pairs_py(i as i64);
-                        if multipless.is_empty() {
-                            into.push(String::new());
-                            continue;
-                        }
                         let mut teile: Vec<String> = vec![];
-                        for multi in multipless.iter() {
-                            let Some(text) = self.generated2_kombi_pair_text_py(
-                                *multi,
-                                kombi_idx,
-                                &motivation[poly_idx],
-                                &transzendentalien[poly_idx],
-                            ) else {
-                                continue;
-                            };
-                            if self.outType == "html" {
-                                teile.push("<li>".to_string());
-                                teile.push(text);
-                                teile.push("</li>".to_string());
-                            } else if self.outType == "bbcode" {
-                                teile.push("[*]".to_string());
-                                teile.push(text);
-                            } else {
-                                if !teile.is_empty() {
+                        if self.outType == "html" {
+                            teile.push("<ul>".to_string());
+                        } else if self.outType == "bbcode" {
+                            teile.push("[list]".to_string());
+                        }
+                        if brr == 0 {
+                            let mut multipless = self.primMultiple_pairs_py(i as i64);
+                            multipless.sort();
+                            for (k, multi) in multipless.iter().enumerate() {
+                                if k > 0 && self.outType != "html" && self.outType != "bbcode" {
                                     teile.push(", außerdem: ".to_string());
                                 }
-                                teile.push(text);
+                                let lhsrhs = match null_bis_drei {
+                                    0 => (&kombis_all[zwei][multi.1 as usize].0.0, &kombis_all[zwei][multi.0 as usize].0.1),
+                                    1 => (&kombis_all[zwei][multi.1 as usize].1.0, &kombis_all[zwei][multi.0 as usize].1.1),
+                                    2 => (&kombis_all[zwei][multi.1 as usize].2.0, &kombis_all[zwei][multi.0 as usize].2.1),
+                                    _ => (&kombis_all[zwei][multi.1 as usize].3.0, &kombis_all[zwei][multi.0 as usize].3.1),
+                                };
+                                let lhs = if lhsrhs.0.trim().len() > 3 { lhsrhs.0.trim() } else { "..." };
+                                let rhs = if lhsrhs.1.trim().len() > 3 { lhsrhs.1.trim() } else { "..." };
+                                if self.outType == "html" {
+                                    teile.push(format!("<li>({}) * ({})</li>", lhs, rhs));
+                                } else if self.outType == "bbcode" {
+                                    teile.push(format!("[*]({}) * ({})", lhs, rhs));
+                                } else {
+                                    teile.push(format!("({}) * ({})", lhs, rhs));
+                                }
+                            }
+                        } else {
+                            let multipless = alle_fraction_ergebnisse2
+                                .get(kombi_namen2[null_bis_drei])
+                                .and_then(|a| a.get(poly_keys[zwei]))
+                                .and_then(|a| a.get("mul"))
+                                .and_then(|a| a.get(&i))
+                                .cloned()
+                                .unwrap_or_default();
+                            for (k, multi) in multipless.iter().enumerate() {
+                                let csv_von = if null_bis_drei >= 2 { &uni_csv } else { &gal_csv };
+                                let csv_bis = if null_bis_drei == 1 || null_bis_drei == 3 { &uni_csv } else { &gal_csv };
+                                let von = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                                    multi.0,
+                                    gal_or_uni_n_or_invers[null_bis_drei].0.into(),
+                                    csv_von,
+                                    !(null_bis_drei >= 2),
+                                );
+                                let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                                    multi.1,
+                                    gal_or_uni_n_or_invers[null_bis_drei].1.into(),
+                                    csv_bis,
+                                    !(null_bis_drei == 1 || null_bis_drei == 3),
+                                );
+                                let Some(von) = von else { continue; };
+                                let Some(bis) = bis else { continue; };
+                                let von = von.trim().to_string();
+                                let bis = bis.trim().to_string();
+                                if von.len() > 3 && bis.len() > 3 {
+                                    if k > 0 && self.outType != "html" && self.outType != "bbcode" && !teile.is_empty() {
+                                        teile.push("| außerdem: ".to_string());
+                                    }
+                                    let middle = if self.outType == "html" && (von.len() > 30 || bis.len() > 30) { "<br>" } else { " " };
+                                    if self.outType == "html" {
+                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
+                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
+                                        teile.push(format!("<li>\"{}\"{}({})*({}){}\"{}\"</li>", von, middle, frac1, frac2, middle, bis));
+                                    } else if self.outType == "bbcode" {
+                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
+                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
+                                        teile.push(format!("[*]\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
+                                    } else {
+                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
+                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
+                                        teile.push(format!("\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
+                                    }
+                                }
                             }
                         }
                         if self.outType == "html" {
-                            teile.insert(0, "<ul>".to_string());
                             teile.push("</ul>".to_string());
                         } else if self.outType == "bbcode" {
-                            teile.insert(0, "[list]".to_string());
                             teile.push("[/list]".to_string());
                         }
                         into.push(teile.join(""));
