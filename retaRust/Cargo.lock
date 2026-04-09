@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reta_bitexact_direction_pass"
+name = "reta"
 version = "0.1.0"
 dependencies = [
  "hypher",

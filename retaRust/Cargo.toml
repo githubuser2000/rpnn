@@ -1,16 +1,22 @@
 [package]
-name = "reta_bitexact_direction_pass"
+name = "reta"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+default-run = "reta"
+autobins = false
 
 [dependencies]
 indexmap = "2"
 hypher = { version = "0.1.7", default-features = false, features = ["german"] }
 
 [lib]
-name = "reta_shared"
+name = "reta"
 path = "src/lib.rs"
 
 [[bin]]
 name = "reta"
 path = "src/bin/reta.rs"
+
+[[bin]]
+name = "grundStrukHtml"
+path = "src/bin/grundStrukHtml.rs"
