@@ -1,7 +1,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
+use crate::shared::reta_program_types::Program;
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 impl Program {
@@ -123,100 +123,21 @@ impl Program {
         code.to_string()
     }
 
-    fn generated2_coordinate_specs_py(&self, code: &str) -> Vec<(usize, usize, usize)> {
+    fn generated2_code_source_columns_py(&self, code: &str) -> (usize, usize) {
         match code {
-            "primMotivStern" => vec![(0, 0, 0), (0, 1, 0), (0, 2, 0)],
-            "primStrukStern" => vec![(0, 1, 0), (0, 2, 0), (0, 3, 0)],
-            "primMotivGleichf" => vec![(1, 0, 0), (1, 1, 0), (1, 2, 0)],
-            "primStrukGleichf" => vec![(1, 1, 0), (1, 2, 0), (1, 3, 0)],
-            "primMotivSternGebr" => vec![(0, 0, 1), (0, 1, 1), (0, 2, 1)],
-            "primStrukSternGebr" => vec![(0, 1, 1), (0, 2, 1), (0, 3, 1)],
-            "primMotivGleichfGebr" => vec![(1, 0, 1), (1, 1, 1), (1, 2, 1)],
-            "primStrukGleichfGebr" => vec![(1, 1, 1), (1, 2, 1), (1, 3, 1)],
-            _ => vec![],
-        }
-    }
-
-    fn generated2_combo_name_py(&self, index: usize) -> &'static str {
-        match index {
-            0 => "Motiv -> Motiv",
-            1 => "Motiv -> Struktur",
-            2 => "Struktur -> Motiv",
-            3 => "Struktur -> Struktur",
-            _ => "Motiv -> Motiv",
-        }
-    }
-
-    fn generated2_poly_name_py(&self, index: usize) -> &'static str {
-        match index {
-            0 => "Sternpolygone",
-            1 => "gleichförmige Polygone",
-            _ => "Sternpolygone",
-        }
-    }
-
-    fn generated2_pair_columns_py(&self, poly_index: usize) -> (usize, usize) {
-        match poly_index {
-            0 => (10, 5),
-            1 => (42, 131),
+            "primMotivStern" => (10, 5),
+            "primStrukStern" => (5, 10),
+            "primMotivGleichf" => (42, 131),
+            "primStrukGleichf" => (131, 42),
+            "primMotivSternGebr" => (138, 202),
+            "primStrukSternGebr" => (202, 138),
+            "primMotivGleichfGebr" => (44, 56),
+            "primStrukGleichfGebr" => (56, 44),
+            "PrimCSV" => {
+                let first = self.CsvTheirsSpalten.get(&1).and_then(|v| v.first()).copied().unwrap_or(19);
+                (first as usize, first as usize)
+            }
             _ => (10, 5),
-        }
-    }
-
-    fn generated2_row_pair_texts_py(&self, row_idx: usize, poly_index: usize) -> ((String, String), (String, String), (String, String), (String, String)) {
-        let (motiv_col, strukt_col) = self.generated2_pair_columns_py(poly_index);
-        let motiv = self.zellenwert_py(row_idx, motiv_col);
-        let strukt = self.zellenwert_py(row_idx, strukt_col);
-        (
-            (motiv.clone(), motiv.clone()),
-            (motiv.clone(), strukt.clone()),
-            (strukt.clone(), motiv.clone()),
-            (strukt.clone(), strukt),
-        )
-    }
-
-    fn generated2_heading_py(&self, poly_index: usize, combo_index: usize, brr: usize) -> String {
-        let mut teile = vec![
-            "generierte Multiplikationen".to_string(),
-            self.generated2_poly_name_py(poly_index).to_string(),
-            self.generated2_combo_name_py(combo_index).to_string(),
-        ];
-        if brr == 1 {
-            teile.push(", mit Faktoren aus gebrochen-rationalen Zahlen".to_string());
-        }
-        self.nicht_leere_teile_join_py(teile, " ")
-    }
-
-    fn readConcatCsv_tabelleDazuColchange_py(&self, zeilenNr: i64, tabelleDazuCol: Vec<String>, _concatTable: i64, ifTransponiert: bool) -> Vec<String> {
-        let mut out: Vec<String> = vec![];
-        for (i, cell) in tabelleDazuCol.iter().enumerate() {
-            if i == 0 {
-                out.push(cell.clone());
-                continue;
-            }
-            let label = if !ifTransponiert {
-                format!("{}/{}", zeilenNr, i)
-            } else {
-                format!("{}/{}", i, zeilenNr)
-            };
-            if cell.trim().is_empty() {
-                out.push(String::new());
-            } else {
-                out.push(format!("{} {}", label, cell));
-            }
-        }
-        out
-    }
-
-    fn readConcatCsv_LoopBody_py(&mut self, concatCSVspalten: &mut Vec<i64>, concatTable: i64, concatTableSelection: &Vec<i64>, dazu: &Vec<String>, heading: &str, rowsAsNumbers: &mut Vec<i64>, u: usize) {
-        if ((concatTableSelection.contains(&((u as i64) + 2)) && (2..=9).contains(&concatTable)) || concatTable == 1)
-            && (!(2..=9).contains(&concatTable) || u + 1 != dazu.len())
-        {
-            let delta = if (2..=9).contains(&concatTable) { 1 } else { 0 };
-            let selectedSpalten = u as i64 + self.relitable.first().map(|r| r.len()).unwrap_or(0) as i64 - dazu.len() as i64 + delta;
-            Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
-            Self::push_unique_i64_py(concatCSVspalten, selectedSpalten);
-            self.generatedSpaltenParameter.push(heading.to_string());
         }
     }
 
@@ -771,16 +692,19 @@ impl Program {
 
     pub fn readConcatCsv(&mut self, rowsAsNumbers: &mut Vec<i64>, concatTableSelection: Vec<i64>, concatTable: i64) -> Vec<i64> {
         let mut concatCSVspalten: Vec<i64> = vec![];
-        if concatTableSelection.is_empty() || !(1..=9).contains(&concatTable) {
-            return concatCSVspalten;
-        }
+        if concatTableSelection.is_empty() { return concatCSVspalten; }
         let Some(csvFileName) = self.concat_csv_name_py(concatTable) else { return concatCSVspalten; };
         let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csvFileName) else { return concatCSVspalten; };
         tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, tableToAdd);
         if concatTable == 1 {
             let mut tableToAdd2 = vec![vec!["Primzahlvielfache, nicht generiert".to_string()]];
             for zeile in tableToAdd.into_iter().skip(1) {
-                let teile: Vec<String> = zeile.into_iter().filter(|z| z.trim().len() > 3).collect();
+                let mut teile: Vec<String> = vec![];
+                for zelle in zeile {
+                    if zelle.trim().len() > 3 {
+                        teile.push(zelle);
+                    }
+                }
                 tableToAdd2.push(vec![teile.join(" | ")]);
             }
             tableToAdd = tableToAdd2;
@@ -795,39 +719,22 @@ impl Program {
             let width = tableToAdd.first().map(|r| r.len()).unwrap_or(0);
             tableToAdd.push(vec![String::new(); width]);
         }
-
-        let mut maxlen = 0usize;
-        for row in &tableToAdd {
-            if row.len() > maxlen { maxlen = row.len(); }
-        }
+        let maxlen = tableToAdd.iter().map(|r| r.len()).max().unwrap_or(0);
         for i in 0..target_rows {
-            let mut dazu = tableToAdd.get(i).cloned().unwrap_or_default();
-            if dazu.len() < maxlen { dazu.resize(maxlen, String::new()); }
-            if i != 0 && (2..=9).contains(&concatTable) {
-                let ifTransponiert = matches!(concatTable, 3 | 5 | 7 | 9);
-                dazu = self.readConcatCsv_tabelleDazuColchange_py(i as i64, dazu, concatTable, ifTransponiert);
-            }
-            let old_len = self.relitable[i].len();
-            self.relitable[i].extend(dazu.clone());
+            if tableToAdd[i].len() < maxlen { tableToAdd[i].resize(maxlen, String::new()); }
+            let start = self.relitable[i].len() as i64;
+            self.relitable[i].extend(tableToAdd[i].clone());
             if i == 0 {
-                for (u, heading) in dazu.iter().enumerate() {
-                    self.readConcatCsv_LoopBody_py(&mut concatCSVspalten, concatTable, &concatTableSelection, &dazu, heading, rowsAsNumbers, u);
-                }
-                // Python marks the generated column positions relative to the just-extended table.
-                // Our helper above used the extended row width, so normalize any accidentally out-of-range positions.
-                for value in concatCSVspalten.iter_mut() {
-                    if *value >= self.relitable[i].len() as i64 {
-                        *value = old_len as i64;
-                    }
-                }
-                for value in rowsAsNumbers.iter_mut() {
-                    if *value >= self.relitable[i].len() as i64 {
-                        *value = old_len as i64;
+                for u in 0..maxlen {
+                    if ((u as i64 + 2).checked_sub(0).unwrap_or(0) != 0 && concatTableSelection.contains(&(u as i64 + 2)) && (2..=9).contains(&concatTable)) || concatTable == 1 {
+                        let selectedSpalten = start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
+                        Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
+                        concatCSVspalten.push(selectedSpalten);
                     }
                 }
             }
         }
-        dedup_preserve_order_i64(concatCSVspalten)
+        concatCSVspalten
     }
 
     fn getModaloperatorsPerLineCoordinates_py(&self, lineWeAreAt: usize) -> (usize, usize, usize) {
@@ -999,62 +906,132 @@ impl Program {
         }
     }
 
+    fn generated2_exact_coords_py(&self, code: &str) -> Option<(usize, &'static str, Vec<usize>)> {
+        match code {
+            "primMotivStern" => Some((0, "Sternpolygone", vec![0, 1, 2])),
+            "primStrukStern" => Some((0, "Sternpolygone", vec![1, 2, 3])),
+            "primMotivGleichf" => Some((1, "gleichförmige Polygone", vec![0, 1, 2])),
+            "primStrukGleichf" => Some((1, "gleichförmige Polygone", vec![1, 2, 3])),
+            _ => None,
+        }
+    }
+
+    fn generated2_kombi_pair_text_py(&self, pair: (i64, i64), kombi_idx: usize, motivation: &Vec<String>, transzendentalien: &Vec<String>) -> String {
+        let a = pair.0 as usize;
+        let b = pair.1 as usize;
+        let read = |values: &Vec<String>, idx: usize| -> String {
+            values.get(idx).cloned().unwrap_or_default()
+        };
+        let (lhs, rhs) = match kombi_idx {
+            0 => (read(motivation, a), read(motivation, b)),
+            1 => (read(motivation, a), read(transzendentalien, b)),
+            2 => (read(transzendentalien, a), read(motivation, b)),
+            3 => (read(transzendentalien, a), read(transzendentalien, b)),
+            _ => (String::new(), String::new()),
+        };
+        let lhs = if lhs.trim().len() > 3 { lhs } else { "...".to_string() };
+        let rhs = if rhs.trim().len() > 3 { rhs } else { "...".to_string() };
+        format!("({}) * ({})", lhs, rhs)
+    }
+
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let generatedBefehle: Vec<String> = self.generated2Codes.clone();
         if generatedBefehle.is_empty() {
             return;
         }
 
-        let row_end = self.generator_row_end_py();
-        let mut active_coords: BTreeMap<(usize, usize, usize), Vec<String>> = BTreeMap::new();
-        for code in &generatedBefehle {
-            if code == "primzahlkreuzprocontra" || code == "PrimCSV" {
-                continue;
-            }
-            for coord in self.generated2_coordinate_specs_py(code) {
-                active_coords.entry(coord).or_default().push(code.clone());
-            }
-        }
-        if active_coords.is_empty() {
-            return;
+        let relitableCopy = self.relitable.clone();
+        let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
+        let mut motivation: [Vec<String>; 2] = [vec![], vec![]];
+        let mut transzendentalien: [Vec<String>; 2] = [vec![], vec![]];
+        for cols in &relitableCopy {
+            motivation[0].push(cols.get(10).cloned().unwrap_or_default());
+            motivation[1].push(cols.get(42).cloned().unwrap_or_default());
+            transzendentalien[0].push(cols.get(5).cloned().unwrap_or_default());
+            transzendentalien[1].push(cols.get(131).cloned().unwrap_or_default());
         }
 
-        for ((poly_index, combo_index, brr), active_codes) in active_coords {
-            let heading = self.generated2_heading_py(poly_index, combo_index, brr);
-            let mut into: Vec<String> = Vec::with_capacity(row_end + 1);
-            into.push(heading.clone());
-            for i in 1..=row_end {
+        for code in generatedBefehle {
+            if code == "primzahlkreuzprocontra" {
+                continue;
+            }
+            if let Some((poly_idx, poly_name, kombis)) = self.generated2_exact_coords_py(&code) {
+                for kombi_idx in kombis {
+                    let heading = format!("generierte Multiplikationen {} {}", poly_name, kombi_namen[kombi_idx]);
+                    let mut into: Vec<String> = vec![];
+                    let row_end = self.generator_row_end_py();
+                    for i in 0..=row_end {
+                        if i == 0 {
+                            into.push(heading.clone());
+                            continue;
+                        }
+                        let multipless = self.primMultiple_pairs_py(i as i64);
+                        if multipless.is_empty() {
+                            into.push(String::new());
+                            continue;
+                        }
+                        let mut teile: Vec<String> = vec![];
+                        for (k, multi) in multipless.iter().enumerate() {
+                            if self.outType == "html" {
+                                teile.push("<li>".to_string());
+                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                                teile.push("</li>".to_string());
+                            } else if self.outType == "bbcode" {
+                                teile.push("[*]".to_string());
+                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                            } else {
+                                if k > 0 {
+                                    teile.push(", außerdem: ".to_string());
+                                }
+                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                            }
+                        }
+                        if self.outType == "html" {
+                            teile.insert(0, "<ul>".to_string());
+                            teile.push("</ul>".to_string());
+                        } else if self.outType == "bbcode" {
+                            teile.insert(0, "[list]".to_string());
+                            teile.push("[/list]".to_string());
+                        }
+                        into.push(teile.join(""));
+                    }
+                    let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+                    Self::push_unique_i64_py(rowsAsNumbers, spalte);
+                }
+                continue;
+            }
+            let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
+            let heading = self.generated2_code_heading_py(&code);
+            let mut into: Vec<String> = vec![];
+            let row_end = self.generator_row_end_py();
+            for i in 0..=row_end {
+                if i == 0 {
+                    into.push(heading.clone());
+                    continue;
+                }
                 let mut teile: Vec<String> = vec![];
-                if brr == 0 {
-                    for (left_idx, right_idx) in self.primMultiple_pairs_py(i as i64) {
-                        let combos_left = self.generated2_row_pair_texts_py(left_idx as usize, poly_index);
-                        let combos_right = self.generated2_row_pair_texts_py(right_idx as usize, poly_index);
-                        let left = match combo_index {
-                            0 => combos_left.0.0,
-                            1 => combos_left.1.0,
-                            2 => combos_left.2.0,
-                            3 => combos_left.3.0,
-                            _ => String::new(),
-                        };
-                        let right = match combo_index {
-                            0 => combos_right.0.1,
-                            1 => combos_right.1.1,
-                            2 => combos_right.2.1,
-                            3 => combos_right.3.1,
-                            _ => String::new(),
-                        };
-                        let left = if left.trim().len() > 3 { left } else { "...".to_string() };
-                        let right = if right.trim().len() > 3 { right } else { "...".to_string() };
-                        teile.push(format!("({}) * ({})", left, right));
+                for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
+                    let basis = if primAmount % 2 == 0 {
+                        self.zellenwert_py(prim as usize, col_b)
+                    } else {
+                        self.zellenwert_py(prim as usize, col_a)
+                    };
+                    if basis.trim().is_empty() {
+                        continue;
+                    }
+                    if primAmount > 1 {
+                        teile.push(format!("{} * {}", primAmount, basis));
+                    } else {
+                        teile.push(basis);
                     }
                 }
                 if teile.is_empty() {
                     into.push(String::new());
                 } else {
-                    into.push(teile.join(", außerdem: "));
+                    into.push(self.nicht_leere_teile_join_py(teile, " + "));
                 }
             }
-            let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} [{}]", heading, active_codes.join(",")));
+            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
