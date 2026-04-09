@@ -59,6 +59,14 @@ impl Program {
 
     fn hat_generated2_code_py(&self, code: &str) -> bool {
         self.generated2Codes.iter().any(|v| v == code)
+            || self.generated2Selections.iter().any(|selection| selection.code == code)
+    }
+
+    fn remove_concat1_trigger_columns_py(&self, rowsAsNumbers: &mut Vec<i64>) {
+        if self.puniverseprims.is_empty() {
+            return;
+        }
+        rowsAsNumbers.retain(|n| !self.puniverseprims.contains(n));
     }
 
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
@@ -122,15 +130,6 @@ impl Program {
             }
         }
         code.to_string()
-    }
-
-    fn generated2_selection_heading_py(&self, selection: &Generated2Selection) -> String {
-        if !selection.parameter_main_name.is_empty() || !selection.parameter_name.is_empty() {
-            return format!("{} {}", selection.parameter_main_name, selection.parameter_name)
-                .trim()
-                .to_string();
-        }
-        self.generated2_code_heading_py(&selection.code)
     }
 
     fn generated2_code_source_columns_py(&self, code: &str) -> (usize, usize) {
@@ -958,28 +957,41 @@ impl Program {
         }
     }
 
+    fn generated2_selections_exact_py(&self) -> Vec<Generated2Selection> {
+        if !self.generated2Selections.is_empty() {
+            return self.generated2Selections.clone();
+        }
+        self.generated2Codes
+            .iter()
+            .cloned()
+            .map(|code| Generated2Selection {
+                parameter_main_name: String::new(),
+                parameter_name: self.generated2_code_heading_py(&code),
+                code,
+            })
+            .collect()
+    }
+
+    fn generated2_selection_heading_exact_py(&self, selection: &Generated2Selection) -> String {
+        if !selection.parameter_main_name.is_empty() && !selection.parameter_name.is_empty() {
+            return format!("{} {}", selection.parameter_main_name, selection.parameter_name);
+        }
+        if !selection.parameter_name.is_empty() {
+            return selection.parameter_name.clone();
+        }
+        self.generated2_code_heading_py(&selection.code)
+    }
+
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let generated_selections: Vec<Generated2Selection> = if !self.generated2Selections.is_empty() {
-            self.generated2Selections.clone()
-        } else {
-            self.generated2Codes
-                .iter()
-                .cloned()
-                .map(|code| Generated2Selection {
-                    parameter_main_name: String::new(),
-                    parameter_name: String::new(),
-                    code,
-                })
-                .collect()
-        };
-        if generated_selections.is_empty() {
+        let generatedSelections: Vec<Generated2Selection> = self.generated2_selections_exact_py();
+        if generatedSelections.is_empty() {
             return;
         }
 
         let relitableCopy = self.relitable.clone();
         let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
 
-        for selection in generated_selections {
+        for selection in generatedSelections {
             let code = selection.code.clone();
             if code == "primzahlkreuzprocontra" {
                 continue;
@@ -996,11 +1008,13 @@ impl Program {
 
                 for kombi_idx in kombis {
                     let mut heading = format!(
-                        "{} {} {}",
-                        self.generated2_selection_heading_py(&selection),
-                        poly_name,
+                        "{} {}",
+                        self.generated2_selection_heading_exact_py(&selection),
                         kombi_namen[kombi_idx]
                     );
+                    if heading.trim().is_empty() {
+                        heading = format!("{} {}", poly_name, kombi_namen[kombi_idx]);
+                    }
                     if is_gebr {
                         heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
                     }
@@ -1017,7 +1031,7 @@ impl Program {
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
-                        for (_k, multi) in multipless.iter().enumerate() {
+                        for (k, multi) in multipless.iter().enumerate() {
                             let Some(text) = self.generated2_kombi_pair_text_py(
                                 *multi,
                                 kombi_idx,
@@ -1056,7 +1070,7 @@ impl Program {
             }
 
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
-            let heading = self.generated2_selection_heading_py(&selection);
+            let heading = self.generated2_selection_heading_exact_py(&selection);
             let mut into: Vec<String> = vec![];
             let row_end = self.generator_row_end_py();
             for i in 0..=row_end {
@@ -1421,6 +1435,7 @@ impl Program {
         self.spalteMetaKontretTheorieAbstrakt_etc_1(&mut rowsAsNumbers);
         self.createSpalteGestirn(&mut rowsAsNumbers);
 
+        self.remove_concat1_trigger_columns_py(&mut rowsAsNumbers);
         self.rowsAsNumbers = rowsAsNumbers;
     }
 }
