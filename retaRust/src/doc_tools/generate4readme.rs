@@ -7,17 +7,140 @@ This Rust fallback only avoids a build-time include failure when the file was no
 "#;
 
 pub fn python_source_generate4readme() -> String {
-    let candidate = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("python_reference")
-        .join("libs")
-        .join("generate4readme.py");
-    match std::fs::read_to_string(candidate) {
-        Ok(text) => text,
-        Err(_) => PYTHON_SOURCE__GENERATE4README_FALLBACK.to_string(),
+    for candidate in python_source_candidates_generate4readme() {
+        if let Ok(text) = std::fs::read_to_string(&candidate) {
+            return text;
+        }
+    }
+    PYTHON_SOURCE__GENERATE4README_FALLBACK.to_string()
+}
+
+fn python_source_candidates_generate4readme() -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    if let Ok(current) = std::env::current_dir() {
+        out.push(current.join("python_reference").join("libs").join("generate4readme.py"));
+        out.push(current.join("retaRust").join("python_reference").join("libs").join("generate4readme.py"));
+    }
+    out.push(manifest.join("python_reference").join("libs").join("generate4readme.py"));
+    out.push(manifest.join("retaRust").join("python_reference").join("libs").join("generate4readme.py"));
+    out
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LanguageMode {
+    German,
+    English,
+}
+
+#[derive(Clone, Debug)]
+enum ThingValue {
+    Text(String),
+    Many(Vec<String>),
+}
+
+impl LanguageMode {
+    fn from_argv(argv: &[String]) -> Self {
+        if argv
+            .iter()
+            .any(|arg| arg == "-language=english" || arg == "-language=englisch")
+        {
+            Self::English
+        } else {
+            Self::German
+        }
     }
 }
 
-const EN_HEADER: &str = r#"Main program is reta or reta.py.
+pub fn main_like_python(argv: &[String]) -> i32 {
+    let language = LanguageMode::from_argv(argv);
+
+    if argv.iter().any(|arg| arg == "--render-retaprompt") {
+        match markdown_reader::retaprompt_hilfe_rendered_like_python() {
+            Ok(text) => {
+                print!("{text}");
+                return 0;
+            }
+            Err(err) => {
+                eprintln!("retaprompt-readme konnte nicht gelesen oder gerendert werden: {err}");
+                return 1;
+            }
+        }
+    }
+    if argv.iter().any(|arg| arg == "--render-reta") {
+        match markdown_reader::reta_hilfe_text() {
+            Ok(text) => {
+                print!("{text}");
+                return 0;
+            }
+            Err(err) => {
+                eprintln!("reta-readme konnte nicht gelesen werden: {err}");
+                return 1;
+            }
+        }
+    }
+    if argv.iter().any(|arg| arg == "--show-python-source") {
+        print!("{}", python_source_generate4readme());
+        return 0;
+    }
+
+    let i18n = I18nExact::from_python_evaluated_shapes();
+    print!("{}", ensure_trailing_newline(&python_header(language)));
+    print_things_like_python(&i18n);
+    print_combination_section(language, &i18n);
+    print!("{}", ensure_trailing_newline(&python_footer(language)));
+    0
+}
+
+
+fn ensure_trailing_newline(text: &str) -> String {
+    if text.ends_with('\n') {
+        text.to_string()
+    } else {
+        let mut out = String::with_capacity(text.len() + 1);
+        out.push_str(text);
+        out.push('\n');
+        out
+    }
+}
+
+
+
+fn python_header(language: LanguageMode) -> String {
+    let source = python_source_generate4readme();
+    match language {
+        LanguageMode::English => extract_triple_quoted_assignment(&source, "anfang", 0)
+            .unwrap_or_else(|| EN_HEADER_FALLBACK.to_string()),
+        LanguageMode::German => extract_triple_quoted_assignment(&source, "anfang", 1)
+            .unwrap_or_else(|| DE_HEADER_FALLBACK.to_string()),
+    }
+}
+
+fn python_footer(language: LanguageMode) -> String {
+    let source = python_source_generate4readme();
+    match language {
+        LanguageMode::English => extract_triple_quoted_assignment(&source, "ende", 0)
+            .unwrap_or_else(|| EN_FOOTER_FALLBACK.to_string()),
+        LanguageMode::German => extract_triple_quoted_assignment(&source, "ende", 1)
+            .unwrap_or_else(|| DE_FOOTER_FALLBACK.to_string()),
+    }
+}
+
+fn extract_triple_quoted_assignment(source: &str, name: &str, branch_index: usize) -> Option<String> {
+    let needle = format!("{name} = \"\"\"");
+    let mut starts = Vec::new();
+    let mut offset = 0usize;
+    while let Some(idx) = source[offset..].find(&needle) {
+        starts.push(offset + idx + needle.len());
+        offset += idx + needle.len();
+    }
+    let start = *starts.get(branch_index)?;
+    let rest = &source[start..];
+    let end_rel = rest.find("\"\"\"")?;
+    Some(rest[..end_rel].to_string())
+}
+
+const EN_HEADER_FALLBACK: &str = r#"Main program is reta or reta.py.
 More convenient is retaPrompt, which is still available with presets as rp and rpl.
 
 User manual:
@@ -35,15 +158,15 @@ Secondary parameters start with 2 minus --.
 
     * --all
     * --time=
-        * "yesterday"
+        * \"yesterday\"
             means religions 1-9
-        * "today"
+        * \"today\"
             means only religion 10
-        * "tomorrow"
+        * \"tomorrow\"
             means religions > 10
-        * "yesterday,today,tomorrow"
+        * \"yesterday,today,tomorrow\"
             means religion 1-10 and higher than 10,
-        * "-yesterday,-today,-tomorrow"
+        * \"-yesterday,-today,-tomorrow\"
             to substract
     * --counting=
         * 1,2,3,4,5,...
@@ -60,14 +183,14 @@ Secondary parameters start with 2 minus --.
     * --thisrangebefore=
         * 1-5,7-10,14,20
     * --thisrangebeforedividers
-        * causes that the divisors of all numbers, which result from the specification of "--beforefromsection=", are added additionally
+        * causes that the divisors of all numbers, which result from the specification of \"--beforefromsection=\", are added additionally
         * e.g. 12 becomes: 2,3,4,6,12
     * --retrospectiverecount=
         * 3-6,8
-        * For this the result rows are recounted. If lines "5 to 7" were previously determined and line 2 is now selected with this, it would be line 6.
+        * For this the result rows are recounted. If lines \"5 to 7\" were previously determined and line 2 is now selected with this, it would be line 6.
     * ---retrospectiverecountmultiples=
         * 3-6,8
-        * For this the result lines are counted again. If lines "5 to 8" were determined before and now line 2 is chosen with this, this would be line 6.8, because recounting lines "5 to 8" results in lines "1 to 4". Of these, every second line is 2 and 4. Calculated back to lines "5 to 8", these are lines 6 and 8.
+        * For this the result lines are counted again. If lines \"5 to 8\" were determined before and now line 2 is chosen with this, this would be line 6.8, because recounting lines \"5 to 8\" results in lines \"1 to 4\". Of these, every second line is 2 and 4. Calculated back to lines \"5 to 8\", these are lines 6 and 8.
     * --potenciesofnumbers=
         * 2,3
     * --uppermaximum
@@ -87,7 +210,7 @@ Secondary parameters start with 2 minus --.
     * --widths=
         * 20,50,10,70"#;
 
-const DE_HEADER: &str = r#"Hauptprogramm ist reta oder reta.py
+const DE_HEADER_FALLBACK: &str = r#"Hauptprogramm ist reta oder reta.py
 Bequemer ist retaPrompt, was es mit Voreinstellungen noch als rp und rpl gibt.
 
 Bedienungsanleitung:
@@ -107,15 +230,15 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
 
     * --alles
     * --zeit=
-        * "gestern"
+        * \"gestern\"
             bedeutet Religionen 1-9
-        * "heute"
+        * \"heute\"
             bedeutet nur Religion 10
-        * "morgen"
+        * \"morgen\"
             bedeutet Religionen > 10
-        * "gestern,heute,morgen"
+        * \"gestern,heute,morgen\"
             bedeutet Religion 1-10 und höher als 10,
-        * "-gestern,-heute,-morgen"
+        * \"-gestern,-heute,-morgen\"
             zum Abziehen
     * --zaehlung=
         * 1,2,3,4,5,...
@@ -132,14 +255,14 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
     * --vorhervonausschnitt=
         * 1-5,7-10,14,20
     * --vorhervonausschnittteiler
-        * bewirkt, dass die Teiler aller Zahlen, die sich aus der Angabe von "--vorhervonausschnitt=" ergeben, zusätzlich dazu kommen
+        * bewirkt, dass die Teiler aller Zahlen, die sich aus der Angabe von \"--vorhervonausschnitt=\" ergeben, zusätzlich dazu kommen
         * z.B. wird aus 12: 2,3,4,6,12
     * --nachtraeglichneuabzaehlung=
         * 3-6,8
-        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen "5 bis 7" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6.
+        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen \"5 bis 7\" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6.
     * --nachtraeglichneuabzaehlungvielfache=
         * 3-6,8
-        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen "5 bis 8" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6,8, denn bei Neuzählung der Zeilen "5 bis 8" ergeben sich Zeilen "1 bis 4". Davon ist jeder zweite Zeile 2 und 4. Zurückgerechnet auf Zeilen "5 bis 8" sind das Zeilen 6 und 8.
+        * Dafür werden die Ergebniszeilen neu gezählt. Wurden Zeilen \"5 bis 8\" zuvor bestimmt und wird nun Zeile 2 hiermit gewählt, wäre das Zeile 6,8, denn bei Neuzählung der Zeilen \"5 bis 8\" ergeben sich Zeilen \"1 bis 4\". Davon ist jeder zweite Zeile 2 und 4. Zurückgerechnet auf Zeilen \"5 bis 8\" sind das Zeilen 6 und 8.
     * --potenzenvonzahlen=
         * 2,3
     * --oberesmaximum=
@@ -157,7 +280,7 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
         * 30,40,70
     "#;
 
-const EN_FOOTER: &str = r#"
+const EN_FOOTER_FALLBACK: &str = r#"
 
 ## -output
     * --nocolor
@@ -231,7 +354,7 @@ const EN_FOOTER: &str = r#"
 Better read this with a markdown reader!
         "#;
 
-const DE_FOOTER: &str = r#"
+const DE_FOOTER_FALLBACK: &str = r#"
 
 ## -ausgabe
     * --nocolor
@@ -303,78 +426,6 @@ const DE_FOOTER: &str = r#"
         * statt Generator {2*n for n in range(2,5)} geht auch eine Rechnung wie [2*3].
         Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!"#;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum LanguageMode {
-    German,
-    English,
-}
-
-#[derive(Clone, Debug)]
-enum ThingValue {
-    Text(String),
-    Many(Vec<String>),
-}
-
-impl LanguageMode {
-    fn from_argv(argv: &[String]) -> Self {
-        if argv
-            .iter()
-            .any(|arg| arg == "-language=english" || arg == "-language=englisch")
-        {
-            Self::English
-        } else {
-            Self::German
-        }
-    }
-}
-
-pub fn main_like_python(argv: &[String]) -> i32 {
-    let language = LanguageMode::from_argv(argv);
-
-    if argv.iter().any(|arg| arg == "--render-retaprompt") {
-        match markdown_reader::retaprompt_hilfe_rendered_like_python() {
-            Ok(text) => {
-                print!("{text}");
-                return 0;
-            }
-            Err(err) => {
-                eprintln!("retaprompt-readme konnte nicht gelesen oder gerendert werden: {err}");
-                return 1;
-            }
-        }
-    }
-    if argv.iter().any(|arg| arg == "--render-reta") {
-        match markdown_reader::reta_hilfe_text() {
-            Ok(text) => {
-                print!("{text}");
-                return 0;
-            }
-            Err(err) => {
-                eprintln!("reta-readme konnte nicht gelesen werden: {err}");
-                return 1;
-            }
-        }
-    }
-    if argv.iter().any(|arg| arg == "--show-python-source") {
-        print!("{}", python_source_generate4readme());
-        return 0;
-    }
-
-    let i18n = I18nExact::from_python_evaluated_shapes();
-    print_anfang(language);
-    print_things_like_python(&i18n);
-    print_combination_section(language, &i18n);
-    print_ende(language);
-    0
-}
-
-fn print_anfang(language: LanguageMode) {
-    match language {
-        LanguageMode::German => println!("{DE_HEADER}"),
-        LanguageMode::English => println!("{EN_HEADER}"),
-    }
-}
-
 fn print_things_like_python(i18n: &I18nExact) {
     let things = collect_things_like_python(i18n);
 
@@ -444,13 +495,6 @@ fn print_combination_section(language: LanguageMode, i18n: &I18nExact) {
                     .join(",")
             );
         }
-    }
-}
-
-fn print_ende(language: LanguageMode) {
-    match language {
-        LanguageMode::German => println!("{DE_FOOTER}"),
-        LanguageMode::English => println!("{EN_FOOTER}"),
     }
 }
 

@@ -4,8 +4,13 @@ use std::path::{Path, PathBuf};
 
 fn candidate_doc_paths(file_name: &str) -> Vec<PathBuf> {
     vec![
-        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("doc").join(file_name),
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("doc").join(file_name),
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("doc")
+            .join(Path::new(file_name).file_name().unwrap_or_default()),
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("doc")
+            .join(Path::new(file_name).file_name().unwrap_or_default()),
         Path::new(file_name).to_path_buf(),
         Path::new(env!("CARGO_MANIFEST_DIR")).join(file_name),
     ]
@@ -42,7 +47,7 @@ pub fn strip_retaprompt_like_center_py(markdown_text: &str) -> String {
     let start = without_anchors
         .get(2..)
         .and_then(|tail| tail.find("+++"))
-        .map(|idx| idx + 5)
+        .map(|idx| idx + 2 + 3)
         .unwrap_or(0);
     without_anchors[start.min(without_anchors.len())..].to_string()
 }

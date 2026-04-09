@@ -1505,16 +1505,16 @@ impl Program {
                                     continue;
                                 }
                                 if k > 0 && self.outType != "html" && self.outType != "bbcode" && !teile.is_empty() {
-                                    teile.push(", außerdem: ".to_string());
+                                    teile.push("| außerdem: ".to_string());
                                 }
                                 let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
                                 let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
                                 if self.outType == "html" {
-                                    teile.push(format!("<li>({} [{}]) * ({} [{}])</li>", von, frac1, bis, frac2));
+                                    teile.push(format!("<li>\"{}\" ({})*({}) \"{}\"</li>", von, frac1, frac2, bis));
                                 } else if self.outType == "bbcode" {
-                                    teile.push(format!("[*]({} [{}]) * ({} [{}])", von, frac1, bis, frac2));
+                                    teile.push(format!("[*]\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
                                 } else {
-                                    teile.push(format!("({} [{}]) * ({} [{}])", von, frac1, bis, frac2));
+                                    teile.push(format!("\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
                                 }
                             }
                         }
