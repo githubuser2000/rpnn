@@ -343,7 +343,11 @@ impl Program {
 
     fn primMultiple_pairs_py(&self, num: i64) -> Vec<(i64, i64)> {
         let mut out: Vec<(i64, i64)> = vec![];
-        if num <= 1 {
+        if num <= 0 {
+            return out;
+        }
+        out.push((1, num));
+        if num == 1 {
             return out;
         }
         let mut a = 2i64;
@@ -358,32 +362,6 @@ impl Program {
             a += 1;
         }
         out
-    }
-
-    fn multiplication_pairs_including_one_py(&self, num: i64) -> Vec<(i64, i64)> {
-        let mut out: Vec<(i64, i64)> = vec![];
-        if num <= 0 {
-            return out;
-        }
-        let mut a = 1i64;
-        while a * a <= num {
-            if num % a == 0 {
-                let b = num / a;
-                let pair = if a <= b { (a, b) } else { (b, a) };
-                if !out.contains(&pair) {
-                    out.push(pair);
-                }
-            }
-            a += 1;
-        }
-        out
-    }
-
-    fn multiplikationen_cli_active_py(&self) -> bool {
-        self.argvWithoutProgram.iter().any(|arg| {
-            let lower = arg.to_lowercase();
-            lower.starts_with("--multiplikationen=") || lower == "--multiplikationen"
-        })
     }
 
     fn gleichheitFreiheitVergleich(&self, zahl: i64) -> String {
@@ -1002,12 +980,28 @@ impl Program {
             .collect()
     }
 
-    fn generated2_selection_heading_exact_py(&self, selection: &Generated2Selection) -> String {
-        if !selection.parameter_main_name.is_empty() && !selection.parameter_name.is_empty() {
-            return format!("{} {}", selection.parameter_main_name, selection.parameter_name);
+    fn normalize_generated2_display_main_name_py(&self, main_name: &str) -> String {
+        match main_name.to_ascii_lowercase().as_str() {
+            "primvielfache" => "generierte Multiplikationen".to_string(),
+            _ => main_name.to_string(),
         }
-        if !selection.parameter_name.is_empty() {
-            return selection.parameter_name.clone();
+    }
+
+    fn normalize_generated2_display_parameter_name_py(&self, parameter_name: &str) -> String {
+        parameter_name
+            .replace("Motive_", "")
+            .replace("Struktur_", "")
+            .replace("_", " ")
+    }
+
+    fn generated2_selection_heading_exact_py(&self, selection: &Generated2Selection) -> String {
+        let main_name = self.normalize_generated2_display_main_name_py(&selection.parameter_main_name);
+        let parameter_name = self.normalize_generated2_display_parameter_name_py(&selection.parameter_name);
+        if !main_name.is_empty() && !parameter_name.is_empty() {
+            return format!("{} {}", main_name, parameter_name);
+        }
+        if !parameter_name.is_empty() {
+            return parameter_name;
         }
         self.generated2_code_heading_py(&selection.code)
     }
@@ -1036,17 +1030,12 @@ impl Program {
                     transzendentalien.push(cols.get(trans_col).cloned().unwrap_or_default());
                 }
 
-                let canonical_multiplikationen = self.multiplikationen_cli_active_py();
                 for kombi_idx in kombis {
-                    let mut heading = if canonical_multiplikationen {
-                        format!("generierte Multiplikationen {} {}", poly_name, kombi_namen[kombi_idx])
-                    } else {
-                        format!(
-                            "{} {}",
-                            self.generated2_selection_heading_exact_py(&selection),
-                            kombi_namen[kombi_idx]
-                        )
-                    };
+                    let mut heading = format!(
+                        "{} {}",
+                        self.generated2_selection_heading_exact_py(&selection),
+                        kombi_namen[kombi_idx]
+                    );
                     if heading.trim().is_empty() {
                         heading = format!("{} {}", poly_name, kombi_namen[kombi_idx]);
                     }
@@ -1060,11 +1049,7 @@ impl Program {
                             into.push(heading.clone());
                             continue;
                         }
-                        let multipless = if canonical_multiplikationen {
-                            self.multiplication_pairs_including_one_py(i as i64)
-                        } else {
-                            self.primMultiple_pairs_py(i as i64)
-                        };
+                        let multipless = self.primMultiple_pairs_py(i as i64);
                         if multipless.is_empty() {
                             into.push(String::new());
                             continue;
@@ -1109,12 +1094,7 @@ impl Program {
             }
 
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
-            let canonical_multiplikationen = self.multiplikationen_cli_active_py();
-            let heading = if canonical_multiplikationen {
-                format!("generierte Multiplikationen {}", self.generated2_selection_heading_exact_py(&selection))
-            } else {
-                self.generated2_selection_heading_exact_py(&selection)
-            };
+            let heading = self.generated2_selection_heading_exact_py(&selection);
             let mut into: Vec<String> = vec![];
             let row_end = self.generator_row_end_py();
             for i in 0..=row_end {
@@ -1123,30 +1103,19 @@ impl Program {
                     continue;
                 }
                 let mut teile: Vec<String> = vec![];
-                if canonical_multiplikationen {
-                    for (left, right) in self.multiplication_pairs_including_one_py(i as i64) {
-                        let lhs = self.zellenwert_py(left as usize, col_a);
-                        let rhs = self.zellenwert_py(right as usize, col_b);
-                        if lhs.trim().is_empty() || rhs.trim().is_empty() {
-                            continue;
-                        }
-                        teile.push(format!("{} * {}", lhs, rhs));
+                for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
+                    let basis = if primAmount % 2 == 0 {
+                        self.zellenwert_py(prim as usize, col_b)
+                    } else {
+                        self.zellenwert_py(prim as usize, col_a)
+                    };
+                    if basis.trim().is_empty() {
+                        continue;
                     }
-                } else {
-                    for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
-                        let basis = if primAmount % 2 == 0 {
-                            self.zellenwert_py(prim as usize, col_b)
-                        } else {
-                            self.zellenwert_py(prim as usize, col_a)
-                        };
-                        if basis.trim().is_empty() {
-                            continue;
-                        }
-                        if primAmount > 1 {
-                            teile.push(format!("{} * {}", primAmount, basis));
-                        } else {
-                            teile.push(basis);
-                        }
+                    if primAmount > 1 {
+                        teile.push(format!("{} * {}", primAmount, basis));
+                    } else {
+                        teile.push(basis);
                     }
                 }
                 if teile.is_empty() {
