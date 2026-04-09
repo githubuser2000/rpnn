@@ -2,7 +2,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::shared::reta_program_types::Program;
-use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
+use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
 impl Program {
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
@@ -55,54 +55,16 @@ impl Program {
         spaltenNummer
     }
 
-    fn generated2_codes_exact_py(&self) -> Vec<String> {
-        self.generated2Codes.clone()
-    }
-
     fn hat_generated2_code_py(&self, code: &str) -> bool {
-        self.generated2_codes_exact_py().iter().any(|v| v == code)
+        self.generated2Codes.iter().any(|v| v == code)
     }
 
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
-        if !self.boolAndTupleSet1Options.is_empty() {
-            return self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect();
-        }
-        let selected_rows: BTreeSet<i64> = self
-            .spaltenArtenKey_SpaltennummernValue
-            .get(&self.spaltenTypeNaming.boolAndTupleSet1)
-            .cloned()
-            .unwrap_or_default();
-        let mut options: Vec<Option<usize>> = vec![];
-        for spec in BOOL_AND_TUPLE_SET1_SPECS {
-            if selected_rows.contains(&spec.col_a) {
-                let option = if spec.col_a >= 0 { Some(spec.col_a as usize) } else { None };
-                if !options.contains(&option) {
-                    options.push(option);
-                }
-            }
-        }
-        options
+        self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect()
     }
 
     fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
-        if !self.metakonkretPairs.is_empty() {
-            return self.metakonkretPairs.clone();
-        }
-        let selected_rows: BTreeSet<i64> = self
-            .spaltenArtenKey_SpaltennummernValue
-            .get(&self.spaltenTypeNaming.metakonkret)
-            .cloned()
-            .unwrap_or_default();
-        let mut pairs: Vec<(i64, i64)> = vec![];
-        for spec in METAKONKRET_SPECS {
-            if selected_rows.contains(&spec.col_a) {
-                let pair = (spec.col_a, spec.col_b);
-                if !pairs.contains(&pair) {
-                    pairs.push(pair);
-                }
-            }
-        }
-        pairs
+        self.metakonkretPairs.clone()
     }
 
     fn generator_row_end_py(&self) -> usize {
@@ -984,7 +946,7 @@ impl Program {
     }
 
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let generatedBefehle: Vec<String> = self.generated2_codes_exact_py();
+        let generatedBefehle: Vec<String> = self.generated2Codes.clone();
         if generatedBefehle.is_empty() {
             return;
         }
