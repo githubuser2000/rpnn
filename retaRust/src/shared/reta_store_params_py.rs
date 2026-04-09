@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
@@ -204,7 +206,7 @@ impl Program {
                 let mut into: Vec<PairStr> = vec![];
                 let mut parameterMainNamePerLoop: Vec<String> = vec![];
                 let mut case_: i64 = -1;
-                let mut spaltenNummerOderEtc_local = spaltenNummerOderEtc.clone();
+                let spaltenNummerOderEtc_local = spaltenNummerOderEtc.clone();
 
                 for parameterMainName in parameterMainNames {
                     let parameterNames_local = if parameterNames.len() > 0 {

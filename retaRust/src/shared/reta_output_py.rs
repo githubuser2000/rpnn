@@ -1,9 +1,10 @@
-use indexmap::IndexMap;
+#![allow(non_snake_case)]
+
 use std::collections::BTreeSet;
+
 use hypher::{hyphenate, Lang};
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
-use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 impl Program {
     pub(crate) fn prepare4out_py(

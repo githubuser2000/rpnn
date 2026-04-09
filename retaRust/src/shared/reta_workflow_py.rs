@@ -1,8 +1,7 @@
-use indexmap::IndexMap;
-use std::collections::BTreeSet;
+#![allow(non_snake_case)]
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
-use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
+use crate::shared::reta_program_types::Program;
+use crate::shared::words_py::Words;
 
 impl Program {
     pub fn workflowEverything(&mut self, argv: Vec<String>, words: &Words) -> Vec<Vec<String>> {
@@ -87,6 +86,6 @@ impl Program {
         self.runDone = true;
     }
 
-    pub fn runAllesLikePythonInit(&mut self, words: &Words) {
+    pub fn runAllesLikePythonInit(&mut self, _words: &Words) {
     }
 }

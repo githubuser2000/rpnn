@@ -1,7 +1,8 @@
-use indexmap::IndexMap;
-use std::collections::BTreeSet;
+#![allow(non_snake_case)]
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
+use indexmap::IndexMap;
+
+use crate::shared::reta_program_types::{Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
@@ -124,7 +125,7 @@ impl Program {
             self.cliErrors.push("Versuche Parameter -h".to_string());
         }
         let rowsAsNumbers: Vec<i64> = vec![];
-        let rowsOfcombi: Vec<Vec<String>> = vec![];
+        let _rowsOfcombi: Vec<Vec<String>> = vec![];
         let mut spaltenreihenfolgeundnurdiese: Vec<i64> = vec![];
         let puniverseprims_only: Vec<i64> = vec![];
         let generRows: Vec<i64> = vec![];

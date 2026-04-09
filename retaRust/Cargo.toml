@@ -3,7 +3,6 @@ name = "reta"
 version = "0.1.0"
 edition = "2024"
 default-run = "reta"
-autobins = false
 
 [dependencies]
 indexmap = "2"

@@ -1,8 +1,10 @@
+#![allow(non_snake_case)]
+#![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 use crate::shared::reta_program_types::Program;
-use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 impl Program {
     fn push_unique_i64_py(target: &mut Vec<i64>, value: i64) {
@@ -631,7 +633,6 @@ impl Program {
         for kk in extraSpalten {
             let mut zeilenInhalte: Vec<String> = vec![];
             let mut primAmounts = 0i64;
-            let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
             let row_end = self.generator_row_end_py();
             for i in 0..=row_end {
@@ -640,7 +641,7 @@ impl Program {
                 } else {
                     vec!["Primzahlwirkung (7, Richtung) ".to_string(), match kk { Some(k) => format!("{}", self.zellenwert_py(0, k)), None => "Richtung-Richtung".to_string() }]
                 };
-                oldPrimAmounts = primAmounts;
+                let oldPrimAmounts = primAmounts;
                 if self.couldBePrimeNumberPrimzahlkreuz(i as i64) {
                     primAmounts += 1;
                 }

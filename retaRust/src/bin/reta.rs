@@ -10,12 +10,12 @@ fn main() {
     program.run(&words);
     program.combiTableWorkflow();
 
-    if !program.cliErrors.is_empty() {
-        for line in &program.cliErrors {
+    if program.cliErrors.len() > 0 {
+        for line in program.cliErrors.iter() {
             println!("{}", line);
         }
-    } else if !program.finallyDisplayLines.is_empty() {
-        for line in &program.finallyDisplayLines {
+    } else if program.finallyDisplayLines.len() > 0 {
+        for line in program.finallyDisplayLines.iter() {
             println!("{}", line);
         }
     } else {

@@ -1,8 +1,6 @@
-use indexmap::IndexMap;
-use std::collections::BTreeSet;
+#![allow(non_snake_case)]
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
-use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
+use crate::shared::reta_program_types::Program;
 
 impl Program {
     pub fn resultingTable(&mut self) -> Vec<Vec<String>> {

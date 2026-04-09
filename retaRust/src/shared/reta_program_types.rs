@@ -1,6 +1,8 @@
+#![allow(non_snake_case)]
+
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
-use crate::shared::words_py::{Words, PyValue, StoreParameterEntry};
+use crate::shared::words_py::PyValue;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
