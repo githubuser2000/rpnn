@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use indexmap::IndexMap;
 
 use crate::shared::reta_program_types::{Program, SpaltenTyp};
