@@ -1,8 +1,7 @@
-#![allow(non_snake_case)]
-
 use indexmap::IndexMap;
+use std::collections::BTreeSet;
 
-use crate::shared::reta_program_types::{Program, SpaltenTyp};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
@@ -125,7 +124,7 @@ impl Program {
             self.cliErrors.push("Versuche Parameter -h".to_string());
         }
         let rowsAsNumbers: Vec<i64> = vec![];
-        let _rowsOfcombi: Vec<Vec<String>> = vec![];
+        let rowsOfcombi: Vec<Vec<String>> = vec![];
         let mut spaltenreihenfolgeundnurdiese: Vec<i64> = vec![];
         let puniverseprims_only: Vec<i64> = vec![];
         let generRows: Vec<i64> = vec![];
@@ -393,94 +392,52 @@ impl Program {
 
 
 
-    fn push_generated1_pairs_from_entry_py(target: &mut Vec<(i64, i64)>, entry: &StoreParameterEntry) {
-        for value in entry.datas.get(1).into_iter().flatten() {
-            if let PyValue::Tuple(inner) = value {
-                if inner.len() >= 2 {
-                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
-                        let pair = (*a, *b);
-                        if !target.contains(&pair) {
-                            target.push(pair);
-                        }
-                    }
-                }
-            }
+    fn push_unique_generator_pair_py(target: &mut Vec<(i64, i64)>, pair: (i64, i64)) {
+        if !target.contains(&pair) {
+            target.push(pair);
         }
     }
 
-    fn push_generated2_codes_from_entry_py(target: &mut Vec<String>, entry: &StoreParameterEntry) {
-        for value in entry.datas.get(2).into_iter().flatten() {
-            if let PyValue::Str(code) = value {
-                if !target.iter().any(|v| v == code) {
-                    target.push(code.clone());
-                }
-            }
+    fn push_unique_generator_text_py(target: &mut Vec<String>, value: String) {
+        if !target.iter().any(|existing| existing == &value) {
+            target.push(value);
         }
     }
 
-    fn push_bool_and_tuple_set1_from_entry_py(target: &mut Vec<Option<i64>>, entry: &StoreParameterEntry) {
-        for value in entry.datas.get(4).into_iter().flatten() {
-            if let PyValue::Tuple(inner) = value {
-                let option = match inner.first() {
-                    Some(PyValue::Int(n)) => Some(*n),
-                    Some(PyValue::NoneValue) => None,
-                    _ => continue,
-                };
-                if !target.contains(&option) {
-                    target.push(option);
-                }
-            }
+    fn push_unique_generator_option_py(target: &mut Vec<Option<i64>>, value: Option<i64>) {
+        if !target.contains(&value) {
+            target.push(value);
         }
     }
 
-    fn push_metakonkret_pairs_from_entry_py(target: &mut Vec<(i64, i64)>, entry: &StoreParameterEntry) {
-        for value in entry.datas.get(11).into_iter().flatten() {
-            if let PyValue::Tuple(inner) = value {
-                if inner.len() >= 2 {
-                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
-                        let pair = (*a, *b);
-                        if !target.contains(&pair) {
-                            target.push(pair);
-                        }
-                    }
-                }
-            }
+    fn pyvalue_tuple2_to_i64_pair_py(value: &PyValue) -> Option<(i64, i64)> {
+        match value {
+            PyValue::Tuple(values) if values.len() == 2 => match (&values[0], &values[1]) {
+                (PyValue::Int(a), PyValue::Int(b)) => Some((*a, *b)),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
-    fn collect_generator_metadata_from_entry_py(
-        generated1_pairs: &mut Vec<(i64, i64)>,
-        generated2_codes: &mut Vec<String>,
-        bool_and_tuple_set1_options: &mut Vec<Option<i64>>,
-        metakonkret_pairs: &mut Vec<(i64, i64)>,
+    fn pyvalue_tuple1_to_option_i64_py(value: &PyValue) -> Option<Option<i64>> {
+        match value {
+            PyValue::Tuple(values) if values.len() == 1 => match &values[0] {
+                PyValue::Int(a) => Some(Some(*a)),
+                PyValue::NoneValue => Some(None),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn parameter_entry_matches_cli_selection_py(
         entry: &StoreParameterEntry,
-    ) {
-        Self::push_generated1_pairs_from_entry_py(generated1_pairs, entry);
-        Self::push_generated2_codes_from_entry_py(generated2_codes, entry);
-        Self::push_bool_and_tuple_set1_from_entry_py(bool_and_tuple_set1_options, entry);
-        Self::push_metakonkret_pairs_from_entry_py(metakonkret_pairs, entry);
-    }
-
-    fn selected_spalten_sideparas_py(&self) -> (Vec<String>, bool) {
-        let mut in_spalten = false;
-        let mut selected: Vec<String> = vec![];
-        let mut has_alles = false;
-
-        for arg in &self.argvWithoutProgram {
-            if arg.starts_with('-') && !arg.starts_with("--") {
-                in_spalten = arg == "-spalten";
-                continue;
-            }
-            if !in_spalten || !arg.starts_with("--") {
-                continue;
-            }
-            if arg == "--alles" {
-                has_alles = true;
-            }
-            selected.push(arg.clone());
-        }
-
-        (selected, has_alles)
+        main_name: &str,
+        sub_name: &str,
+    ) -> bool {
+        entry.parameterMainNames.iter().any(|candidate| candidate == main_name)
+            && entry.parameterNames.iter().any(|candidate| candidate == sub_name)
     }
 
     fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
@@ -489,42 +446,67 @@ impl Program {
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
         let mut metakonkretPairs: Vec<(i64, i64)> = vec![];
 
-        let (selected_sideparas, has_alles_spalten) = self.selected_spalten_sideparas_py();
+        let has_spalten_main_parameter = self.mainParas.iter().any(|para| para == "-spalten");
+        let has_alles_side_parameter = self.sideParas.iter().any(|para| para == "--alles");
 
-        if has_alles_spalten {
+        if has_spalten_main_parameter && has_alles_side_parameter {
             for entry in &words.paraNdataMatrix {
-                Self::collect_generator_metadata_from_entry_py(
-                    &mut generated1Pairs,
-                    &mut generated2Codes,
-                    &mut boolAndTupleSet1Options,
-                    &mut metakonkretPairs,
-                    entry,
-                );
+                for value in &entry.datas[self.spaltenTypeNaming.generated1.1] {
+                    if let Some(pair) = Self::pyvalue_tuple2_to_i64_pair_py(value) {
+                        Self::push_unique_generator_pair_py(&mut generated1Pairs, pair);
+                    }
+                }
+                for value in &entry.datas[self.spaltenTypeNaming.generated2.1] {
+                    if let PyValue::Str(code) = value {
+                        Self::push_unique_generator_text_py(&mut generated2Codes, code.clone());
+                    }
+                }
+                for value in &entry.datas[self.spaltenTypeNaming.boolAndTupleSet1.1] {
+                    if let Some(option) = Self::pyvalue_tuple1_to_option_i64_py(value) {
+                        Self::push_unique_generator_option_py(&mut boolAndTupleSet1Options, option);
+                    }
+                }
+                for value in &entry.datas[self.spaltenTypeNaming.metakonkret.1] {
+                    if let Some(pair) = Self::pyvalue_tuple2_to_i64_pair_py(value) {
+                        Self::push_unique_generator_pair_py(&mut metakonkretPairs, pair);
+                    }
+                }
             }
+            return (generated1Pairs, generated2Codes, boolAndTupleSet1Options, metakonkretPairs);
         }
 
-        for side_para in selected_sideparas {
-            if !side_para.starts_with("--") {
+        for sidePara in &self.sideParas {
+            if !sidePara.starts_with("--") {
                 continue;
             }
-            let Some((main_name_raw, sub_names_raw)) = side_para[2..].split_once('=') else {
+            let Some((main_name_raw, sub_names_raw)) = sidePara[2..].split_once('=') else {
                 continue;
             };
             let main_name = main_name_raw.trim();
-
-            for sub_name in sub_names_raw.split(',').map(|v| v.trim()).filter(|v| !v.is_empty()) {
-                let normalized_sub_name = if let Some(rest) = sub_name.strip_prefix('-') { rest } else { sub_name };
+            for sub_name in sub_names_raw.split(',').map(|part| part.trim()).filter(|part| !part.is_empty()) {
                 for entry in &words.paraNdataMatrix {
-                    let main_matches = entry.parameterMainNames.iter().any(|name| name == main_name);
-                    let sub_matches = entry.parameterNames.iter().any(|name| name == normalized_sub_name);
-                    if main_matches && sub_matches {
-                        Self::collect_generator_metadata_from_entry_py(
-                            &mut generated1Pairs,
-                            &mut generated2Codes,
-                            &mut boolAndTupleSet1Options,
-                            &mut metakonkretPairs,
-                            entry,
-                        );
+                    if !Self::parameter_entry_matches_cli_selection_py(entry, main_name, sub_name) {
+                        continue;
+                    }
+                    for value in &entry.datas[self.spaltenTypeNaming.generated1.1] {
+                        if let Some(pair) = Self::pyvalue_tuple2_to_i64_pair_py(value) {
+                            Self::push_unique_generator_pair_py(&mut generated1Pairs, pair);
+                        }
+                    }
+                    for value in &entry.datas[self.spaltenTypeNaming.generated2.1] {
+                        if let PyValue::Str(code) = value {
+                            Self::push_unique_generator_text_py(&mut generated2Codes, code.clone());
+                        }
+                    }
+                    for value in &entry.datas[self.spaltenTypeNaming.boolAndTupleSet1.1] {
+                        if let Some(option) = Self::pyvalue_tuple1_to_option_i64_py(value) {
+                            Self::push_unique_generator_option_py(&mut boolAndTupleSet1Options, option);
+                        }
+                    }
+                    for value in &entry.datas[self.spaltenTypeNaming.metakonkret.1] {
+                        if let Some(pair) = Self::pyvalue_tuple2_to_i64_pair_py(value) {
+                            Self::push_unique_generator_pair_py(&mut metakonkretPairs, pair);
+                        }
                     }
                 }
             }
