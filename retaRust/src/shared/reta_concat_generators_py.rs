@@ -1461,8 +1461,11 @@ impl Program {
                                     2 => (&kombis_all[zwei][multi.1 as usize].2.0, &kombis_all[zwei][multi.0 as usize].2.1),
                                     _ => (&kombis_all[zwei][multi.1 as usize].3.0, &kombis_all[zwei][multi.0 as usize].3.1),
                                 };
-                                let lhs = if lhsrhs.0.trim().len() > 3 { lhsrhs.0.trim() } else { "..." };
-                                let rhs = if lhsrhs.1.trim().len() > 3 { lhsrhs.1.trim() } else { "..." };
+                                let lhs = lhsrhs.0.trim();
+                                let rhs = lhsrhs.1.trim();
+                                if lhs.is_empty() || rhs.is_empty() {
+                                    continue;
+                                }
                                 if self.outType == "html" {
                                     teile.push(format!("<li>({}) * ({})</li>", lhs, rhs));
                                 } else if self.outType == "bbcode" {
@@ -1496,26 +1499,22 @@ impl Program {
                                 );
                                 let Some(von) = von else { continue; };
                                 let Some(bis) = bis else { continue; };
-                                let von = von.trim().to_string();
-                                let bis = bis.trim().to_string();
-                                if von.len() > 3 && bis.len() > 3 {
-                                    if k > 0 && self.outType != "html" && self.outType != "bbcode" && !teile.is_empty() {
-                                        teile.push("| außerdem: ".to_string());
-                                    }
-                                    let middle = if self.outType == "html" && (von.len() > 30 || bis.len() > 30) { "<br>" } else { " " };
-                                    if self.outType == "html" {
-                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
-                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
-                                        teile.push(format!("<li>\"{}\"{}({})*({}){}\"{}\"</li>", von, middle, frac1, frac2, middle, bis));
-                                    } else if self.outType == "bbcode" {
-                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
-                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
-                                        teile.push(format!("[*]\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
-                                    } else {
-                                        let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
-                                        let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
-                                        teile.push(format!("\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
-                                    }
+                                let von = von.trim();
+                                let bis = bis.trim();
+                                if von.is_empty() || bis.is_empty() {
+                                    continue;
+                                }
+                                if k > 0 && self.outType != "html" && self.outType != "bbcode" && !teile.is_empty() {
+                                    teile.push(", außerdem: ".to_string());
+                                }
+                                let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
+                                let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
+                                if self.outType == "html" {
+                                    teile.push(format!("<li>({} [{}]) * ({} [{}])</li>", von, frac1, bis, frac2));
+                                } else if self.outType == "bbcode" {
+                                    teile.push(format!("[*]({} [{}]) * ({} [{}])", von, frac1, bis, frac2));
+                                } else {
+                                    teile.push(format!("({} [{}]) * ({} [{}])", von, frac1, bis, frac2));
                                 }
                             }
                         }
