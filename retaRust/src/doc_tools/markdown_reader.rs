@@ -2,11 +2,11 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-fn candidate_doc_paths(file_name: &str) -> [PathBuf; 4] {
-    [
-        Path::new("doc").join(file_name),
-        Path::new(file_name).to_path_buf(),
+fn candidate_doc_paths(file_name: &str) -> Vec<PathBuf> {
+    vec![
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join("doc").join(file_name),
         Path::new(env!("CARGO_MANIFEST_DIR")).join("doc").join(file_name),
+        Path::new(file_name).to_path_buf(),
         Path::new(env!("CARGO_MANIFEST_DIR")).join(file_name),
     ]
 }
@@ -29,38 +29,43 @@ pub fn reta_hilfe_text() -> io::Result<String> {
 
 pub fn retaprompt_hilfe_text() -> io::Result<String> {
     let markdown_text = read_doc_file("readme-retaPrompt.md")?;
-    Ok(strip_front_matter_and_anchor_tags(&markdown_text))
+    Ok(strip_retaprompt_like_center_py(&markdown_text))
 }
 
-pub fn strip_front_matter_and_anchor_tags(markdown_text: &str) -> String {
-    let after_front_matter = if let Some(stripped) = markdown_text.strip_prefix("+++") {
-        if let Some(end) = stripped.find("+++") {
-            stripped[end + 3..].to_string()
-        } else {
-            markdown_text.to_string()
-        }
-    } else {
-        markdown_text.to_string()
-    };
+pub fn retaprompt_hilfe_rendered_like_python() -> io::Result<String> {
+    let markdown = retaprompt_hilfe_text()?;
+    Ok(render_markdown_for_terminal(&markdown))
+}
 
-    strip_pandoc_anchor_tags(&after_front_matter)
+pub fn strip_retaprompt_like_center_py(markdown_text: &str) -> String {
+    let without_anchors = strip_pandoc_anchor_tags(markdown_text);
+    let start = without_anchors
+        .get(2..)
+        .and_then(|tail| tail.find("+++"))
+        .map(|idx| idx + 5)
+        .unwrap_or(0);
+    without_anchors[start.min(without_anchors.len())..].to_string()
+}
+
+pub fn render_markdown_for_terminal(markdown_text: &str) -> String {
+    format!("{}", termimad::term_text(markdown_text))
 }
 
 fn strip_pandoc_anchor_tags(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
-    let bytes = input.as_bytes();
+    let chars: Vec<char> = input.chars().collect();
     let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'{' && i + 1 < bytes.len() && bytes[i + 1] == b'#' {
+    while i < chars.len() {
+        if chars[i] == '{' && i + 1 < chars.len() && chars[i + 1] == '#' {
             i += 2;
-            while i < bytes.len() && bytes[i] != b'}' {
+            while i < chars.len() && chars[i] != '}' {
                 i += 1;
             }
-            if i < bytes.len() && bytes[i] == b'}' {
+            if i < chars.len() {
                 i += 1;
             }
         } else {
-            output.push(bytes[i] as char);
+            output.push(chars[i]);
             i += 1;
         }
     }

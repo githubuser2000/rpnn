@@ -332,13 +332,13 @@ pub fn main_like_python(argv: &[String]) -> i32 {
     let language = LanguageMode::from_argv(argv);
 
     if argv.iter().any(|arg| arg == "--render-retaprompt") {
-        match markdown_reader::retaprompt_hilfe_text() {
+        match markdown_reader::retaprompt_hilfe_rendered_like_python() {
             Ok(text) => {
                 print!("{text}");
                 return 0;
             }
             Err(err) => {
-                eprintln!("retaprompt-readme konnte nicht gelesen werden: {err}");
+                eprintln!("retaprompt-readme konnte nicht gelesen oder gerendert werden: {err}");
                 return 1;
             }
         }
