@@ -169,15 +169,15 @@ impl Program {
         }
     }
 
-    fn generated2_parenthesize_single_term_py(&self, s: &str) -> String {
-        let s_trim = s.trim();
-        if s_trim.is_empty() {
+    fn generated2_parenthesize_single_term_py(&self, text: &str) -> String {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
             return String::new();
         }
-        if s_trim.starts_with('(') && s_trim.ends_with(')') {
-            return s_trim.to_string();
+        if trimmed.starts_with('(') && trimmed.ends_with(')') {
+            return trimmed.to_string();
         }
-        format!("({})", s_trim)
+        format!("({})", trimmed)
     }
 
     fn generated2_kombi_pair_text_py(
@@ -201,17 +201,17 @@ impl Program {
         };
         let lhs = lhs.trim();
         let rhs = rhs.trim();
-        match (lhs.is_empty(), rhs.is_empty()) {
-            (true, true) => None,
-            (false, true) => Some(self.generated2_parenthesize_single_term_py(lhs)),
-            (true, false) => Some(self.generated2_parenthesize_single_term_py(rhs)),
-            (false, false) if lhs == rhs => Some(self.generated2_parenthesize_single_term_py(lhs)),
-            (false, false) => Some(format!(
-                "{} * {}",
-                self.generated2_parenthesize_single_term_py(lhs),
-                self.generated2_parenthesize_single_term_py(rhs)
-            )),
+        if lhs.is_empty() || rhs.is_empty() {
+            return None;
         }
+        if lhs == rhs {
+            return Some(self.generated2_parenthesize_single_term_py(lhs));
+        }
+        Some(format!(
+            "{} * {}",
+            self.generated2_parenthesize_single_term_py(lhs),
+            self.generated2_parenthesize_single_term_py(rhs),
+        ))
     }
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
@@ -1053,6 +1053,7 @@ impl Program {
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
+                        let mut seen_plain: BTreeSet<String> = BTreeSet::new();
                         for (_k, multi) in multipless.iter().enumerate() {
                             let Some(text) = self.generated2_kombi_pair_text_py(
                                 *multi,
@@ -1062,6 +1063,9 @@ impl Program {
                             ) else {
                                 continue;
                             };
+                            if !seen_plain.insert(text.clone()) {
+                                continue;
+                            }
                             if self.outType == "html" {
                                 teile.push("<li>".to_string());
                                 teile.push(text);
