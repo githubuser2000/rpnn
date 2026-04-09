@@ -19,11 +19,33 @@ fn python_source_candidates_generate4readme() -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     if let Ok(current) = std::env::current_dir() {
-        out.push(current.join("python_reference").join("libs").join("generate4readme.py"));
-        out.push(current.join("retaRust").join("python_reference").join("libs").join("generate4readme.py"));
+        out.push(
+            current
+                .join("python_reference")
+                .join("libs")
+                .join("generate4readme.py"),
+        );
+        out.push(
+            current
+                .join("retaRust")
+                .join("python_reference")
+                .join("libs")
+                .join("generate4readme.py"),
+        );
     }
-    out.push(manifest.join("python_reference").join("libs").join("generate4readme.py"));
-    out.push(manifest.join("retaRust").join("python_reference").join("libs").join("generate4readme.py"));
+    out.push(
+        manifest
+            .join("python_reference")
+            .join("libs")
+            .join("generate4readme.py"),
+    );
+    out.push(
+        manifest
+            .join("retaRust")
+            .join("python_reference")
+            .join("libs")
+            .join("generate4readme.py"),
+    );
     out
 }
 
@@ -92,7 +114,6 @@ pub fn main_like_python(argv: &[String]) -> i32 {
     0
 }
 
-
 fn ensure_trailing_newline(text: &str) -> String {
     if text.ends_with('\n') {
         text.to_string()
@@ -103,8 +124,6 @@ fn ensure_trailing_newline(text: &str) -> String {
         out
     }
 }
-
-
 
 fn python_header(language: LanguageMode) -> String {
     let source = python_source_generate4readme();
@@ -126,7 +145,11 @@ fn python_footer(language: LanguageMode) -> String {
     }
 }
 
-fn extract_triple_quoted_assignment(source: &str, name: &str, branch_index: usize) -> Option<String> {
+fn extract_triple_quoted_assignment(
+    source: &str,
+    name: &str,
+    branch_index: usize,
+) -> Option<String> {
     let needle = format!("{name} = \"\"\"");
     let mut starts = Vec::new();
     let mut offset = 0usize;
