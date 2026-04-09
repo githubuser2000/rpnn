@@ -68,11 +68,11 @@ impl Program {
     }
 
     fn generator_row_end_py(&self) -> usize {
-        if self.lastLineNumber > 0 {
-            let max_idx = self.relitable.len().saturating_sub(1) as i64;
-            return self.lastLineNumber.min(max_idx).max(0) as usize;
-        }
-        self.relitable.len().saturating_sub(1)
+        let relitable_end = self.relitable.len().saturating_sub(1);
+        let last = if self.lastLineNumber > 0 { self.lastLineNumber as usize } else { 0 };
+        let highest = if self.hoechsteZeile > 0 { self.hoechsteZeile as usize } else { 0 };
+        let wished = last.max(highest);
+        if wished == 0 { relitable_end } else { wished.min(relitable_end) }
     }
 
     fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
@@ -284,6 +284,25 @@ impl Program {
 
     fn couldBePrimeNumberPrimzahlkreuz_fuer_aussen(&self, num: i64) -> bool {
         matches!(num.rem_euclid(24), 1 | 7 | 13 | 19)
+    }
+
+    fn primMultiple_pairs_py(&self, num: i64) -> Vec<(i64, i64)> {
+        let mut out: Vec<(i64, i64)> = vec![];
+        if num <= 1 {
+            return out;
+        }
+        let mut a = 2i64;
+        while a * a <= num {
+            if num % a == 0 {
+                let b = num / a;
+                let pair = if a <= b { (a, b) } else { (b, a) };
+                if !out.contains(&pair) {
+                    out.push(pair);
+                }
+            }
+            a += 1;
+        }
+        out
     }
 
     fn gleichheitFreiheitVergleich(&self, zahl: i64) -> String {
@@ -936,153 +955,206 @@ impl Program {
         if !self.hat_generated2_code_py("primzahlkreuzprocontra") {
             return;
         }
-
         let row_end = self.generator_row_end_py();
-        let mut pro_map: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
-        let mut contra_map: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
-        let mut reverse_pro: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
-        let mut reverse_contra: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        let mut pro_pro: BTreeMap<i64, i64> = BTreeMap::new();
+        let mut contra_contra: BTreeMap<i64, i64> = BTreeMap::new();
+        let mut pro_pro2: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        let mut contra_contra2: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        let mut list1: Vec<i64> = vec![];
+        let mut list2: Vec<i64> = vec![];
+        let mut keine_primzahl1 = true;
+        let mut keine_primzahl2 = true;
+        let mut weiter1a = 0usize;
+        let mut weiter1b = 0usize;
+        let mut weiter2a = 0usize;
+        let mut weiter2b = 0usize;
+        let mut col_main: Vec<String> = vec![];
 
-        let mut list_innen: Vec<i64> = vec![];
-        let mut list_aussen: Vec<i64> = vec![];
-        let mut keine_primzahl_innen = true;
-        let mut keine_primzahl_aussen = true;
-        let mut weiter_innen_a = 0usize;
-        let mut weiter_innen_b = 0usize;
-        let mut weiter_aussen_a = 0usize;
-        let mut weiter_aussen_b = 0usize;
+        for num in 0..=row_end as i64 {
+            contra_contra2.entry(num).or_default();
+            pro_pro2.entry(num).or_default();
+            let mut into: Vec<String> = if num == 0 {
+                vec![self.generated2_code_heading_py("primzahlkreuzprocontra")]
+            } else {
+                vec![]
+            };
+            let mut into1: Vec<String> = vec![];
+            let mut into2: Vec<String> = vec![];
 
-        for num in 0..=row_end {
-            let num_i64 = num as i64;
-
-            if self.primCreativity_exact_py(num_i64) == 1 || num_i64 == 1 {
-                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(num_i64) {
-                    list_innen.push(num_i64);
-                    let mut gegen: Option<i64> = None;
-                    if num_i64 > 16 {
-                        if keine_primzahl_innen {
-                            if list_aussen.len() > weiter_innen_b + 1 {
-                                gegen = Some(list_aussen[weiter_innen_b + 1]);
-                                weiter_innen_b += 1;
-                            }
-                        } else if list_innen.len() > weiter_innen_a {
-                            gegen = Some(list_innen[weiter_innen_a]);
-                            weiter_innen_a += 1;
+            if self.primCreativity_exact_py(num) == 1 || num == 1 {
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(num) {
+                    list1.push(num);
+                    if num > 16 {
+                        let maybe_gegen = if keine_primzahl1 {
+                            list2.get(weiter1b + 1).copied().map(|v| { weiter1b += 1; v })
+                        } else {
+                            list1.get(weiter1a).copied().map(|v| { weiter1a += 1; v })
+                        };
+                        if let Some(gegen) = maybe_gegen {
+                            contra_contra.insert(num, gegen);
+                            contra_contra2.entry(num).or_default().insert(gegen);
+                            into1.push(format!("gegen {}", gegen));
                         }
-                    } else if num_i64 == 5 || num_i64 == 11 {
-                        gegen = Some(2);
+                    } else if matches!(num, 5 | 11) {
+                        let gegen = 2;
+                        contra_contra.insert(num, gegen);
+                        contra_contra2.entry(num).or_default().insert(gegen);
+                        into1.push(format!("gegen {}", gegen));
                     }
-                    if let Some(g) = gegen {
-                        contra_map.entry(num_i64).or_default().insert(g);
-                        reverse_contra.entry(g).or_default().insert(num_i64);
-                    }
-                    keine_primzahl_innen = false;
+                    keine_primzahl1 = false;
                 }
-
-                if num_i64 == 2 {
-                    contra_map.entry(num_i64).or_default().insert(1);
-                    reverse_contra.entry(1).or_default().insert(num_i64);
-                } else if num_i64 == 3 {
-                    pro_map.entry(num_i64).or_default().insert(1);
-                    reverse_pro.entry(1).or_default().insert(num_i64);
+                if num == 2 {
+                    let gegen = 1;
+                    contra_contra.insert(num, gegen);
+                    contra_contra2.entry(num).or_default().insert(gegen);
+                    into1.push(format!("gegen {}", gegen));
+                } else if num == 3 {
+                    let pro = 1;
+                    pro_pro.insert(num, pro);
+                    pro_pro2.entry(num).or_default().insert(pro);
+                    into2.push(format!("pro {}", pro));
                 }
-
-                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(num_i64) {
-                    list_aussen.push(num_i64);
-                    let mut pro: Option<i64> = None;
-                    if num_i64 > 16 {
-                        if keine_primzahl_aussen {
-                            if list_innen.len() > weiter_aussen_b + 1 {
-                                pro = Some(list_innen[weiter_aussen_b + 1]);
-                                weiter_aussen_b += 1;
-                            }
-                        } else if list_aussen.len() > weiter_aussen_a {
-                            pro = Some(list_aussen[weiter_aussen_a]);
-                            weiter_aussen_a += 1;
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(num) {
+                    list2.push(num);
+                    if num > 16 {
+                        let maybe_pro = if keine_primzahl2 {
+                            list1.get(weiter2b + 1).copied().map(|v| { weiter2b += 1; v })
+                        } else {
+                            list2.get(weiter2a).copied().map(|v| { weiter2a += 1; v })
+                        };
+                        if let Some(pro) = maybe_pro {
+                            pro_pro.insert(num, pro);
+                            pro_pro2.entry(num).or_default().insert(pro);
+                            into2.push(format!("pro {}", pro));
                         }
-                    } else if num_i64 == 7 || num_i64 == 13 {
-                        pro = Some(3);
+                    } else if matches!(num, 7 | 13) {
+                        let pro = 3;
+                        pro_pro.insert(num, pro);
+                        pro_pro2.entry(num).or_default().insert(pro);
+                        into2.push(format!("pro {}", pro));
                     }
-                    if let Some(p) = pro {
-                        pro_map.entry(num_i64).or_default().insert(p);
-                        reverse_pro.entry(p).or_default().insert(num_i64);
-                    }
-                    keine_primzahl_aussen = false;
+                    keine_primzahl2 = false;
                 }
             } else {
-                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(num_i64) {
-                    keine_primzahl_innen = true;
-                } else if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(num_i64) {
-                    keine_primzahl_aussen = true;
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(num) {
+                    keine_primzahl1 = true;
+                } else if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(num) {
+                    keine_primzahl2 = true;
                 }
-
-                if num_i64 > 1 {
-                    for (prim, prim_amount) in self.primRepeat(self.primFak(num_i64)) {
-                        if let Some(ps) = pro_map.get(&prim).cloned() {
-                            for p in ps {
-                                if prim_amount == 1 {
-                                    pro_map.entry(num_i64).or_default().insert(p);
-                                    reverse_pro.entry(p).or_default().insert(num_i64);
+                for couple_a in self.primMultiple_pairs_py(num) {
+                    if couple_a.0 == 1 || couple_a.1 == 1 {
+                        continue;
+                    }
+                    let pair_variants: Vec<(i64, i64)> = if couple_a.0 == couple_a.1 {
+                        vec![couple_a]
+                    } else {
+                        vec![couple_a, (couple_a.1, couple_a.0)]
+                    };
+                    for couple in pair_variants {
+                        for first_or_second in if couple.0 != couple.1 { vec![1usize, 0usize] } else { vec![1usize] } {
+                            let chosen = if first_or_second == 1 { couple.1 } else { couple.0 };
+                            let other = if first_or_second == 1 { couple.0 } else { couple.1 };
+                            if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(chosen) || couple.0 % 2 == 0 || couple.1 % 2 == 0 {
+                                if let Some(base) = contra_contra.get(&chosen).copied() {
+                                    let gegen3 = other * base;
+                                    contra_contra.insert(num, gegen3);
+                                    contra_contra2.entry(num).or_default().insert(gegen3);
+                                    into1.push(format!("gegen {}", gegen3));
                                 }
                             }
-                        }
-                        if let Some(cs) = contra_map.get(&prim).cloned() {
-                            for c in cs {
-                                if prim_amount == 1 {
-                                    contra_map.entry(num_i64).or_default().insert(c);
-                                    reverse_contra.entry(c).or_default().insert(num_i64);
+                            if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(couple.1) || couple.1 % 3 == 0 || couple.0 % 3 == 0 {
+                                if let Some(base) = pro_pro.get(&chosen).copied() {
+                                    let pro3 = other * base;
+                                    pro_pro.insert(num, pro3);
+                                    pro_pro2.entry(num).or_default().insert(pro3);
+                                    into2.push(format!("pro {}", pro3));
                                 }
                             }
                         }
                     }
                 }
             }
+
+            let text206 = self.zellenwert_py(num as usize, 206);
+            if let Some((_, rhs)) = text206.split_once('|') {
+                if !rhs.trim().is_empty() {
+                    into.push(rhs.trim().to_string());
+                }
+            }
+            into1.sort();
+            into1.dedup();
+            into2.sort();
+            into2.dedup();
+            if num != 0 {
+                let mut into_b: Vec<String> = vec![];
+                if !into1.is_empty() {
+                    into_b.push(into1.join(", "));
+                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                }
+                if !into2.is_empty() {
+                    into_b.push(into2.join(", "));
+                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                }
+                if !into.is_empty() {
+                    into_b.push(into.join(", "));
+                }
+                col_main.push(into_b.join(" | "));
+            } else {
+                col_main.push(into.join(" | "));
+            }
         }
 
-        let mut into: Vec<String> = Vec::with_capacity(row_end + 1);
-        for num in 0..=row_end {
+        let mut reverse_pro: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        let mut reverse_contra: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        for (key, values) in &pro_pro2 {
+            for value in values {
+                reverse_pro.entry(*value).or_default().insert(*key);
+            }
+        }
+        for (key, values) in &contra_contra2 {
+            for value in values {
+                reverse_contra.entry(*value).or_default().insert(*key);
+            }
+        }
+        let mut col_reverse: Vec<String> = vec![];
+        for num in 0..=row_end as i64 {
             if num == 0 {
-                into.push("Gegen / pro: Nach Rechenregeln auf Primzahlkreuz und Vielfachern von Primzahlen".to_string());
+                col_reverse.push(self.generated2_code_heading_py("primzahlkreuzprocontra"));
                 continue;
             }
-            let num_i64 = num as i64;
-            let pro2: Vec<String> = reverse_pro
-                .get(&num_i64)
-                .map(|s| s.iter().map(|v| v.to_string()).collect())
-                .unwrap_or_else(Vec::new);
-            let contra2: Vec<String> = reverse_contra
-                .get(&num_i64)
-                .map(|s| s.iter().map(|v| v.to_string()).collect())
-                .unwrap_or_else(Vec::new);
-
+            let pro2: Vec<i64> = reverse_pro.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
+            let contra2: Vec<i64> = reverse_contra.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
             if pro2.is_empty() && contra2.is_empty() {
-                into.push("-".to_string());
+                col_reverse.push("-".to_string());
                 continue;
             }
-
-            let mut teile: Vec<String> = Vec::new();
+            let mut teile: Vec<String> = vec![];
             if !pro2.is_empty() {
-                let label = if pro2.len() == 1 {
-                    "pro dieser Zahl ist "
-                } else {
-                    "pro dieser Zahl sind: "
-                };
-                teile.push(format!("{}{}", label, pro2.join(", ")));
+                teile.push(if pro2.len() == 1 { format!("pro dieser Zahl ist {}", pro2[0]) } else { format!("pro dieser Zahl sind {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
+                let hints: Vec<String> = pro2.iter().filter_map(|c| {
+                    let t = self.zellenwert_py(*c as usize, 206);
+                    let (lhs, rhs) = t.split_once('|')?;
+                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
+                }).collect();
+                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
             }
             if !contra2.is_empty() {
-                let label = if contra2.len() == 1 {
-                    "contra dieser Zahl ist "
-                } else {
-                    "contra dieser Zahl sind: "
-                };
-                teile.push(format!("{}{}", label, contra2.join(", ")));
+                teile.push(if contra2.len() == 1 { format!("contra dieser Zahl ist {}", contra2[0]) } else { format!("contra dieser Zahl sind {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
+                let hints: Vec<String> = contra2.iter().filter_map(|c| {
+                    let t = self.zellenwert_py(*c as usize, 206);
+                    let (lhs, rhs) = t.split_once('|')?;
+                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
+                }).collect();
+                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
             }
-            teile.push("- Die Zahlen, die für oder gegen diese Zahlen hier sind, können sich in diese am Besten gedanklich hineinversetzen.".to_string());
-            into.push(teile.join(" | "));
+            teile.push("hineinversetzen/empathisch dazu sein".to_string());
+            col_reverse.push(teile.join(" | "));
         }
 
-        let spalte = self.fuege_spalte_hinzu_py(into, "primzahlkreuzprocontra");
-        Self::push_unique_i64_py(rowsAsNumbers, spalte);
+        let spalte_main = self.fuege_spalte_hinzu_py(col_main, &self.generated2_code_heading_py("primzahlkreuzprocontra"));
+        let spalte_reverse = self.fuege_spalte_hinzu_py(col_reverse, &self.generated2_code_heading_py("primzahlkreuzprocontra"));
+        Self::push_unique_i64_py(rowsAsNumbers, spalte_main);
+        Self::push_unique_i64_py(rowsAsNumbers, spalte_reverse);
     }
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
