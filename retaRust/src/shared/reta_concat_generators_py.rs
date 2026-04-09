@@ -181,18 +181,29 @@ impl Program {
         let read = |values: &Vec<String>, idx: usize| -> String {
             values.get(idx).cloned().unwrap_or_default()
         };
-        let (lhs, rhs) = match kombi_idx {
-            0 => (read(motivation, a), read(motivation, b)),
-            1 => (read(motivation, a), read(transzendentalien, b)),
-            2 => (read(transzendentalien, a), read(motivation, b)),
-            3 => (read(transzendentalien, a), read(transzendentalien, b)),
-            _ => (String::new(), String::new()),
+        let kombi_a = (
+            (read(motivation, a), read(motivation, a)),
+            (read(motivation, a), read(transzendentalien, a)),
+            (read(transzendentalien, a), read(motivation, a)),
+            (read(transzendentalien, a), read(transzendentalien, a)),
+        );
+        let kombi_b = (
+            (read(motivation, b), read(motivation, b)),
+            (read(motivation, b), read(transzendentalien, b)),
+            (read(transzendentalien, b), read(motivation, b)),
+            (read(transzendentalien, b), read(transzendentalien, b)),
+        );
+        let (lhs_raw, rhs_raw) = match kombi_idx {
+            0 => (&kombi_a.0.0, &kombi_b.0.1),
+            1 => (&kombi_a.1.0, &kombi_b.1.1),
+            2 => (&kombi_a.2.0, &kombi_b.2.1),
+            3 => (&kombi_a.3.0, &kombi_b.3.1),
+            _ => return None,
         };
-        let lhs = lhs.trim();
-        let rhs = rhs.trim();
-        if lhs.is_empty() || rhs.is_empty() {
-            return None;
-        }
+        let lhs_trimmed = lhs_raw.trim();
+        let rhs_trimmed = rhs_raw.trim();
+        let lhs = if lhs_trimmed.len() > 3 { lhs_trimmed } else { "..." };
+        let rhs = if rhs_trimmed.len() > 3 { rhs_trimmed } else { "..." };
         Some(format!("({}) * ({})", lhs, rhs))
     }
 
@@ -756,7 +767,7 @@ impl Program {
         tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, tableToAdd);
         let show_concat1_non_generated = self.should_show_concat1_non_generated_column_py();
         if concatTable == 1 {
-            let mut tableToAdd2 = vec![vec!["Primzahlvielfache, nicht generiert".to_string()]];
+            let mut tableToAdd2 = vec![vec!["Primzahlvielfache, - nicht generiert".to_string()]];
             for zeile in tableToAdd.into_iter().skip(1) {
                 let mut teile: Vec<String> = vec![];
                 for zelle in zeile {
@@ -1006,117 +1017,99 @@ impl Program {
         self.generated2_code_heading_py(&selection.code)
     }
 
-    fn generated2_python_heading_exact_py(&self, poly_name: &str, kombi_name: &str, is_gebr: bool) -> String {
-        let mut heading = format!("generierte Multiplikationen {} {}", poly_name, kombi_name);
-        if is_gebr {
-            heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
-        }
-        heading
-    }
-
-    fn generated2_python_order_codes_py(&self) -> Vec<&'static str> {
-        vec![
-            "PrimCSV",
-            "primMotivStern",
-            "primStrukStern",
-            "primMotivGleichf",
-            "primStrukGleichf",
-            "primMotivSternGebr",
-            "primStrukSternGebr",
-            "primMotivGleichfGebr",
-            "primStrukGleichfGebr",
-        ]
-    }
-
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let generatedSelections: Vec<Generated2Selection> = self.generated2_selections_exact_py();
         if generatedSelections.is_empty() {
             return;
         }
 
-        let mut requested_codes: Vec<String> = vec![];
-        for code in self.generated2_python_order_codes_py() {
-            if generatedSelections.iter().any(|selection| selection.code == code) {
-                requested_codes.push(code.to_string());
-            }
-        }
+        let relitableCopy = self.relitable.clone();
+        let row_end = self.generator_row_end_py();
+        let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
+        let poly_namen = ["Sternpolygone", "gleichförmige Polygone"];
+
+        let mut requested_coords: BTreeSet<(usize, usize, bool)> = BTreeSet::new();
+        let mut wants_primcsv = false;
         for selection in &generatedSelections {
-            if selection.code == "primzahlkreuzprocontra" {
+            let code = selection.code.as_str();
+            if code == "primzahlkreuzprocontra" {
                 continue;
             }
-            if !requested_codes.iter().any(|code| code == &selection.code) {
-                requested_codes.push(selection.code.clone());
+            if code == "PrimCSV" {
+                wants_primcsv = true;
+                continue;
             }
-        }
-        if requested_codes.is_empty() {
-            return;
-        }
-
-        let relitableCopy = self.relitable.clone();
-        let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
-
-        if requested_codes.iter().any(|code| code == "PrimCSV") {
-            let (col_a, _col_b) = self.generated2_code_source_columns_py("PrimCSV");
-            let heading = "Primzahlvielfache, - nicht generiert".to_string();
-            let row_end = self.generator_row_end_py();
-            let mut into: Vec<String> = vec![];
-            for i in 0..=row_end {
-                if i == 0 {
-                    into.push(heading.clone());
-                } else {
-                    into.push(self.zellenwert_py(i, col_a));
+            if let Some((poly_idx, _poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(code) {
+                for kombi_idx in kombis {
+                    requested_coords.insert((poly_idx, kombi_idx, is_gebr));
                 }
             }
-            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
-            Self::push_unique_i64_py(rowsAsNumbers, spalte);
+        }
+
+        if wants_primcsv {
+            if let Some(csv_name) = self.concat_csv_name_py(1) {
+                if let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csv_name) {
+                    tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(1, tableToAdd);
+                    let mut into: Vec<String> = vec!["Primzahlvielfache, - nicht generiert".to_string()];
+                    for zeile in tableToAdd.into_iter().skip(1).take(row_end) {
+                        let mut teile: Vec<String> = vec![];
+                        for zelle in zeile {
+                            if zelle.trim().len() > 3 {
+                                teile.push(zelle);
+                            }
+                        }
+                        into.push(teile.join(" | "));
+                    }
+                    while into.len() <= row_end {
+                        into.push(String::new());
+                    }
+                    let spalte = self.fuege_spalte_hinzu_py(into, "Primzahlvielfache, nicht generiert");
+                    Self::push_unique_i64_py(rowsAsNumbers, spalte);
+                }
+            }
+        }
+
+        let hard_coded_couple = [10usize, 42usize];
+        let transzendentalien_nrezi = [5usize, 131usize];
+        let mut motivation: [Vec<String>; 2] = [vec![], vec![]];
+        let mut transzendentalien: [Vec<String>; 2] = [vec![], vec![]];
+        for cols in &relitableCopy {
+            for zwei in 0..=1usize {
+                motivation[zwei].push(cols.get(hard_coded_couple[zwei]).cloned().unwrap_or_default());
+                transzendentalien[zwei].push(cols.get(transzendentalien_nrezi[zwei]).cloned().unwrap_or_default());
+            }
         }
 
         for is_gebr in [false, true] {
-            for poly_name in ["Sternpolygone", "gleichförmige Polygone"] {
-                let code = match (poly_name, is_gebr) {
-                    ("Sternpolygone", false) => Some(("primMotivStern", "primStrukStern")),
-                    ("gleichförmige Polygone", false) => Some(("primMotivGleichf", "primStrukGleichf")),
-                    ("Sternpolygone", true) => Some(("primMotivSternGebr", "primStrukSternGebr")),
-                    ("gleichförmige Polygone", true) => Some(("primMotivGleichfGebr", "primStrukGleichfGebr")),
-                    _ => None,
-                };
-                let Some((motiv_code, struk_code)) = code else { continue; };
-
-                let mapping: Vec<(&str, usize)> = vec![
-                    (motiv_code, 0),
-                    (motiv_code, 1),
-                    (struk_code, 2),
-                    (struk_code, 3),
-                ];
-
-                for (code, kombi_idx) in mapping {
-                    if !requested_codes.iter().any(|value| value == code) {
+            for poly_idx in 0..=1usize {
+                for kombi_idx in 0..=3usize {
+                    if !requested_coords.contains(&(poly_idx, kombi_idx, is_gebr)) {
                         continue;
                     }
-                    let (motiv_col, trans_col) = self.generated2_code_source_columns_py(code);
-                    let mut motivation: Vec<String> = vec![];
-                    let mut transzendentalien: Vec<String> = vec![];
-                    for cols in &relitableCopy {
-                        motivation.push(cols.get(motiv_col).cloned().unwrap_or_default());
-                        transzendentalien.push(cols.get(trans_col).cloned().unwrap_or_default());
+                    let mut heading = format!(
+                        "generierte Multiplikationen {} {}",
+                        poly_namen[poly_idx],
+                        kombi_namen[kombi_idx]
+                    );
+                    if is_gebr {
+                        heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
                     }
 
-                    let heading = self.generated2_python_heading_exact_py(poly_name, kombi_namen[kombi_idx], is_gebr);
-                    let row_end = self.generator_row_end_py();
-                    let mut into: Vec<String> = vec![];
-                    for i in 0..=row_end {
-                        if i == 0 {
-                            into.push(heading.clone());
-                            continue;
-                        }
+                    let mut into: Vec<String> = vec![heading.clone()];
+                    for i in 1..=row_end {
                         let multipless = self.primMultiple_pairs_py(i as i64);
                         if multipless.is_empty() {
                             into.push(String::new());
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
-                        for (k, multi) in multipless.iter().enumerate() {
-                            let Some(text) = self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation, &transzendentalien) else {
+                        for multi in multipless.iter() {
+                            let Some(text) = self.generated2_kombi_pair_text_py(
+                                *multi,
+                                kombi_idx,
+                                &motivation[poly_idx],
+                                &transzendentalien[poly_idx],
+                            ) else {
                                 continue;
                             };
                             if self.outType == "html" {
@@ -1127,7 +1120,7 @@ impl Program {
                                 teile.push("[*]".to_string());
                                 teile.push(text);
                             } else {
-                                if k > 0 && !teile.is_empty() {
+                                if !teile.is_empty() {
                                     teile.push(", außerdem: ".to_string());
                                 }
                                 teile.push(text);

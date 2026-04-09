@@ -19,3 +19,7 @@ path = "src/bin/reta.rs"
 [[bin]]
 name = "grundStrukHtml"
 path = "src/bin/grundStrukHtml.rs"
+
+[[bin]]
+name = "generate4readme"
+path = "src/bin/generate4readme.rs"
