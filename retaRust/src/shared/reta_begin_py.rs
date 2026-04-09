@@ -392,32 +392,12 @@ impl Program {
 
 
 
-    fn spalten_side_paras_exact_py(&self) -> Vec<String> {
-        let mut out: Vec<String> = vec![];
-        let mut in_spalten = false;
-        for arg in &self.argvWithoutProgram {
-            if arg == "-spalten" {
-                in_spalten = true;
-                continue;
-            }
-            if arg.starts_with('-') && !arg.starts_with("--") {
-                in_spalten = false;
-                continue;
-            }
-            if in_spalten && arg.starts_with("--") {
-                out.push(arg.clone());
-            }
-        }
-        out
-    }
-
-    fn push_generated1_from_datas_exact_py(target: &mut Vec<(i64, i64)>, datas: &Vec<Vec<PyValue>>) {
-        if let Some(values) = datas.get(1) {
-            for value in values {
-                if let PyValue::Tuple(inner) = value {
-                    let ints: Vec<i64> = inner.iter().filter_map(|v| if let PyValue::Int(n) = v { Some(*n) } else { None }).collect();
-                    if ints.len() >= 2 {
-                        let pair = (ints[0], ints[1]);
+    fn push_generated1_pairs_from_entry_py(target: &mut Vec<(i64, i64)>, entry: &StoreParameterEntry) {
+        for value in entry.datas.get(1).into_iter().flatten() {
+            if let PyValue::Tuple(inner) = value {
+                if inner.len() >= 2 {
+                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                        let pair = (*a, *b);
                         if !target.contains(&pair) {
                             target.push(pair);
                         }
@@ -427,44 +407,37 @@ impl Program {
         }
     }
 
-    fn push_generated2_from_datas_exact_py(target: &mut Vec<String>, datas: &Vec<Vec<PyValue>>) {
-        if let Some(values) = datas.get(7) {
-            for value in values {
-                if let PyValue::Str(code) = value {
-                    if !target.iter().any(|v| v == code) {
-                        target.push(code.clone());
-                    }
+    fn push_generated2_codes_from_entry_py(target: &mut Vec<String>, entry: &StoreParameterEntry) {
+        for value in entry.datas.get(2).into_iter().flatten() {
+            if let PyValue::Str(code) = value {
+                if !target.iter().any(|v| v == code) {
+                    target.push(code.clone());
                 }
             }
         }
     }
 
-    fn push_bool_and_tuple_from_datas_exact_py(target: &mut Vec<Option<i64>>, datas: &Vec<Vec<PyValue>>) {
-        if let Some(values) = datas.get(4) {
-            for value in values {
-                if let PyValue::Tuple(inner) = value {
-                    let option = inner.iter().find_map(|v| match v {
-                        PyValue::Int(n) => Some(Some(*n)),
-                        PyValue::NoneValue => Some(None),
-                        _ => None,
-                    });
-                    if let Some(option) = option {
-                        if !target.contains(&option) {
-                            target.push(option);
-                        }
-                    }
+    fn push_bool_and_tuple_set1_from_entry_py(target: &mut Vec<Option<i64>>, entry: &StoreParameterEntry) {
+        for value in entry.datas.get(4).into_iter().flatten() {
+            if let PyValue::Tuple(inner) = value {
+                let option = match inner.first() {
+                    Some(PyValue::Int(n)) => Some(*n),
+                    Some(PyValue::NoneValue) => None,
+                    _ => continue,
+                };
+                if !target.contains(&option) {
+                    target.push(option);
                 }
             }
         }
     }
 
-    fn push_metakonkret_from_datas_exact_py(target: &mut Vec<(i64, i64)>, datas: &Vec<Vec<PyValue>>) {
-        if let Some(values) = datas.get(11) {
-            for value in values {
-                if let PyValue::Tuple(inner) = value {
-                    let ints: Vec<i64> = inner.iter().filter_map(|v| if let PyValue::Int(n) = v { Some(*n) } else { None }).collect();
-                    if ints.len() >= 2 {
-                        let pair = (ints[0], ints[1]);
+    fn push_metakonkret_pairs_from_entry_py(target: &mut Vec<(i64, i64)>, entry: &StoreParameterEntry) {
+        for value in entry.datas.get(11).into_iter().flatten() {
+            if let PyValue::Tuple(inner) = value {
+                if inner.len() >= 2 {
+                    if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                        let pair = (*a, *b);
                         if !target.contains(&pair) {
                             target.push(pair);
                         }
@@ -474,18 +447,39 @@ impl Program {
         }
     }
 
-    fn push_exact_generators_from_entry_py(
-        &self,
-        generated1Pairs: &mut Vec<(i64, i64)>,
-        generated2Codes: &mut Vec<String>,
-        boolAndTupleSet1Options: &mut Vec<Option<i64>>,
-        metakonkretPairs: &mut Vec<(i64, i64)>,
+    fn collect_generator_metadata_from_entry_py(
+        generated1_pairs: &mut Vec<(i64, i64)>,
+        generated2_codes: &mut Vec<String>,
+        bool_and_tuple_set1_options: &mut Vec<Option<i64>>,
+        metakonkret_pairs: &mut Vec<(i64, i64)>,
         entry: &StoreParameterEntry,
     ) {
-        Self::push_generated1_from_datas_exact_py(generated1Pairs, &entry.datas);
-        Self::push_generated2_from_datas_exact_py(generated2Codes, &entry.datas);
-        Self::push_bool_and_tuple_from_datas_exact_py(boolAndTupleSet1Options, &entry.datas);
-        Self::push_metakonkret_from_datas_exact_py(metakonkretPairs, &entry.datas);
+        Self::push_generated1_pairs_from_entry_py(generated1_pairs, entry);
+        Self::push_generated2_codes_from_entry_py(generated2_codes, entry);
+        Self::push_bool_and_tuple_set1_from_entry_py(bool_and_tuple_set1_options, entry);
+        Self::push_metakonkret_pairs_from_entry_py(metakonkret_pairs, entry);
+    }
+
+    fn selected_spalten_sideparas_py(&self) -> (Vec<String>, bool) {
+        let mut in_spalten = false;
+        let mut selected: Vec<String> = vec![];
+        let mut has_alles = false;
+
+        for arg in &self.argvWithoutProgram {
+            if arg.starts_with('-') && !arg.starts_with("--") {
+                in_spalten = arg == "-spalten";
+                continue;
+            }
+            if !in_spalten || !arg.starts_with("--") {
+                continue;
+            }
+            if arg == "--alles" {
+                has_alles = true;
+            }
+            selected.push(arg.clone());
+        }
+
+        (selected, has_alles)
     }
 
     fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
@@ -494,12 +488,11 @@ impl Program {
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
         let mut metakonkretPairs: Vec<(i64, i64)> = vec![];
 
-        let spalten_side_paras = self.spalten_side_paras_exact_py();
-        let has_alles_spalten = spalten_side_paras.iter().any(|arg| arg == "--alles");
+        let (selected_sideparas, has_alles_spalten) = self.selected_spalten_sideparas_py();
 
         if has_alles_spalten {
             for entry in &words.paraNdataMatrix {
-                self.push_exact_generators_from_entry_py(
+                Self::collect_generator_metadata_from_entry_py(
                     &mut generated1Pairs,
                     &mut generated2Codes,
                     &mut boolAndTupleSet1Options,
@@ -507,37 +500,32 @@ impl Program {
                     entry,
                 );
             }
-            return (generated1Pairs, generated2Codes, boolAndTupleSet1Options, metakonkretPairs);
         }
 
-        for sidePara in &spalten_side_paras {
-            let Some((main_name_raw, sub_names_raw)) = sidePara[2..].split_once('=') else {
+        for side_para in selected_sideparas {
+            if !side_para.starts_with("--") {
+                continue;
+            }
+            let Some((main_name_raw, sub_names_raw)) = side_para[2..].split_once('=') else {
                 continue;
             };
             let main_name = main_name_raw.trim();
-            let selected_sub_names: Vec<&str> = sub_names_raw
-                .split(',')
-                .map(|txt| txt.trim())
-                .filter(|txt| !txt.is_empty())
-                .collect();
-            if selected_sub_names.is_empty() {
-                continue;
-            }
 
-            for entry in &words.paraNdataMatrix {
-                if !entry.parameterMainNames.iter().any(|alias| alias == main_name) {
-                    continue;
+            for sub_name in sub_names_raw.split(',').map(|v| v.trim()).filter(|v| !v.is_empty()) {
+                let normalized_sub_name = if let Some(rest) = sub_name.strip_prefix('-') { rest } else { sub_name };
+                for entry in &words.paraNdataMatrix {
+                    let main_matches = entry.parameterMainNames.iter().any(|name| name == main_name);
+                    let sub_matches = entry.parameterNames.iter().any(|name| name == normalized_sub_name);
+                    if main_matches && sub_matches {
+                        Self::collect_generator_metadata_from_entry_py(
+                            &mut generated1Pairs,
+                            &mut generated2Codes,
+                            &mut boolAndTupleSet1Options,
+                            &mut metakonkretPairs,
+                            entry,
+                        );
+                    }
                 }
-                if !selected_sub_names.iter().any(|sub| entry.parameterNames.iter().any(|alias| alias == sub)) {
-                    continue;
-                }
-                self.push_exact_generators_from_entry_py(
-                    &mut generated1Pairs,
-                    &mut generated2Codes,
-                    &mut boolAndTupleSet1Options,
-                    &mut metakonkretPairs,
-                    entry,
-                );
             }
         }
 
