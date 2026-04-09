@@ -57,11 +57,55 @@ impl Program {
             .collect()
     }
 
+    pub(crate) fn canonical_spalten_main_cli_name_py(cmd: &str) -> &'static str {
+        match cmd {
+            "primvielfache" | "multiplikationen" => "multiplikationen",
+            "gebrochenuniversum2" | "gebrochenuniversum" => "gebrochenuniversum",
+            "gebrochengalaxie2" | "gebrochengalaxie" => "gebrochengalaxie",
+            "gebrochenemotion2" | "gebrochenemotion" => "gebrochenemotion",
+            "gebrochengroesse2" | "gebrochengroesse" => "gebrochengroesse",
+            _ => "",
+        }
+    }
+
+    pub(crate) fn internal_spalten_group_name_py(cmd: &str) -> &'static str {
+        match cmd {
+            "primvielfache" | "multiplikationen" => "primvielfache",
+            "gebrochenuniversum2" | "gebrochenuniversum" => "gebrochenuniversum",
+            "gebrochengalaxie2" | "gebrochengalaxie" => "gebrochengalaxie",
+            "gebrochenemotion2" | "gebrochenemotion" => "gebrochenemotion",
+            "gebrochengroesse2" | "gebrochengroesse" => "gebrochengroesse",
+            _ => "",
+        }
+    }
+
+    pub(crate) fn spalten_main_name_candidates_py(cmd: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        if !cmd.is_empty() {
+            out.push(cmd.to_string());
+        }
+        let canonical = Self::canonical_spalten_main_cli_name_py(cmd);
+        if !canonical.is_empty() && !out.iter().any(|s| s == canonical) {
+            out.push(canonical.to_string());
+        }
+        let internal = Self::internal_spalten_group_name_py(cmd);
+        if !internal.is_empty() && !out.iter().any(|s| s == internal) {
+            out.push(internal.to_string());
+        }
+        out
+    }
+
     pub(crate) fn parameter_main_name_matches_py(stored: &str, cmd: &str) -> bool {
-        stored == cmd
-            || stored.contains(&format!("'{}'", cmd))
-            || stored.contains(&format!("[\"{}\"]", cmd))
-            || stored.contains(cmd)
+        for candidate in Self::spalten_main_name_candidates_py(cmd) {
+            if stored == candidate
+                || stored.contains(&format!("'{}'", candidate))
+                || stored.contains(&format!("[\"{}\"]", candidate))
+                || stored.contains(&candidate)
+            {
+                return true;
+            }
+        }
+        false
     }
 
     pub(crate) fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
@@ -81,7 +125,11 @@ impl Program {
                 }
             }
 
-            let befehl = befehlName.unwrap_or("");
+            let befehl_raw = befehlName.unwrap_or("");
+            let befehl = {
+                let canonical = Self::canonical_spalten_main_cli_name_py(befehl_raw);
+                if canonical.is_empty() { befehl_raw } else { canonical }
+            };
             let para = paraValue.unwrap_or("");
 
             let gebr_idx = match befehl {
@@ -202,7 +250,15 @@ impl Program {
                     } else if cmd == "keinenummerierung" && neg.is_empty() {
                         self.nummeriere = false;
                     } else if let Some(eq) = eq {
-                        let left = cmd[..eq].to_string();
+                        let left_raw = cmd[..eq].to_string();
+                        let left = {
+                            let canonical = Self::canonical_spalten_main_cli_name_py(&left_raw);
+                            if canonical.is_empty() {
+                                left_raw.clone()
+                            } else {
+                                canonical.to_string()
+                            }
+                        };
                         let right = cmd[eq + 1..].to_string();
                         for mut one in right.split(',').map(|s| s.to_string()) {
                             let yes1 = if !one.is_empty() && one.starts_with('-') {
@@ -212,11 +268,17 @@ impl Program {
                                 neg.is_empty()
                             };
                             if yes1 {
-                                if let Some(tupl) = self.paraDict.get(&(left.clone(), one.clone())).cloned() {
-                                    self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
-                                } else {
+                                let mut found_exact = false;
+                                for candidate in Self::spalten_main_name_candidates_py(&left_raw) {
+                                    if let Some(tupl) = self.paraDict.get(&(candidate.clone(), one.clone())).cloned() {
+                                        self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                        found_exact = true;
+                                        break;
+                                    }
+                                }
+                                if !found_exact {
                                     for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                                        if Self::parameter_main_name_matches_py(&k1, &left) && k2 == one {
+                                        if Self::parameter_main_name_matches_py(&k1, &left_raw) && k2 == one {
                                             self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
                                         }
                                     }
@@ -224,9 +286,18 @@ impl Program {
                             }
                         }
                     } else if neg.is_empty() {
+                        let cmd_raw = cmd.clone();
+                        let cmd_canonical = {
+                            let canonical = Self::canonical_spalten_main_cli_name_py(&cmd_raw);
+                            if canonical.is_empty() {
+                                cmd_raw.clone()
+                            } else {
+                                canonical.to_string()
+                            }
+                        };
                         for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                            if Self::parameter_main_name_matches_py(&k1, &cmd) && k2.is_empty() {
-                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd));
+                            if Self::parameter_main_name_matches_py(&k1, &cmd_raw) && k2.is_empty() {
+                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
                             }
                         }
                     }
