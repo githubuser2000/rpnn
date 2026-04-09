@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
-use crate::shared::reta_generators_inventory_py::{GENERATED2_SPECS, BOOL_AND_TUPLE_SET1_SPECS, METAKONKRET_SPECS};
+use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 impl Program {
     pub(crate) fn help_lines_py(&self) -> Vec<String> {
@@ -399,6 +399,44 @@ impl Program {
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
         let mut metakonkretPairs: Vec<(i64, i64)> = vec![];
 
+        let selected_generated1 = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.generated1)
+            .cloned()
+            .unwrap_or_default();
+        let selected_bool = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.boolAndTupleSet1)
+            .cloned()
+            .unwrap_or_default();
+        let selected_meta = self.spaltenArtenKey_SpaltennummernValue
+            .get(&self.spaltenTypeNaming.metakonkret)
+            .cloned()
+            .unwrap_or_default();
+
+        for spec in GENERATED1_SPECS {
+            if selected_generated1.contains(&spec.col_a) || selected_generated1.contains(&spec.col_b) {
+                let pair = (spec.col_a, spec.col_b);
+                if !generated1Pairs.contains(&pair) {
+                    generated1Pairs.push(pair);
+                }
+            }
+        }
+        for spec in BOOL_AND_TUPLE_SET1_SPECS {
+            if spec.col_a >= 0 && selected_bool.contains(&spec.col_a) {
+                let parsed = Some(spec.col_a);
+                if !boolAndTupleSet1Options.contains(&parsed) {
+                    boolAndTupleSet1Options.push(parsed);
+                }
+            }
+        }
+        for spec in METAKONKRET_SPECS {
+            if selected_meta.contains(&spec.col_a) {
+                let pair = (spec.col_a, spec.col_b);
+                if !metakonkretPairs.contains(&pair) {
+                    metakonkretPairs.push(pair);
+                }
+            }
+        }
+
         for sidePara in &self.sideParas {
             if !sidePara.starts_with("--") {
                 continue;
@@ -410,15 +448,15 @@ impl Program {
             let sub_name = sub_name_raw.trim();
 
             for entry in &words.paraNdataMatrix {
-                if !entry.parameterMainNames.iter().any(|n| n == main_name) {
+                if !entry.parameterMainNames.iter().any(|n| Self::parameter_main_name_matches_py(n, main_name)) {
                     continue;
                 }
                 if !entry.parameterNames.iter().any(|n| n == sub_name) {
                     continue;
                 }
 
-                if let Some(datas0) = entry.datas.get(1) {
-                    for value in datas0 {
+                if let Some(datas1) = entry.datas.get(1) {
+                    for value in datas1 {
                         if let PyValue::Tuple(values) = value {
                             if values.len() == 2 {
                                 if let (PyValue::Int(a), PyValue::Int(b)) = (&values[0], &values[1]) {
@@ -472,6 +510,17 @@ impl Program {
             }
         }
 
+        for spec in GENERATED2_SPECS {
+            let flag = self.sideParas.iter().any(|side| {
+                side.starts_with("--")
+                    && side.contains(spec.main_name)
+                    && side.contains(spec.parameter_name)
+            });
+            if flag && !generated2Codes.iter().any(|v| v == spec.code) {
+                generated2Codes.push(spec.code.to_string());
+            }
+        }
+
         (generated1Pairs, generated2Codes, boolAndTupleSet1Options, metakonkretPairs)
     }
 
@@ -497,15 +546,19 @@ impl Program {
         self.init_spalten_arten_python_like();
         self.storeParamtersForColumns(words);
         self.produceAllSpaltenNumbers("");
+        if self.argvWithoutProgram.iter().any(|a| a == "--alles") {
+            if let Some(ordinary) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&self.spaltenTypeNaming.ordinary) {
+                for v in &self.AllSimpleCommandSpalten {
+                    ordinary.insert(*v);
+                }
+            }
+        }
 
         let (mut paramLines, paramLinesNot) = self.deleteDoublesInSets_py(paramLines0, paramLinesNot0);
 
         self.rowsAsNumbers = Self::ordered_set_to_vec_i64(
             self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.ordinary).cloned().unwrap_or_default(),
         );
-        if self.argvWithoutProgram.iter().any(|arg| arg == "--alles") && !self.AllSimpleCommandSpalten.is_empty() {
-            self.rowsAsNumbers = self.AllSimpleCommandSpalten.clone();
-        }
         self.generRows = Self::ordered_set_to_vec_i64(
             self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.generated1).cloned().unwrap_or_default(),
         );

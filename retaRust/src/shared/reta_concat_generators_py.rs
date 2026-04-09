@@ -901,6 +901,11 @@ impl Program {
                     into.push(heading.clone());
                     continue;
                 }
+                if i == 1 {
+                    let basis = self.zellenwert_py(1, col_a);
+                    into.push(basis);
+                    continue;
+                }
                 let mut teile: Vec<String> = vec![];
                 for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
                     let basis = if primAmount % 2 == 0 {
@@ -917,11 +922,7 @@ impl Program {
                         teile.push(basis);
                     }
                 }
-                if teile.is_empty() {
-                    into.push(String::new());
-                } else {
-                    into.push(self.nicht_leere_teile_join_py(teile, " + "));
-                }
+                into.push(self.nicht_leere_teile_join_py(teile, " + "));
             }
             let spalte = self.fuege_spalte_hinzu_py(into, &heading);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
@@ -935,28 +936,94 @@ impl Program {
         let mut into_pro: Vec<String> = vec![];
         let mut into_contra: Vec<String> = vec![];
         let row_end = self.generator_row_end_py();
+        let mut list_innen: Vec<i64> = vec![];
+        let mut list_aussen: Vec<i64> = vec![];
+        let mut keine_prim_innen = true;
+        let mut keine_prim_aussen = true;
+        let mut weiter1a = 0usize;
+        let mut weiter1b = 0usize;
+        let mut weiter2a = 0usize;
+        let mut weiter2b = 0usize;
+        let mut pro_map: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+        let mut contra_map: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+
         for i in 0..=row_end {
             if i == 0 {
                 into_pro.push("Primzahlkreuz pro".to_string());
                 into_contra.push("Primzahlkreuz contra".to_string());
                 continue;
             }
-            let mut pro: Vec<String> = vec![];
-            let mut contra: Vec<String> = vec![];
-            for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
-                let strukturalie = self.zellenwert_py(prim as usize, 5);
-                let reziproke = self.zellenwert_py(prim as usize, 131);
-                let basis_pro = if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(prim) { strukturalie.clone() } else { reziproke.clone() };
-                let basis_contra = if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(prim) { reziproke } else { strukturalie };
-                if !basis_pro.trim().is_empty() {
-                    if primAmount > 1 { pro.push(format!("{} * {}", primAmount, basis_pro)); } else { pro.push(basis_pro); }
+            let n = i as i64;
+            let mut pro_nums: BTreeSet<i64> = BTreeSet::new();
+            let mut contra_nums: BTreeSet<i64> = BTreeSet::new();
+
+            if self.primCreativity_exact_py(n) == 1 || n == 1 {
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(n) {
+                    list_innen.push(n);
+                    if n > 16 {
+                        let gegen = if keine_prim_innen {
+                            *list_aussen.get(weiter1b + 1).unwrap_or(&1)
+                        } else {
+                            *list_innen.get(weiter1a).unwrap_or(&1)
+                        };
+                        if keine_prim_innen { weiter1b += 1; } else { weiter1a += 1; }
+                        contra_nums.insert(gegen);
+                    } else if matches!(n, 5 | 11) {
+                        contra_nums.insert(2);
+                    }
+                    keine_prim_innen = false;
                 }
-                if !basis_contra.trim().is_empty() {
-                    if primAmount > 1 { contra.push(format!("{} * {}", primAmount, basis_contra)); } else { contra.push(basis_contra); }
+                if n == 2 {
+                    contra_nums.insert(1);
+                } else if n == 3 {
+                    pro_nums.insert(1);
+                }
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(n) {
+                    list_aussen.push(n);
+                    if n > 16 {
+                        let pro = if keine_prim_aussen {
+                            *list_innen.get(weiter2b + 1).unwrap_or(&1)
+                        } else {
+                            *list_aussen.get(weiter2a).unwrap_or(&1)
+                        };
+                        if keine_prim_aussen { weiter2b += 1; } else { weiter2a += 1; }
+                        pro_nums.insert(pro);
+                    } else if matches!(n, 7 | 13) {
+                        pro_nums.insert(3);
+                    }
+                    keine_prim_aussen = false;
+                }
+            } else {
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(n) {
+                    keine_prim_innen = true;
+                } else if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(n) {
+                    keine_prim_aussen = true;
+                }
+                for (prim, _) in self.primRepeat(self.primFak(n)) {
+                    if let Some(existing) = contra_map.get(&prim) {
+                        for other in existing {
+                            contra_nums.insert((n / prim) * *other);
+                        }
+                    }
+                    if let Some(existing) = pro_map.get(&prim) {
+                        for other in existing {
+                            pro_nums.insert((n / prim) * *other);
+                        }
+                    }
                 }
             }
-            into_pro.push(self.nicht_leere_teile_join_py(pro, " | "));
-            into_contra.push(self.nicht_leere_teile_join_py(contra, " | "));
+
+            if !pro_nums.is_empty() {
+                pro_map.insert(n, pro_nums.clone());
+            }
+            if !contra_nums.is_empty() {
+                contra_map.insert(n, contra_nums.clone());
+            }
+
+            let pro_text = pro_nums.into_iter().map(|v| format!("pro {}", v)).collect::<Vec<_>>();
+            let contra_text = contra_nums.into_iter().map(|v| format!("gegen {}", v)).collect::<Vec<_>>();
+            into_pro.push(self.nicht_leere_teile_join_py(pro_text, ", "));
+            into_contra.push(self.nicht_leere_teile_join_py(contra_text, ", "));
         }
         let spalte_pro = self.fuege_spalte_hinzu_py(into_pro, "Primzahlkreuz pro");
         let spalte_contra = self.fuege_spalte_hinzu_py(into_contra, "Primzahlkreuz contra");
