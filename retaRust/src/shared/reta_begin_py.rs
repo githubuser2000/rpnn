@@ -437,16 +437,24 @@ impl Program {
         }
     }
 
+    fn parameter_main_name_matches_local_py(stored: &str, cmd: &str) -> bool {
+        let normalize = |value: &str| -> String {
+            match value.trim().to_ascii_lowercase().as_str() {
+                "multiplikationen" | "primvielfache" => "primvielfache".to_string(),
+                other => other.to_string(),
+            }
+        };
+        normalize(stored) == normalize(cmd)
+    }
+
     fn entry_matches_main_and_sub_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
-        let main_matches = entry
-            .parameterMainNames
+        entry.parameterMainNames
             .iter()
-            .any(|candidate| Self::parameter_main_name_matches_py(candidate, main_name));
-        let sub_matches = entry.parameterNames.iter().any(|candidate| {
-            candidate == sub_name
-                || candidate.eq_ignore_ascii_case(sub_name)
-        });
-        main_matches && sub_matches
+            .any(|candidate| Self::parameter_main_name_matches_local_py(candidate, main_name))
+            && entry
+                .parameterNames
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(sub_name))
     }
 
     fn push_unique_generated2_selection_py(target: &mut Vec<Generated2Selection>, value: Generated2Selection) {

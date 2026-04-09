@@ -1006,44 +1006,104 @@ impl Program {
         self.generated2_code_heading_py(&selection.code)
     }
 
+    fn generated2_python_heading_exact_py(&self, poly_name: &str, kombi_name: &str, is_gebr: bool) -> String {
+        let mut heading = format!("generierte Multiplikationen {} {}", poly_name, kombi_name);
+        if is_gebr {
+            heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
+        }
+        heading
+    }
+
+    fn generated2_python_order_codes_py(&self) -> Vec<&'static str> {
+        vec![
+            "PrimCSV",
+            "primMotivStern",
+            "primStrukStern",
+            "primMotivGleichf",
+            "primStrukGleichf",
+            "primMotivSternGebr",
+            "primStrukSternGebr",
+            "primMotivGleichfGebr",
+            "primStrukGleichfGebr",
+        ]
+    }
+
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let generatedSelections: Vec<Generated2Selection> = self.generated2_selections_exact_py();
         if generatedSelections.is_empty() {
             return;
         }
 
+        let mut requested_codes: Vec<String> = vec![];
+        for code in self.generated2_python_order_codes_py() {
+            if generatedSelections.iter().any(|selection| selection.code == code) {
+                requested_codes.push(code.to_string());
+            }
+        }
+        for selection in &generatedSelections {
+            if selection.code == "primzahlkreuzprocontra" {
+                continue;
+            }
+            if !requested_codes.iter().any(|code| code == &selection.code) {
+                requested_codes.push(selection.code.clone());
+            }
+        }
+        if requested_codes.is_empty() {
+            return;
+        }
+
         let relitableCopy = self.relitable.clone();
         let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
 
-        for selection in generatedSelections {
-            let code = selection.code.clone();
-            if code == "primzahlkreuzprocontra" {
-                continue;
-            }
-
-            if let Some((_, poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(&code) {
-                let (motiv_col, trans_col) = self.generated2_code_source_columns_py(&code);
-                let mut motivation: Vec<String> = vec![];
-                let mut transzendentalien: Vec<String> = vec![];
-                for cols in &relitableCopy {
-                    motivation.push(cols.get(motiv_col).cloned().unwrap_or_default());
-                    transzendentalien.push(cols.get(trans_col).cloned().unwrap_or_default());
+        if requested_codes.iter().any(|code| code == "PrimCSV") {
+            let (col_a, _col_b) = self.generated2_code_source_columns_py("PrimCSV");
+            let heading = "Primzahlvielfache, - nicht generiert".to_string();
+            let row_end = self.generator_row_end_py();
+            let mut into: Vec<String> = vec![];
+            for i in 0..=row_end {
+                if i == 0 {
+                    into.push(heading.clone());
+                } else {
+                    into.push(self.zellenwert_py(i, col_a));
                 }
+            }
+            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+            Self::push_unique_i64_py(rowsAsNumbers, spalte);
+        }
 
-                for kombi_idx in kombis {
-                    let mut heading = format!(
-                        "{} {}",
-                        self.generated2_selection_heading_exact_py(&selection),
-                        kombi_namen[kombi_idx]
-                    );
-                    if heading.trim().is_empty() {
-                        heading = format!("{} {}", poly_name, kombi_namen[kombi_idx]);
+        for is_gebr in [false, true] {
+            for poly_name in ["Sternpolygone", "gleichförmige Polygone"] {
+                let code = match (poly_name, is_gebr) {
+                    ("Sternpolygone", false) => Some(("primMotivStern", "primStrukStern")),
+                    ("gleichförmige Polygone", false) => Some(("primMotivGleichf", "primStrukGleichf")),
+                    ("Sternpolygone", true) => Some(("primMotivSternGebr", "primStrukSternGebr")),
+                    ("gleichförmige Polygone", true) => Some(("primMotivGleichfGebr", "primStrukGleichfGebr")),
+                    _ => None,
+                };
+                let Some((motiv_code, struk_code)) = code else { continue; };
+
+                let mapping: Vec<(&str, usize)> = vec![
+                    (motiv_code, 0),
+                    (motiv_code, 1),
+                    (struk_code, 2),
+                    (struk_code, 3),
+                ];
+
+                for (code, kombi_idx) in mapping {
+                    if !requested_codes.iter().any(|value| value == code) {
+                        continue;
                     }
-                    if is_gebr {
-                        heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
+                    let (motiv_col, trans_col) = self.generated2_code_source_columns_py(code);
+                    let mut motivation: Vec<String> = vec![];
+                    let mut transzendentalien: Vec<String> = vec![];
+                    for cols in &relitableCopy {
+                        motivation.push(cols.get(motiv_col).cloned().unwrap_or_default());
+                        transzendentalien.push(cols.get(trans_col).cloned().unwrap_or_default());
                     }
-                    let mut into: Vec<String> = vec![];
+
+                    let heading = self.generated2_python_heading_exact_py(poly_name, kombi_namen[kombi_idx], is_gebr);
                     let row_end = self.generator_row_end_py();
+                    let mut into: Vec<String> = vec![];
                     for i in 0..=row_end {
                         if i == 0 {
                             into.push(heading.clone());
@@ -1055,13 +1115,8 @@ impl Program {
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
-                        for (_k, multi) in multipless.iter().enumerate() {
-                            let Some(text) = self.generated2_kombi_pair_text_py(
-                                *multi,
-                                kombi_idx,
-                                &motivation,
-                                &transzendentalien,
-                            ) else {
+                        for (k, multi) in multipless.iter().enumerate() {
+                            let Some(text) = self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation, &transzendentalien) else {
                                 continue;
                             };
                             if self.outType == "html" {
@@ -1072,7 +1127,7 @@ impl Program {
                                 teile.push("[*]".to_string());
                                 teile.push(text);
                             } else {
-                                if !teile.is_empty() {
+                                if k > 0 && !teile.is_empty() {
                                     teile.push(", außerdem: ".to_string());
                                 }
                                 teile.push(text);
@@ -1090,42 +1145,7 @@ impl Program {
                     let spalte = self.fuege_spalte_hinzu_py(into, &heading);
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
-                continue;
             }
-
-            let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
-            let heading = self.generated2_selection_heading_exact_py(&selection);
-            let mut into: Vec<String> = vec![];
-            let row_end = self.generator_row_end_py();
-            for i in 0..=row_end {
-                if i == 0 {
-                    into.push(heading.clone());
-                    continue;
-                }
-                let mut teile: Vec<String> = vec![];
-                for (prim, primAmount) in self.primRepeat(self.primFak(i as i64)) {
-                    let basis = if primAmount % 2 == 0 {
-                        self.zellenwert_py(prim as usize, col_b)
-                    } else {
-                        self.zellenwert_py(prim as usize, col_a)
-                    };
-                    if basis.trim().is_empty() {
-                        continue;
-                    }
-                    if primAmount > 1 {
-                        teile.push(format!("{} * {}", primAmount, basis));
-                    } else {
-                        teile.push(basis);
-                    }
-                }
-                if teile.is_empty() {
-                    into.push(String::new());
-                } else {
-                    into.push(self.nicht_leere_teile_join_py(teile, " + "));
-                }
-            }
-            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
-            Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
 
