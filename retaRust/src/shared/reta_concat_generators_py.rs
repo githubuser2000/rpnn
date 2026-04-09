@@ -141,6 +141,45 @@ impl Program {
         }
     }
 
+
+    fn generated2_exact_coords_py(&self, code: &str) -> Option<(usize, &'static str, Vec<usize>, bool)> {
+        match code {
+            "primMotivStern" => Some((0, "Sternpolygone", vec![0, 1, 2], false)),
+            "primStrukStern" => Some((0, "Sternpolygone", vec![1, 2, 3], false)),
+            "primMotivGleichf" => Some((1, "gleichförmige Polygone", vec![0, 1, 2], false)),
+            "primStrukGleichf" => Some((1, "gleichförmige Polygone", vec![1, 2, 3], false)),
+            "primMotivSternGebr" => Some((0, "Sternpolygone", vec![0, 1, 2], true)),
+            "primStrukSternGebr" => Some((0, "Sternpolygone", vec![1, 2, 3], true)),
+            "primMotivGleichfGebr" => Some((1, "gleichförmige Polygone", vec![0, 1, 2], true)),
+            "primStrukGleichfGebr" => Some((1, "gleichförmige Polygone", vec![1, 2, 3], true)),
+            _ => None,
+        }
+    }
+
+    fn generated2_kombi_pair_text_py(
+        &self,
+        pair: (i64, i64),
+        kombi_idx: usize,
+        motivation: &Vec<String>,
+        transzendentalien: &Vec<String>,
+    ) -> String {
+        let a = pair.0 as usize;
+        let b = pair.1 as usize;
+        let read = |values: &Vec<String>, idx: usize| -> String {
+            values.get(idx).cloned().unwrap_or_default()
+        };
+        let (lhs, rhs) = match kombi_idx {
+            0 => (read(motivation, a), read(motivation, b)),
+            1 => (read(motivation, a), read(transzendentalien, b)),
+            2 => (read(transzendentalien, a), read(motivation, b)),
+            3 => (read(transzendentalien, a), read(transzendentalien, b)),
+            _ => (String::new(), String::new()),
+        };
+        let lhs = if lhs.trim().len() > 3 { lhs } else { "...".to_string() };
+        let rhs = if rhs.trim().len() > 3 { rhs } else { "...".to_string() };
+        format!("({}) * ({})", lhs, rhs)
+    }
+
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
         match metavariable {
             2 => ("Meta", "Konkretes"),
@@ -906,34 +945,6 @@ impl Program {
         }
     }
 
-    fn generated2_exact_coords_py(&self, code: &str) -> Option<(usize, &'static str, Vec<usize>)> {
-        match code {
-            "primMotivStern" => Some((0, "Sternpolygone", vec![0, 1, 2])),
-            "primStrukStern" => Some((0, "Sternpolygone", vec![1, 2, 3])),
-            "primMotivGleichf" => Some((1, "gleichförmige Polygone", vec![0, 1, 2])),
-            "primStrukGleichf" => Some((1, "gleichförmige Polygone", vec![1, 2, 3])),
-            _ => None,
-        }
-    }
-
-    fn generated2_kombi_pair_text_py(&self, pair: (i64, i64), kombi_idx: usize, motivation: &Vec<String>, transzendentalien: &Vec<String>) -> String {
-        let a = pair.0 as usize;
-        let b = pair.1 as usize;
-        let read = |values: &Vec<String>, idx: usize| -> String {
-            values.get(idx).cloned().unwrap_or_default()
-        };
-        let (lhs, rhs) = match kombi_idx {
-            0 => (read(motivation, a), read(motivation, b)),
-            1 => (read(motivation, a), read(transzendentalien, b)),
-            2 => (read(transzendentalien, a), read(motivation, b)),
-            3 => (read(transzendentalien, a), read(transzendentalien, b)),
-            _ => (String::new(), String::new()),
-        };
-        let lhs = if lhs.trim().len() > 3 { lhs } else { "...".to_string() };
-        let rhs = if rhs.trim().len() > 3 { rhs } else { "...".to_string() };
-        format!("({}) * ({})", lhs, rhs)
-    }
-
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let generatedBefehle: Vec<String> = self.generated2Codes.clone();
         if generatedBefehle.is_empty() {
@@ -942,22 +953,30 @@ impl Program {
 
         let relitableCopy = self.relitable.clone();
         let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
-        let mut motivation: [Vec<String>; 2] = [vec![], vec![]];
-        let mut transzendentalien: [Vec<String>; 2] = [vec![], vec![]];
-        for cols in &relitableCopy {
-            motivation[0].push(cols.get(10).cloned().unwrap_or_default());
-            motivation[1].push(cols.get(42).cloned().unwrap_or_default());
-            transzendentalien[0].push(cols.get(5).cloned().unwrap_or_default());
-            transzendentalien[1].push(cols.get(131).cloned().unwrap_or_default());
-        }
 
         for code in generatedBefehle {
             if code == "primzahlkreuzprocontra" {
                 continue;
             }
-            if let Some((poly_idx, poly_name, kombis)) = self.generated2_exact_coords_py(&code) {
+
+            if let Some((_, poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(&code) {
+                let (motiv_col, trans_col) = self.generated2_code_source_columns_py(&code);
+                let mut motivation: Vec<String> = vec![];
+                let mut transzendentalien: Vec<String> = vec![];
+                for cols in &relitableCopy {
+                    motivation.push(cols.get(motiv_col).cloned().unwrap_or_default());
+                    transzendentalien.push(cols.get(trans_col).cloned().unwrap_or_default());
+                }
+
                 for kombi_idx in kombis {
-                    let heading = format!("generierte Multiplikationen {} {}", poly_name, kombi_namen[kombi_idx]);
+                    let mut heading = format!(
+                        "generierte Multiplikationen {} {}",
+                        poly_name,
+                        kombi_namen[kombi_idx]
+                    );
+                    if is_gebr {
+                        heading.push_str(", mit Faktoren aus gebrochen-rationalen Zahlen");
+                    }
                     let mut into: Vec<String> = vec![];
                     let row_end = self.generator_row_end_py();
                     for i in 0..=row_end {
@@ -972,18 +991,24 @@ impl Program {
                         }
                         let mut teile: Vec<String> = vec![];
                         for (k, multi) in multipless.iter().enumerate() {
+                            let text = self.generated2_kombi_pair_text_py(
+                                *multi,
+                                kombi_idx,
+                                &motivation,
+                                &transzendentalien,
+                            );
                             if self.outType == "html" {
                                 teile.push("<li>".to_string());
-                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                                teile.push(text);
                                 teile.push("</li>".to_string());
                             } else if self.outType == "bbcode" {
                                 teile.push("[*]".to_string());
-                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                                teile.push(text);
                             } else {
                                 if k > 0 {
                                     teile.push(", außerdem: ".to_string());
                                 }
-                                teile.push(self.generated2_kombi_pair_text_py(*multi, kombi_idx, &motivation[poly_idx], &transzendentalien[poly_idx]));
+                                teile.push(text);
                             }
                         }
                         if self.outType == "html" {
@@ -1000,6 +1025,7 @@ impl Program {
                 }
                 continue;
             }
+
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
             let heading = self.generated2_code_heading_py(&code);
             let mut into: Vec<String> = vec![];
