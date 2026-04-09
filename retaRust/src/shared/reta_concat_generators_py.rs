@@ -169,6 +169,17 @@ impl Program {
         }
     }
 
+    fn generated2_parenthesize_single_term_py(&self, s: &str) -> String {
+        let s_trim = s.trim();
+        if s_trim.is_empty() {
+            return String::new();
+        }
+        if s_trim.starts_with('(') && s_trim.ends_with(')') {
+            return s_trim.to_string();
+        }
+        format!("({})", s_trim)
+    }
+
     fn generated2_kombi_pair_text_py(
         &self,
         pair: (i64, i64),
@@ -190,10 +201,17 @@ impl Program {
         };
         let lhs = lhs.trim();
         let rhs = rhs.trim();
-        if lhs.is_empty() || rhs.is_empty() {
-            return None;
+        match (lhs.is_empty(), rhs.is_empty()) {
+            (true, true) => None,
+            (false, true) => Some(self.generated2_parenthesize_single_term_py(lhs)),
+            (true, false) => Some(self.generated2_parenthesize_single_term_py(rhs)),
+            (false, false) if lhs == rhs => Some(self.generated2_parenthesize_single_term_py(lhs)),
+            (false, false) => Some(format!(
+                "{} * {}",
+                self.generated2_parenthesize_single_term_py(lhs),
+                self.generated2_parenthesize_single_term_py(rhs)
+            )),
         }
-        Some(format!("({}) * ({})", lhs, rhs))
     }
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
