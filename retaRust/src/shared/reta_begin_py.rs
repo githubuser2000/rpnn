@@ -503,6 +503,9 @@ impl Program {
         self.rowsAsNumbers = Self::ordered_set_to_vec_i64(
             self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.ordinary).cloned().unwrap_or_default(),
         );
+        if self.argvWithoutProgram.iter().any(|arg| arg == "--alles") && !self.AllSimpleCommandSpalten.is_empty() {
+            self.rowsAsNumbers = self.AllSimpleCommandSpalten.clone();
+        }
         self.generRows = Self::ordered_set_to_vec_i64(
             self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.generated1).cloned().unwrap_or_default(),
         );

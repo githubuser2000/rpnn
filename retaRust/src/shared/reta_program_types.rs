@@ -160,7 +160,7 @@ pub struct Program {
     pub boolAndTupleSet1Options: Vec<Option<i64>>,
     pub metakonkretPairs: Vec<(i64, i64)>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
-    pub AllSimpleCommandSpalten: BTreeSet<i64>,
+    pub AllSimpleCommandSpalten: Vec<i64>,
     pub lastLineNumber: i64,
 }
 
@@ -261,7 +261,7 @@ impl Program {
             boolAndTupleSet1Options: vec![],
             metakonkretPairs: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
-            AllSimpleCommandSpalten: BTreeSet::new(),
+            AllSimpleCommandSpalten: vec![],
             lastLineNumber: 0,
         }
     }

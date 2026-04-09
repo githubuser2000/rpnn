@@ -1,6 +1,12 @@
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
+fn push_unique_i64_preserve_order(into: &mut Vec<i64>, value: i64) {
+    if !into.iter().any(|existing| *existing == value) {
+        into.push(value);
+    }
+}
+
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
@@ -26,7 +32,7 @@ impl Program {
     }
 
     pub(crate) fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
-        let mut allValues: Vec<BTreeSet<i64>> = (0..12).map(|_| BTreeSet::new()).collect();
+        let mut allValues: Vec<Vec<i64>> = (0..12).map(|_| Vec::new()).collect();
         let mut gebrochenSpaltenMaximumPlus1 = 2i64;
 
         for possibleCommands in words.paraNdataMatrix.iter() {
@@ -34,7 +40,7 @@ impl Program {
                 for spaltenNummerOderEtc in commandValue {
                     match spaltenNummerOderEtc {
                         PyValue::Int(n) => {
-                            allValues[i].insert(*n);
+                            push_unique_i64_preserve_order(&mut allValues[i], *n);
                             if [5usize, 6usize, 9usize, 10usize].contains(&i) && *n + 1 > gebrochenSpaltenMaximumPlus1 {
                                 gebrochenSpaltenMaximumPlus1 = *n + 1;
                             }
@@ -42,7 +48,7 @@ impl Program {
                         PyValue::Tuple(inner) => {
                             for vv in inner {
                                 if let PyValue::Int(n) = vv {
-                                    allValues[i].insert(*n);
+                                    push_unique_i64_preserve_order(&mut allValues[i], *n);
                                 }
                             }
                         }
@@ -56,7 +62,7 @@ impl Program {
             .filter(|num| Self::primCreativity_py(*num) == 1)
             .collect();
 
-        allValues[2] = allowedPrimNumbersForCommand.into_iter().collect();
+        allValues[2] = allowedPrimNumbersForCommand;
         allValues[3] = words.kombiParaNdataMatrix.keys().cloned().collect();
         allValues[5] = (2..gebrochenSpaltenMaximumPlus1).collect();
         allValues[6] = (2..gebrochenSpaltenMaximumPlus1).collect();
@@ -66,19 +72,20 @@ impl Program {
 
         if self.__invertAlles {
             let max0 = *allValues[0].iter().max().unwrap_or(&0);
-            let mut inverted = BTreeSet::new();
-            for n in 0..max0 {
-                if !allValues[0].contains(&n) {
-                    inverted.insert(n);
-                }
-            }
+            let generated_pairs: BTreeSet<i64> = allValues[1].iter().copied().collect();
+            let inverted = (0..max0)
+                .filter(|n| !allValues[0].contains(n) && !generated_pairs.contains(n))
+                .collect::<Vec<i64>>();
             allValues[0] = inverted;
             for zahl in 1..11usize {
                 allValues[zahl].clear();
             }
         }
 
-        let datas = allValues.into_iter().map(|set| set.into_iter().map(PyValue::Int).collect::<Vec<PyValue>>()).collect::<Vec<Vec<PyValue>>>();
+        let datas = allValues
+            .into_iter()
+            .map(|values| values.into_iter().map(PyValue::Int).collect::<Vec<PyValue>>())
+            .collect::<Vec<Vec<PyValue>>>();
         StoreParameterEntry {
             parameterMainNames: vec!["alles".to_string()],
             parameterNames: vec![],
