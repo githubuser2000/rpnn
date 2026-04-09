@@ -1,8 +1,6 @@
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
-use crate::shared::reta_generators_inventory_py::GENERATED1_SPECS;
-
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
@@ -26,70 +24,64 @@ impl Program {
         }
         1
     }
-
     pub(crate) fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
-        fn push_pyvalue_into_all_values(target: &mut BTreeSet<i64>, value: &PyValue) {
-            match value {
-                PyValue::Int(n) => {
-                    target.insert(*n);
-                }
-                PyValue::Tuple(inner) => {
-                    for vv in inner {
-                        push_pyvalue_into_all_values(target, vv);
-                    }
-                }
-                _ => {}
-            }
-        }
-
         let mut allValues: Vec<BTreeSet<i64>> = (0..12).map(|_| BTreeSet::new()).collect();
         let mut gebrochenSpaltenMaximumPlus1 = 2i64;
 
         for possibleCommands in words.paraNdataMatrix.iter() {
             for (i, commandValue) in possibleCommands.datas.iter().enumerate() {
-                for value in commandValue {
-                    push_pyvalue_into_all_values(&mut allValues[i], value);
-                }
-                if matches!(i, 5 | 6 | 9 | 10) {
-                    for n in &allValues[i] {
-                        if *n + 1 > gebrochenSpaltenMaximumPlus1 {
-                            gebrochenSpaltenMaximumPlus1 = *n + 1;
+                for spaltenNummerOderEtc in commandValue {
+                    match spaltenNummerOderEtc {
+                        PyValue::Int(n) => {
+                            allValues[i].insert(*n);
                         }
+                        PyValue::Tuple(inner) => {
+                            for inner_value in inner {
+                                if let PyValue::Int(n) = inner_value {
+                                    allValues[i].insert(*n);
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
         }
 
-        let allowedPrimNumbersForCommand: Vec<i64> = (2..32)
+                let allowedPrimNumbersForCommand: Vec<i64> = (2..32)
             .filter(|num| Self::primCreativity_py(*num) == 1)
-            .collect();
-
-        let generated1_pair_members: BTreeSet<i64> = GENERATED1_SPECS
-            .iter()
-            .flat_map(|spec| [spec.col_a, spec.col_b])
-            .collect();
-
-        let mut ordinary_before_invert = allValues[0].clone();
-        ordinary_before_invert = ordinary_before_invert
-            .difference(&generated1_pair_members)
-            .copied()
             .collect();
 
         allValues[2] = allowedPrimNumbersForCommand.into_iter().collect();
         allValues[3] = words.kombiParaNdataMatrix.keys().cloned().collect();
+
+        for idx in [5usize, 6usize, 9usize, 10usize] {
+            let mut max_local = 2i64;
+            for v in &allValues[idx] {
+                if *v + 1 > max_local {
+                    max_local = *v + 1;
+                }
+            }
+            if max_local > gebrochenSpaltenMaximumPlus1 {
+                gebrochenSpaltenMaximumPlus1 = max_local;
+            }
+        }
+
         allValues[5] = (2..gebrochenSpaltenMaximumPlus1).collect();
         allValues[6] = (2..gebrochenSpaltenMaximumPlus1).collect();
         allValues[8] = words.kombiParaNdataMatrix2.keys().cloned().collect();
         allValues[9] = (2..gebrochenSpaltenMaximumPlus1).collect();
         allValues[10] = (2..gebrochenSpaltenMaximumPlus1).collect();
 
-        allValues[0] = ordinary_before_invert.clone();
-
         if self.__invertAlles {
-            let max0 = *ordinary_before_invert.iter().max().unwrap_or(&0);
+            let max0 = *allValues[0].iter().max().unwrap_or(&0);
+            let pair_a: BTreeSet<i64> = allValues[1]
+                .iter()
+                .cloned()
+                .collect();
             let mut inverted = BTreeSet::new();
             for n in 0..max0 {
-                if !ordinary_before_invert.contains(&n) {
+                if !allValues[0].contains(&n) && !pair_a.contains(&n) {
                     inverted.insert(n);
                 }
             }

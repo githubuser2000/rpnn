@@ -390,52 +390,11 @@ impl Program {
             self.cliErrors.push(msg(p2));
         }
     }
-
-
-
     fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
         let mut generated1Pairs: Vec<(i64, i64)> = vec![];
         let mut generated2Codes: Vec<String> = vec![];
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
         let mut metakonkretPairs: Vec<(i64, i64)> = vec![];
-
-        let selected_generated1 = self.spaltenArtenKey_SpaltennummernValue
-            .get(&self.spaltenTypeNaming.generated1)
-            .cloned()
-            .unwrap_or_default();
-        let selected_bool = self.spaltenArtenKey_SpaltennummernValue
-            .get(&self.spaltenTypeNaming.boolAndTupleSet1)
-            .cloned()
-            .unwrap_or_default();
-        let selected_meta = self.spaltenArtenKey_SpaltennummernValue
-            .get(&self.spaltenTypeNaming.metakonkret)
-            .cloned()
-            .unwrap_or_default();
-
-        for spec in GENERATED1_SPECS {
-            if selected_generated1.contains(&spec.col_a) || selected_generated1.contains(&spec.col_b) {
-                let pair = (spec.col_a, spec.col_b);
-                if !generated1Pairs.contains(&pair) {
-                    generated1Pairs.push(pair);
-                }
-            }
-        }
-        for spec in BOOL_AND_TUPLE_SET1_SPECS {
-            if spec.col_a >= 0 && selected_bool.contains(&spec.col_a) {
-                let parsed = Some(spec.col_a);
-                if !boolAndTupleSet1Options.contains(&parsed) {
-                    boolAndTupleSet1Options.push(parsed);
-                }
-            }
-        }
-        for spec in METAKONKRET_SPECS {
-            if selected_meta.contains(&spec.col_a) {
-                let pair = (spec.col_a, spec.col_b);
-                if !metakonkretPairs.contains(&pair) {
-                    metakonkretPairs.push(pair);
-                }
-            }
-        }
 
         for sidePara in &self.sideParas {
             if !sidePara.starts_with("--") {
@@ -447,8 +406,41 @@ impl Program {
             let main_name = main_name_raw.trim();
             let sub_name = sub_name_raw.trim();
 
+            for spec in GENERATED1_SPECS {
+                if spec.main_name == main_name && spec.parameter_name == sub_name {
+                    let pair = (spec.col_a, spec.col_b);
+                    if !generated1Pairs.contains(&pair) {
+                        generated1Pairs.push(pair);
+                    }
+                }
+            }
+            for spec in GENERATED2_SPECS {
+                if spec.main_name == main_name && spec.parameter_name == sub_name {
+                    let code = spec.code.to_string();
+                    if !generated2Codes.contains(&code) {
+                        generated2Codes.push(code);
+                    }
+                }
+            }
+            for spec in BOOL_AND_TUPLE_SET1_SPECS {
+                if spec.main_name == main_name && spec.parameter_name == sub_name {
+                    let parsed = if spec.col_a >= 0 { Some(spec.col_a) } else { None };
+                    if !boolAndTupleSet1Options.contains(&parsed) {
+                        boolAndTupleSet1Options.push(parsed);
+                    }
+                }
+            }
+            for spec in METAKONKRET_SPECS {
+                if spec.main_name == main_name && spec.parameter_name == sub_name {
+                    let pair = (spec.col_a, spec.col_b);
+                    if !metakonkretPairs.contains(&pair) {
+                        metakonkretPairs.push(pair);
+                    }
+                }
+            }
+
             for entry in &words.paraNdataMatrix {
-                if !entry.parameterMainNames.iter().any(|n| Self::parameter_main_name_matches_py(n, main_name)) {
+                if !entry.parameterMainNames.iter().any(|n| n == main_name) {
                     continue;
                 }
                 if !entry.parameterNames.iter().any(|n| n == sub_name) {
@@ -486,8 +478,9 @@ impl Program {
                 if let Some(datas7) = entry.datas.get(7) {
                     for value in datas7 {
                         if let PyValue::Str(code) = value {
-                            if !generated2Codes.iter().any(|v| v == code) {
-                                generated2Codes.push(code.clone());
+                            let code = code.clone();
+                            if !generated2Codes.contains(&code) {
+                                generated2Codes.push(code);
                             }
                         }
                     }
@@ -507,17 +500,6 @@ impl Program {
                         }
                     }
                 }
-            }
-        }
-
-        for spec in GENERATED2_SPECS {
-            let flag = self.sideParas.iter().any(|side| {
-                side.starts_with("--")
-                    && side.contains(spec.main_name)
-                    && side.contains(spec.parameter_name)
-            });
-            if flag && !generated2Codes.iter().any(|v| v == spec.code) {
-                generated2Codes.push(spec.code.to_string());
             }
         }
 
@@ -546,13 +528,6 @@ impl Program {
         self.init_spalten_arten_python_like();
         self.storeParamtersForColumns(words);
         self.produceAllSpaltenNumbers("");
-        if self.argvWithoutProgram.iter().any(|a| a == "--alles") {
-            if let Some(ordinary) = self.spaltenArtenKey_SpaltennummernValue.get_mut(&self.spaltenTypeNaming.ordinary) {
-                for v in &self.AllSimpleCommandSpalten {
-                    ordinary.insert(*v);
-                }
-            }
-        }
 
         let (mut paramLines, paramLinesNot) = self.deleteDoublesInSets_py(paramLines0, paramLinesNot0);
 
