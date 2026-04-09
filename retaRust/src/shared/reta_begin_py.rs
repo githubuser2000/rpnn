@@ -2,7 +2,6 @@ use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
-use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
@@ -393,7 +392,88 @@ impl Program {
 
 
 
-    fn parse_exact_generator_selections_from_words_py(&self, _words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
+    fn push_unique_pair_py(target: &mut Vec<(i64, i64)>, pair: (i64, i64)) {
+        if !target.contains(&pair) {
+            target.push(pair);
+        }
+    }
+
+    fn push_unique_option_py(target: &mut Vec<Option<i64>>, value: Option<i64>) {
+        if !target.contains(&value) {
+            target.push(value);
+        }
+    }
+
+    fn push_unique_string_py(target: &mut Vec<String>, value: String) {
+        if !target.iter().any(|existing| existing == &value) {
+            target.push(value);
+        }
+    }
+
+    fn matches_side_parameter_exact_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
+        entry.parameterMainNames.iter().any(|candidate| candidate == main_name)
+            && entry.parameterNames.iter().any(|candidate| candidate == sub_name)
+    }
+
+    fn parse_generated1_pairs_from_entry_py(entry: &StoreParameterEntry, generated1Pairs: &mut Vec<(i64, i64)>) {
+        if let Some(values) = entry.datas.get(1) {
+            for value in values {
+                if let PyValue::Tuple(inner) = value {
+                    if inner.len() == 2 {
+                        if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                            Self::push_unique_pair_py(generated1Pairs, (*a, *b));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn parse_generated2_codes_from_entry_py(entry: &StoreParameterEntry, generated2Codes: &mut Vec<String>) {
+        if let Some(values) = entry.datas.get(7) {
+            for value in values {
+                if let PyValue::Str(code) = value {
+                    Self::push_unique_string_py(generated2Codes, code.clone());
+                }
+            }
+        }
+    }
+
+    fn parse_bool_and_tuple_set1_from_entry_py(entry: &StoreParameterEntry, boolAndTupleSet1Options: &mut Vec<Option<i64>>) {
+        if let Some(values) = entry.datas.get(4) {
+            for value in values {
+                match value {
+                    PyValue::Bool(_) => Self::push_unique_option_py(boolAndTupleSet1Options, None),
+                    PyValue::Tuple(inner) => {
+                        if inner.len() == 1 {
+                            match &inner[0] {
+                                PyValue::Int(v) => Self::push_unique_option_py(boolAndTupleSet1Options, Some(*v)),
+                                PyValue::NoneValue => Self::push_unique_option_py(boolAndTupleSet1Options, None),
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn parse_metakonkret_pairs_from_entry_py(entry: &StoreParameterEntry, metakonkretPairs: &mut Vec<(i64, i64)>) {
+        if let Some(values) = entry.datas.get(11) {
+            for value in values {
+                if let PyValue::Tuple(inner) = value {
+                    if inner.len() == 2 {
+                        if let (PyValue::Int(a), PyValue::Int(b)) = (&inner[0], &inner[1]) {
+                            Self::push_unique_pair_py(metakonkretPairs, (*a, *b));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
         let mut generated1Pairs: Vec<(i64, i64)> = vec![];
         let mut generated2Codes: Vec<String> = vec![];
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
@@ -409,40 +489,14 @@ impl Program {
             let main_name = main_name_raw.trim();
             let sub_name = sub_name_raw.trim();
 
-            for spec in GENERATED1_SPECS {
-                if spec.main_name == main_name && spec.parameter_name == sub_name {
-                    let pair = (spec.col_a, spec.col_b);
-                    if !generated1Pairs.contains(&pair) {
-                        generated1Pairs.push(pair);
-                    }
+            for entry in &words.paraNdataMatrix {
+                if !Self::matches_side_parameter_exact_py(entry, main_name, sub_name) {
+                    continue;
                 }
-            }
-
-            for spec in GENERATED2_SPECS {
-                if spec.main_name == main_name && spec.parameter_name == sub_name {
-                    let code = spec.code.to_string();
-                    if !generated2Codes.iter().any(|v| v == &code) {
-                        generated2Codes.push(code);
-                    }
-                }
-            }
-
-            for spec in BOOL_AND_TUPLE_SET1_SPECS {
-                if spec.main_name == main_name && spec.parameter_name == sub_name {
-                    let option = if spec.col_a >= 0 { Some(spec.col_a) } else { None };
-                    if !boolAndTupleSet1Options.contains(&option) {
-                        boolAndTupleSet1Options.push(option);
-                    }
-                }
-            }
-
-            for spec in METAKONKRET_SPECS {
-                if spec.main_name == main_name && spec.parameter_name == sub_name {
-                    let pair = (spec.col_a, spec.col_b);
-                    if !metakonkretPairs.contains(&pair) {
-                        metakonkretPairs.push(pair);
-                    }
-                }
+                Self::parse_generated1_pairs_from_entry_py(entry, &mut generated1Pairs);
+                Self::parse_generated2_codes_from_entry_py(entry, &mut generated2Codes);
+                Self::parse_bool_and_tuple_set1_from_entry_py(entry, &mut boolAndTupleSet1Options);
+                Self::parse_metakonkret_pairs_from_entry_py(entry, &mut metakonkretPairs);
             }
         }
 
