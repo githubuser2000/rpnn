@@ -2,8 +2,8 @@ use indexmap::IndexMap;
 use std::collections::BTreeSet;
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
-use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 use crate::shared::reta_generators_inventory_py::{BOOL_AND_TUPLE_SET1_SPECS, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
+use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
     pub(crate) fn help_lines_py(&self) -> Vec<String> {
@@ -390,7 +390,10 @@ impl Program {
             self.cliErrors.push(msg(p2));
         }
     }
-    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
+
+
+
+    fn parse_exact_generator_selections_from_words_py(&self, _words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Option<i64>>, Vec<(i64, i64)>) {
         let mut generated1Pairs: Vec<(i64, i64)> = vec![];
         let mut generated2Codes: Vec<String> = vec![];
         let mut boolAndTupleSet1Options: Vec<Option<i64>> = vec![];
@@ -414,90 +417,30 @@ impl Program {
                     }
                 }
             }
+
             for spec in GENERATED2_SPECS {
                 if spec.main_name == main_name && spec.parameter_name == sub_name {
                     let code = spec.code.to_string();
-                    if !generated2Codes.contains(&code) {
+                    if !generated2Codes.iter().any(|v| v == &code) {
                         generated2Codes.push(code);
                     }
                 }
             }
+
             for spec in BOOL_AND_TUPLE_SET1_SPECS {
                 if spec.main_name == main_name && spec.parameter_name == sub_name {
-                    let parsed = if spec.col_a >= 0 { Some(spec.col_a) } else { None };
-                    if !boolAndTupleSet1Options.contains(&parsed) {
-                        boolAndTupleSet1Options.push(parsed);
+                    let option = if spec.col_a >= 0 { Some(spec.col_a) } else { None };
+                    if !boolAndTupleSet1Options.contains(&option) {
+                        boolAndTupleSet1Options.push(option);
                     }
                 }
             }
+
             for spec in METAKONKRET_SPECS {
                 if spec.main_name == main_name && spec.parameter_name == sub_name {
                     let pair = (spec.col_a, spec.col_b);
                     if !metakonkretPairs.contains(&pair) {
                         metakonkretPairs.push(pair);
-                    }
-                }
-            }
-
-            for entry in &words.paraNdataMatrix {
-                if !entry.parameterMainNames.iter().any(|n| n == main_name) {
-                    continue;
-                }
-                if !entry.parameterNames.iter().any(|n| n == sub_name) {
-                    continue;
-                }
-
-                if let Some(datas1) = entry.datas.get(1) {
-                    for value in datas1 {
-                        if let PyValue::Tuple(values) = value {
-                            if values.len() == 2 {
-                                if let (PyValue::Int(a), PyValue::Int(b)) = (&values[0], &values[1]) {
-                                    let pair = (*a, *b);
-                                    if !generated1Pairs.contains(&pair) {
-                                        generated1Pairs.push(pair);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if let Some(datas4) = entry.datas.get(4) {
-                    for value in datas4 {
-                        let parsed = match value {
-                            PyValue::Int(v) => Some(*v),
-                            PyValue::NoneValue => None,
-                            _ => continue,
-                        };
-                        if !boolAndTupleSet1Options.contains(&parsed) {
-                            boolAndTupleSet1Options.push(parsed);
-                        }
-                    }
-                }
-
-                if let Some(datas7) = entry.datas.get(7) {
-                    for value in datas7 {
-                        if let PyValue::Str(code) = value {
-                            let code = code.clone();
-                            if !generated2Codes.contains(&code) {
-                                generated2Codes.push(code);
-                            }
-                        }
-                    }
-                }
-
-                if let Some(datas11) = entry.datas.get(11) {
-                    for value in datas11 {
-                        if let PyValue::Tuple(values) = value {
-                            if values.len() == 2 {
-                                if let (PyValue::Int(a), PyValue::Int(b)) = (&values[0], &values[1]) {
-                                    let pair = (*a, *b);
-                                    if !metakonkretPairs.contains(&pair) {
-                                        metakonkretPairs.push(pair);
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -563,6 +506,22 @@ impl Program {
         self.generated2Codes = generated2Codes_exact;
         self.boolAndTupleSet1Options = boolAndTupleSet1Options_exact;
         self.metakonkretPairs = metakonkretPairs_exact;
+
+        let has_alles_spalten = self.argvWithoutProgram.iter().any(|a| a == "--alles");
+        if has_alles_spalten {
+            let mut merged_direct = self.rowsAsNumbers.clone();
+            for n in self.AllSimpleCommandSpalten.iter().copied() {
+                if !merged_direct.contains(&n) {
+                    merged_direct.push(n);
+                }
+            }
+            self.rowsAsNumbers = merged_direct;
+            let ordinary_key = self.spaltenTypeNaming.ordinary;
+            let ordinary_set = self.spaltenArtenKey_SpaltennummernValue.entry(ordinary_key).or_default();
+            for n in self.rowsAsNumbers.iter().copied() {
+                ordinary_set.insert(n);
+            }
+        }
 
         if !self.rowsOfcombi.is_empty() {
             Self::push_unique_string(&mut paramLines, "ka".to_string());
