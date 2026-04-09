@@ -79,6 +79,14 @@ impl Default for SpaltenTyp {
     }
 }
 
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Generated2Selection {
+    pub parameter_main_name: String,
+    pub parameter_name: String,
+    pub code: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct Program {
     pub argv: Vec<String>,
@@ -159,6 +167,7 @@ pub struct Program {
     pub CsvTheirsSpalten: IndexMap<i64, Vec<i64>>,
     pub generated1Pairs: Vec<(i64, i64)>,
     pub generated2Codes: Vec<String>,
+    pub generated2Selections: Vec<Generated2Selection>,
     pub boolAndTupleSet1Options: Vec<Option<i64>>,
     pub metakonkretPairs: Vec<(i64, i64)>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
@@ -260,6 +269,7 @@ impl Program {
             CsvTheirsSpalten: IndexMap::new(),
             generated1Pairs: vec![],
             generated2Codes: vec![],
+            generated2Selections: vec![],
             boolAndTupleSet1Options: vec![],
             metakonkretPairs: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),

@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::shared::reta_program_types::Program;
+use crate::shared::reta_program_types::{Generated2Selection, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
 impl Program {
@@ -70,11 +70,10 @@ impl Program {
     }
 
     fn generator_row_end_py(&self) -> usize {
-        let relitable_end = self.relitable.len().saturating_sub(1);
-        let last = if self.lastLineNumber > 0 { self.lastLineNumber as usize } else { 0 };
-        let highest = if self.hoechsteZeile > 0 { self.hoechsteZeile as usize } else { 0 };
-        let wished = last.max(highest);
-        if wished == 0 { relitable_end } else { wished.min(relitable_end) }
+        // Python-näher: Generatoren rechnen über die bereits aufgebaute Gesamttabelle
+        // und die spätere Ausgabe filtert erst danach. Kein Kappen auf aktuell sichtbare
+        // Zeilenwünsche, solange die Tabelle die Zeilen bereits trägt.
+        self.relitable.len().saturating_sub(1)
     }
 
     fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
@@ -125,6 +124,15 @@ impl Program {
         code.to_string()
     }
 
+    fn generated2_selection_heading_py(&self, selection: &Generated2Selection) -> String {
+        if !selection.parameter_main_name.is_empty() || !selection.parameter_name.is_empty() {
+            return format!("{} {}", selection.parameter_main_name, selection.parameter_name)
+                .trim()
+                .to_string();
+        }
+        self.generated2_code_heading_py(&selection.code)
+    }
+
     fn generated2_code_source_columns_py(&self, code: &str) -> (usize, usize) {
         match code {
             "primMotivStern" => (10, 5),
@@ -164,7 +172,7 @@ impl Program {
         kombi_idx: usize,
         motivation: &Vec<String>,
         transzendentalien: &Vec<String>,
-    ) -> String {
+    ) -> Option<String> {
         let a = pair.0 as usize;
         let b = pair.1 as usize;
         let read = |values: &Vec<String>, idx: usize| -> String {
@@ -177,9 +185,12 @@ impl Program {
             3 => (read(transzendentalien, a), read(transzendentalien, b)),
             _ => (String::new(), String::new()),
         };
-        let lhs = if lhs.trim().len() > 3 { lhs } else { "...".to_string() };
-        let rhs = if rhs.trim().len() > 3 { rhs } else { "...".to_string() };
-        format!("({}) * ({})", lhs, rhs)
+        let lhs = lhs.trim();
+        let rhs = rhs.trim();
+        if lhs.is_empty() || rhs.is_empty() {
+            return None;
+        }
+        Some(format!("({}) * ({})", lhs, rhs))
     }
 
     fn meta_prefixes_py(&self, metavariable: i64) -> (&'static str, &'static str) {
@@ -948,15 +959,28 @@ impl Program {
     }
 
     pub fn concat1RowPrimUniverse2(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let generatedBefehle: Vec<String> = self.generated2Codes.clone();
-        if generatedBefehle.is_empty() {
+        let generated_selections: Vec<Generated2Selection> = if !self.generated2Selections.is_empty() {
+            self.generated2Selections.clone()
+        } else {
+            self.generated2Codes
+                .iter()
+                .cloned()
+                .map(|code| Generated2Selection {
+                    parameter_main_name: String::new(),
+                    parameter_name: String::new(),
+                    code,
+                })
+                .collect()
+        };
+        if generated_selections.is_empty() {
             return;
         }
 
         let relitableCopy = self.relitable.clone();
         let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
 
-        for code in generatedBefehle {
+        for selection in generated_selections {
+            let code = selection.code.clone();
             if code == "primzahlkreuzprocontra" {
                 continue;
             }
@@ -972,7 +996,8 @@ impl Program {
 
                 for kombi_idx in kombis {
                     let mut heading = format!(
-                        "generierte Multiplikationen {} {}",
+                        "{} {} {}",
+                        self.generated2_selection_heading_py(&selection),
                         poly_name,
                         kombi_namen[kombi_idx]
                     );
@@ -992,13 +1017,15 @@ impl Program {
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
-                        for (k, multi) in multipless.iter().enumerate() {
-                            let text = self.generated2_kombi_pair_text_py(
+                        for (_k, multi) in multipless.iter().enumerate() {
+                            let Some(text) = self.generated2_kombi_pair_text_py(
                                 *multi,
                                 kombi_idx,
                                 &motivation,
                                 &transzendentalien,
-                            );
+                            ) else {
+                                continue;
+                            };
                             if self.outType == "html" {
                                 teile.push("<li>".to_string());
                                 teile.push(text);
@@ -1007,7 +1034,7 @@ impl Program {
                                 teile.push("[*]".to_string());
                                 teile.push(text);
                             } else {
-                                if k > 0 {
+                                if !teile.is_empty() {
                                     teile.push(", außerdem: ".to_string());
                                 }
                                 teile.push(text);
@@ -1029,7 +1056,7 @@ impl Program {
             }
 
             let (col_a, col_b) = self.generated2_code_source_columns_py(&code);
-            let heading = self.generated2_code_heading_py(&code);
+            let heading = self.generated2_selection_heading_py(&selection);
             let mut into: Vec<String> = vec![];
             let row_end = self.generator_row_end_py();
             for i in 0..=row_end {
