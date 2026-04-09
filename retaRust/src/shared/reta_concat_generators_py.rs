@@ -69,6 +69,10 @@ impl Program {
         rowsAsNumbers.retain(|n| !self.puniverseprims.contains(n));
     }
 
+    fn should_show_concat1_non_generated_column_py(&self) -> bool {
+        self.generated2_selections_exact_py().is_empty()
+    }
+
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
         self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect()
     }
@@ -643,7 +647,6 @@ impl Program {
         for kk in extraSpalten {
             let mut zeilenInhalte: Vec<String> = vec![];
             let mut primAmounts = 0i64;
-            let mut oldPrimAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
             let row_end = self.generator_row_end_py();
             for i in 0..=row_end {
@@ -652,7 +655,7 @@ impl Program {
                 } else {
                     vec!["Primzahlwirkung (7, Richtung) ".to_string(), match kk { Some(k) => format!("{}", self.zellenwert_py(0, k)), None => "Richtung-Richtung".to_string() }]
                 };
-                oldPrimAmounts = primAmounts;
+                let oldPrimAmounts = primAmounts;
                 if self.couldBePrimeNumberPrimzahlkreuz(i as i64) {
                     primAmounts += 1;
                 }
@@ -747,6 +750,7 @@ impl Program {
         let Some(csvFileName) = self.concat_csv_name_py(concatTable) else { return concatCSVspalten; };
         let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csvFileName) else { return concatCSVspalten; };
         tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, tableToAdd);
+        let show_concat1_non_generated = self.should_show_concat1_non_generated_column_py();
         if concatTable == 1 {
             let mut tableToAdd2 = vec![vec!["Primzahlvielfache, nicht generiert".to_string()]];
             for zeile in tableToAdd.into_iter().skip(1) {
@@ -777,7 +781,7 @@ impl Program {
             self.relitable[i].extend(tableToAdd[i].clone());
             if i == 0 {
                 for u in 0..maxlen {
-                    if ((u as i64 + 2).checked_sub(0).unwrap_or(0) != 0 && concatTableSelection.contains(&(u as i64 + 2)) && (2..=9).contains(&concatTable)) || concatTable == 1 {
+                    if ((u as i64 + 2).checked_sub(0).unwrap_or(0) != 0 && concatTableSelection.contains(&(u as i64 + 2)) && (2..=9).contains(&concatTable)) || (concatTable == 1 && show_concat1_non_generated) {
                         let selectedSpalten = start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
                         Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
                         concatCSVspalten.push(selectedSpalten);
@@ -1031,7 +1035,7 @@ impl Program {
                             continue;
                         }
                         let mut teile: Vec<String> = vec![];
-                        for (k, multi) in multipless.iter().enumerate() {
+                        for (_k, multi) in multipless.iter().enumerate() {
                             let Some(text) = self.generated2_kombi_pair_text_py(
                                 *multi,
                                 kombi_idx,
