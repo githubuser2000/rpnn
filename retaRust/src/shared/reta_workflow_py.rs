@@ -69,8 +69,10 @@ impl Program {
         );
 
         if !kombi13_rows.is_empty() {
+            let prepared_animalsProfessionsTable =
+                self.prepare4out_kombi_table_py(&animalsProfessionsTable, &kombi13_rows);
             newTable = self.combiTableWorkflow_impl(
-                animalsProfessionsTable,
+                prepared_animalsProfessionsTable,
                 finallyDisplayLines.clone(),
                 kombiTable_Kombis,
                 maintable2subtable_Relation,
@@ -79,11 +81,14 @@ impl Program {
                 paramLines.clone(),
                 &csv_names.kombi13,
                 output_column_origins.clone(),
+                &kombi13_rows,
             );
         }
         if !kombi15_rows.is_empty() {
+            let prepared_animalsProfessionsTable2 =
+                self.prepare4out_kombi_table_py(&animalsProfessionsTable2, &kombi15_rows);
             newTable = self.combiTableWorkflow_impl(
-                animalsProfessionsTable2,
+                prepared_animalsProfessionsTable2,
                 finallyDisplayLines.clone(),
                 kombiTable_Kombis2,
                 maintable2subtable_Relation2,
@@ -92,11 +97,12 @@ impl Program {
                 paramLines.clone(),
                 &csv_names.kombi15,
                 output_column_origins.clone(),
+                &kombi15_rows,
             );
         }
 
         newTable = self.onlyThatColumns_py(newTable, self.spaltenreihenfolgeundnurdiese.clone());
-        self.newTable = newTable.len() > 0;
+        self.newTable = !newTable.is_empty();
         self.finallyDisplayLines = finallyDisplayLines.clone();
         self.numlen = numlen;
         let _old2newTable = old2newTable.clone();
@@ -264,139 +270,121 @@ impl Program {
         chosen
     }
 
-    fn removeOneNumber_lines_py(&self, hinein: &[String], colNum: i64) -> Vec<String> {
-        let condition = !hinein.is_empty()
-            && (((self.textWidth == 0 && self.oneTable) || self.htmlOrBBcode)
-                && self.breiten.is_empty());
-        if !condition {
-            return hinein.to_vec();
+    fn combo_certaintextwidth_py(&self, rowToDisplay: usize, combi_len: usize) -> usize {
+        if self.shellRowsAmount == 0 {
+            return 0;
         }
+        let breiten: Vec<i64> = if self.rowsAsNumbers.len() >= combi_len {
+            self.breiten
+                .iter()
+                .skip(self.rowsAsNumbers.len().saturating_sub(combi_len))
+                .copied()
+                .collect()
+        } else {
+            vec![]
+        };
+        let certain = if rowToDisplay >= 1 && rowToDisplay - 1 < breiten.len() {
+            breiten[rowToDisplay - 1]
+        } else {
+            self.textWidth
+        };
+        if certain <= 0 {
+            0
+        } else {
+            certain as usize
+        }
+    }
 
-        let original_text = hinein.join("\n");
-        let mut parse_lines: Vec<String> = Vec::new();
-        for zellenzeile in hinein {
-            let mut current = zellenzeile.clone();
-            if current.ends_with('-') {
-                current.pop();
+    fn prepare4out_kombi_table_py(
+        &self,
+        kombiTable: &Vec<Vec<String>>,
+        rowsOfcombi: &[i64],
+    ) -> Vec<Vec<String>> {
+        let mut newerTable: Vec<Vec<String>> = vec![];
+        if kombiTable.is_empty() {
+            return newerTable;
+        }
+        let selected_cols = dedup_preserve_order_i64(rowsOfcombi.to_vec());
+
+        for line in kombiTable.iter() {
+            let mut new2Lines: Vec<String> = vec![];
+            let mut rowToDisplay: usize = 0;
+            for t in selected_cols.iter().copied() {
+                let idx = t as usize;
+                let cell = line.get(idx).cloned().unwrap_or_default();
+                rowToDisplay += 1;
+                let certaintextwidth = self.combo_certaintextwidth_py(rowToDisplay, selected_cols.len());
+                let into = if certaintextwidth == 0 {
+                    vec![cell.trim().to_string()]
+                } else {
+                    Self::wrap_text_py(cell.trim(), certaintextwidth)
+                };
+                new2Lines.push(into.join("\n"));
             }
-            parse_lines.push(current);
+            newerTable.push(new2Lines);
         }
-        let parse_text = parse_lines.join("");
+        newerTable
+    }
 
-        let parse_open = match parse_text.find('(') {
+    fn removeOneNumber_lines_py(
+        &self,
+        cell_lines: &[String],
+        colNum: i64,
+        text_width: usize,
+    ) -> Vec<String> {
+        let mut text = cell_lines.join("");
+        while text.ends_with('-') {
+            text.pop();
+        }
+
+        let open_pos = match text.find('(') {
             Some(v) => v,
             None => {
-                return if self.textWidth != 0 {
-                    original_text
-                        .split('\n')
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
+                return if text_width > 0 {
+                    text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
                 } else {
-                    vec![original_text.replace('\n', "; ")]
-                };
-            }
-        };
-        let parse_close = match parse_text[parse_open..].find(") ") {
-            Some(v) => parse_open + v,
-            None => {
-                return if self.textWidth != 0 {
-                    original_text
-                        .split('\n')
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
-                } else {
-                    vec![original_text.replace('\n', "; ")]
+                    vec![text.replace('\n', "; ")]
                 };
             }
         };
 
-        let raw_open = match original_text.find('(') {
+        let close_rel = match text[open_pos..].find(") ") {
             Some(v) => v,
             None => {
-                return if self.textWidth != 0 {
-                    original_text
-                        .split('\n')
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
+                return if text_width > 0 {
+                    text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
                 } else {
-                    vec![original_text.replace('\n', "; ")]
-                };
-            }
-        };
-        let raw_close = match original_text[raw_open..].find(") ") {
-            Some(v) => raw_open + v,
-            None => {
-                return if self.textWidth != 0 {
-                    original_text
-                        .split('\n')
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
-                } else {
-                    vec![original_text.replace('\n', "; ")]
+                    vec![text.replace('\n', "; ")]
                 };
             }
         };
 
-        if parse_close < parse_open || raw_close < raw_open {
-            return hinein.to_vec();
-        }
-
-        let parse_inside = &parse_text[(parse_open + 1)..parse_close];
+        let close_pos = open_pos + close_rel;
+        let inside = &text[(open_pos + 1)..close_pos];
         let target_plain = colNum.to_string();
         let target_paren = format!("({})", colNum);
 
-        let mut should_remove_any = false;
-        for part in parse_inside.split('|') {
-            let compact = part.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-            if compact == target_plain || compact == target_paren {
-                should_remove_any = true;
-                break;
-            }
-        }
-        if !should_remove_any {
-            return if self.textWidth != 0 {
-                original_text
-                    .split('\n')
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-            } else {
-                vec![original_text.replace('\n', "; ")]
-            };
-        }
+        let kept_parts: Vec<&str> = inside
+            .split('|')
+            .filter(|part| {
+                let p = part.trim();
+                !(p == target_plain || p == target_paren)
+            })
+            .collect();
 
-        let raw_inside = &original_text[(raw_open + 1)..raw_close];
-        let mut kept_parts: Vec<String> = Vec::new();
+        let rebuilt_inside = kept_parts.join("|");
 
-        for part in raw_inside.split('|') {
-            let compact = part.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-            let removable = !compact.contains('/')
-                && (compact == target_plain || compact == target_paren);
-            if !removable {
-                kept_parts.push(part.to_string());
-            }
-        }
-
-        let rebuilt = if kept_parts.is_empty() {
-            let suffix_start = raw_close + 2;
-            if suffix_start > original_text.len() {
-                original_text.clone()
-            } else {
-                original_text[suffix_start..].to_string()
-            }
-        } else {
-            let mut s = String::new();
-            s.push_str(&original_text[..raw_open + 1]);
-            s.push_str(&kept_parts.join("|"));
-            s.push_str(&original_text[raw_close..]);
-            s
-        };
+        let mut rebuilt = String::new();
+        rebuilt.push_str(&text[..open_pos + 1]);
+        rebuilt.push_str(&rebuilt_inside);
+        rebuilt.push_str(&text[close_pos..]);
 
         let rebuilt = rebuilt
             .replace("(|", "(")
             .replace("|)", ")")
             .replace("||", "|");
 
-        if self.textWidth != 0 {
+        if text_width > 0 {
             rebuilt
                 .split('\n')
                 .map(|s| s.to_string())
@@ -406,35 +394,9 @@ impl Program {
         }
     }
 
-    fn append_kombi_lines_py(existing: &mut String, lines: &[String]) {
-        if lines.is_empty() {
-            return;
-        }
-        let block = lines
-            .iter()
-            .filter(|line| !line.is_empty())
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n");
-        if block.trim().is_empty() {
-            return;
-        }
-        if existing.is_empty() {
-            *existing = block;
-            return;
-        }
-        if existing.split("\n").collect::<Vec<_>>() == block.split("\n").collect::<Vec<_>>() {
-            return;
-        }
-        if !existing.ends_with('\n') {
-            existing.push('\n');
-        }
-        existing.push_str(&block);
-    }
-
     fn combiTableWorkflow_impl(
         &mut self,
-        animalsProfessionsTable: Vec<Vec<String>>,
+        preparedKombiTable: Vec<Vec<String>>,
         finallyDisplayLines: Vec<String>,
         kombiTable_Kombis: Vec<Vec<i64>>,
         maintable2subtable_Relation: (IndexMap<i64, i64>, IndexMap<i64, i64>),
@@ -443,6 +405,7 @@ impl Program {
         paramLines: Vec<String>,
         csvFileName: &str,
         output_column_origins: Vec<i64>,
+        rowsOfcombi: &[i64],
     ) -> Vec<Vec<String>> {
         let kind = if csvFileName.contains("meta") { "kombi15" } else { "kombi13" };
         let chosen = self.prepare_kombi_py(&paramLines, &finallyDisplayLines, &kombiTable_Kombis, kind);
@@ -450,17 +413,23 @@ impl Program {
             return newTable;
         }
 
-        let mut output_to_subcol: BTreeMap<usize, usize> = BTreeMap::new();
+        let mut output_to_preparedcol: BTreeMap<usize, usize> = BTreeMap::new();
         for (out_idx, orig_col) in output_column_origins.iter().copied().enumerate() {
             if let Some(sub_idx) = maintable2subtable_Relation.0.get(&orig_col) {
-                output_to_subcol.insert(out_idx, (*sub_idx as usize) + 1);
+                let wanted_csv_col = *sub_idx + 1;
+                if let Some(pos) = rowsOfcombi.iter().position(|v| *v == wanted_csv_col) {
+                    output_to_preparedcol.insert(out_idx, pos);
+                }
             }
         }
-        if output_to_subcol.is_empty() {
+        if output_to_preparedcol.is_empty() {
             return newTable;
         }
 
         let oneLinePerLine = self.outType == "html" || self.outType == "bbcode";
+        let remove_number_now =
+            (((self.textWidth == 0 && self.oneTable) || self.outType == "html" || self.outType == "bbcode")
+                && self.breiten.is_empty());
 
         for (display_row_idx, original_row_no) in old2newTable.iter().copied().enumerate() {
             if display_row_idx >= newTable.len() {
@@ -469,49 +438,91 @@ impl Program {
             let Some(kombi_line_numbers) = chosen.get(&original_row_no) else {
                 continue;
             };
-            for (out_col_idx, csv_col_idx) in output_to_subcol.iter() {
+
+            for (out_col_idx, prepared_col_idx) in output_to_preparedcol.iter() {
                 if *out_col_idx >= newTable[display_row_idx].len() {
                     continue;
                 }
+
                 let mut teile: Vec<String> = vec![];
                 for kombi_line_no in kombi_line_numbers.iter().copied() {
                     let src_row_idx = kombi_line_no as usize;
-                    if src_row_idx >= animalsProfessionsTable.len() {
+                    if src_row_idx >= preparedKombiTable.len() {
                         continue;
                     }
-                    let raw = animalsProfessionsTable[src_row_idx].get(*csv_col_idx).cloned().unwrap_or_default();
-                    if raw.trim().is_empty() {
+
+                    let raw_prepared = preparedKombiTable[src_row_idx]
+                        .get(*prepared_col_idx)
+                        .cloned()
+                        .unwrap_or_default();
+                    if raw_prepared.trim().is_empty() {
                         continue;
                     }
-                    let raw_lines: Vec<String> = raw.split('\n').map(|s| s.to_string()).collect();
-                    let cleaned_lines = self.removeOneNumber_lines_py(&raw_lines, original_row_no);
-                    let cleaned_block = cleaned_lines.join("\n");
-                    if !cleaned_block.trim().is_empty() {
-                        teile.push(cleaned_block);
+
+                    let block = if remove_number_now {
+                        let raw_lines: Vec<String> =
+                            raw_prepared.split('\n').map(|s| s.to_string()).collect::<Vec<String>>();
+                        self.removeOneNumber_lines_py(
+                            &raw_lines,
+                            original_row_no,
+                            self.textWidth.max(0) as usize,
+                        ).join("\n")
+                    } else {
+                        raw_prepared
+                    };
+
+                    if !block.trim().is_empty() {
+                        teile.push(block);
                     }
                 }
+
                 if teile.is_empty() {
                     continue;
                 }
+
                 let merged = if oneLinePerLine {
                     if self.outType == "html" {
-                        format!("<ul>{}</ul>", teile.into_iter().map(|t| format!("<li>{}</li>", t)).collect::<Vec<_>>().join(""))
+                        format!(
+                            "<ul>{}</ul>",
+                            teile
+                                .into_iter()
+                                .map(|t| format!("<li>{}</li>", t))
+                                .collect::<Vec<_>>()
+                                .join("")
+                        )
                     } else if self.outType == "bbcode" {
-                        format!("[list]{}[/list]", teile.into_iter().map(|t| format!("[*]{}", t)).collect::<Vec<_>>().join(""))
+                        format!(
+                            "[list]{}[/list]",
+                            teile
+                                .into_iter()
+                                .map(|t| format!("[*]{}", t))
+                                .collect::<Vec<_>>()
+                                .join("")
+                        )
                     } else {
                         teile.join("\n")
                     }
+                } else if self.textWidth == 0 && self.oneTable {
+                    teile.join(" | ")
                 } else {
                     teile.join("\n")
                 };
-                let merged_lines: Vec<String> = merged.split("\n").map(|s| s.to_string()).collect();
-                Self::append_kombi_lines_py(&mut newTable[display_row_idx][*out_col_idx], &merged_lines);
+
+                if newTable[display_row_idx][*out_col_idx].is_empty() {
+                    newTable[display_row_idx][*out_col_idx] = merged;
+                } else if !newTable[display_row_idx][*out_col_idx].contains(&merged) {
+                    if oneLinePerLine || (self.textWidth == 0 && self.oneTable) {
+                        newTable[display_row_idx][*out_col_idx].push_str(" | ");
+                    } else {
+                        newTable[display_row_idx][*out_col_idx].push('\n');
+                    }
+                    newTable[display_row_idx][*out_col_idx].push_str(&merged);
+                }
             }
         }
 
         newTable
     }
-
 
     pub fn combiTableWorkflow(&mut self) {
         self.tableGenerated = self.tableGenerated || self.newTable;

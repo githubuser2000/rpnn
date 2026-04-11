@@ -1,0 +1,80 @@
+
+
+## 1. Netzwerk 24, 2. math Kategorie 32, 3. Topologie 28.
+
+Netzwerke sind sehr vieles, beispielsweise der gesamte Input, dann wie es dann weiter geht laut KI.
+Topologie ist die Zeilenfilterung der Spalten laut KI und die Gesamt-Reta-Struktur meiner Meinung nach.
+Math Kategorie ist die Ausgabeform wie HTML CLI Text BBCode und laut KI auch math Kategorie Objekte: A Anfragen, B Parameterbäume, C die reta Kategorien sind math Kategorien, D Spaltenmengen, E Generatorbeschreibungen, F Ausgabestrukturen, G HTML Meta Daten.
+Natürliche Transformation wäre dann genau diese Unterscheidung von diesen Ausgaben HTML, CLI Text, BBCode oder sogar die Originaldaten woher das kommt, laut KI.
+Funktor wäre laut KI die Umwandlung der beiden Kategorien Py Reta zu Rust Reta.
+
+Reihenfolge laut KI.
+1. Netzwerk, da es viele Netzwerke gibt.
+2. math Kategorie(n)
+3. Topologie, da es das angeblich kaum gibt, aber IMHO hat bereits jedes Netzwerk seine jeweilige Topologie und diese zusammen bilden widerum eine Topologie meiner Meinung nach.
+
+Vorteile falls ich reta so abstrahiere immer bei so etwas:
+1. mehr bugsicherheit aber mehr komplexität durch Verallgemeinerung und Abstraktion
+2. Parallelisierbarkeit
+3. Bessere Wartbarkeit aber abstrakter komplexer naja
+4. Kompositionalität wird oft unterschätzt.
+5. Wiederverwendbarkeit
+6. Testbarkeit 
+7. Formalisierbarkeit was sehr wichtig für mich laut KI ist was die math Beschreibbarkeit Beschreibung meines Programms als Formeln und anderen Dingen wie Graphen Kategorien Transformationen ist.
+8. Erlaubt Beweise von Eigenschaften, systematische Erweiterung, Verifikation.
+9. Erweiterbarkeit ohne Chaos.
+10. Performanz langfristig mehr statt weniger, aber hängt von vielem ab.
+11. Verständlichkeit durch mehr verallgemeinerte abstraktion dann langfristig doch Besser 
+12. Debugging wird strukturell und dami ggf. einfacher
+13. Automatisierbarkeit 
+14. Konsistenz gleiche Regeln Muster.
+
+Für Topologien aber auch für Netzwerke und math Kategorien mögliche Morphismen
+A Parsen, B Auflösen, C Selektieren, D Ableiten, E Generieren, F Formatieren, H Annotieren.
+Damit sind dann Verarbeitungsketten möglich.
+
+Produkte, Koprodukte, Pullbacks (aber was ist das, zu was gehört das?) für A Kombination von Parametern, B Schnittmengen von Auswahlräumen, C Zusammenführungen von Generatorpfaden, D gemeinsame Ableitungen aus mehreren Quellen: sind oft Kategorial: Produkte Koprodukte Pullbacks gemeinsamer Verfeinerungen über geteilte Kriterien , Pushouts als Vereinigung mit Identifikation gemeinsamer Teile. Bsp Pullback Pushout hin zurück ist Parameterpfade die gleich sind führen zu gleicher Spaltenmenge oder Teilmenge.
+
+abstrahierbar: Parser- und Parameterabhängigkeiten, Spalten-/Unterkategoriennetz, Generator-Abhängigkeitsgraph, Reverse-Request-Mapping, Äquivalenz-/Ähnlichkeitsbeziehungen von Spalten, HTML-Meta-Zuordnungen: Das sei laut KI kurzfristig am nützlichsten.
+
+topologisch sei laut KI am Besten: Auswahl, Suchraum von Kategorien und Spalten, von Anfragen Closure Interior, Nachbarschaften um eine Kategorie als Kategorie, Stabilität kleiner Anfragen Variationen.
+
+bestens kategorial laut KI abstrahierbar: gesamte Verarbeitungskette, Generatoren als Morphismen math Kategorie, Darstellungsebenen als Funktoren um Kategorien die Kategorien umwandeln und zwar hier das was dargestellt werden soll ist die math Kategorie und der Funktor betrifft die Darstellungsweise, Komposition von Selektions-/Tranformationsschritten, Trennung Semantik Darstellung ist eine Kategorie: laut KI intellektuell starke math Kategorien.
+
+Kleine Anzahl nützlicher Topologien laut KI in Wirklichkeit: A OberUnterkategorien, B Generatoren über Ableitungen, C Ähnlichkeits Äquivalenz Topologien, Parameter Topologien über CLI Struktur: Diese seien kombinierbar.
+
+Funktionen können topologisch getrennt werden in: Input Output Stabilität oder Kontinuierlichkeit oder sowas etwas: Anwendbar für Parser, Generatoren, Mapping Funktionen.
+
+Mehr Netzwerke bedeuten mehr strukturrierte Relationen bei reta hier insgesamt und nicht mehr sondern weniger natürliche nützliche Topologien bei reta hier.
+Bei Topologien geht es immer um Nachbarschaft Nähe.
+Bei Reta hier sind es wenn dann u.a. strukturell betrachtbar gesehen Relationen ein relationales System wo Toplogien aus Relationen entstehen, immer wieder neu eine andere.
+Reta ist eher eine gesamte Kategorie als eine gesamte Topologie.
+
+
+Aber welchen Vorteil gäbe es, wenn ich constraint programmierung verwende und mehr deklarativen Programmieranteil?
+
+Constraint Programmierung: Solver findet die Lösung der Problembeschreibung, bringt:
+A Komplexe Kombinatorik wird beherrschbar da genau diese formuliert wird,  
+B keine versteckte Entscheidungslogik mehr da alles explizit als Regel,
+C automatisches finden anstelle alles hart zu programmieren 
+D Erweiterbarkeit ohne Explosion 
+E Debugging auf der abstrakteren geringeren Regel Ebene der Constraint Programmierung 
+
+Deklarative Programmierung würde für reta bringen 
+A Getrennt: Ausführungslogik in Regeln und Engine also Logikregeln und Ausführugsengine 
+B mehr Strukturübersicht
+C leichtere Veränderbarkeit 
+D näher zur Mathematik 
+E Parallelisierung fast gratis 
+F weniger Seiteneffekte und mehr determinismus bedeuten weniger Bugs Fehler 
+
+laut KI sollte ich definitiv tun: 
+A Kategorien als Daten definieren,
+B Generatoren strukturell definieren,
+C Relationen explizit machen,
+D Constraint Programmierung für: 1 Spaltenauswahl, 2 Gültigkeit der Kombinierung von Generatoren, 3 reverse Mapping welche Anfrage welches Ergebnis erzeugt, also rückwärts.
+E deklarativ sollte sein: Typen, Relationen, Generatordefinitionen.
+F Engine imperativ Logik deklarativ wäre gut.
+G Constraint Programmierung mächtig bei komplexen Auswahlproblemen und für Verständlichkeit und Stabilität deklarative Programmierung.
+
+Laut KI: Deklarativ ist Pflicht und Constraint Programmierung gezieltes Werkzeug.
