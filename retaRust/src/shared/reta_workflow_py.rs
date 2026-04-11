@@ -264,15 +264,172 @@ impl Program {
         chosen
     }
 
-    fn remove_one_number_simple_py(&self, text: &str, colNum: i64) -> String {
-        let target_a = format!("({}) ", colNum);
-        let target_b = format!("|{}", colNum);
-        let target_c = format!("{}|", colNum);
-        let target_d = format!("/{}/", colNum);
-        text.replace(&target_a, "(")
-            .replace(&target_b, "")
-            .replace(&target_c, "")
-            .replace(&target_d, "/")
+    fn removeOneNumber_lines_py(&self, hinein: &[String], colNum: i64) -> Vec<String> {
+        let condition = !hinein.is_empty()
+            && (((self.textWidth == 0 && self.oneTable) || self.htmlOrBBcode)
+                && self.breiten.is_empty());
+        if !condition {
+            return hinein.to_vec();
+        }
+
+        let original_text = hinein.join("\n");
+        let mut parse_lines: Vec<String> = Vec::new();
+        for zellenzeile in hinein {
+            let mut current = zellenzeile.clone();
+            if current.ends_with('-') {
+                current.pop();
+            }
+            parse_lines.push(current);
+        }
+        let parse_text = parse_lines.join("");
+
+        let parse_open = match parse_text.find('(') {
+            Some(v) => v,
+            None => {
+                return if self.textWidth != 0 {
+                    original_text
+                        .split('\n')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    vec![original_text.replace('\n', "; ")]
+                };
+            }
+        };
+        let parse_close = match parse_text[parse_open..].find(") ") {
+            Some(v) => parse_open + v,
+            None => {
+                return if self.textWidth != 0 {
+                    original_text
+                        .split('\n')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    vec![original_text.replace('\n', "; ")]
+                };
+            }
+        };
+
+        let raw_open = match original_text.find('(') {
+            Some(v) => v,
+            None => {
+                return if self.textWidth != 0 {
+                    original_text
+                        .split('\n')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    vec![original_text.replace('\n', "; ")]
+                };
+            }
+        };
+        let raw_close = match original_text[raw_open..].find(") ") {
+            Some(v) => raw_open + v,
+            None => {
+                return if self.textWidth != 0 {
+                    original_text
+                        .split('\n')
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                } else {
+                    vec![original_text.replace('\n', "; ")]
+                };
+            }
+        };
+
+        if parse_close < parse_open || raw_close < raw_open {
+            return hinein.to_vec();
+        }
+
+        let parse_inside = &parse_text[(parse_open + 1)..parse_close];
+        let target_plain = colNum.to_string();
+        let target_paren = format!("({})", colNum);
+
+        let mut should_remove_any = false;
+        for part in parse_inside.split('|') {
+            let compact = part.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+            if compact == target_plain || compact == target_paren {
+                should_remove_any = true;
+                break;
+            }
+        }
+        if !should_remove_any {
+            return if self.textWidth != 0 {
+                original_text
+                    .split('\n')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            } else {
+                vec![original_text.replace('\n', "; ")]
+            };
+        }
+
+        let raw_inside = &original_text[(raw_open + 1)..raw_close];
+        let mut kept_parts: Vec<String> = Vec::new();
+
+        for part in raw_inside.split('|') {
+            let compact = part.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+            let removable = !compact.contains('/')
+                && (compact == target_plain || compact == target_paren);
+            if !removable {
+                kept_parts.push(part.to_string());
+            }
+        }
+
+        let rebuilt = if kept_parts.is_empty() {
+            let suffix_start = raw_close + 2;
+            if suffix_start > original_text.len() {
+                original_text.clone()
+            } else {
+                original_text[suffix_start..].to_string()
+            }
+        } else {
+            let mut s = String::new();
+            s.push_str(&original_text[..raw_open + 1]);
+            s.push_str(&kept_parts.join("|"));
+            s.push_str(&original_text[raw_close..]);
+            s
+        };
+
+        let rebuilt = rebuilt
+            .replace("(|", "(")
+            .replace("|)", ")")
+            .replace("||", "|");
+
+        if self.textWidth != 0 {
+            rebuilt
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+        } else {
+            vec![rebuilt.replace('\n', "; ")]
+        }
+    }
+
+    fn append_kombi_lines_py(existing: &mut String, lines: &[String]) {
+        if lines.is_empty() {
+            return;
+        }
+        let block = lines
+            .iter()
+            .filter(|line| !line.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
+        if block.trim().is_empty() {
+            return;
+        }
+        if existing.is_empty() {
+            *existing = block;
+            return;
+        }
+        if existing.split("\n").collect::<Vec<_>>() == block.split("\n").collect::<Vec<_>>() {
+            return;
+        }
+        if !existing.ends_with('\n') {
+            existing.push('\n');
+        }
+        existing.push_str(&block);
     }
 
     fn combiTableWorkflow_impl(
@@ -326,9 +483,11 @@ impl Program {
                     if raw.trim().is_empty() {
                         continue;
                     }
-                    let cleaned = self.remove_one_number_simple_py(&raw, original_row_no);
-                    if !cleaned.trim().is_empty() {
-                        teile.push(cleaned);
+                    let raw_lines: Vec<String> = raw.split('\n').map(|s| s.to_string()).collect();
+                    let cleaned_lines = self.removeOneNumber_lines_py(&raw_lines, original_row_no);
+                    let cleaned_block = cleaned_lines.join("\n");
+                    if !cleaned_block.trim().is_empty() {
+                        teile.push(cleaned_block);
                     }
                 }
                 if teile.is_empty() {
@@ -340,22 +499,19 @@ impl Program {
                     } else if self.outType == "bbcode" {
                         format!("[list]{}[/list]", teile.into_iter().map(|t| format!("[*]{}", t)).collect::<Vec<_>>().join(""))
                     } else {
-                        teile.join(" | ")
+                        teile.join("\n")
                     }
                 } else {
-                    teile.join(" | ")
+                    teile.join("\n")
                 };
-                if newTable[display_row_idx][*out_col_idx].is_empty() {
-                    newTable[display_row_idx][*out_col_idx] = merged;
-                } else if !newTable[display_row_idx][*out_col_idx].contains(&merged) {
-                    newTable[display_row_idx][*out_col_idx].push_str(" | ");
-                    newTable[display_row_idx][*out_col_idx].push_str(&merged);
-                }
+                let merged_lines: Vec<String> = merged.split("\n").map(|s| s.to_string()).collect();
+                Self::append_kombi_lines_py(&mut newTable[display_row_idx][*out_col_idx], &merged_lines);
             }
         }
 
         newTable
     }
+
 
     pub fn combiTableWorkflow(&mut self) {
         self.tableGenerated = self.tableGenerated || self.newTable;
