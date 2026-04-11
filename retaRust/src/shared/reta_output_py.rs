@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use hypher::{hyphenate, Lang};
 
@@ -23,39 +23,29 @@ impl Program {
         }
 
         let max_row = relitable.len().saturating_sub(1) as i64;
-        let original_lines: BTreeSet<i64> = (0..=max_row).collect();
-        let mut finally_display_set = self.filter_original_lines_py(original_lines.clone(), &paramLines, max_row);
-        if !paramLinesNot.is_empty() {
-            let finally_display_not = self.filter_original_lines_py(finally_display_set.clone(), &paramLinesNot, max_row);
-            let has_anything_changed: BTreeSet<i64> = original_lines.difference(&finally_display_not).copied().filter(|n| *n != 0).collect();
-            if !has_anything_changed.is_empty() {
-                finally_display_set = finally_display_set.difference(&finally_display_not).copied().collect();
-            }
+        let mut selected_rows: Vec<i64> = self.selected_rows_from_param_lines_py(
+            &paramLines,
+            &paramLinesNot,
+            max_row,
+        );
+        selected_rows = dedup_preserve_order_i64(selected_rows);
+        if !self.keineUeberschriften && !selected_rows.contains(&0) {
+            selected_rows.insert(0, 0);
         }
-
-        if finally_display_set.is_empty() {
-            if self.ifZeilenSetted {
-                finally_display_set = BTreeSet::new();
-            } else {
-                finally_display_set = (0..=max_row).collect();
-            }
-        }
-
-        if !self.keineUeberschriften {
-            finally_display_set.insert(0);
-        }
-
-        let selected_rows: Vec<i64> = finally_display_set.iter().copied().collect();
 
         let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
-            if relitable[0].is_empty() { vec![] } else { (0..(relitable[0].len() as i64)).collect() }
+            if relitable[0].is_empty() {
+                vec![]
+            } else {
+                (0..(relitable[0].len() as i64)).collect()
+            }
         } else {
             rowsAsNumbers.clone()
         };
         selected_cols = dedup_preserve_order_i64(selected_cols);
         let selected_cols_set: BTreeSet<i64> = selected_cols.iter().cloned().collect();
 
-        for row_no in &selected_rows {
+        for row_no in selected_rows.iter() {
             let idx = *row_no as usize;
             if idx >= relitable.len() {
                 continue;
@@ -70,64 +60,329 @@ impl Program {
             old2newTable.push(*row_no);
         }
 
+        if newTable.is_empty() {
+            newTable = relitable.clone();
+            old2newTable = (0..(relitable.len() as i64)).collect();
+        }
+
         finallyDisplayLines = old2newTable.iter().map(|n| n.to_string()).collect();
         if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
             finallyDisplayLines[0] = "".to_string();
         }
 
-        let rowsRange: Vec<i64> = if newTable.is_empty() { vec![] } else { (0..(newTable[0].len() as i64)).collect() };
-        let numlen = finallyDisplayLines.iter().filter(|s| !s.is_empty()).map(|s| s.len() as i64).max().unwrap_or(0);
+        let rowsRange: Vec<i64> = if newTable.is_empty() {
+            vec![]
+        } else {
+            (0..(newTable[0].len() as i64)).collect()
+        };
+        let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
 
-    fn cutset_py(whether: bool, a: &BTreeSet<i64>, b: &BTreeSet<i64>) -> BTreeSet<i64> {
-        if whether {
-            return a.intersection(b).copied().collect();
+
+    fn selected_rows_from_param_lines_py(
+        &self,
+        param_lines: &[String],
+        param_lines_not: &[String],
+        max_row: i64,
+    ) -> Vec<i64> {
+        let mut selected_rows: Vec<i64> = self
+            .filter_original_lines_py(BTreeSet::new(), param_lines, max_row)
+            .into_iter()
+            .collect();
+        if selected_rows.is_empty() && !self.rowRange.is_empty() {
+            selected_rows = self
+                .rowRange
+                .iter()
+                .copied()
+                .filter(|row| *row > 0 && *row <= max_row)
+                .collect();
         }
-        a.clone()
+        if !param_lines_not.is_empty() {
+            let exclude_rows = self.filter_original_lines_py(BTreeSet::new(), param_lines_not, max_row);
+            selected_rows.retain(|row| !exclude_rows.contains(row));
+        }
+        selected_rows.sort_unstable();
+        selected_rows
     }
 
-    fn prim_fak_py(mut n: i64) -> Vec<i64> {
-        let mut out = Vec::new();
-        if n < 2 { return out; }
-        while n % 2 == 0 {
-            out.push(2);
-            n /= 2;
+    fn cutset_py(wether: bool, a: &BTreeSet<i64>, b: &BTreeSet<i64>) -> BTreeSet<i64> {
+        if wether {
+            a.intersection(b).copied().collect()
+        } else {
+            a.clone()
         }
-        let mut d = 3;
-        while d * d <= n {
-            while n % d == 0 {
-                out.push(d);
-                n /= d;
+    }
+
+    fn split_top_level_commas_filter_py(txt: &str) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let mut current = String::new();
+        let mut depth_round = 0i32;
+        let mut depth_square = 0i32;
+        let mut depth_curly = 0i32;
+
+        for ch in txt.chars() {
+            match ch {
+                '(' => { depth_round += 1; current.push(ch); }
+                ')' => { depth_round -= 1; current.push(ch); }
+                '[' => { depth_square += 1; current.push(ch); }
+                ']' => { depth_square -= 1; current.push(ch); }
+                '{' => { depth_curly += 1; current.push(ch); }
+                '}' => { depth_curly -= 1; current.push(ch); }
+                ',' if depth_round == 0 && depth_square == 0 && depth_curly == 0 => {
+                    if !current.is_empty() {
+                        out.push(current.clone());
+                    }
+                    current.clear();
+                }
+                _ => current.push(ch),
             }
-            d += 2;
         }
-        if n > 1 { out.push(n); }
+        if !current.is_empty() {
+            out.push(current);
+        }
         out
     }
 
-    fn prim_repeat2_py(n: &[i64]) -> Vec<(i64, i64)> {
-        let mut out: Vec<(i64, i64)> = Vec::new();
-        for &a in n {
-            if let Some(last) = out.last_mut() {
-                if last.0 == a {
-                    last.1 += 1;
+    fn is_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
+        let txt = txt.trim();
+        if txt.is_empty() {
+            return false;
+        }
+        let txt = txt.strip_prefix('v').unwrap_or(txt);
+        let txt = txt.strip_prefix('-').unwrap_or(txt);
+        if txt.is_empty() {
+            return false;
+        }
+        let mut parts = txt.split('+');
+        let first = parts.next().unwrap_or_default();
+        let first_ok = if let Some((a, b)) = first.split_once('-') {
+            !a.is_empty() && !b.is_empty() && a.chars().all(|c| c.is_ascii_digit()) && b.chars().all(|c| c.is_ascii_digit())
+        } else {
+            first.chars().all(|c| c.is_ascii_digit())
+        };
+        first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    }
+
+    fn is_zeilen_angabe_filter_py(txt: &str) -> bool {
+        let parts = Self::split_top_level_commas_filter_py(txt);
+        let any_at_all = parts.iter().any(|part| !part.is_empty());
+        any_at_all && parts.iter().all(|part| part.is_empty() || Self::is_zeilen_angabe_between_kommas_filter_py(part))
+    }
+
+    fn bereich_to_numbers2_py(txt: &str, vielfache: bool, max_zahl: i64, allow_less_eq_zero: bool) -> BTreeSet<i64> {
+        let cleaned_parts = Self::split_top_level_commas_filter_py(txt);
+        let cleaned = cleaned_parts.iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(",");
+        if cleaned.is_empty() || !Self::is_zeilen_angabe_filter_py(&cleaned) {
+            return BTreeSet::new();
+        }
+
+        let effective_max = if !vielfache && max_zahl == 0 { i64::MAX / 4 } else if max_zahl <= 0 { 1028 } else { max_zahl };
+        let mut dazu: BTreeSet<i64> = BTreeSet::new();
+        let mut hinfort: BTreeSet<i64> = BTreeSet::new();
+
+        for mut ein_bereich in Self::split_top_level_commas_filter_py(&cleaned) {
+            if ein_bereich.is_empty() {
+                continue;
+            }
+            let mut vielfache2 = vielfache;
+            if let Some(rest) = ein_bereich.strip_prefix('v') {
+                ein_bereich = rest.to_string();
+                vielfache2 = true;
+            }
+
+            let mut remove = false;
+            if let Some(rest) = ein_bereich.strip_prefix('-') {
+                remove = true;
+                ein_bereich = rest.to_string();
+            }
+
+            let menge = if remove { &mut hinfort } else { &mut dazu };
+            let mut around: Vec<i64> = Vec::new();
+            let plus_parts: Vec<&str> = ein_bereich.split('+').collect();
+            let normalized = if ein_bereich.chars().all(|c| c.is_ascii_digit()) {
+                format!("{0}-{0}", ein_bereich)
+            } else if !plus_parts.is_empty() && plus_parts[0].chars().all(|c| c.is_ascii_digit()) {
+                let mut rebuilt = format!("{0}-{0}", plus_parts[0]);
+                if plus_parts.len() > 1 {
+                    rebuilt.push('+');
+                    rebuilt.push_str(&plus_parts[1..].join("+"));
+                }
+                rebuilt
+            } else {
+                ein_bereich.clone()
+            };
+
+            let Some((left, right_all)) = normalized.split_once('-') else {
+                continue;
+            };
+            if !left.chars().all(|c| c.is_ascii_digit()) || left == "0" {
+                continue;
+            }
+            let right_parts: Vec<&str> = right_all.split('+').collect();
+            if right_parts.is_empty() || !right_parts[0].chars().all(|c| c.is_ascii_digit()) {
+                continue;
+            }
+            let start = left.parse::<i64>().unwrap_or(0);
+            let end = right_parts[0].parse::<i64>().unwrap_or(0);
+            if start <= 0 || end <= 0 || end < start {
+                continue;
+            }
+            if right_parts.len() < 2 {
+                around.push(0);
+            } else {
+                let mut ok = true;
+                for part in &right_parts[1..] {
+                    if part.chars().all(|c| c.is_ascii_digit()) {
+                        around.push(part.parse::<i64>().unwrap_or(0));
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+                if !ok {
                     continue;
                 }
             }
+
+            if !vielfache2 {
+                for number in start..=end {
+                    for a in &around {
+                        let c = number + *a;
+                        if c < effective_max {
+                            menge.insert(c);
+                        }
+                        let d = number - *a;
+                        if d > 0 && d < effective_max {
+                            menge.insert(d);
+                        }
+                    }
+                }
+            } else {
+                let around_only_zero = around.is_empty() || around.iter().all(|a| *a == 0);
+                let mut i = 0i64;
+                loop {
+                    let cond = around.iter().all(|a| start.saturating_mul(i) < effective_max.saturating_sub(*a));
+                    if !cond {
+                        break;
+                    }
+                    i += 1;
+                    for number in start..=end {
+                        if around_only_zero {
+                            let c = number.saturating_mul(i);
+                            if c <= effective_max {
+                                menge.insert(c);
+                            }
+                        } else {
+                            for a in &around {
+                                let c = number.saturating_mul(i) + *a;
+                                if c <= effective_max {
+                                    menge.insert(c);
+                                }
+                                let d = number.saturating_mul(i) - *a;
+                                if d > 0 && d < effective_max {
+                                    menge.insert(d);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let result: BTreeSet<i64> = dazu.difference(&hinfort).copied().collect();
+        if allow_less_eq_zero {
+            result
+        } else {
+            result.into_iter().filter(|x| *x > 0).collect()
+        }
+    }
+
+    fn multiples_py(a: i64, mul1: bool) -> Vec<(i64, i64)> {
+        let mut menge: BTreeSet<(i64, i64)> = BTreeSet::new();
+        let mut b = 2i64;
+        while b * b <= a {
+            if a % b == 0 {
+                menge.insert((a / b, b));
+            }
+            b += 1;
+        }
+        let mut out: Vec<(i64, i64)> = menge.into_iter().collect();
+        if mul1 {
             out.push((a, 1));
         }
         out
     }
 
-    fn is_prim_multiple_py(is_it: i64, multiples1: &[i64]) -> bool {
-        let mut multiples2: Vec<(i64, i64)> = vec![(1, is_it)];
-        for prim in Self::prim_repeat2_py(&Self::prim_fak_py(is_it)) {
-            multiples2.push((prim.0, is_it / prim.0));
+    fn teiler_py(zahlen_bereichs_angabe: &str) -> BTreeSet<i64> {
+        let zahlen_bereich_menge = Self::bereich_to_numbers2_py(zahlen_bereichs_angabe, false, 0, false);
+        let mut zahlen_wbereich_menge: BTreeSet<i64> = BTreeSet::new();
+        for each1 in zahlen_bereich_menge {
+            for each2 in Self::multiples_py(each1, true) {
+                zahlen_wbereich_menge.insert(each2.0);
+                zahlen_wbereich_menge.insert(each2.1);
+            }
         }
-        for multiple1 in multiples1 {
-            for multiple2 in &multiples2 {
-                if *multiple1 == multiple2.1 {
+        if zahlen_wbereich_menge != BTreeSet::from([1]) {
+            zahlen_wbereich_menge.remove(&1);
+        }
+        zahlen_wbereich_menge
+    }
+
+    fn prim_fak_py(n: i64) -> Vec<i64> {
+        if n < 2 {
+            return vec![];
+        }
+        let mut z = n;
+        let mut out: Vec<i64> = Vec::new();
+        while z > 1 {
+            let mut i = 2i64;
+            let mut p = z;
+            let mut gefunden = false;
+            while i * i <= z && !gefunden {
+                if z % i == 0 {
+                    gefunden = true;
+                    p = i;
+                } else {
+                    i += 1;
+                }
+            }
+            out.push(p);
+            z /= p;
+        }
+        out
+    }
+
+    fn prim_repeat2_py(factors: &[i64]) -> Vec<(i64, i64)> {
+        let mut counts: BTreeMap<i64, i64> = BTreeMap::new();
+        for &f in factors {
+            *counts.entry(f).or_insert(0) += 1;
+        }
+        counts.into_iter().collect()
+    }
+
+    fn moonsun_rows_py(&self, moon_not_sun: bool, num_range: &BTreeSet<i64>) -> BTreeSet<i64> {
+        let mut out = BTreeSet::new();
+        for n in num_range {
+            if Self::moon_number_is_py(*n) == moon_not_sun {
+                out.insert(*n);
+            }
+        }
+        out
+    }
+
+    fn is_prim_multiple_py(is_it: i64, multiples1: &[i64]) -> bool {
+        if multiples1.is_empty() {
+            return false;
+        }
+        if multiples1.contains(&is_it) {
+            return true;
+        }
+        let mut seen_primes: BTreeSet<i64> = BTreeSet::new();
+        for p in Self::prim_fak_py(is_it) {
+            if seen_primes.insert(p) {
+                let multiple2 = is_it / p;
+                if multiples1.contains(&multiple2) {
                     return true;
                 }
             }
@@ -135,17 +390,28 @@ impl Program {
         false
     }
 
-    fn filter_original_lines_py(&self, mut num_range: BTreeSet<i64>, param_lines: &[String], max_row: i64) -> BTreeSet<i64> {
+    fn filter_original_lines_py(
+        &self,
+        mut num_range: BTreeSet<i64>,
+        param_lines: &[String],
+        max_row: i64,
+    ) -> BTreeSet<i64> {
         num_range.remove(&0);
-        let has_non_ka = param_lines.iter().any(|p| p != "ka" && p != "ka2");
-        if param_lines.iter().any(|p| p == "all") || !has_non_ka || !self.ifZeilenSetted {
+
+        let relevant_params: BTreeSet<String> = param_lines
+            .iter()
+            .filter(|p| p.as_str() != "ka" && p.as_str() != "ka2")
+            .cloned()
+            .collect();
+
+        if param_lines.iter().any(|p| p == "all") || relevant_params.is_empty() || !self.ifZeilenSetted {
             num_range = (1..=max_row).collect();
         } else {
             num_range.clear();
         }
 
         let mut if_a_at_all = false;
-        let mut mehrere: Vec<String> = vec![];
+        let mut mehrere: Vec<String> = Vec::new();
         let mut if_teiler = false;
         for condition in param_lines {
             if condition.starts_with("_a_") && condition.len() > 3 {
@@ -158,17 +424,13 @@ impl Program {
         }
         if if_a_at_all {
             let joined = mehrere.join(",");
-            for v in Self::bereich_to_numbers2_py(&joined, false, max_row + 1, false) {
-                if v <= max_row { num_range.insert(v); }
-            }
+            num_range.extend(Self::bereich_to_numbers2_py(&joined, false, max_row + 1, false));
             if if_teiler {
-                for v in Self::teiler_py(&num_range.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(",")) {
-                    if v <= max_row { num_range.insert(v); }
-                }
+                num_range.extend(Self::teiler_py(&joined));
             }
             if !num_range.is_empty() {
-                for eins0 in joined.split(',') {
-                    let mut eins = eins0.to_string();
+                for eins in joined.split(',') {
+                    let mut eins = eins.to_string();
                     let ja1 = eins.starts_with('-');
                     let ja2 = eins.starts_with("v-");
                     if ja1 || ja2 {
@@ -178,9 +440,8 @@ impl Program {
                         if ja2 {
                             eins = format!("v{}", &eins[2..]);
                         }
-                        for v in Self::bereich_to_numbers2_py(&eins, false, max_row + 1, false) {
-                            num_range.remove(&v);
-                        }
+                        let minus = Self::bereich_to_numbers2_py(&eins, false, max_row + 1, false);
+                        num_range = num_range.difference(&minus).copied().collect();
                     }
                 }
             }
@@ -199,23 +460,21 @@ impl Program {
             if num_range.is_empty() && !if_a_at_all && !param_lines.iter().any(|p| p == "all") {
                 num_range = (1..=max_row).collect();
             }
-            for v in Self::bereich_to_numbers2_py(&mehrere.join(","), true, max_row + 1, false) {
-                if v <= max_row { num_range_yes_z.insert(v); }
-            }
+            let joined = mehrere.join(",");
+            num_range_yes_z.extend(Self::bereich_to_numbers2_py(&joined, true, max_row + 1, false));
             if !num_range_yes_z.is_empty() {
                 num_range = num_range.intersection(&num_range_yes_z).copied().collect();
             }
             if !num_range.is_empty() {
-                for eins0 in mehrere.join(",").split(',') {
-                    let mut eins = eins0.to_string();
+                for eins in joined.split(',') {
+                    let mut eins = eins.to_string();
                     let ja1 = eins.starts_with('-');
                     let ja2 = eins.starts_with("v-");
                     if ja1 || ja2 {
                         if ja1 { eins = eins[1..].to_string(); }
                         if ja2 { eins = format!("v{}", &eins[2..]); }
-                        for v in Self::bereich_to_numbers2_py(&eins, true, max_row + 1, false) {
-                            num_range.remove(&v);
-                        }
+                        let minus = Self::bereich_to_numbers2_py(&eins, true, max_row + 1, false);
+                        num_range = num_range.difference(&minus).copied().collect();
                     }
                 }
             }
@@ -229,17 +488,17 @@ impl Program {
                 if max_row >= 10 { num_range_yes_z.insert(10); }
             } else if condition == "<" {
                 if_zeit_at_all = true;
-                for n in 1..=std::cmp::min(9, max_row) { num_range_yes_z.insert(n); }
+                num_range_yes_z.extend(1..=max_row.min(9));
             } else if condition == ">" {
                 if_zeit_at_all = true;
-                for n in 11..=max_row { num_range_yes_z.insert(n); }
+                if max_row >= 11 { num_range_yes_z.extend(11..=max_row); }
             }
         }
         if if_zeit_at_all {
             if num_range.is_empty() && !if_b_at_all && !if_a_at_all && !param_lines.iter().any(|p| p == "all") && num_range_yes_z.is_empty() {
                 num_range = (1..=max_row).collect();
             }
-            if if_a_at_all || if_b_at_all || param_lines.iter().any(|p| p == "all") {
+            if if_a_at_all || param_lines.iter().any(|p| p == "all") || if_b_at_all {
                 num_range = num_range.intersection(&num_range_yes_z).copied().collect();
             } else {
                 num_range.extend(num_range_yes_z.iter().copied());
@@ -251,11 +510,13 @@ impl Program {
         mehrere.clear();
         for condition in param_lines {
             if condition.starts_with("_n_") && condition.len() > 3 {
-                for v in Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false) {
-                    num_range_yes_z.insert(v);
-                }
+                num_range_yes_z.extend(Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false));
                 if_zaehlungen_at_all = true;
                 mehrere.push(condition[3..].to_string());
+            } else if let Some(rest) = condition.strip_prefix("zaehlung=") {
+                num_range_yes_z.extend(Self::bereich_to_numbers2_py(rest, false, max_row + 1, false));
+                if_zaehlungen_at_all = true;
+                mehrere.push(rest.to_string());
             }
         }
         if if_zaehlungen_at_all {
@@ -277,21 +538,19 @@ impl Program {
             }
             if !num_range.is_empty() {
                 let mut minus_bereiche: BTreeSet<i64> = BTreeSet::new();
-                for eins0 in mehrere.join(",").split(',') {
-                    let mut eins = eins0.to_string();
+                for eins in mehrere.join(",").split(',') {
+                    let mut eins = eins.to_string();
                     let ja1 = eins.starts_with('-');
                     let ja2 = eins.starts_with("v-");
                     if ja1 || ja2 {
                         if ja1 { eins = eins[1..].to_string(); }
                         if ja2 { eins = format!("v{}", &eins[2..]); }
-                        for v in Self::bereich_to_numbers2_py(&eins, false, max_row + 1, false) {
-                            minus_bereiche.insert(v);
-                        }
+                        minus_bereiche.extend(Self::bereich_to_numbers2_py(&eins, false, max_row + 1, false));
                     }
                 }
                 if !minus_bereiche.is_empty() {
-                    let snapshot: Vec<i64> = num_range.iter().copied().collect();
-                    for n in snapshot {
+                    let current_rows: Vec<i64> = num_range.iter().copied().collect();
+                    for n in current_rows {
                         for z in &minus_bereiche {
                             if Self::zeile_which_zaehlung_py(n) == *z {
                                 num_range.remove(&n);
@@ -302,80 +561,77 @@ impl Program {
             }
         }
 
-        let mut if_typ_at_all = false;
         num_range_yes_z.clear();
-        if num_range.is_empty() && has_non_ka {
+        if num_range.is_empty() && !relevant_params.is_empty() {
             num_range = (1..=max_row).collect();
         }
-
-        if param_lines.iter().any(|p| ["aussenerste","innenerste","aussenalle","innenalle"].contains(&p.as_str())) {
-            use std::collections::BTreeMap;
+        let primzahl_filter_present = param_lines.iter().any(|p| matches!(p.as_str(), "aussenerste" | "innenerste" | "aussenalle" | "innenalle"));
+        if primzahl_filter_present {
             let mut innen_aussen: BTreeMap<i64, (bool, bool, bool)> = BTreeMap::new();
             innen_aussen.insert(1, (true, false, true));
             for n in num_range.iter().copied().filter(|n| *n > 3) {
-                let primzahlen = Self::prim_fak_py(n);
-                let nur_eine = primzahlen.len() == 1;
+                let prim_zahlen = Self::prim_fak_py(n);
+                let nur_eine_zahl = prim_zahlen.len() == 1;
+                let ein_fach_vorkommen = nur_eine_zahl;
                 let mut innen = false;
                 let mut aussen = false;
-                for prim in primzahlen {
-                    if prim >= 4 {
-                        let r = prim % 6;
-                        innen = innen || r == 1;
-                        aussen = aussen || r == 5;
+                for prim_zahl in prim_zahlen {
+                    if prim_zahl >= 4 {
+                        let innen_or_aussen = prim_zahl % 6;
+                        innen = innen || innen_or_aussen == 1;
+                        aussen = aussen || innen_or_aussen == 5;
                     }
                 }
-                innen_aussen.insert(n, (innen, aussen, nur_eine));
+                innen_aussen.insert(n, (innen, aussen, ein_fach_vorkommen));
             }
             if param_lines.iter().any(|p| p == "aussenerste") {
-                for (n, tup) in &innen_aussen { if tup.0 && tup.2 { num_range_yes_z.insert(*n); } }
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.0 && t.2 { Some(*n) } else { None }));
             }
             if param_lines.iter().any(|p| p == "innenerste") {
-                for (n, tup) in &innen_aussen { if tup.1 && tup.2 { num_range_yes_z.insert(*n); } }
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.1 && t.2 { Some(*n) } else { None }));
             }
             if param_lines.iter().any(|p| p == "aussenalle") {
-                for (n, tup) in &innen_aussen { if tup.0 { num_range_yes_z.insert(*n); } }
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.0 { Some(*n) } else { None }));
             }
             if param_lines.iter().any(|p| p == "innenalle") {
-                for (n, tup) in &innen_aussen { if tup.1 { num_range_yes_z.insert(*n); } }
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.1 { Some(*n) } else { None }));
             }
-            if_typ_at_all = !num_range_yes_z.is_empty();
-            num_range = Self::cutset_py(if_typ_at_all, &num_range, &num_range_yes_z);
+            let if_primtyp_at_all = !num_range_yes_z.is_empty();
+            num_range = Self::cutset_py(if_primtyp_at_all, &num_range, &num_range_yes_z);
         }
 
-        if_typ_at_all = false;
+        let mut if_typ_at_all = false;
         num_range_yes_z.clear();
-        if num_range.is_empty() && has_non_ka {
+        if num_range.is_empty() && !relevant_params.is_empty() {
             num_range = (1..=max_row).collect();
         }
         for condition in param_lines {
             if condition.contains("mond") {
+                num_range_yes_z.extend(self.moonsun_rows_py(true, &num_range));
                 if_typ_at_all = true;
-                for n in &num_range { if Self::moon_number_is_py(*n) { num_range_yes_z.insert(*n); } }
-            } else if condition == "schwarzesonne" {
-                if_typ_at_all = true;
+            } else if condition.contains("schwarzesonne") {
                 for n in &num_range { if *n % 3 == 0 { num_range_yes_z.insert(*n); } }
-            } else if condition == "sonne" {
                 if_typ_at_all = true;
-                for n in &num_range { if !Self::moon_number_is_py(*n) { num_range_yes_z.insert(*n); } }
-            } else if condition == "planet" {
+            } else if condition.contains("sonne") {
+                num_range_yes_z.extend(self.moonsun_rows_py(false, &num_range));
                 if_typ_at_all = true;
+            } else if condition.contains("planet") {
                 for n in &num_range { if *n % 2 == 0 { num_range_yes_z.insert(*n); } }
-            } else if condition == "SonneMitMondanteil" {
                 if_typ_at_all = true;
+            } else if condition.contains("SonneMitMondanteil") {
                 for n in &num_range {
-                    let repeats = Self::prim_repeat2_py(&Self::prim_fak_py(*n));
-                    let mut has_true = false;
-                    let mut has_false = false;
-                    for (_prim, faktor) in repeats {
-                        if faktor == 1 { has_true = true; } else { has_false = true; }
+                    let factors = Self::prim_repeat2_py(&Self::prim_fak_py(*n));
+                    let booleans: BTreeSet<bool> = factors.iter().map(|(_, faktor)| *faktor == 1).collect();
+                    if booleans.contains(&true) && booleans.contains(&false) {
+                        num_range_yes_z.insert(*n);
                     }
-                    if has_true && has_false { num_range_yes_z.insert(*n); }
                 }
+                if_typ_at_all = true;
             }
         }
         num_range = Self::cutset_py(if_typ_at_all, &num_range, &num_range_yes_z);
 
-        let mut prim_multiples: Vec<i64> = vec![];
+        let mut prim_multiples: Vec<i64> = Vec::new();
         let mut if_prim_at_all = false;
         for condition in param_lines {
             if condition.len() > 1 && condition.ends_with('p') {
@@ -404,21 +660,25 @@ impl Program {
             if condition.starts_with("_^_") && condition.len() > 3 {
                 if_power_at_all = true;
                 mehrere.push(condition[3..].to_string());
+            } else if condition.len() > 1 && condition.ends_with('^') {
+                if_power_at_all = true;
+                mehrere.push(condition[..condition.len()-1].to_string());
             }
         }
-        let to_power_it = Self::bereich_to_numbers2_py(&mehrere.join(","), false, 0, false);
+        let to_power_it: Vec<i64> = Self::bereich_to_numbers2_py(&mehrere.join(","), false, max_row + 1, false).into_iter().collect();
         if if_power_at_all {
             num_range_yes_z.clear();
-            if num_range.is_empty() && has_non_ka {
+            if num_range.is_empty() && !relevant_params.is_empty() {
                 num_range = (1..=max_row).collect();
             }
-            if !num_range.is_empty() {
-                let last_el = *num_range.iter().max().unwrap_or(&0);
-                for base in &to_power_it {
+            if let Some(&last_el) = num_range.iter().next_back() {
+                for base in to_power_it {
                     let mut n = 0u32;
                     loop {
-                        let one_power = (*base).pow(n);
-                        if one_power > last_el { break; }
+                        let Some(one_power) = base.checked_pow(n) else { break; };
+                        if one_power > last_el {
+                            break;
+                        }
                         num_range_yes_z.insert(one_power);
                         n += 1;
                     }
@@ -429,72 +689,82 @@ impl Program {
         }
 
         let mut if_multiples_from_any_at_all = false;
-        let mut any_multiples: Vec<i64> = vec![];
+        let mut any_multiples: Vec<i64> = Vec::new();
         for condition in param_lines {
             if condition.len() > 1 && condition.ends_with('v') && condition[..condition.len()-1].chars().all(|c| c.is_ascii_digit()) {
-                if_multiples_from_any_at_all = true;
-                if let Ok(v) = condition[..condition.len()-1].parse::<i64>() { any_multiples.push(v); }
+                if let Ok(v) = condition[..condition.len()-1].parse::<i64>() {
+                    if_multiples_from_any_at_all = true;
+                    any_multiples.push(v);
+                }
             }
         }
         if if_multiples_from_any_at_all {
             num_range_yes_z.clear();
             for n in &num_range {
                 for divisor in &any_multiples {
-                    if *divisor != 0 && *n % *divisor == 0 { num_range_yes_z.insert(*n); }
+                    if *divisor != 0 && *n % *divisor == 0 {
+                        num_range_yes_z.insert(*n);
+                    }
                 }
             }
             num_range = Self::cutset_py(if_multiples_from_any_at_all, &num_range, &num_range_yes_z);
         }
 
-        let cutoff114 = std::cmp::min(114, max_row);
-        let snapshot: Vec<i64> = num_range.iter().copied().collect();
-        for n in snapshot {
-            if !Self::moon_number_is_py(n) && n > cutoff114 {
+        let current_rows: Vec<i64> = num_range.iter().copied().collect();
+        for n in current_rows {
+            if !Self::moon_number_is_py(n) && n > max_row {
                 num_range.remove(&n);
             }
         }
 
-        let invertieren = param_lines.iter().any(|condition| condition.starts_with("_i_"));
+        let invertieren = param_lines.iter().any(|condition| condition.starts_with("_i_") || condition == "1i");
         if invertieren {
-            let mut num_range2 = BTreeSet::new();
+            let current: BTreeSet<i64> = num_range.clone();
+            let mut num_range2_set = BTreeSet::new();
             for i in 1..=max_row {
-                if (num_range.contains(&(i + 1)) || num_range.contains(&(i - 1))) && !num_range.contains(&i) {
-                    num_range2.insert(i);
+                if (current.contains(&(i + 1)) || current.contains(&(i - 1))) && !current.contains(&i) {
+                    num_range2_set.insert(i);
                 }
             }
-            num_range = num_range2;
+            num_range = num_range2_set;
         }
 
         let num_range_list: Vec<i64> = num_range.iter().copied().collect();
-        let mut num_range2map = std::collections::BTreeMap::new();
-        for (i, a) in num_range_list.iter().enumerate() {
-            num_range2map.insert((i + 1) as i64, *a);
-        }
+        let num_range2_map: BTreeMap<i64, i64> = num_range_list.iter().enumerate().map(|(i, a)| ((i as i64) + 1, *a)).collect();
+
         let mut z_ja = false;
         let mut num_range_neu2: BTreeSet<i64> = BTreeSet::new();
         for condition in param_lines {
             if condition.starts_with("_z_") && condition.len() > 3 {
                 z_ja = true;
-                let keys: BTreeSet<i64> = num_range2map.keys().copied().collect();
-                let nums: BTreeSet<i64> = Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false).into_iter().collect();
-                let intersection: Vec<i64> = keys.intersection(&nums).copied().collect();
-                for a in intersection { if let Some(v) = num_range2map.get(&a) { num_range_neu2.insert(*v); } }
+                let neu = Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false);
+                for a in num_range2_map.keys().copied().collect::<BTreeSet<_>>().intersection(&neu).copied() {
+                    if let Some(mapped) = num_range2_map.get(&a) {
+                        num_range_neu2.insert(*mapped);
+                    }
+                }
             }
         }
-        if z_ja { num_range = num_range.intersection(&num_range_neu2).copied().collect(); }
+        if z_ja {
+            num_range = num_range.intersection(&num_range_neu2).copied().collect();
+        }
 
         let mut y_ja = false;
         num_range_neu2.clear();
         for condition in param_lines {
             if condition.starts_with("_y_") && condition.len() > 3 {
                 y_ja = true;
-                let keys: BTreeSet<i64> = num_range2map.keys().copied().collect();
-                let nums: BTreeSet<i64> = Self::bereich_to_numbers2_py(&condition[3..], true, max_row + 1, false).into_iter().collect();
-                let intersection: Vec<i64> = keys.intersection(&nums).copied().collect();
-                for a in intersection { if let Some(v) = num_range2map.get(&a) { num_range_neu2.insert(*v); } }
+                let neu = Self::bereich_to_numbers2_py(&condition[3..], true, max_row + 1, false);
+                for a in num_range2_map.keys().copied().collect::<BTreeSet<_>>().intersection(&neu).copied() {
+                    if let Some(mapped) = num_range2_map.get(&a) {
+                        num_range_neu2.insert(*mapped);
+                    }
+                }
             }
         }
-        if y_ja { num_range = num_range.intersection(&num_range_neu2).copied().collect(); }
+        if y_ja {
+            num_range = num_range.intersection(&num_range_neu2).copied().collect();
+        }
 
         num_range
     }

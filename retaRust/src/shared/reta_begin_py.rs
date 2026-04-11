@@ -82,37 +82,67 @@ impl Program {
 
     pub(crate) fn parse_simple_numeric_list_py(&self, txt: &str) -> Vec<i64> {
         let mut out = vec![];
-        for v in Self::bereich_to_numbers2_py(txt, false, 0, false) {
-            out.push(v);
+        for part in txt.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            if let Some((a, b)) = part.split_once('-') {
+                if let (Ok(start), Ok(end)) = (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
+                    if start <= end {
+                        for v in start..=end {
+                            out.push(v);
+                        }
+                    }
+                }
+            } else if let Ok(v) = part.parse::<i64>() {
+                out.push(v);
+            }
         }
-        out.sort_unstable();
         out
     }
 
-    pub(crate) fn split_top_level_commas_py(txt: &str) -> Vec<String> {
+    fn split_top_level_commas_py(txt: &str) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         let mut current = String::new();
-        let mut square = 0i32;
-        let mut curly = 0i32;
-        let mut round = 0i32;
+        let mut depth_round = 0i32;
+        let mut depth_square = 0i32;
+        let mut depth_curly = 0i32;
+
         for ch in txt.chars() {
             match ch {
-                '[' => square += 1,
-                ']' => square -= 1,
-                '{' => curly += 1,
-                '}' => curly -= 1,
-                '(' => round += 1,
-                ')' => round -= 1,
-                ',' if square == 0 && curly == 0 && round == 0 => {
+                '(' => {
+                    depth_round += 1;
+                    current.push(ch);
+                }
+                ')' => {
+                    depth_round -= 1;
+                    current.push(ch);
+                }
+                '[' => {
+                    depth_square += 1;
+                    current.push(ch);
+                }
+                ']' => {
+                    depth_square -= 1;
+                    current.push(ch);
+                }
+                '{' => {
+                    depth_curly += 1;
+                    current.push(ch);
+                }
+                '}' => {
+                    depth_curly -= 1;
+                    current.push(ch);
+                }
+                ',' if depth_round == 0 && depth_square == 0 && depth_curly == 0 => {
                     if !current.is_empty() {
                         out.push(current.clone());
-                        current.clear();
                     }
-                    continue;
+                    current.clear();
                 }
-                _ => {}
+                _ => current.push(ch),
             }
-            current.push(ch);
         }
         if !current.is_empty() {
             out.push(current);
@@ -120,191 +150,36 @@ impl Program {
         out
     }
 
-    pub(crate) fn is_zeilen_angabe_between_kommas_py(txt: &str) -> bool {
+    fn is_zeilen_angabe_between_kommas_py(txt: &str) -> bool {
         let txt = txt.trim();
         if txt.is_empty() {
             return false;
         }
-        let txt = txt.strip_prefix('v').unwrap_or(txt);
-        let txt = txt.strip_prefix('-').unwrap_or(txt);
-        let parts: Vec<&str> = txt.split('+').collect();
-        if parts.is_empty() {
+        let txt = if let Some(rest) = txt.strip_prefix('v') { rest } else { txt };
+        let txt = if let Some(rest) = txt.strip_prefix('-') { rest } else { txt };
+        if txt.is_empty() {
             return false;
         }
-        let mut first = true;
-        for part in parts {
-            if first {
-                first = false;
-                if let Some((a, b)) = part.split_once('-') {
-                    if a.is_empty() || b.is_empty() || !a.chars().all(|c| c.is_ascii_digit()) || !b.chars().all(|c| c.is_ascii_digit()) {
-                        return false;
-                    }
-                } else if !part.chars().all(|c| c.is_ascii_digit()) {
-                    return false;
-                }
-            } else if !part.chars().all(|c| c.is_ascii_digit()) {
-                return false;
-            }
+        let mut parts = txt.split('+');
+        let first = parts.next().unwrap_or_default();
+        let first_ok = if let Some((a, b)) = first.split_once('-') {
+            !a.is_empty() && !b.is_empty() && a.chars().all(|c| c.is_ascii_digit()) && b.chars().all(|c| c.is_ascii_digit())
+        } else {
+            first.chars().all(|c| c.is_ascii_digit())
+        };
+        if !first_ok {
+            return false;
         }
-        true
+        parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
     }
 
-    pub(crate) fn is_zeilen_angabe_py(txt: &str) -> bool {
+    fn is_zeilen_angabe_py(txt: &str) -> bool {
         let parts = Self::split_top_level_commas_py(txt);
-        let any_at_all = parts.iter().any(|p| !p.is_empty());
-        parts.iter().all(|p| Self::is_zeilen_angabe_between_kommas_py(p) || (p.is_empty() && any_at_all))
-    }
-
-    fn bereich_to_numbers2_ein_bereich_menge_nicht_vielfache_py(bereich_couple: &[String], around: &[i64], max_zahl: i64, menge: &mut std::collections::BTreeSet<i64>) {
-        let start = bereich_couple.get(0).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
-        let end = bereich_couple.get(1).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
-        for number in start..=end {
-            for a in around {
-                let c = number + *a;
-                if c < max_zahl {
-                    menge.insert(c);
-                }
-                let d = number - *a;
-                if d > 0 && d < max_zahl {
-                    menge.insert(d);
-                }
-            }
+        let any_at_all = parts.iter().any(|part| !part.is_empty());
+        if !any_at_all {
+            return false;
         }
-    }
-
-    fn bereich_to_numbers2_ein_bereich_menge_vielfache_py(bereich_couple: &[String], around: &[i64], max_zahl: i64, menge: &mut std::collections::BTreeSet<i64>) {
-        let start = bereich_couple.get(0).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
-        let end = bereich_couple.get(1).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
-        let mut i = 0i64;
-        let around_nonzero = around.iter().any(|a| *a != 0);
-        loop {
-            let all_ok = around.iter().all(|a| start * i < max_zahl - *a);
-            if !all_ok {
-                break;
-            }
-            i += 1;
-            for number in start..=end {
-                if !around_nonzero {
-                    let c = number * i;
-                    if c <= max_zahl {
-                        menge.insert(c);
-                    }
-                } else {
-                    for a in around {
-                        let c = number * i + *a;
-                        if c <= max_zahl {
-                            menge.insert(c);
-                        }
-                        let d = number * i - *a;
-                        if d > 0 && d < max_zahl {
-                            menge.insert(d);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn bereich_to_numbers2_ein_bereich_py(ein_bereich: &str, dazu: &mut std::collections::BTreeSet<i64>, hinfort: &mut std::collections::BTreeSet<i64>, max_zahl: i64, vielfache: bool) {
-        let mut ein_bereich = ein_bereich.to_string();
-        let menge = if ein_bereich.len() > 1 && ein_bereich.starts_with('-') {
-            ein_bereich = ein_bereich[1..].to_string();
-            hinfort
-        } else if !ein_bereich.is_empty() {
-            dazu
-        } else {
-            return;
-        };
-
-        let plus_parts: Vec<String> = ein_bereich.split('+').map(|s| s.to_string()).collect();
-        if ein_bereich.chars().all(|c| c.is_ascii_digit()) {
-            ein_bereich = format!("{0}-{0}", ein_bereich);
-        } else if !plus_parts.is_empty() && plus_parts[0].chars().all(|c| c.is_ascii_digit()) {
-            let mut rebuilt = format!("{0}-{0}", plus_parts[0]);
-            if plus_parts.len() > 1 {
-                rebuilt.push('+');
-                rebuilt.push_str(&plus_parts[1..].join("+"));
-            }
-            ein_bereich = rebuilt;
-        }
-
-        let mut bereich_couple: Vec<String> = ein_bereich.split('-').map(|s| s.to_string()).collect();
-        if bereich_couple.len() != 2 {
-            return;
-        }
-        if !bereich_couple[0].chars().all(|c| c.is_ascii_digit()) || bereich_couple[0] == "0" {
-            return;
-        }
-        let bereich_plus_tuples: Vec<String> = bereich_couple[1].split('+').map(|s| s.to_string()).collect();
-        let around: Vec<i64> = if bereich_plus_tuples.len() < 2 {
-            vec![0]
-        } else {
-            let mut num_list = Vec::new();
-            for t2 in &bereich_plus_tuples {
-                if let Ok(v) = t2.parse::<i64>() {
-                    num_list.push(v);
-                } else {
-                    return;
-                }
-            }
-            bereich_couple[1] = num_list[0].to_string();
-            num_list.into_iter().skip(1).collect()
-        };
-
-        if vielfache {
-            Self::bereich_to_numbers2_ein_bereich_menge_vielfache_py(&bereich_couple, &around, max_zahl, menge);
-        } else {
-            Self::bereich_to_numbers2_ein_bereich_menge_nicht_vielfache_py(&bereich_couple, &around, max_zahl, menge);
-        }
-    }
-
-    pub(crate) fn bereich_to_numbers2_py(mehrere_bereiche: &str, vielfache: bool, mut max_zahl: i64, allow_less_eq_zero: bool) -> Vec<i64> {
-        let cleaned = Self::split_top_level_commas_py(mehrere_bereiche).join(",");
-        if !Self::is_zeilen_angabe_py(&cleaned) {
-            return vec![];
-        }
-        if !vielfache && max_zahl == 0 {
-            max_zahl = i64::MAX / 4;
-        }
-        let bereiche = Self::split_top_level_commas_py(&cleaned);
-        let mut dazu: std::collections::BTreeSet<i64> = std::collections::BTreeSet::new();
-        let mut hinfort: std::collections::BTreeSet<i64> = std::collections::BTreeSet::new();
-        for mut ein_bereich in bereiche {
-            if ein_bereich.is_empty() {
-                continue;
-            }
-            let mut vielfache2 = false;
-            if let Some(rest) = ein_bereich.strip_prefix('v') {
-                ein_bereich = rest.to_string();
-                vielfache2 = true;
-            }
-            let eff_max = if (vielfache || vielfache2) && max_zahl >= i64::MAX / 8 { 1028 } else { max_zahl };
-            Self::bereich_to_numbers2_ein_bereich_py(&ein_bereich, &mut dazu, &mut hinfort, eff_max, vielfache || vielfache2);
-        }
-        let mut out: Vec<i64> = dazu.difference(&hinfort).copied().collect();
-        if !allow_less_eq_zero {
-            out.retain(|x| *x > 0);
-        }
-        out.sort_unstable();
-        out
-    }
-
-    pub(crate) fn teiler_py(zahlen_bereichs_angabe: &str) -> Vec<i64> {
-        let zahlen_bereich = Self::bereich_to_numbers2_py(zahlen_bereichs_angabe, false, 0, false);
-        let mut out: std::collections::BTreeSet<i64> = std::collections::BTreeSet::new();
-        for each in zahlen_bereich {
-            for b in 2..=((each as f64).sqrt().floor() as i64) {
-                if each % b == 0 {
-                    out.insert(b);
-                    out.insert(each / b);
-                }
-            }
-            out.insert(each);
-        }
-        if out != std::collections::BTreeSet::from([1]) {
-            out.remove(&1);
-        }
-        out.into_iter().collect()
+        parts.iter().all(|part| part.is_empty() || Self::is_zeilen_angabe_between_kommas_py(part))
     }
 
     pub(crate) fn parametersCmdWithSomeBereich_py(&self, txt: &str, suffix: &str, neg: &str, keineNegBeruecksichtigung: bool) -> Vec<String> {
@@ -315,23 +190,21 @@ impl Program {
             }
             return out;
         }
-        for mut ein_bereich in Self::split_top_level_commas_py(txt) {
+        for ein_bereich in Self::split_top_level_commas_py(txt) {
             if ein_bereich.is_empty() {
                 continue;
             }
-            let matches = if neg.is_empty() {
-                !ein_bereich.starts_with('-')
-            } else {
-                ein_bereich.starts_with(neg)
-            };
-            if !matches {
-                continue;
-            }
-            if !neg.is_empty() {
-                ein_bereich = ein_bereich[neg.len()..].to_string();
-            }
-            if Self::is_zeilen_angabe_py(&ein_bereich) {
-                out.push(format!("_{}_{}", suffix, ein_bereich));
+            let starts_without_minus = !ein_bereich.starts_with('-');
+            let starts_with_neg = !neg.is_empty() && ein_bereich.starts_with(neg);
+            if (neg.is_empty() && starts_without_minus) || starts_with_neg {
+                let payload = if starts_with_neg {
+                    ein_bereich[neg.len()..].to_string()
+                } else {
+                    ein_bereich.clone()
+                };
+                if Self::is_zeilen_angabe_between_kommas_py(&payload) {
+                    out.push(format!("_{}_{}", suffix, payload));
+                }
             }
         }
         out
@@ -423,7 +296,7 @@ impl Program {
                 } else if let Some(tail) = sub.strip_prefix("primzahlvielfache=") {
                     self.obZeilenBereicheAngegeben = true;
                     if neg.is_empty() {
-                        for zahl in Self::bereich_to_numbers2_py(tail, false, 0, false) {
+                        for zahl in self.parse_simple_numeric_list_py(tail) {
                             Self::push_unique_string(&mut paramLines, format!("{}p", zahl));
                         }
                     }
@@ -567,11 +440,27 @@ impl Program {
         self.rowRange = vec![];
         for arg in self.argvWithoutProgram.clone() {
             if let Some(tail) = arg.strip_prefix("--vorhervonausschnitt=") {
-                self.rowRange.extend(Self::bereich_to_numbers2_py(tail, false, 0, false));
+                for part in Self::split_top_level_commas_py(tail) {
+                    let part = part.trim();
+                    if part.is_empty() {
+                        continue;
+                    }
+                    if let Some((a, b)) = part.split_once('-') {
+                        let start = a.parse::<i64>().unwrap_or(0);
+                        let end = b.parse::<i64>().unwrap_or(0);
+                        if start > 0 && end >= start {
+                            for v in start..=end {
+                                self.rowRange.push(v);
+                            }
+                        }
+                    } else if let Ok(v) = part.parse::<i64>() {
+                        if v > 0 {
+                            self.rowRange.push(v);
+                        }
+                    }
+                }
             }
         }
-        self.rowRange.sort_unstable();
-        self.rowRange.dedup();
         self.rowsRangeLen = self.rowRange.len() as i64;
     }
 
