@@ -90,7 +90,7 @@ pub fn main_like_python(argv: &[String]) -> i32 {
         }
     }
     if argv.iter().any(|arg| arg == "--render-reta") {
-        match markdown_reader::reta_hilfe_text() {
+        match markdown_reader::reta_hilfe_rendered_like_python() {
             Ok(text) => {
                 print!("{text}");
                 return 0;

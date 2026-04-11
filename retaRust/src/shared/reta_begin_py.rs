@@ -65,7 +65,14 @@ impl Program {
 
     pub fn helpPage(&mut self) -> bool {
         if self.argvWithoutProgram.iter().any(|a| a == "-h" || a == "-help" || a == "--help") {
-            self.finallyDisplayLines = self.help_lines_py();
+            match crate::doc_tools::markdown_reader::reta_hilfe_rendered_like_python() {
+                Ok(rendered) => {
+                    self.finallyDisplayLines = rendered.lines().map(|s| s.to_string()).collect();
+                }
+                Err(_) => {
+                    self.finallyDisplayLines = self.help_lines_py();
+                }
+            }
             return true;
         }
         false
