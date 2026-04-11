@@ -109,3 +109,14 @@ Darunter sind nur wenige Teile als Paradigma und dazu außerdem Architektur Mode
 Und als Unterstes als sehr vieles Überwiegendes viel mehr als Datenbank ist alles ein riesiges Netzwerk aus Netzwerken welche als beides passen als Programmierparadigma und dazu außerdem als Programmarchitektur Design Modell.
 
 So sollte Reta als erstes umgestaltet werden.
+
+
+Noch mal, wie ich reta umgestalten werde:
+Zwei math Kategorien, die mit einem Funktor verbunden sind wird die Architektur das Modell Design und gleichzeitig das Paradigma. Als Architektur Modell Design ist es ein Grundgerüst auf dem der Rest strukturell aufbaut und als Programmierparadigma ist es ein Objekt, das Prozeduren, Klassen, Objekte, Netzwerke, Datenströme, Topologien enthält. Diese sind entweder imperative Befehle, deklarative beschriebene Formulierungen oder Contraints Formulierungen, welche an einen Solver übergeben werden, also wie eine 2D Matrix hier.
+Als Programmierparadigma sind beide math Kategorien je ein Objekt mit deren Objekten man vieles machen kann, wie je ein jeweiliges Mathematik Thema.
+Die eine große Kategorie ist keine Datenbank, die zweite kleine mathematische Kategorie von nur beiden ist eine Datenbank mehrerer relationaler Tabellen. Das ist die eine Ausgabe-Tabelle, die mehreren Eingabetabellen, und alles, was auch nur mit aller schrecklicher Gewalt auch nur irgendwie in eine Tabelle gequetscht werden kann, was danach klingt, als ob man das ablehnen sollte, aber ich will das so. Beispielsweise Teile der Eingabeparameter und Teile von Codebeschreibungen wie BBCode HTML CLI Ausgabetextformatierung. Denn Dokus darüber haben manchmal darüber Tabellenübersichten.
+Also wir haben eine mathematische Kategorie keine Datenbank ist und den größten Teil umfasst und eine die auch gleichzeitig Datenbank ist und beides ist mit einem Funktor und einer natürlichen Transformation verbunden und mit Datenbankmanagement.
+
+Programmteile könnte man mit Haskell machen. Das sollte überlegt werden, Programmteie als Bibliotheken mit Haskell als dynamische oder statische Programmbibiliothek sowohl für Rust als auch für Python als pip Modul zu bauen. Das könnte Sinn machen drei Programmiersprachen einzusetzen.
+
+Reta das dann als Programmierparadigmaobjekt mit Ereignissen und als Gerüststruktur außerdem zwei math Kategorien ist wo das kleinere das außerdem als Datenbank ist, hat dann viele Netzwerke und wenige Topologien die beides Objekte mit Sachen die man damit machen kann als Programmierparadigma und außerdem als Architektur Grobgeräust Design Modell. 
