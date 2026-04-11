@@ -680,6 +680,71 @@ impl Program {
         (generated1_pairs, generated2_codes, generated2_selections, bool_and_tuple_set1_options, metakonkret_pairs)
     }
 
+
+
+    fn apply_kombination_args_after_reverse_dicts_py(&mut self, neg: &str) {
+        let mut in_kombination = false;
+        for arg in self.argvWithoutProgram.clone() {
+            if arg == "-kombination" {
+                in_kombination = neg.is_empty();
+                continue;
+            }
+            if arg == "--kombination" {
+                continue;
+            }
+            if arg.starts_with('-') && !arg.starts_with("--") {
+                in_kombination = false;
+                continue;
+            }
+            if !in_kombination || !arg.starts_with("--") {
+                continue;
+            }
+            let sub = &arg[2..];
+            let Some((left, right)) = sub.split_once('=') else {
+                continue;
+            };
+            if left == "galaxie" {
+                for raw_single in right.split(',') {
+                    let single = raw_single.trim();
+                    if single.is_empty() {
+                        continue;
+                    }
+                    let starts_with_neg = single.starts_with('-');
+                    let lookup = if starts_with_neg { &single[1..] } else { single };
+                    let yes1 = if starts_with_neg { neg == "-" } else { neg.is_empty() };
+                    if !yes1 {
+                        continue;
+                    }
+                    if let Some(v) = self.kombiReverseDict.get(lookup) {
+                        self.spaltenArtenKey_SpaltennummernValue
+                            .entry(self.spaltenTypeNaming.kombi1)
+                            .or_default()
+                            .insert(*v);
+                    }
+                }
+            } else if left == "universum" {
+                for raw_single in right.split(',') {
+                    let single = raw_single.trim();
+                    if single.is_empty() {
+                        continue;
+                    }
+                    let starts_with_neg = single.starts_with('-');
+                    let lookup = if starts_with_neg { &single[1..] } else { single };
+                    let yes1 = if starts_with_neg { neg == "-" } else { neg.is_empty() };
+                    if !yes1 {
+                        continue;
+                    }
+                    if let Some(v) = self.kombiReverseDict2.get(lookup) {
+                        self.spaltenArtenKey_SpaltennummernValue
+                            .entry(self.spaltenTypeNaming.kombi2)
+                            .or_default()
+                            .insert(*v);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
         let _ = self.load_religion_csv_exact();
@@ -702,6 +767,8 @@ impl Program {
         self.init_spalten_arten_python_like();
         self.storeParamtersForColumns(words);
         self.produceAllSpaltenNumbers("");
+        self.apply_kombination_args_after_reverse_dicts_py("");
+        self.apply_kombination_args_after_reverse_dicts_py("-");
 
         let (mut paramLines, paramLinesNot) = self.deleteDoublesInSets_py(paramLines0, paramLinesNot0);
 
