@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 pub mod words_py;
 pub mod csv_loader_py;
 pub mod reta_program_types;

@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use crate::doc_tools::markdown_reader;
 use crate::runtime::I18nExact;
 use indexmap::IndexMap;

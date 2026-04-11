@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 pub use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use std::collections::BTreeSet;
 impl Program {

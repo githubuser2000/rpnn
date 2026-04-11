@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use indexmap::IndexMap;
 use crate::shared::words_python_like::{Words, PyValue};
 

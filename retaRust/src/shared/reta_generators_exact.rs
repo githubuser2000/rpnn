@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 // Automatisch aus Python- und Rust-Quellen des hochgeladenen reta-Projekts erzeugt.
 // Ziel: exakte Referenz aller Generatorspalten in reta-Architektur.
 

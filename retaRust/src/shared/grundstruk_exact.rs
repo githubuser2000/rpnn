@@ -1,4 +1,4 @@
-
+#![allow(non_snake_case)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PyVal {
     NoneValue,

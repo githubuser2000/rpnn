@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use crate::shared::exact_i18n::I18nExact;
 
 #[derive(Clone, Debug)]

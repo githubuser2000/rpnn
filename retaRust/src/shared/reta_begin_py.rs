@@ -65,14 +65,7 @@ impl Program {
 
     pub fn helpPage(&mut self) -> bool {
         if self.argvWithoutProgram.iter().any(|a| a == "-h" || a == "-help" || a == "--help") {
-            match crate::doc_tools::markdown_reader::reta_hilfe_rendered_like_python() {
-                Ok(rendered) => {
-                    self.finallyDisplayLines = rendered.lines().map(|s| s.to_string()).collect();
-                }
-                Err(_) => {
-                    self.finallyDisplayLines = self.help_lines_py();
-                }
-            }
+            self.finallyDisplayLines = self.help_lines_py();
             return true;
         }
         false
@@ -164,7 +157,7 @@ impl Program {
                     self.obZeilenBereicheAngegeben = true;
                     if neg.is_empty() {
                         for value in self.parametersCmdWithSomeBereich_py(tail, "n", "", true) {
-                            Self::push_unique_string(&mut paramLines, value);
+                            Self::push_unique_string(&mut paramLines, format!("zaehlung={}", value));
                         }
                     }
                 } else if let Some(tail) = sub.strip_prefix("hoehemaximal=") {

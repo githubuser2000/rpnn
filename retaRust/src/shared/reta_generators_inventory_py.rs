@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 // Aus Python reta automatisch extrahiertes Generator-Inventar.
 // Noch keine Vollimplementierung aller Algorithmen; dies ist die bitgenaue Referenz fuer die Architektur.
 

@@ -7,63 +7,6 @@ use hypher::{hyphenate, Lang};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 impl Program {
-    fn row_numbers_for_param_line_py(&self, condition: &str, max_row_number: i64) -> Option<Vec<i64>> {
-        if max_row_number < 1 {
-            return Some(vec![]);
-        }
-
-        let rows = match condition {
-            "all" => (1..=max_row_number).collect(),
-            "=" => vec![10].into_iter().filter(|row| *row <= max_row_number).collect(),
-            "<" => (1..=std::cmp::min(9, max_row_number)).collect(),
-            ">" => {
-                if max_row_number <= 10 {
-                    vec![]
-                } else {
-                    (11..=max_row_number).collect()
-                }
-            }
-            _ => return None,
-        };
-
-        Some(rows)
-    }
-
-    fn selected_rows_from_param_lines_py(
-        &self,
-        paramLines: &[String],
-        paramLinesNot: &[String],
-        max_row_number: i64,
-    ) -> Option<Vec<i64>> {
-        let mut positive_rows: Vec<i64> = vec![];
-        let mut has_positive_row_filter = false;
-
-        for condition in paramLines {
-            if let Some(rows) = self.row_numbers_for_param_line_py(condition, max_row_number) {
-                has_positive_row_filter = true;
-                positive_rows.extend(rows);
-            }
-        }
-
-        if !has_positive_row_filter {
-            return None;
-        }
-
-        let mut selected_rows = dedup_preserve_order_i64(positive_rows);
-        if !paramLinesNot.is_empty() {
-            let mut negative_rows: Vec<i64> = vec![];
-            for condition in paramLinesNot {
-                if let Some(rows) = self.row_numbers_for_param_line_py(condition, max_row_number) {
-                    negative_rows.extend(rows);
-                }
-            }
-            let negative_set: BTreeSet<i64> = negative_rows.into_iter().collect();
-            selected_rows.retain(|row| !negative_set.contains(row));
-        }
-
-        Some(selected_rows)
-    }
-
     pub(crate) fn prepare4out_py(
         &mut self,
         paramLines: Vec<String>,
@@ -79,25 +22,12 @@ impl Program {
             return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
         }
 
-        let max_row_number = (relitable.len() as i64).saturating_sub(1);
-        let row_filter_from_param_lines = self.selected_rows_from_param_lines_py(
+        let max_row = relitable.len().saturating_sub(1) as i64;
+        let mut selected_rows: Vec<i64> = self.selected_rows_from_param_lines_py(
             &paramLines,
             &paramLinesNot,
-            max_row_number,
+            max_row,
         );
-
-        let mut selected_rows: Vec<i64> = if !self.rowRange.is_empty() {
-            let mut rows = dedup_preserve_order_i64(self.rowRange.clone());
-            if let Some(filtered_rows) = &row_filter_from_param_lines {
-                let filtered_set: BTreeSet<i64> = filtered_rows.iter().copied().collect();
-                rows.retain(|row| filtered_set.contains(row));
-            }
-            rows
-        } else if let Some(filtered_rows) = row_filter_from_param_lines {
-            filtered_rows
-        } else {
-            (0..(relitable.len() as i64)).collect()
-        };
         selected_rows = dedup_preserve_order_i64(selected_rows);
         if !self.keineUeberschriften && !selected_rows.contains(&0) {
             selected_rows.insert(0, 0);
@@ -148,6 +78,78 @@ impl Program {
         let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
+
+    fn selected_rows_from_param_lines_py(
+        &self,
+        param_lines: &[String],
+        param_lines_not: &[String],
+        max_row: i64,
+    ) -> Vec<i64> {
+        let base_rows: Vec<i64> = if self.rowRange.is_empty() {
+            (1..=max_row).collect()
+        } else {
+            self.rowRange
+                .iter()
+                .copied()
+                .filter(|row| *row > 0 && *row <= max_row)
+                .collect()
+        };
+
+        let include_rows = self.collect_matching_rows_py(param_lines, max_row);
+        let mut selected_rows: Vec<i64> = if include_rows.is_empty() {
+            base_rows
+        } else {
+            base_rows
+                .into_iter()
+                .filter(|row| include_rows.contains(row))
+                .collect()
+        };
+
+        let exclude_rows = self.collect_matching_rows_py(param_lines_not, max_row);
+        if !exclude_rows.is_empty() {
+            selected_rows.retain(|row| !exclude_rows.contains(row));
+        }
+
+        selected_rows
+    }
+
+    fn collect_matching_rows_py(&self, conditions: &[String], max_row: i64) -> BTreeSet<i64> {
+        let mut rows = BTreeSet::new();
+
+        for condition in conditions {
+            match condition.as_str() {
+                "=" => {
+                    if max_row >= 10 {
+                        rows.insert(10);
+                    }
+                }
+                "<" => {
+                    for row in 1..=max_row.min(9) {
+                        rows.insert(row);
+                    }
+                }
+                ">" => {
+                    for row in 11..=max_row {
+                        rows.insert(row);
+                    }
+                }
+                _ => {
+                    if let Some(value) = condition.strip_prefix("zaehlung=") {
+                        if let Ok(target) = value.parse::<i64>() {
+                            for row in 1..=max_row {
+                                if Self::zeile_which_zaehlung_py(row) == target {
+                                    rows.insert(row);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        rows
+    }
+
     fn hypher_lang_py(_word: &str) -> Lang {
         Lang::German
     }

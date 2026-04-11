@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 /*
 DIREKT-TRANSCOMPILATIONSFRONT FÜR i18n/words.py
 Python-Quelle eingefroren für 1:1-Übernahme.

@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use indexmap::IndexMap;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
