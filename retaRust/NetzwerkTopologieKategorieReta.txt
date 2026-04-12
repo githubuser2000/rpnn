@@ -120,3 +120,1024 @@ Also wir haben eine mathematische Kategorie keine Datenbank ist und den größte
 Programmteile könnte man mit Haskell machen. Das sollte überlegt werden, Programmteie als Bibliotheken mit Haskell als dynamische oder statische Programmbibiliothek sowohl für Rust als auch für Python als pip Modul zu bauen. Das könnte Sinn machen drei Programmiersprachen einzusetzen.
 
 Reta das dann als Programmierparadigmaobjekt mit Ereignissen und als Gerüststruktur außerdem zwei math Kategorien ist wo das kleinere das außerdem als Datenbank ist, hat dann viele Netzwerke und wenige Topologien die beides Objekte mit Sachen die man damit machen kann als Programmierparadigma und außerdem als Architektur Grobgeräust Design Modell. 
+
+Ontologische Grundtrennung
+1.1 Große semantische Kategorie
+Diese Kategorie enthält die eigentliche Bedeutung von reta.
+Sie ist nicht primär Datenbank.
+Sie ist die Welt der:
+Anfragen
+Parameterstrukturen
+Kategorien
+Unterkategorien
+Spalten
+Generatoren
+Ableitungen
+Ausgaben
+Formatierungsobjekte
+Ereignisse
+Datenströme
+Relationen
+Transformationen
+
+Diese Kategorie ist das eigentliche Architekturzentrum.
+
+1.2 Kleine relationale Kategorie
+Diese Kategorie enthält alles, was sinnvoll in Tabellen, relationale Schemata oder tabellierbare Metastrukturen überführt werden kann.
+Sie ist die Welt der:
+Eingabetabellen
+Ausgabetabellen
+Lookup-Tabellen
+Mapping-Tabellen
+Join-Tabellen
+Dokumentationstabellen
+Formatmetadaten-Tabellen
+tabellarisch fassbaren Code- und Ausgabebeschreibungen
+DB-Verwaltung und Schemaebenen
+Diese Kategorie ist nicht das ganze System, sondern eine geordnete, kontrollierte Repräsentationsebene.
+
+Wie reta math Kategorie:
+große semantische Kategorie SemReta:
+Objekte sind nicht nur Klassen im OOP-Sinn, sondern semantische Entitäten.
+Kernobjekte
+Request
+ParameterMain
+ParameterSub
+ParameterValue
+RequestContext
+Kategorie
+Unterkategorie
+Spalte
+SpaltenMenge
+Generator
+GeneratorFamilie
+Zeile
+ZeilenMenge
+AusgabeModell
+FormatModell
+HtmlMeta
+CliMeta
+DocMeta
+Event
+Datenstrom
+ConstraintSystem
+SolverResult
+
+Morphismen sind strukturtreue Transformationen.
+
+Typische Morphismen
+parse : RawInput -> Request
+validate : Request -> Request
+resolve : Request -> RequestContext
+select_columns : RequestContext -> SpaltenMenge
+select_rows : RequestContext -> ZeilenMenge
+generate : (Generator, RequestContext) -> SpaltenMenge
+enrich_meta : SpaltenMenge -> AusgabeModell
+format_cli : AusgabeModell -> CliText
+format_html : AusgabeModell -> HtmlText
+document : AusgabeModell -> DocMeta
+to_constraints : RequestContext -> ConstraintSystem
+solve : ConstraintSystem -> SolverResult
+
+Komposition in SemReta
+Die Hauptstärke der Kategorie ist Komposition.
+Beispiel:
+RawInput -> Request -> RequestContext -> SpaltenMenge -> AusgabeModell -> CliText
+oder
+Request -> RequestContext -> ConstraintSystem -> SolverResult -> SpaltenMenge
+Die Architektur muss diese Kompositionen explizit sichtbar machen.
+
+Invarianten von SemReta
+Diese Kategorie braucht harte Invarianten:
+Python-Verhalten ist die Referenz
+semantische Identität darf durch Refactoring nicht verloren gehen
+Generatoren bleiben semantisch unterscheidbar
+Kategorien und Unterkategorien bleiben getypt
+exakte Äquivalenz ist von bloßer Ähnlichkeit zu trennen
+Darstellung darf Semantik nicht verfälschen
+
+kleine relationale Kategorie RelReta
+Kernobjekte
+InputTable
+OutputTable
+CategoryTable
+SubcategoryTable
+ColumnTable
+GeneratorTable
+ParameterTable
+RelationTable
+EquivalenceTable
+CompatibilityTable
+FormatRuleTable
+HtmlMetaTable
+CliMetaTable
+DocTable
+MappingTable
+JoinView
+Schema
+DbState
+
+3.2 Morphismen in RelReta
+Projektion
+Selektion
+Join
+Restriktion
+Schemaabbildung
+Normalisierung
+Export
+Import
+Materialisierung
+View-Bildung
+
+Beispielhaft:
+
+project_columns : OutputTable -> ColumnTable
+join_category_column : (CategoryTable, ColumnTable) -> JoinView
+normalize_schema : Schema -> Schema
+materialize_cli_meta : FormatRuleTable -> CliMetaTable
+
+RelReta hat drei Hauptaufgaben:
+1. Speicherung
+Strukturen explizit und prüfbar machen.
+2. Übersicht
+Komplexität in Tabellen, Views und Relationen sichtbar machen.
+3. Verwaltung
+Konsistenz, Dokumentation, Zuordnung und spätere Automatisierung ermöglichen.
+
+Funktoren zwischen beiden Kategorien
+Jetzt der eigentliche Kern der Architektur.
+4.1 Hauptfunktor: Semantik nach Relation
+
+F : SemReta -> RelReta
+Dieser Funktor projiziert semantische Objekte in relationale Repräsentationen.
+Beispiele
+RequestContext → mehrere Input-/Context-Tabellen
+SpaltenMenge → ColumnTable / OutputTable
+GeneratorFamilie → GeneratorTable
+Kategorie / Unterkategorie → CategoryTable / SubcategoryTable
+HtmlMeta → HtmlMetaTable
+CliMeta → CliMetaTable
+
+Wichtig:
+F ersetzt die semantischen Objekte nicht.
+Er bildet sie nur tabellarisch ab.
+
+4.2 Optionaler Gegenfunktor oder partielle Rückabbildung
+Eine vollständige Umkehrung ist meist nicht möglich.
+Aber partielle Rückprojektionen können sinnvoll sein.
+
+Nenne sie etwa:
+G : RelReta -> SemReta (partiell / rekonstruktiv)
+
+Beispiele:
+
+aus Tabellen rekonstruiertes Metamodell
+aus Mappingtabellen rekonstruierte Kategoriebeziehungen
+aus Doku-/Formattabellen abgeleitete semantische Regeln
+
+Aber hier ist Vorsicht nötig:
+Nicht jede Tabelle trägt genug Bedeutung für vollständige Rückgewinnung.
+
+5. Natürliche Transformationen
+
+Die sind nur dann sinnvoll, wenn zwei verschiedene Funktoren vom selben Ursprung ausgehen.
+5.1 Beispiel
+Angenommen, es gibt:
+F_cli : SemReta -> RelReta/CLIView
+F_html : SemReta -> RelReta/HTMLView
+Dann kann eine natürliche Transformation die systematische Korrespondenz zwischen diesen Darstellungen beschreiben.
+Also etwa:
+dieselbe semantische Spalte
+einmal als CLI-Ausgabe,
+einmal als HTML-Klasse / HTML-Darstellung
+
+Wenn diese Zuordnung strukturell für alle Objekte konsistent ist, ist das eine echte natürliche Transformation.
+
+5.2 Sinnvolle Anwendung in reta
+CLI-Ausgabe ↔ HTML-Ausgabe
+semantisches Ausgabemodell ↔ Dokumentationssicht
+tabellarische Metadaten ↔ Laufzeitrepräsentation
+6. Netzwerke in reta
+Typische Netzwerke
+Parameternetzwerk
+Kategorienetzwerk
+Unterkategorienetzwerk
+Spaltennetzwerk
+Generatornetzwerk
+Äquivalenznetzwerk
+Kompatibilitätsnetzwerk
+Formatierungsnetzwerk
+Datenflussnetzwerk
+Ereignisnetzwerk
+
+Diese Netzwerke sind konkrete Relationen, aus denen spätere Topologien abgeleitet werden können.
+
+7. Topologien in reta
+Nähe auf Requests
+Nähe auf Spalten
+Nähe auf Kategorien
+Nähe auf Darstellungsformen
+
+Diese Topologien entstehen aus Relationen wie:
+Ähnlichkeit
+Erreichbarkeit
+Zugehörigkeit
+Ableitbarkeit
+lokale Änderungsstabilität
+
+Topologie ist also keine Primärschicht, sondern eine sekundäre Struktur über Relationen.
+
+8.1 Imperativ
+Ablaufsteuerung
+I/O
+Orchestrierung
+Reihenfolgeabhängige Prozesse
+Performance-kritische Routinen
+
+8.2 Deklarativ
+Kategorien
+Relationen
+Regeln
+Generatorbeschreibungen
+Mappingdefinitionen
+Formatdefinitionen
+Das ist in reta besonders wertvoll.
+
+8.3 Constraint-basiert
+Kompatibilitätsprüfung
+beste Auswahl
+Reverse Mapping
+Konsistenzprobleme
+komplexe Parametersuche
+Nicht als Totalersatz des Systems, sondern als gezielte Problemlöseebene.
+
+Ereignisse und Datenströme
+Ereignisse
+Sinnvolle Events:
+Request empfangen
+Parsing abgeschlossen
+Selektion abgeschlossen
+Generator angewendet
+Ausgabe modelliert
+Darstellung erzeugt
+Constraint-Konflikt erkannt
+Datenströme
+
+Sinnvolle Ströme:
+Inputstrom
+Transformationsstrom
+Metadatenstrom
+Formatierungsstrom
+Exportstrom
+
+Tabellierbar sind beispielsweise:
+Parametereigenschaften
+Mappingregeln
+Generatorregister
+Formatregeln
+HTML-Metadaten
+CLI-Metadaten
+Dokuübersichten
+Zuordnungslisten
+Kompatibilitätsmatrizen
+Constraintübersichten
+
+12. Konkrete Modulableitung für Rust
+Semantischer Kern
+sem/request
+sem/parameter
+sem/category
+sem/subcategory
+sem/column
+sem/generator
+sem/output_model
+sem/format_model
+sem/relations
+sem/events
+sem/constraints
+Relationale Schicht
+rel/schema
+rel/tables
+rel/views
+rel/mappings
+rel/normalization
+rel/export
+rel/import
+Funktor-Schicht
+bridge/sem_to_rel
+bridge/rel_to_sem
+bridge/cli_projection
+bridge/html_projection
+bridge/doc_projection
+Laufzeit/Orchestrierung
+runtime/pipeline
+runtime/io
+runtime/execution
+runtime/cache
+So etwas wäre deutlich sauberer als vermischte Großmodule.
+
+Die erste, große Schicht ist die semantische Kategorie SemReta.
+Sie enthält die eigentlichen Objekte und Transformationen des Systems: Requests, Parameter, Kategorien, Spalten, Generatoren, Ausgabemodelle, Formatmodelle, Ereignisse und Datenströme.
+
+Die zweite, kleinere Schicht ist die relationale Kategorie RelReta.
+Sie enthält alle tabellarisch darstellbaren Repräsentationen und Verwaltungssichten: Eingabe- und Ausgabetabellen, Mappingtabellen, Relationen, Formatmetadaten und dokumentarische Tabellen.
+
+Zwischen beiden wirkt mindestens ein Funktor, der semantische Objekte strukturerhaltend in relationale Repräsentationen projiziert. Wo mehrere Darstellungsfunktoren vom selben semantischen Ursprung ausgehen, können natürliche Transformationen auftreten.
+
+reta verwendet imperative, deklarative und constraint-basierte Teilparadigmen. Diese sind nicht konkurrierende Gesamtmodelle, sondern spezialisierte Ausdrucksformen innerhalb der semantischen Gesamtarchitektur.
+
+Das System enthält viele Netzwerke und nur wenige wesentliche Topologien. Netzwerke bilden die konkreten Relationen; Topologien entstehen sekundär aus Nähe-, Erreichbarkeits- und Ähnlichkeitsstrukturen.
+
+
+deklarativ für Wissen, Zuordnungen, Schemata, Regeln
+deklarativ-funktional für reine Transformationen und Generatorlogik
+Constraint Programming für Auswahl, Konsistenz, Rückschluss und KonfliktlöSpeicherung
+
+Das sollte deklarativ beschrieben sein:
+welche Oberkategorien existieren
+welche Unterkategorien zu welcher Oberkategorie gehören
+welche Aliasnamen erlaubt sind
+welche exakten Bezeichnungen die Python-Referenz vorgibt
+welche Ähnlichkeiten und Verwandtschaften es gibt
+
+Sehr stark deklarativ:
+welche Hauptparameter existieren
+welche Nebenparameter zu welchem Hauptparameter gehören
+welche Wertebereiche erlaubt sind
+welche Kombinationen formal zulässig sind
+welche Reihenfolgeregeln gelten
+welche Standardwerte oder impliziten Annahmen gelten
+
+Tabellen- und Mapping-Metadaten
+Auch deklarativ:
+welche Eingabetabellen es gibt
+welche Ausgabetabellen es gibt
+welche Spalte in welcher Tabelle welche Bedeutung hat
+welche Join-Beziehungen existieren
+welche Formatmetadaten mit welchen Objekten verbunden sind
+
+D. Ausgabe- und Formatregeln auf Beschreibungsebene
+Soweit sie beschreibbar sind:
+welche semantischen Elemente in CLI sichtbar werden
+welche HTML-Meta-Klassen grundsätzlich aus welchen Eigenschaften folgen
+welche Doku-Sichten existieren
+welche Textformate prinzipiell erlaubt sind
+Nicht die endgültige Renderfunktion selbst, aber die Regelbasis.
+
+E. Registries
+Alles, was Registercharakter hat:
+Generatorregister
+Formatregister
+Projektionen
+bekannte Relationen
+bekannte Typfamilien
+sollte deklarativ definiert werden.
+
+2. Was in reta deklarativ-funktional sein sollte
+Das ist der Bereich, in dem etwas nicht nur beschrieben, sondern rein transformiert wird.
+Hier ist nicht mehr bloß Wissen, sondern echte Ableitung.
+Aber möglichst:
+rein,
+deterministisch,
+ohne Seiteneffekte,
+gut komponierbar.
+Das ist vermutlich der wichtigste Teil für deinen Kern.
+
+A. Generatorlogik
+Die meisten eigentlichen Generatorspalten sollten deklarativ-funktional modelliert werden.
+Warum?
+Weil Generatoren typischerweise sind:
+Eingabe: definierte Struktur
+Ausgabe: definierte Struktur
+möglichst keine versteckten Seiteneffekte
+oft kombinierbar
+oft testbar als reine Funktion
+Also:
+Generator × Kontext -> SpaltenMenge
+SpaltenMenge -> angereicherte SpaltenMenge
+Das ist fast ideal funktional.
+
+B. Parsing-Normalisierung nach dem Rohparser
+Der erste Tokenizer/CLI-Einleseteil ist oft imperativ.
+Aber danach:
+Normalisierung
+Strukturabbildung
+Typisierung
+Auflösung von Aliasen
+Aufbau von getypten Request-Objekten
+sollte möglichst deklarativ-funktional sein.
+
+C. Projektionen zwischen Modellschichten
+Sehr guter Bereich dafür:
+semantisches Modell → relationale Sicht
+semantisches Modell → CLI-Modell
+semantisches Modell → HTML-Modell
+relationale Sicht → Doku-Sicht
+
+Das sind genau die Dinge, die als reine Funktionen gut funktionieren.
+D. Meta-Ableitungen
+Zum Beispiel:
+aus Kategorie + Unterkategorie → HTML-Meta
+aus RequestContext → aktive Generatorfamilien
+aus Spaltenmenge → Ausgabegruppierung
+aus Tabellenrelationen → Dokumentationssicht
+Das sind klare Transformationsschritte.
+
+E. Komposition von Verarbeitungsschritten
+Die Pipeline selbst darf imperativ orchestriert werden.
+Aber ihre Bausteine sollten möglichst funktional sein:
+
+parse
+resolve
+select
+generate
+enrich
+project
+format-model
+Je reiner diese Teile sind, desto besser.
+
+3. Was in reta Constraint Programming sein sollte
+Nur der Teil, wo du keine einfache direkte Ableitung mehr hast, sondern ein Lösungsproblem.
+Also dort, wo mehrere Bedingungen zugleich gelten und nicht klar ist, welche Lösung oder Kombination daraus folgt.
+
+A. Parameterkompatibilität
+Sehr geeigneter Bereich:
+welche Kombination von Parametern ist zulässig
+welche Kombination ist widersprüchlich
+welche Parameter implizieren oder verbieten andere
+welche Werte dürfen gleichzeitig auftreten
+Das ist echtes Constraint-Thema.
+
+B. Spaltenauswahl bei Mehrdeutigkeit
+Wenn ein Request nicht genau auf eine Spaltenmenge zeigt, sondern:
+mehrere Kandidaten zulässt
+exakte und nicht exakte Treffer hat
+Prioritäten berücksichtigt
+Konflikte auflösen muss
+dann ist Constraint Programming sehr passend.
+
+C. Reverse Mapping
+Das ist fast der klassische CP-Fall.
+Beispiel:
+gegebene Ausgabe oder Spaltenmenge
+finde mögliche Requests, Generatoren oder Parameterkombinationen, die dazu führen
+Das ist Suche unter Bedingungen, also Constraint-nah.
+
+D. Konfliktauflösung und beste Auswahl
+Wenn du sagst:
+muss diese Eigenschaften erfüllen
+sollte möglichst jene anderen Eigenschaften erfüllen
+darf nicht mit diesen Regeln kollidieren
+bevorzuge exakte Äquivalenz gegenüber bloßer Ähnlichkeit
+
+dann bist du schon im Bereich von:
+Constraints
+eventuell Ranking
+eventuell Optimierung
+E. Konsistenzprüfung komplexer Modellteile
+
+Zum Beispiel:
+jede Unterkategorie muss zu genau einer Oberkategorie gehören
+jede deklarierte Projektion muss für alle relevanten Typen definiert sein
+jede Formatregel muss auf existierende semantische Objekte zeigen
+keine zirkulären Verbote in einer bestimmten Klasse von Parametern
+Das kann mit Constraint-Denken sehr sauber geprüft werden.
+
+6. Konkrete Aufteilung für reta
+Jetzt direkt in deine Systemsprache übersetzt.
+
+Deklarativ
+Sollten deklarativ modelliert werden:
+Oberkategorien
+Unterkategorien
+Spaltendefinitionen
+Aliasdefinitionen
+Parameterdefinitionen
+Parameterhierarchien
+Kompatibilitätsgrundregeln
+Äquivalenz- und Verwandtschaftsdefinitionen
+Formatregel-Grundlagen
+Tabellen- und Schemainformationen
+Generatorregister als Metadaten
+Doku-/Übersichtsdefinitionen
+
+Deklarativ-funktional
+Sollten deklarativ-funktional modelliert werden:
+Request-Normalisierung
+Aufbau des getypten RequestContext
+Auflösung von Aliasen in echte Typobjekte
+Generatorberechnung
+Spaltenableitung aus semantischem Kontext
+Gruppierungslogik der Ausgabe
+HTML-Meta-Ableitung
+CLI-Projektionslogik
+SemReta → RelReta Projektionen
+RelReta → Doku-/View-Projektionen
+Metadatenanreicherung
+reine Teile der Reverse-Report-Erzeugung
+
+Constraint Programming
+Sollten als Constraints formuliert werden:
+Parameterkombinationsprüfung
+Mehrdeutige Spaltenauswahl
+exakte vs nicht-exakte Trefferwahl
+Konfliktprüfung zwischen Regeln
+Rekonstruktion möglicher Requests aus Ergebnisstrukturen
+Suche nach minimalen oder besten Erklärungen
+Konsistenzprüfung des Gesamtschemas
+optionale intelligente Vorschläge für ähnliche/kompatible Requests
+
+
+7. Die Pipeline als Mischform
+Die beste Architektur ist ungefähr so:
+Schritt 1: Imperativ orchestriert
+CLI lesen
+Dateien laden
+Pipeline starten
+Schritt 2: Deklarativ validiert
+welche Regeln gelten
+welche Typen und Schemata existieren
+Schritt 3: Deklarativ-funktional transformiert
+parse
+normalize
+resolve
+generate
+project
+Schritt 4: Constraint-basiert löst Sonderprobleme
+Mehrdeutigkeit
+Konflikt
+Reverse Mapping
+optimale Auswahl
+Schritt 5: Deklarativ-funktional formatiert
+Ausgabeobjekt
+CLI-/HTML-/Doku-Projektion
+Schritt 6: Imperativ ausgibt
+stdout
+html-file
+db export
+
+
+8. Der tiefere architektonische Punkt
+Die beste Zuordnung ist nicht nach „welches Paradigma ist edler“, sondern nach:
+Handelt es sich um
+Wissen,
+reine Transformation,
+oder Lösung unter Bedingungen?
+
+Dann ist die Antwort fast automatisch:
+Wissen → deklarativ
+reine Transformation → deklarativ-funktional
+Lösung unter Bedingungen → Constraint Programming
+Das ist die sauberste Dreiteilung.
+
+9. Die prägnante Fassung
+Für reta würde ich hart so entscheiden:
+
+Deklarativ
+für:
+Schemata
+Kategorien
+Relationen
+Register
+Tabellenwissen
+Formatregeln als Wissensbasis
+
+Deklarativ-funktional
+für:
+Generatoren
+Projektionen
+Meta-Ableitungen
+Modelltransformationen
+große Teile der Kernlogik
+
+Constraint-basiert
+für:
+Konfliktlösung
+Mehrdeutigkeit
+Auswahlprobleme
+Rückschlussprobleme
+Konsistenzprobleme
+
+Im Reta Projekt ist der größte Hebel wahrscheinlich:
+so viel wie möglich von der bisherigen String-/Ad-hoc-Logik in deklarative Definitionen plus deklarativ-funktionale Transformationen zu überführen,
+und Constraint Programming nur gezielt dort einzusetzen, wo echte kombinatorische Mehrdeutigkeit entsteht.
+
+
+3. C. Constraint-Module
+Hier nur echte Lösungsprobleme.
+Nicht normalen Ablauf hineinziehen.
+
+constraint/parameter_constraints.rs
+Inhalt:
+erlaubte / verbotene Parameterkombinationen
+Implikationen
+Widersprüche
+Besitz- und Bereichsconstraints
+
+constraint/column_choice.rs
+Inhalt:
+mehrdeutige Spaltenauswahl
+exakte Treffer vs verwandte Treffer
+Kandidatenreduktion unter Bedingungen
+
+constraint/reverse_request.rs
+Inhalt:
+aus Ausgabe oder Spaltenmengen mögliche Requests rekonstruieren
+ideal für Reverse-Request-Report
+
+constraint/schema_consistency.rs
+Inhalt:
+prüft, ob definierte Schemata konsistent sind
+jede Unterkategorie hat Oberkategorie
+jede Formatregel zeigt auf existierende Entitäten
+keine unaufgelösten Referenzen
+
+constraint/generator_compat.rs
+Inhalt:
+welche Generatoren dürfen zusammen auftreten
+welche schließen sich aus
+welche implizieren einander
+
+constraint/solver_bridge.rs
+Inhalt:
+falls später echter Solver kommt:
+CP-SAT
+MiniZinc
+Prolog-artig
+Haskell-Bibliothek
+dies ist die einzige Stelle, die externe Solver direkt kennt
+Sehr wichtig:
+Nicht den ganzen Code solverabhängig machen.
+
+
+Deklarativ
+Das solltest du in reta fast vollständig aus dem bisherigen Ad-hoc-Code herausziehen:
+Kategorienamen
+Unterkategorienamen
+Aliaslisten
+Parameterdefinitionen
+Generatorregister
+feste Spaltenmetadaten
+Kompatibilitätsgrundwissen
+relationale Schemata
+Formatregelbeschreibungen
+
+Deklarativ-funktional
+Hier sitzt der eigentliche „saubere Kern“:
+Request-Normalisierung
+Request-Auflösung
+Generatoren
+Metadatenableitungen
+Projektionen
+Render-Modelle
+Gruppierungen
+Python-genaue Auswahl- und Ableitungslogik, soweit eindeutig
+
+Constraint-basiert
+Nur wo das Problem tatsächlich ein Lösungsproblem ist:
+Parameterkonflikte
+mehrdeutige Auswahl
+Reverse Mapping
+Konsistenzprüfung
+Priorisierung exakter vs naher Treffer
+
+Alles, was Wissen ist, kommt in deklarative Module.
+Alles, was reine Ableitung ist, kommt in deklarativ-funktionale Module.
+Alles, was unter Bedingungen gelöst werden muss, kommt in Constraint-Module.
+Alles, was nur Ablauf und I/O ist, bleibt imperativ.
+
+
+Wie formuliere ich in Python beide Kategorien SemReta RelReta und dazwischen Funktoren und natürlichen Transformationen?
+SemReta in Python als getyptes semantisches Modell
+RelReta in Python als getyptes relationales Modell
+Funktoren als strukturtreue Abbildungen zwischen Modellwelten
+natürliche Transformationen als familienweise konsistente Projektionen zwischen parallelen Darstellungen 
+
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Protocol, Iterable, Mapping, Any
+
+
+class MainParam(Enum):
+    ZEILEN = auto()
+    SPALTEN = auto()
+    KOMBINATION = auto()
+    AUSGABE = auto()
+
+
+class CategoryKind(Enum):
+    RELIGIONEN = auto()
+    EIGENSCHAFTEN = auto()
+    PRIMVIELFACHE = auto()
+    PROCONTRA = auto()
+
+
+class GeneratorKind(Enum):
+    MOTIV_GLEICHFOERMIG = auto()
+    STRUKTUR_GLEICHFOERMIG = auto()
+    MOTIV_STERN = auto()
+    STRUKTUR_STERN = auto()
+
+
+@dataclass(frozen=True)
+class ParameterValue:
+    raw: str
+
+
+@dataclass(frozen=True)
+class Request:
+    main_params: tuple[MainParam, ...]
+    raw_sub_params: Mapping[str, tuple[ParameterValue, ...]]
+
+
+@dataclass(frozen=True)
+class Category:
+    kind: CategoryKind
+    label: str
+
+
+@dataclass(frozen=True)
+class Column:
+    id: str
+    label: str
+    category: Category
+
+
+@dataclass(frozen=True)
+class Generator:
+    kind: GeneratorKind
+    label: str
+
+
+@dataclass(frozen=True)
+class ColumnSet:
+    columns: tuple[Column, ...]
+
+
+@dataclass(frozen=True)
+class OutputModel:
+    columns: ColumnSet
+    meta: Mapping[str, Any] = field(default_factory=dict)
+
+
+
+def resolve_request(req: Request) -> Request:
+    # Python-genaue Normalisierung / Auflösung
+    return req
+
+
+def select_columns(req: Request) -> ColumnSet:
+    # direkter semantischer Selektionsschritt
+    return ColumnSet(columns=())
+
+
+def apply_generator(gen: Generator, req: Request) -> ColumnSet:
+    # reine Generatorlogik
+    return ColumnSet(columns=())
+
+
+def enrich_output(cols: ColumnSet) -> OutputModel:
+    return OutputModel(columns=cols)
+
+
+@dataclass(frozen=True)
+class RelRow:
+    values: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class RelTable:
+    name: str
+    columns: tuple[str, ...]
+    rows: tuple[RelRow, ...]
+
+
+@dataclass(frozen=True)
+class RelSchema:
+    tables: tuple[RelTable, ...]
+
+
+@dataclass(frozen=True)
+class RelationView:
+    name: str
+    source_tables: tuple[str, ...]
+    rows: tuple[RelRow, ...]
+
+
+
+def project(table: RelTable, selected: tuple[str, ...]) -> RelTable:
+    new_rows = tuple(
+        RelRow(values={k: row.values[k] for k in selected})
+        for row in table.rows
+    )
+    return RelTable(name=f"{table.name}_project", columns=selected, rows=new_rows)
+
+
+def restrict(table: RelTable, predicate) -> RelTable:
+    return RelTable(
+        name=f"{table.name}_restrict",
+        columns=table.columns,
+        rows=tuple(row for row in table.rows if predicate(row))
+    )
+
+
+def simple_join(left: RelTable, right: RelTable, left_key: str, right_key: str) -> RelationView:
+    joined = []
+    for lrow in left.rows:
+        for rrow in right.rows:
+            if lrow.values[left_key] == rrow.values[right_key]:
+                merged = dict(lrow.values)
+                merged.update(rrow.values)
+                joined.append(RelRow(values=merged))
+    return RelationView(
+        name=f"{left.name}_{right.name}_join",
+        source_tables=(left.name, right.name),
+        rows=tuple(joined),
+    )
+
+from typing import Generic, TypeVar, Callable
+
+SObj = TypeVar("SObj")
+SMor = TypeVar("SMor")
+RObj = TypeVar("RObj")
+RMor = TypeVar("RMor")
+
+
+class Functor(Protocol):
+    def map_object(self, obj: Any) -> Any:
+        ...
+
+    def map_morphism(self, morphism: Callable[..., Any]) -> Callable[..., Any]:
+        ... 
+
+
+class SemToRelFunctor:
+    def map_object(self, obj: Any) -> Any:
+        if isinstance(obj, Category):
+            return RelTable(
+                name="category",
+                columns=("kind", "label"),
+                rows=(RelRow(values={"kind": obj.kind.name, "label": obj.label}),),
+            )
+
+        if isinstance(obj, ColumnSet):
+            return RelTable(
+                name="columns",
+                columns=("id", "label", "category"),
+                rows=tuple(
+                    RelRow(values={
+                        "id": c.id,
+                        "label": c.label,
+                        "category": c.category.kind.name,
+                    })
+                    for c in obj.columns
+                ),
+            )
+
+        if isinstance(obj, OutputModel):
+            column_table = self.map_object(obj.columns)
+            meta_table = RelTable(
+                name="output_meta",
+                columns=("key", "value"),
+                rows=tuple(
+                    RelRow(values={"key": k, "value": v})
+                    for k, v in obj.meta.items()
+                ),
+            )
+            return RelSchema(tables=(column_table, meta_table))
+
+        raise TypeError(f"Unsupported SemReta object: {type(obj)!r}") 
+
+
+
+class SemToRelFunctor:
+    def map_object(self, obj: Any) -> Any:
+        # wie oben
+        ...
+
+    def map_morphism(self, morphism):
+        def lifted(obj: Any) -> Any:
+            sem_result = morphism(obj)
+            return self.map_object(sem_result)
+        return lifted 
+
+class RelToSemProjector:
+    def map_object(self, obj: Any) -> Any:
+        if isinstance(obj, RelTable) and obj.name == "columns":
+            cols = []
+            for row in obj.rows:
+                cat = Category(kind=CategoryKind[row.values["category"]], label=row.values["category"])
+                cols.append(Column(
+                    id=str(row.values["id"]),
+                    label=str(row.values["label"]),
+                    category=cat,
+                ))
+            return ColumnSet(columns=tuple(cols))
+
+        raise TypeError(f"Unsupported RelReta object: {type(obj)!r}") 
+
+@dataclass(frozen=True)
+class CliView:
+    lines: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HtmlView:
+    html: str 
+
+class SemToCliFunctor:
+    def map_object(self, obj: Any) -> CliView:
+        if isinstance(obj, ColumnSet):
+            return CliView(lines=tuple(c.label for c in obj.columns))
+        if isinstance(obj, OutputModel):
+            return CliView(lines=tuple(c.label for c in obj.columns.columns))
+        raise TypeError(type(obj))
+
+
+class SemToHtmlFunctor:
+    def map_object(self, obj: Any) -> HtmlView:
+        if isinstance(obj, ColumnSet):
+            body = "".join(f"<li>{c.label}</li>" for c in obj.columns)
+            return HtmlView(html=f"<ul>{body}</ul>")
+        if isinstance(obj, OutputModel):
+            body = "".join(f"<li>{c.label}</li>" for c in obj.columns.columns)
+            return HtmlView(html=f"<ul>{body}</ul>")
+        raise TypeError(type(obj)) 
+
+
+
+
+class CliToHtmlNaturalTransformation:
+    def component(self, obj: Any, cli_view: CliView) -> HtmlView:
+        body = "".join(f"<li>{line}</li>" for line in cli_view.lines)
+        return HtmlView(html=f"<ul>{body}</ul>")
+
+
+
+reta/
+    semreta/
+        objects.py
+        morphisms.py
+        categories.py
+        generators.py
+    relreta/
+        objects.py
+        morphisms.py
+        schema.py
+    functors/
+        sem_to_rel.py
+        sem_to_cli.py
+        sem_to_html.py
+    transformations/
+        cli_to_html.py 
+
+
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class SemColumn:
+    id: str
+    label: str
+    category: str
+
+
+@dataclass(frozen=True)
+class SemColumnSet:
+    columns: tuple[SemColumn, ...]
+
+
+@dataclass(frozen=True)
+class RelRow:
+    values: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RelTable:
+    name: str
+    columns: tuple[str, ...]
+    rows: tuple[RelRow, ...]
+
+
+class SemToRel:
+    def map_object(self, obj: Any) -> RelTable:
+        if isinstance(obj, SemColumnSet):
+            return RelTable(
+                name="columns",
+                columns=("id", "label", "category"),
+                rows=tuple(
+                    RelRow(values={
+                        "id": c.id,
+                        "label": c.label,
+                        "category": c.category,
+                    })
+                    for c in obj.columns
+                ),
+            )
+        raise TypeError(type(obj)) 
+
+
+
