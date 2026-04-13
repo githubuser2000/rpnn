@@ -18,8 +18,10 @@ Aufruf:
   {program_name} pairs <hauptparameter>
   {program_name} main-columns <hauptparameter>
   {program_name} pair <hauptparameter> <unterparameter>
+  {program_name} pair-json <hauptparameter> <unterparameter>
   {program_name} pair-html <hauptparameter> <unterparameter>
   {program_name} column <spaltennummer>
+  {program_name} column-json <spaltennummer>
   {program_name} reverse <spaltennummer>
   {program_name} html <spaltennummer>
 
@@ -43,6 +45,9 @@ Befehle:
       Kanonisiert das Paar auf die Python-Form und zeigt
       die direkten Spaltennummern.
 
+  pair-json <hauptparameter> <unterparameter>
+      Wie pair, aber als maschinenlesbares JSON.
+
   pair-html <hauptparameter> <unterparameter>
       Zeigt für alle direkten Spalten des Paares die HTML-Meta,
       also Klassen und data-* Attribute.
@@ -50,6 +55,9 @@ Befehle:
   column <spaltennummer>
       Zeigt die direkten Python-Metaeinträge für die Spalte
       sowie die kanonischen Paare aus der Rückwärtsabbildung.
+
+  column-json <spaltennummer>
+      Wie column, aber als maschinenlesbares JSON.
 
   reverse <spaltennummer>
       Zeigt nur die kanonischen Paare aus der Rückwärtsabbildung
@@ -65,9 +73,11 @@ Beispiele:
   {program_name} pairs Menschliches
   {program_name} main-columns Menschliches
   {program_name} pair Menschliches Motive
+  {program_name} pair-json Menschliches Motive
   {program_name} pair-html Menschliches Motive
   {program_name} pair menschliches motive
   {program_name} column 240
+  {program_name} column-json 240
   {program_name} reverse 240
   {program_name} html 240
 "#
@@ -76,6 +86,48 @@ Beispiele:
 
 fn print_help(program_name: &str) {
     print!("{}", help_text(program_name));
+}
+
+fn json_escape(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() + 8);
+    for ch in input.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn json_string(input: &str) -> String {
+    format!("\"{}\"", json_escape(input))
+}
+
+fn json_string_array(values: &[String]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|v| json_string(v))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
+fn json_i64_array(values: &[i64]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 fn parse_i64_or_exit(raw: &str, field_name: &str) -> i64 {
@@ -100,58 +152,33 @@ fn print_params(words: &Words, main_name: &str) {
     }
 }
 
-fn collect_pairs_for_main(words: &Words, main_name: &str) -> Vec<(String, String, Vec<i64>)> {
-    let mut pairs: Vec<(String, String, Vec<i64>)> = Vec::new();
-    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
-
+fn print_pairs(words: &Words, main_name: &str) {
     for group in parameter_alias_groups_for_main(words, main_name) {
-        let canonical_parameter = group.canonical;
-        if let Some((canonical_main, canonical_parameter)) =
-            canonicalize_pair(words, main_name, &canonical_parameter)
-        {
-            let key = (canonical_main.clone(), canonical_parameter.clone());
-            if seen.insert(key.clone()) {
-                let columns = column_numbers_for_pair(words, &canonical_main, &canonical_parameter);
-                if !columns.is_empty() {
-                    pairs.push((canonical_main, canonical_parameter, columns));
+        let columns = column_numbers_for_pair(words, main_name, &group.canonical);
+        if !columns.is_empty() {
+            match canonicalize_pair(words, main_name, &group.canonical) {
+                Some((canonical_main, canonical_parameter)) => {
+                    println!(
+                        "{} / {} => {:?}",
+                        canonical_main, canonical_parameter, columns
+                    );
+                }
+                None => {
+                    println!("{} / {} => {:?}", main_name, group.canonical, columns);
                 }
             }
         }
     }
-
-    pairs
-}
-
-fn print_pairs(words: &Words, main_name: &str) {
-    let pairs = collect_pairs_for_main(words, main_name);
-    if pairs.is_empty() {
-        eprintln!("Keine direkten Paare für Hauptparameter gefunden: {}", main_name);
-        std::process::exit(2);
-    }
-
-    for (canonical_main, canonical_parameter, columns) in pairs {
-        println!(
-            "{} / {} => {:?}",
-            canonical_main, canonical_parameter, columns
-        );
-    }
 }
 
 fn print_main_columns(words: &Words, main_name: &str) {
-    let pairs = collect_pairs_for_main(words, main_name);
-    if pairs.is_empty() {
-        eprintln!("Keine direkten Spalten für Hauptparameter gefunden: {}", main_name);
-        std::process::exit(2);
-    }
-
-    let mut cols: BTreeSet<i64> = BTreeSet::new();
-    for (_, _, pair_cols) in pairs {
-        for col in pair_cols {
-            cols.insert(col);
+    let mut columns: BTreeSet<i64> = BTreeSet::new();
+    for group in parameter_alias_groups_for_main(words, main_name) {
+        for column in column_numbers_for_pair(words, main_name, &group.canonical) {
+            columns.insert(column);
         }
     }
-    let cols: Vec<i64> = cols.into_iter().collect();
-    println!("main_columns={:?}", cols);
+    println!("main_columns={:?}", columns.into_iter().collect::<Vec<_>>());
 }
 
 fn print_pair(words: &Words, main_name: &str, parameter_name: &str) {
@@ -170,48 +197,36 @@ fn print_pair(words: &Words, main_name: &str, parameter_name: &str) {
     }
 }
 
-fn print_pair_html(words: &Words, main_name: &str, parameter_name: &str) {
+fn print_pair_json(words: &Words, main_name: &str, parameter_name: &str) {
     match canonicalize_pair(words, main_name, parameter_name) {
         Some((canonical_main, canonical_parameter)) => {
+            let main_aliases = all_main_alias_groups(words)
+                .into_iter()
+                .find(|g| g.canonical == canonical_main)
+                .map(|g| g.aliases)
+                .unwrap_or_else(|| vec![canonical_main.clone()]);
+            let parameter_aliases = parameter_alias_groups_for_main(words, &canonical_main)
+                .into_iter()
+                .find(|g| g.canonical == canonical_parameter)
+                .map(|g| g.aliases)
+                .unwrap_or_else(|| vec![canonical_parameter.clone()]);
             let columns = column_numbers_for_pair(words, &canonical_main, &canonical_parameter);
-            if columns.is_empty() {
-                eprintln!(
-                    "Keine direkten Spalten für Paar gefunden: {} / {}",
-                    canonical_main, canonical_parameter
-                );
-                std::process::exit(2);
-            }
-            println!("canonical={} / {}", canonical_main, canonical_parameter);
-            for column_number in columns {
-                println!("column={}", column_number);
-                match html_meta_for_column(words, column_number) {
-                    Some(meta) => {
-                        println!("classes={}", meta.classes.join(" "));
-                        for (key, value) in meta.data_attributes {
-                            println!("{}={}", key, value);
-                        }
-                    }
-                    None => {
-                        println!("no_html_meta=true");
-                    }
-                }
-            }
+            println!(
+                "{{\"input_main\":{},\"input_parameter\":{},\"canonical_main\":{},\"canonical_parameter\":{},\"main_aliases\":{},\"parameter_aliases\":{},\"columns\":{}}}",
+                json_string(main_name),
+                json_string(parameter_name),
+                json_string(&canonical_main),
+                json_string(&canonical_parameter),
+                json_string_array(&main_aliases),
+                json_string_array(&parameter_aliases),
+                json_i64_array(&columns),
+            );
         }
         None => {
             eprintln!("Unbekanntes Paar: {} / {}", main_name, parameter_name);
             std::process::exit(2);
         }
     }
-}
-
-fn print_reverse(words: &Words, column_number: i64) {
-    let summary_map: BTreeMap<i64, Vec<(String, String)>> = reverse_map_canonical_pairs(words);
-    let summary_pairs = summary_map.get(&column_number).cloned().unwrap_or_default();
-    if summary_pairs.is_empty() {
-        eprintln!("Keine kanonischen Paare für Spalte {} gefunden", column_number);
-        std::process::exit(2);
-    }
-    println!("summary_pairs={:?}", summary_pairs);
 }
 
 fn print_column(words: &Words, column_number: i64) {
@@ -226,7 +241,58 @@ fn print_column(words: &Words, column_number: i64) {
         println!("{} => {:?}", column_number, direct);
     }
 
-    print_reverse(words, column_number);
+    let summary_map: BTreeMap<i64, Vec<(String, String)>> = reverse_map_canonical_pairs(words);
+    let summary_pairs = summary_map.get(&column_number).cloned().unwrap_or_default();
+    println!("summary_pairs={:?}", summary_pairs);
+}
+
+fn print_column_json(words: &Words, column_number: i64) {
+    let meta = exact_meta_for_column(words, column_number);
+    if meta.is_empty() {
+        eprintln!("Unbekannte oder nicht-direkte Spalte: {}", column_number);
+        std::process::exit(2);
+    }
+
+    let summary_map: BTreeMap<i64, Vec<(String, String)>> = reverse_map_canonical_pairs(words);
+    let summary_pairs = summary_map.get(&column_number).cloned().unwrap_or_default();
+
+    let matches_json = meta
+        .iter()
+        .map(|direct| {
+            format!(
+                "{{\"column_number\":{},\"parameter_main\":{},\"parameter_main_aliases\":{},\"parameter\":{},\"parameter_aliases\":{}}}",
+                direct.column_number,
+                json_string(&direct.parameter_main),
+                json_string_array(&direct.parameter_main_aliases),
+                json_string(&direct.parameter),
+                json_string_array(&direct.parameter_aliases),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let summary_json = summary_pairs
+        .iter()
+        .map(|(main_name, parameter_name)| {
+            format!(
+                "{{\"main\":{},\"parameter\":{}}}",
+                json_string(main_name),
+                json_string(parameter_name)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    println!(
+        "{{\"column_number\":{},\"matches\":[{}],\"summary_pairs\":[{}]}}",
+        column_number, matches_json, summary_json
+    );
+}
+
+fn print_reverse(words: &Words, column_number: i64) {
+    let summary_map: BTreeMap<i64, Vec<(String, String)>> = reverse_map_canonical_pairs(words);
+    let summary_pairs = summary_map.get(&column_number).cloned().unwrap_or_default();
+    println!("summary_pairs={:?}", summary_pairs);
 }
 
 fn print_html(words: &Words, column_number: i64) {
@@ -239,6 +305,23 @@ fn print_html(words: &Words, column_number: i64) {
         }
         None => {
             eprintln!("Keine HTML-Meta für Spalte {}", column_number);
+            std::process::exit(2);
+        }
+    }
+}
+
+fn print_pair_html(words: &Words, main_name: &str, parameter_name: &str) {
+    match canonicalize_pair(words, main_name, parameter_name) {
+        Some((canonical_main, canonical_parameter)) => {
+            let columns = column_numbers_for_pair(words, &canonical_main, &canonical_parameter);
+            println!("canonical={} / {}", canonical_main, canonical_parameter);
+            for column in columns {
+                println!("column={}", column);
+                print_html(words, column);
+            }
+        }
+        None => {
+            eprintln!("Unbekanntes Paar: {} / {}", main_name, parameter_name);
             std::process::exit(2);
         }
     }
@@ -292,6 +375,16 @@ fn main() {
             }
             print_pair(&words, &argv[2], &argv[3]);
         }
+        "pair-json" => {
+            if argv.len() != 4 {
+                eprintln!(
+                    "Erwartet: {} pair-json <hauptparameter> <unterparameter>",
+                    program_name
+                );
+                std::process::exit(2);
+            }
+            print_pair_json(&words, &argv[2], &argv[3]);
+        }
         "pair-html" => {
             if argv.len() != 4 {
                 eprintln!(
@@ -309,6 +402,14 @@ fn main() {
             }
             let column_number = parse_i64_or_exit(&argv[2], "spaltennummer");
             print_column(&words, column_number);
+        }
+        "column-json" => {
+            if argv.len() != 3 {
+                eprintln!("Erwartet: {} column-json <spaltennummer>", program_name);
+                std::process::exit(2);
+            }
+            let column_number = parse_i64_or_exit(&argv[2], "spaltennummer");
+            print_column_json(&words, column_number);
         }
         "reverse" => {
             if argv.len() != 3 {
@@ -347,10 +448,17 @@ mod tests {
         assert!(text.contains("pairs"));
         assert!(text.contains("main-columns"));
         assert!(text.contains("pair"));
+        assert!(text.contains("pair-json"));
         assert!(text.contains("pair-html"));
         assert!(text.contains("column"));
+        assert!(text.contains("column-json"));
         assert!(text.contains("reverse"));
         assert!(text.contains("html"));
         assert!(text.contains("--help"));
+    }
+
+    #[test]
+    fn json_escape_handles_quotes() {
+        assert_eq!(json_string("a\"b"), "\"a\\\"b\"");
     }
 }
