@@ -1666,9 +1666,117 @@ impl I18nSubset {
 });
         paraNdataMatrix.push(StoreParameterEntry {
     parameterMainNames: vec!["['universum']".to_string()],
-    parameterNames: vec!["Zahlenarten".to_string()],
+    parameterNames: vec!["Zahlenarten".to_string(), "zahlen".to_string(), "nummern".to_string()],
     datas: vec![
-        vec![PyAtom::Int(462)],
+        vec![PyAtom::Int(462), PyAtom::Int(563), PyAtom::Int(704), PyAtom::Int(717), PyAtom::Int(724), PyAtom::Int(728)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Entwicklungs_Stadium_Spezies".to_string(), "Spezies_Entwicklung".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(661)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Logik".to_string(), "logik".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(725)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Morphismen".to_string(), "morphismus".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(727)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Objekte".to_string(), "objekt".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(546)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Spezies_Typofikation".to_string(), "spezies".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(582)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![]
+    ],
+});
+        paraNdataMatrix.push(StoreParameterEntry {
+    parameterMainNames: vec!["['universum']".to_string()],
+    parameterNames: vec!["Winkel".to_string(), "winkel".to_string()],
+    datas: vec![
+        vec![PyAtom::Int(726)],
         vec![],
         vec![],
         vec![],

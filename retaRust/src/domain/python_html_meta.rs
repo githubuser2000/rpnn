@@ -1,12 +1,14 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::domain::python_source_of_truth::{alias_summary_for_column, exact_meta_for_column};
+use crate::domain::python_html_meta_fallback::fallback_html_meta_for_column;
+use crate::domain::python_source_of_truth::{alias_summary_for_column, exact_meta_for_column, reverse_map_canonical_pairs};
 use crate::shared::words_py::Words;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HtmlDeclMeta {
     pub column_number: i64,
     pub classes: Vec<String>,
+    pub class_string: String,
     pub data_attributes: BTreeMap<String, String>,
 }
 
@@ -24,7 +26,7 @@ fn slug(txt: &str) -> String {
 pub fn html_meta_for_column(words: &Words, column_number: i64) -> Option<HtmlDeclMeta> {
     let exact = exact_meta_for_column(words, column_number);
     if exact.is_empty() {
-        return None;
+        return fallback_html_meta_for_column(column_number);
     }
     let mut classes = vec![format!("p1_col_{}", column_number)];
     let first = &exact[0];
@@ -61,11 +63,26 @@ pub fn html_meta_for_column(words: &Words, column_number: i64) -> Option<HtmlDec
         summary.parameter_aliases.join("|")
     );
 
+    let class_string = classes.join(" ");
     Some(HtmlDeclMeta {
         column_number,
         classes,
+        class_string,
         data_attributes,
     })
+}
+
+pub fn all_known_html_columns(words: &Words) -> Vec<i64> {
+    let mut all = BTreeSet::new();
+    for column in reverse_map_canonical_pairs(words).keys() {
+        all.insert(*column);
+    }
+    for column in 1..=728 {
+        if html_meta_for_column(words, column).is_some() {
+            all.insert(column);
+        }
+    }
+    all.into_iter().collect()
 }
 
 #[cfg(test)]
@@ -96,5 +113,13 @@ mod tests {
         let meta = html_meta_for_column(&words, 240).unwrap();
         assert!(meta.classes.iter().any(|c| c.starts_with("p2alias_")));
         assert!(meta.classes.iter().any(|c| c.starts_with("p3alias_")));
+    }
+
+    #[test]
+    fn fallback_html_meta_is_available_for_missing_column() {
+        let words = Words::new();
+        let meta = html_meta_for_column(&words, 728).unwrap();
+        assert!(meta.classes.iter().any(|c| c == "p1_col_728"));
+        assert!(meta.data_attributes.contains_key("data-column-group"));
     }
 }
