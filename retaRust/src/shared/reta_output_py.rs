@@ -7,13 +7,13 @@ use hypher::{hyphenate, Lang};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 impl Program {
-    fn displayed_column_numbers_for_html_py(rows_range: &[i64]) -> Vec<Option<u32>> {
-        rows_range
-            .iter()
-            .copied()
-            .map(|v| if v >= 0 { Some(v as u32) } else { None })
-            .collect()
-    }
+    fn displayed_column_numbers_for_html_py(rowsRange: &[i64]) -> Vec<Option<u32>> {
+    rowsRange
+        .iter()
+        .copied()
+        .map(|v| if v >= 0 { Some(v as u32) } else { None })
+        .collect()
+}
 
 fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
     if is_header {
