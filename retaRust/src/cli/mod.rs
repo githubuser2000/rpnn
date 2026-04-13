@@ -1,32 +1,41 @@
-use crate::input_help::input_validation::{validate_cli_sequence, ValidationIssue};
+use crate::input_help::input_validation::{validate_cli_structure, ValidationResult};
 use crate::{run_reta_from_args, RetaRunResult};
 
-#[derive(Clone, Debug, Default)]
-pub struct CliCall {
-    pub argv: Vec<String>,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedCli {
     pub main_parameters: Vec<String>,
-    pub side_parameters: Vec<String>,
-    pub validation_issues: Vec<ValidationIssue>,
+    pub validation: ValidationResult,
 }
 
-pub fn split_main_and_side_args(argv: &[String]) -> CliCall {
-    let mut main_parameters = Vec::new();
-    let mut side_parameters = Vec::new();
-    for arg in argv.iter().skip(1) {
-        if arg.starts_with('-') && !arg.starts_with("--") {
-            main_parameters.push(arg.clone());
-        } else if arg.starts_with("--") {
-            side_parameters.push(arg.clone());
-        }
-    }
-    CliCall {
-        argv: argv.to_vec(),
-        main_parameters,
-        side_parameters,
-        validation_issues: validate_cli_sequence(argv),
+pub fn parse_cli(argv: &[String]) -> ParsedCli {
+    let argv_without_program = if argv.len() > 1 { &argv[1..] } else { &[] };
+    let validation = validate_cli_structure(argv_without_program);
+    ParsedCli {
+        main_parameters: validation.seen_main_parameters.clone(),
+        validation,
     }
 }
 
-pub fn run_cli_call(argv: Vec<String>) -> RetaRunResult {
-    run_reta_from_args(argv)
+pub fn run_cli(argv: Vec<String>) -> (ParsedCli, RetaRunResult) {
+    let parsed = parse_cli(&argv);
+    let result = run_reta_from_args(argv);
+    (parsed, result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_cli_collects_main_parameters() {
+        let argv = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-3".to_string(),
+            "-ausgabe".to_string(),
+            "--justtext".to_string(),
+        ];
+        let parsed = parse_cli(&argv);
+        assert_eq!(parsed.main_parameters, vec!["zeilen".to_string(), "ausgabe".to_string()]);
+    }
 }

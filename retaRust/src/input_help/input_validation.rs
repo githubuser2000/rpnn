@@ -1,57 +1,67 @@
-use std::collections::BTreeSet;
+const KNOWN_MAIN_PARAMETERS: &[&str] = &["zeilen", "spalten", "kombination", "ausgabe", "debug", "h", "help"];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValidationIssue {
-    pub argument: String,
-    pub message: String,
+pub struct ValidationResult {
+    pub seen_main_parameters: Vec<String>,
+    pub errors: Vec<String>,
 }
 
-fn known_main_parameters() -> BTreeSet<&'static str> {
-    BTreeSet::from([
-        "-zeilen",
-        "-spalten",
-        "-kombination",
-        "-ausgabe",
-        "-debug",
-        "-h",
-        "-help",
-    ])
+impl ValidationResult {
+    pub fn is_ok(&self) -> bool {
+        self.errors.is_empty()
+    }
 }
 
-pub fn validate_cli_sequence(argv: &[String]) -> Vec<ValidationIssue> {
-    let known = known_main_parameters();
-    let mut issues = Vec::new();
-    let mut active_main: Option<String> = None;
+pub fn validate_cli_structure(argv_without_program: &[String]) -> ValidationResult {
+    let mut seen_main_parameters = Vec::new();
+    let mut errors = Vec::new();
+    let mut last_main_parameter: Option<String> = None;
 
-    for arg in argv.iter().skip(1) {
-        if known.contains(arg.as_str()) {
-            active_main = Some(arg.clone());
+    for token in argv_without_program {
+        if token.starts_with("--") {
+            if last_main_parameter.is_none() {
+                errors.push(format!("Nebenparameter ohne Hauptparameter: {}", token));
+            }
             continue;
         }
-        if arg.starts_with('-') && !arg.starts_with("--") {
-            issues.push(ValidationIssue {
-                argument: arg.clone(),
-                message: "Unbekannter Hauptparameter".to_string(),
-            });
-            active_main = Some(arg.clone());
-            continue;
-        }
-        if arg.starts_with("--") && active_main.is_none() {
-            issues.push(ValidationIssue {
-                argument: arg.clone(),
-                message: "Nebenparameter ohne vorherigen Hauptparameter".to_string(),
-            });
+        if token.starts_with('-') {
+            let cmd = token.trim_start_matches('-').to_string();
+            if KNOWN_MAIN_PARAMETERS.iter().any(|known| *known == cmd) {
+                seen_main_parameters.push(cmd.clone());
+                last_main_parameter = Some(cmd);
+            } else {
+                errors.push(format!("Unbekannter Hauptparameter: {}", token));
+                last_main_parameter = None;
+            }
         }
     }
 
-    issues
+    ValidationResult {
+        seen_main_parameters,
+        errors,
+    }
 }
 
-pub fn collect_main_parameters(argv: &[String]) -> Vec<String> {
-    let known = known_main_parameters();
-    argv.iter()
-        .skip(1)
-        .filter(|arg| known.contains(arg.as_str()))
-        .cloned()
-        .collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_main_side_sequence_is_ok() {
+        let argv = vec![
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-3".to_string(),
+            "-spalten".to_string(),
+            "--alles".to_string(),
+        ];
+        let result = validate_cli_structure(&argv);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn side_parameter_without_main_is_reported() {
+        let argv = vec!["--alles".to_string()];
+        let result = validate_cli_structure(&argv);
+        assert!(!result.is_ok());
+    }
 }

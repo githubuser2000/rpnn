@@ -4,6 +4,11 @@ pub mod shared;
 pub mod runtime;
 pub mod support;
 pub mod doc_tools;
+pub mod cli;
+pub mod domain;
+pub mod input_help;
+pub mod reta_ausgabe;
+pub mod table_printer;
 
 use shared::reta_py::Program;
 use shared::words_py::Words;
@@ -39,16 +44,10 @@ pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {
     program.run(&words);
     program.combiTableWorkflow();
 
-    let snapshot = if program.outType == "nichts" {
-        String::new()
-    } else {
-        program.snapshot()
-    };
-
     RetaRunResult {
         cli_errors: program.cliErrors.clone(),
         display_lines: program.finallyDisplayLines.clone(),
-        snapshot,
+        snapshot: program.snapshot(),
     }
 }
 
@@ -58,10 +57,7 @@ pub fn run_reta_from_env_args() -> RetaRunResult {
 }
 
 pub fn print_reta_result(result: &RetaRunResult) {
-    let rendered = result.render_text();
-    if !rendered.is_empty() {
-        println!("{}", rendered);
-    }
+    println!("{}", result.render_text());
 }
 
 pub fn run_reta_and_print_from_env() -> i32 {

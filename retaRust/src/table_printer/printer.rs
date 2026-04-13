@@ -1,19 +1,28 @@
-use crate::table_printer::table_utils::{compute_column_widths_linear_natural, shrink_widths_to_fit_budget};
+use crate::table_printer::table_utils::natural_column_widths;
 
-fn truncate_cell(cell: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
+pub fn render_table_shell(table: &[Vec<String>]) -> String {
+    let widths = natural_column_widths(table);
+    let mut lines = Vec::new();
+    for row in table {
+        let parts = row
+            .iter()
+            .enumerate()
+            .map(|(idx, cell)| format!("{:<width$}", cell, width = widths.get(idx).copied().unwrap_or(0)))
+            .collect::<Vec<_>>();
+        lines.push(parts.join(" | "));
     }
-    cell.chars().take(width).collect()
+    lines.join("\n")
 }
 
-pub fn render_shell_table(table: &[Vec<String>], budget: usize, min_width: usize) -> Vec<String> {
-    let natural = compute_column_widths_linear_natural(table);
-    let widths = shrink_widths_to_fit_budget(&natural, budget, min_width);
-    table.iter().map(|row| {
-        row.iter().enumerate().map(|(idx, cell)| {
-            let width = widths.get(idx).copied().unwrap_or(min_width.max(1));
-            format!("{:<width$}", truncate_cell(cell, width), width = width)
-        }).collect::<Vec<_>>().join(" ")
-    }).collect()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn printer_keeps_all_cells() {
+        let table = vec![vec!["a".to_string(), "b".to_string()], vec!["c".to_string(), "d".to_string()]];
+        let rendered = render_table_shell(&table);
+        assert!(rendered.contains('a'));
+        assert!(rendered.contains('d'));
+    }
 }

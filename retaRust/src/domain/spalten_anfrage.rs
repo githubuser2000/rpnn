@@ -1,56 +1,68 @@
-use crate::shared::reta_py::Program;
-use crate::shared::words_py::{StoreParameterEntry, Words};
+use crate::domain::python_source_of_truth::{
+    all_parameter_main_names, exact_all_direct_columns_for_pair, parameter_names_for_main, ExactPythonColumn,
+};
+use crate::shared::words_py::Words;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaltenAnfrage {
-    pub ober_cli: String,
-    pub unter_cli: String,
-    pub ober_canonical: String,
-    pub matched_main_names: Vec<String>,
-    pub matched_parameter_names: Vec<String>,
+    pub parameter_main_name: String,
+    pub parameter_name: String,
 }
 
 impl SpaltenAnfrage {
-    pub fn ober_unter_cli_pair(&self) -> (String, String) {
-        (self.ober_cli.clone(), self.unter_cli.clone())
-    }
-}
-
-fn matching_entries<'a>(words: &'a Words, ober: &str, unter: &str) -> Vec<&'a StoreParameterEntry> {
-    let canonical = Program::canonical_spalten_main_cli_name_py(ober).to_string();
-    words.paraNdataMatrix.iter().filter(|entry| {
-        entry.parameterMainNames.iter().any(|name| name == &canonical || name == ober)
-            && entry.parameterNames.iter().any(|name| name == unter)
-    }).collect()
-}
-
-pub fn parse_spalten_anfrage(words: &Words, ober: &str, unter: &str) -> Result<SpaltenAnfrage, String> {
-    let canonical = Program::canonical_spalten_main_cli_name_py(ober).to_string();
-    let entries = matching_entries(words, ober, unter);
-    if entries.is_empty() {
-        return Err(format!("Keine exakte Python-Spaltenanfrage gefunden: --{}={}", ober, unter));
-    }
-
-    let mut matched_main_names = Vec::new();
-    let mut matched_parameter_names = Vec::new();
-    for entry in entries {
-        for name in &entry.parameterMainNames {
-            if !matched_main_names.contains(name) {
-                matched_main_names.push(name.clone());
-            }
-        }
-        for name in &entry.parameterNames {
-            if !matched_parameter_names.contains(name) {
-                matched_parameter_names.push(name.clone());
-            }
+    pub fn new(parameter_main_name: impl Into<String>, parameter_name: impl Into<String>) -> Self {
+        Self {
+            parameter_main_name: parameter_main_name.into(),
+            parameter_name: parameter_name.into(),
         }
     }
 
-    Ok(SpaltenAnfrage {
-        ober_cli: ober.to_string(),
-        unter_cli: unter.to_string(),
-        ober_canonical: canonical,
-        matched_main_names,
-        matched_parameter_names,
-    })
+    pub fn cli_pair(&self) -> (String, String) {
+        (self.parameter_main_name.clone(), self.parameter_name.clone())
+    }
+
+    pub fn exact_columns(&self, words: &Words) -> Vec<ExactPythonColumn> {
+        exact_all_direct_columns_for_pair(words, &self.parameter_main_name, &self.parameter_name)
+    }
+}
+
+pub fn parse_spalten_anfrage(
+    words: &Words,
+    parameter_main_name: &str,
+    parameter_name: &str,
+) -> Result<SpaltenAnfrage, String> {
+    let known_mains = all_parameter_main_names(words);
+    if !known_mains.iter().any(|name| name == parameter_main_name) {
+        return Err(format!("Unbekannte Oberkategorie: {}", parameter_main_name));
+    }
+
+    let known_parameters = parameter_names_for_main(words, parameter_main_name);
+    if !known_parameters.iter().any(|name| name == parameter_name) {
+        return Err(format!(
+            "Unbekannte Unterkategorie für {}: {}",
+            parameter_main_name, parameter_name
+        ));
+    }
+
+    Ok(SpaltenAnfrage::new(parameter_main_name, parameter_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shared::words_py::Words;
+
+    #[test]
+    fn parse_known_pair_works() {
+        let words = Words::new();
+        let request = parse_spalten_anfrage(&words, "Menschliches", "Motive").unwrap();
+        assert_eq!(request.cli_pair(), ("Menschliches".to_string(), "Motive".to_string()));
+        assert!(!request.exact_columns(&words).is_empty());
+    }
+
+    #[test]
+    fn parse_unknown_main_fails() {
+        let words = Words::new();
+        assert!(parse_spalten_anfrage(&words, "does-not-exist", "x").is_err());
+    }
 }
