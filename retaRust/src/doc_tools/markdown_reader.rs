@@ -60,9 +60,8 @@ pub fn strip_retaprompt_like_center_py(markdown_text: &str) -> String {
 }
 
 pub fn render_markdown_for_terminal(markdown_text: &str) -> String {
-    format!("{}", termimad::term_text(markdown_text))
+    markdown_text.to_string()
 }
-
 fn preprocess_reta_markdown_for_terminal(markdown_text: &str) -> String {
     let without_anchors = strip_pandoc_anchor_tags(markdown_text);
     let mut out: Vec<String> = Vec::new();
