@@ -428,8 +428,8 @@ impl Program {
 
         let oneLinePerLine = self.outType == "html" || self.outType == "bbcode";
         let remove_number_now =
-            (((self.textWidth == 0 && self.oneTable) || self.outType == "html" || self.outType == "bbcode")
-                && self.breiten.is_empty());
+            ((self.textWidth == 0 && self.oneTable) || self.outType == "html" || self.outType == "bbcode")
+                && self.breiten.is_empty();
 
         for (display_row_idx, original_row_no) in old2newTable.iter().copied().enumerate() {
             if display_row_idx >= newTable.len() {

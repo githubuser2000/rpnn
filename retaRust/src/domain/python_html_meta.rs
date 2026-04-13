@@ -23,24 +23,40 @@ fn slugify_piece(input: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
+fn push_unique(values: &mut Vec<String>, value: String) {
+    if !value.is_empty() && !values.contains(&value) {
+        values.push(value);
+    }
+}
+
 fn classes_from_meta(meta: &ExactPythonColumnMeta) -> Vec<String> {
     let mut classes = vec![format!("p1_{}", meta.column_number)];
     for direct in &meta.direct_matches {
-        let p2 = format!("p2_{}", slugify_piece(&direct.parameter_main_name));
-        let p3 = format!("p3_{}", slugify_piece(&direct.parameter_name));
-        let p4 = format!(
-            "p4_{}",
-            direct
-                .column_numbers
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join("_")
+        push_unique(
+            &mut classes,
+            format!("p2_{}", slugify_piece(&direct.parameter_main_name)),
         );
-        for value in [p2, p3, p4] {
-            if !classes.contains(&value) {
-                classes.push(value);
-            }
+        push_unique(
+            &mut classes,
+            format!("p3_{}", slugify_piece(&direct.parameter_name)),
+        );
+        push_unique(
+            &mut classes,
+            format!(
+                "p4_{}",
+                direct
+                    .column_numbers
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join("_")
+            ),
+        );
+        for alias in &direct.parameter_main_aliases {
+            push_unique(&mut classes, format!("p2a_{}", slugify_piece(alias)));
+        }
+        for alias in &direct.parameter_aliases {
+            push_unique(&mut classes, format!("p3a_{}", slugify_piece(alias)));
         }
     }
     classes
@@ -50,13 +66,15 @@ pub fn html_decl_meta_for_column(words: &Words, column_number: i64) -> Option<Ht
     let meta = exact_meta_for_column(words, column_number)?;
     let mut data_attributes = vec![("data-column".to_string(), column_number.to_string())];
     if let Some(first) = meta.direct_matches.first() {
+        data_attributes.push(("data-main".to_string(), first.parameter_main_name.clone()));
+        data_attributes.push(("data-parameter".to_string(), first.parameter_name.clone()));
         data_attributes.push((
-            "data-main".to_string(),
-            first.parameter_main_name.clone(),
+            "data-main-aliases".to_string(),
+            first.parameter_main_aliases.join(","),
         ));
         data_attributes.push((
-            "data-parameter".to_string(),
-            first.parameter_name.clone(),
+            "data-parameter-aliases".to_string(),
+            first.parameter_aliases.join(","),
         ));
     }
     Some(HtmlDeclMeta {
@@ -79,5 +97,14 @@ mod tests {
         assert!(meta.classes.iter().any(|value| value.starts_with("p2_")));
         assert!(meta.classes.iter().any(|value| value.starts_with("p3_")));
         assert!(meta.classes.iter().any(|value| value.starts_with("p4_")));
+    }
+
+    #[test]
+    fn html_meta_keeps_alias_attributes() {
+        let words = Words::new();
+        let meta = html_decl_meta_for_column(&words, 5).expect("known column");
+        assert!(meta.data_attributes.iter().any(|(key, value)| {
+            key == "data-main-aliases" && value.contains("wichtigsteverstehen")
+        }));
     }
 }
