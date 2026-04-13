@@ -1,12 +1,55 @@
 #![allow(non_snake_case)]
 
 use std::collections::{BTreeMap, BTreeSet};
-
+use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 impl Program {
+    fn displayed_column_numbers_for_html_py(rows_range: &[i64]) -> Vec<Option<u32>> {
+        rows_range
+            .iter()
+            .copied()
+            .map(|v| if v >= 0 { Some(v as u32) } else { None })
+            .collect()
+    }
+
+fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
+    if is_header {
+        r#" style="background-color:#ff2222;color:#002222;""#.to_string()
+    } else {
+        let row_number = row_number.unwrap_or(0);
+        if row_number % 3 == 1 {
+            r#" style="background-color:#555500;color:#aaaaff;""#.to_string()
+        } else if row_number % 3 == 2 {
+            r#" style="background-color:#66ff66;color:#000000;""#.to_string()
+        } else {
+            r#" style="background-color:#009900;color:#ffffff;""#.to_string()
+        }
+    }
+}
+
+fn html_exact_header_attrs_py(
+    words: &Words,
+    original_col: Option<u32>,
+    html_col_idx: usize,
+) -> String {
+    let _ = words;
+    let _ = original_col;
+
+    if html_col_idx == 0 {
+        return r#" class="z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_" style="background-color:#ffffff;color:#000000;""#
+            .to_string();
+    }
+    if html_col_idx == 1 {
+        return r#" class="z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_""#
+            .to_string();
+    }
+
+    let r_part = format!("z_0 r_{}", html_col_idx);
+    format!(r#" class="{}""#, r_part)
+}
     pub(crate) fn prepare4out_py(
         &mut self,
         paramLines: Vec<String>,
@@ -70,11 +113,7 @@ impl Program {
             finallyDisplayLines[0] = "".to_string();
         }
 
-        let rowsRange: Vec<i64> = if newTable.is_empty() {
-            vec![]
-        } else {
-            (0..(newTable[0].len() as i64)).collect()
-        };
+        let rowsRange: Vec<i64> = selected_cols.clone();
         let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
@@ -1055,6 +1094,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         finallyDisplayLines: &[String],
         newTable: &[Vec<String>],
         numlen: i64,
+        rowsRange: &[i64],
     ) {
         let mut out_lines: Vec<String> = vec![];
         let mut chunked_lines: Vec<Vec<String>> = vec![];
@@ -1146,8 +1186,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 }
             }
             "html" => {
-                out_lines.push("<table>".to_string());
-                let mut current_block = vec!["<table>".to_string()];
+                let words = Words::new();
+                let _col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
+                let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
+                out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
+                let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
                 for (row_idx, row) in newTable.iter().enumerate() {
                     if self.keineleereninhalte {
                         let joined = row.join(" ");
@@ -1158,16 +1201,35 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                     }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
                     let is_header = row_number.is_none();
-                    let tag = if is_header { "th" } else { "td" };
                     let mut cells: Vec<String> = vec![];
                     if self.nummeriere {
-                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(&self.row_prefix_text_py(row_number, is_header))));
-                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default())));
+                        let prefix_text = Self::html_escape_cell_py(&self.row_prefix_text_py(row_number, is_header));
+                        let label_text = Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
+                        if is_header {
+                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 0), prefix_text));
+                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 1), label_text));
+                        } else {
+                            let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
+                                r#" style="background-color:#000000;color:#ffffff;""#
+                            } else {
+                                r#" style="background-color:#ffffff;color:#000000;""#
+                            };
+                            cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_text));
+                            cells.push(format!(r#"<td>{}</td>"#, label_text));
+                        }
                     }
-                    for cell in row {
-                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(cell)));
+                    for (visible_idx, cell) in row.iter().enumerate() {
+                        let html_col_idx = if self.nummeriere { visible_idx + 2 } else { visible_idx };
+                        let original_col = displayed_columns.get(visible_idx).cloned().flatten();
+                        let escaped = Self::html_escape_cell_py(cell);
+                        if is_header {
+                            let attrs = Self::html_exact_header_attrs_py(&words, original_col, html_col_idx);
+                            cells.push(format!(r#"<td{}> {} </td>"#, attrs, escaped));
+                        } else {
+                            cells.push(format!(r#"<td>{}</td>"#, escaped));
+                        }
                     }
-                    let line = format!("<tr>{}</tr>", cells.join(""));
+                    let line = format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" "));
                     out_lines.push(line.clone());
                     current_block.push(line);
                 }
@@ -1222,7 +1284,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         finallyDisplayLines: Vec<String>,
         newTable: Vec<Vec<String>>,
         numlen: i64,
-        _rowsRange: Vec<i64>,
+        rowsRange: Vec<i64>,
     ) -> Vec<Vec<String>> {
         let mut out_lines: Vec<String> = vec![];
         if newTable.is_empty() {
@@ -1241,7 +1303,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         }
 
         if self.outType != "shell" {
-            self.render_structured_output_py(&finallyDisplayLines, &newTable, numlen);
+            self.render_structured_output_py(&finallyDisplayLines, &newTable, numlen, &rowsRange);
             return newTable;
         }
 
