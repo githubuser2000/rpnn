@@ -102,6 +102,28 @@ impl Program {
         out
     }
 
+
+    pub(crate) fn bereich_to_numbers2_ausgabe_py(txt: &str) -> Vec<i64> {
+        let parsed: Vec<i64> = Self::bereich_to_numbers2_py(txt, false, 0, false)
+            .into_iter()
+            .collect();
+        if parsed.is_empty() {
+            let mut fallback = vec![];
+            for part in Self::split_top_level_commas_py(txt) {
+                let trimmed = part.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if let Ok(v) = trimmed.parse::<i64>() {
+                    fallback.push(v);
+                }
+            }
+            fallback
+        } else {
+            parsed
+        }
+    }
+
     fn split_top_level_commas_py(txt: &str) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         let mut current = String::new();
@@ -338,14 +360,14 @@ impl Program {
             } else if arg.starts_with("--") && !self.bigParamaeter.is_empty() && self.bigParamaeter.last().map(|s| s == "ausgabe").unwrap_or(false) {
                 let sub = &arg[2..];
                 if self.breiteBreitenSysArgvPara(sub, neg) {
-                } else if sub == "keineueberschriften" {
+                } else if sub == "keineueberschriften" && neg.is_empty() {
                     self.keineUeberschriften = true;
-                } else if sub == "keinenummerierung" {
+                } else if sub == "keinenummerierung" && neg.is_empty() {
                     self.nummeriere = false;
-                } else if sub == "keineleereninhalte" {
+                } else if sub == "keineleereninhalte" && neg.is_empty() {
                     self.keineleereninhalte = true;
                 } else if let Some(tail) = sub.strip_prefix("spaltenreihenfolgeundnurdiese=") {
-                    spaltenreihenfolgeundnurdiese = self.parse_simple_numeric_list_py(tail);
+                    spaltenreihenfolgeundnurdiese = Self::bereich_to_numbers2_ausgabe_py(tail);
                     self.spaltenreihenfolgeundnurdiese = spaltenreihenfolgeundnurdiese.clone();
                 } else if let Some(outputtype) = sub.strip_prefix("art=") {
                     let breiteIstNull = "breite=0".to_string();

@@ -170,7 +170,7 @@ impl Program {
         any_at_all && parts.iter().all(|part| part.is_empty() || Self::is_zeilen_angabe_between_kommas_filter_py(part))
     }
 
-    fn bereich_to_numbers2_py(txt: &str, vielfache: bool, max_zahl: i64, allow_less_eq_zero: bool) -> BTreeSet<i64> {
+    pub(crate) fn bereich_to_numbers2_py(txt: &str, vielfache: bool, max_zahl: i64, allow_less_eq_zero: bool) -> BTreeSet<i64> {
         let cleaned_parts = Self::split_top_level_commas_filter_py(txt);
         let cleaned = cleaned_parts.iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(",");
         if cleaned.is_empty() || !Self::is_zeilen_angabe_filter_py(&cleaned) {
@@ -1015,6 +1015,208 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
     }
 
 
+    fn csv_escape_cell_py(text: &str) -> String {
+        if text.contains(';') || text.contains('"') || text.contains('\n') || text.contains('\r') {
+            format!("\"{}\"", text.replace('"', "\"\""))
+        } else {
+            text.to_string()
+        }
+    }
+
+    fn markdown_escape_cell_py(text: &str) -> String {
+        text.replace('|', "\\|").replace('\n', "<br>")
+    }
+
+    fn html_escape_cell_py(text: &str) -> String {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\n', "<br>")
+    }
+
+    fn row_prefix_text_py(&self, row_number: Option<i64>, is_header: bool) -> String {
+        if !self.nummeriere {
+            return String::new();
+        }
+        if is_header {
+            return " ".to_string();
+        }
+        if let Some(n) = row_number {
+            if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
+                return "█".to_string();
+            }
+        }
+        " ".to_string()
+    }
+
+    fn render_structured_output_py(
+        &mut self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        numlen: i64,
+    ) {
+        let mut out_lines: Vec<String> = vec![];
+        let mut chunked_lines: Vec<Vec<String>> = vec![];
+        match self.outType.as_str() {
+            "nichts" => {}
+            "csv" => {
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut fields: Vec<String> = vec![];
+                    if self.nummeriere {
+                        fields.push(Self::csv_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                        let label = finallyDisplayLines.get(row_idx).cloned().unwrap_or_default();
+                        fields.push(Self::csv_escape_cell_py(&label));
+                    }
+                    for cell in row {
+                        fields.push(Self::csv_escape_cell_py(cell));
+                    }
+                    let line = fields.join(";");
+                    out_lines.push(line.clone());
+                    chunked_lines.push(vec![line]);
+                }
+            }
+            "markdown" => {
+                let mut header_sep_done = false;
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                        let is_header = row_number.is_none();
+                        cells.push(Self::markdown_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                        cells.push(Self::markdown_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
+                    }
+                    for cell in row {
+                        cells.push(Self::markdown_escape_cell_py(cell));
+                    }
+                    let line = format!("|{}|", cells.join("|"));
+                    out_lines.push(line.clone());
+                    let mut block = vec![line];
+                    if row_idx == 0 && !header_sep_done {
+                        let sep = format!("|{}|", vec![":--:"; cells.len()].join("|"));
+                        out_lines.push(sep.clone());
+                        block.push(sep);
+                        header_sep_done = true;
+                    }
+                    chunked_lines.push(block);
+                }
+            }
+            "emacs" => {
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(self.row_prefix_text_py(row_number, is_header));
+                        cells.push(finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
+                    }
+                    cells.extend(row.iter().cloned());
+                    let line = format!("|{}|", cells.join("|"));
+                    out_lines.push(line.clone());
+                    let mut block = vec![line];
+                    if row_idx == 0 {
+                        let sep = format!("|{}|", vec!["----"; cells.len()].join("+"));
+                        out_lines.push(sep.clone());
+                        block.push(sep);
+                    }
+                    chunked_lines.push(block);
+                }
+            }
+            "html" => {
+                out_lines.push("<table>".to_string());
+                let mut current_block = vec!["<table>".to_string()];
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let tag = if is_header { "th" } else { "td" };
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(&self.row_prefix_text_py(row_number, is_header))));
+                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default())));
+                    }
+                    for cell in row {
+                        cells.push(format!("<{tag}>{}</{tag}>", Self::html_escape_cell_py(cell)));
+                    }
+                    let line = format!("<tr>{}</tr>", cells.join(""));
+                    out_lines.push(line.clone());
+                    current_block.push(line);
+                }
+                out_lines.push("</table>".to_string());
+                current_block.push("</table>".to_string());
+                chunked_lines.push(current_block);
+            }
+            "bbcode" => {
+                out_lines.push("[table]".to_string());
+                let mut current_block = vec!["[table]".to_string()];
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(format!("[td]{}[/td]", self.row_prefix_text_py(row_number, is_header)));
+                        cells.push(format!("[td]{}[/td]", finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
+                    }
+                    for cell in row {
+                        cells.push(format!("[td]{}[/td]", cell.replace('\n', "<br>")));
+                    }
+                    let line = format!("[tr]{}[/tr]", cells.join(""));
+                    out_lines.push(line.clone());
+                    current_block.push(line);
+                }
+                out_lines.push("[/table]".to_string());
+                current_block.push("[/table]".to_string());
+                chunked_lines.push(current_block);
+            }
+            _ => {
+                self.finallyDisplayLines = vec![];
+                self.finallyDisplayLinesByChunks = vec![];
+                self.numlen = numlen;
+                return;
+            }
+        }
+        self.finallyDisplayLinesByChunks = chunked_lines;
+        self.finallyDisplayLines = out_lines;
+        self.numlen = numlen;
+    }
+
+
     pub(crate) fn cliOut_py(
         &mut self,
         finallyDisplayLines: Vec<String>,
@@ -1035,6 +1237,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             self.finallyDisplayLines = out_lines.clone();
             self.numlen = numlen;
             self.finallyDisplayLinesByChunks = vec![];
+            return newTable;
+        }
+
+        if self.outType != "shell" {
+            self.render_structured_output_py(&finallyDisplayLines, &newTable, numlen);
             return newTable;
         }
 

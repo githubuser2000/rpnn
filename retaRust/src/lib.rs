@@ -39,10 +39,16 @@ pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {
     program.run(&words);
     program.combiTableWorkflow();
 
+    let snapshot = if program.outType == "nichts" {
+        String::new()
+    } else {
+        program.snapshot()
+    };
+
     RetaRunResult {
         cli_errors: program.cliErrors.clone(),
         display_lines: program.finallyDisplayLines.clone(),
-        snapshot: program.snapshot(),
+        snapshot,
     }
 }
 
@@ -52,7 +58,10 @@ pub fn run_reta_from_env_args() -> RetaRunResult {
 }
 
 pub fn print_reta_result(result: &RetaRunResult) {
-    println!("{}", result.render_text());
+    let rendered = result.render_text();
+    if !rendered.is_empty() {
+        println!("{}", rendered);
+    }
 }
 
 pub fn run_reta_and_print_from_env() -> i32 {
