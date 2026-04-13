@@ -4,11 +4,7 @@ pub mod shared;
 pub mod runtime;
 pub mod support;
 pub mod doc_tools;
-pub mod cli;
 pub mod domain;
-pub mod input_help;
-pub mod reta_ausgabe;
-pub mod table_printer;
 
 use shared::reta_py::Program;
 use shared::words_py::Words;

@@ -7,6 +7,7 @@ default-run = "reta"
 [dependencies]
 indexmap = "2"
 hypher = { version = "0.1.7", default-features = false, features = ["german"] }
+termimad = "0.34.1"
 
 [lib]
 name = "reta"
@@ -28,3 +29,7 @@ path = "src/bin/generate4readme.rs"
 [[bin]]
 name = "reta_min"
 path = "src/bin/reta_min.rs"
+
+[[bin]]
+name = "reta_domain_probe"
+path = "src/bin/reta_domain_probe.rs"

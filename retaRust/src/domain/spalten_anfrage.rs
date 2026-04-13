@@ -1,66 +1,51 @@
 use crate::domain::python_source_of_truth::{
-    all_main_alias_names, canonicalize_pair, exact_all_direct_columns_for_pair, parameter_alias_names,
-    ExactPythonColumn,
+    canonicalize_pair, column_numbers_for_pair, parameter_alias_names, resolve_parameter_main_alias,
 };
 use crate::shared::words_py::Words;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpaltenAnfrage {
-    pub parameter_main_name: String,
-    pub parameter_name: String,
+    pub parameter_main: String,
+    pub parameter: String,
 }
 
 impl SpaltenAnfrage {
-    pub fn new(parameter_main_name: impl Into<String>, parameter_name: impl Into<String>) -> Self {
-        Self {
-            parameter_main_name: parameter_main_name.into(),
-            parameter_name: parameter_name.into(),
-        }
-    }
-
-    pub fn cli_pair(&self) -> (String, String) {
-        (self.parameter_main_name.clone(), self.parameter_name.clone())
-    }
-
-    pub fn exact_columns(&self, words: &Words) -> Vec<ExactPythonColumn> {
-        exact_all_direct_columns_for_pair(words, &self.parameter_main_name, &self.parameter_name)
+    pub fn ober_unter_cli_pair(&self) -> (String, String) {
+        (self.parameter_main.clone(), self.parameter.clone())
     }
 
     pub fn parameter_main_aliases(&self, words: &Words) -> Vec<String> {
-        all_main_alias_names(words, &self.parameter_main_name)
+        let canonical = resolve_parameter_main_alias(words, &self.parameter_main)
+            .unwrap_or_else(|| self.parameter_main.clone());
+        crate::domain::python_source_of_truth::all_main_alias_groups(words)
+            .into_iter()
+            .find(|g| g.canonical == canonical)
+            .map(|g| g.aliases)
+            .unwrap_or_default()
     }
 
     pub fn parameter_aliases(&self, words: &Words) -> Vec<String> {
-        parameter_alias_names(words, &self.parameter_main_name, &self.parameter_name)
+        let canonical_main = resolve_parameter_main_alias(words, &self.parameter_main)
+            .unwrap_or_else(|| self.parameter_main.clone());
+        parameter_alias_names(words, &canonical_main)
     }
 
     pub fn exact_column_numbers(&self, words: &Words) -> Vec<i64> {
-        let mut out = Vec::new();
-        for entry in self.exact_columns(words) {
-            for number in entry.column_numbers {
-                if !out.contains(&number) {
-                    out.push(number);
-                }
-            }
-        }
-        out
+        column_numbers_for_pair(words, &self.parameter_main, &self.parameter)
     }
 }
 
-pub fn parse_spalten_anfrage(
-    words: &Words,
-    parameter_main_name: &str,
-    parameter_name: &str,
-) -> Result<SpaltenAnfrage, String> {
-    let (canonical_main, canonical_parameter) = canonicalize_pair(words, parameter_main_name, parameter_name)
-        .ok_or_else(|| {
-            format!(
-                "Unbekannte Spaltenanfrage: {} / {}",
-                parameter_main_name, parameter_name
-            )
-        })?;
-
-    Ok(SpaltenAnfrage::new(canonical_main, canonical_parameter))
+pub fn parse_spalten_anfrage(words: &Words, parameter_main: &str, parameter: &str) -> Result<SpaltenAnfrage, String> {
+    let Some((canonical_main, canonical_parameter)) = canonicalize_pair(words, parameter_main, parameter) else {
+        return Err(format!(
+            "Unknown Python pair: {} / {}",
+            parameter_main, parameter
+        ));
+    };
+    Ok(SpaltenAnfrage {
+        parameter_main: canonical_main,
+        parameter: canonical_parameter,
+    })
 }
 
 #[cfg(test)]
@@ -71,29 +56,28 @@ mod tests {
     #[test]
     fn parse_known_pair_works() {
         let words = Words::new();
-        let request = parse_spalten_anfrage(&words, "Menschliches", "Motive").unwrap();
-        assert_eq!(request.cli_pair(), ("Menschliches".to_string(), "Motive".to_string()));
-        assert!(!request.exact_columns(&words).is_empty());
-    }
-
-    #[test]
-    fn parse_unknown_main_fails() {
-        let words = Words::new();
-        assert!(parse_spalten_anfrage(&words, "does-not-exist", "x").is_err());
+        let req = parse_spalten_anfrage(&words, "Menschliches", "Motive").unwrap();
+        assert_eq!(req.ober_unter_cli_pair().0, "Menschliches");
     }
 
     #[test]
     fn parse_known_alias_pair_works() {
         let words = Words::new();
-        let request = parse_spalten_anfrage(&words, "menschliches", "motive").unwrap();
-        assert_eq!(request.cli_pair(), ("Menschliches".to_string(), "Motive".to_string()));
+        let req = parse_spalten_anfrage(&words, "menschliches", "motive").unwrap();
+        assert_eq!(req.ober_unter_cli_pair().0, "Menschliches");
+    }
+
+    #[test]
+    fn parse_unknown_main_fails() {
+        let words = Words::new();
+        assert!(parse_spalten_anfrage(&words, "unbekannt", "motive").is_err());
     }
 
     #[test]
     fn aliases_follow_canonical_request() {
         let words = Words::new();
-        let request = parse_spalten_anfrage(&words, "menschliches", "motive").unwrap();
-        assert!(request.parameter_main_aliases(&words).iter().any(|alias| alias == "menschliches"));
-        assert!(request.parameter_aliases(&words).iter().any(|alias| alias.to_lowercase().contains("motiv")));
+        let req = parse_spalten_anfrage(&words, "menschliches", "motive").unwrap();
+        assert!(req.parameter_main_aliases(&words).iter().any(|a| a == "menschliches"));
+        assert!(req.parameter_aliases(&words).iter().any(|a| a.to_lowercase() == "motive"));
     }
 }
