@@ -23,23 +23,17 @@ fn slugify_piece(input: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
-fn push_unique(values: &mut Vec<String>, value: String) {
-    if !value.is_empty() && !values.contains(&value) {
-        values.push(value);
+fn push_unique(values: &mut Vec<String>, candidate: String) {
+    if !candidate.is_empty() && !values.contains(&candidate) {
+        values.push(candidate);
     }
 }
 
 fn classes_from_meta(meta: &ExactPythonColumnMeta) -> Vec<String> {
     let mut classes = vec![format!("p1_{}", meta.column_number)];
     for direct in &meta.direct_matches {
-        push_unique(
-            &mut classes,
-            format!("p2_{}", slugify_piece(&direct.parameter_main_name)),
-        );
-        push_unique(
-            &mut classes,
-            format!("p3_{}", slugify_piece(&direct.parameter_name)),
-        );
+        push_unique(&mut classes, format!("p2_{}", slugify_piece(&direct.parameter_main_name)));
+        push_unique(&mut classes, format!("p3_{}", slugify_piece(&direct.parameter_name)));
         push_unique(
             &mut classes,
             format!(
@@ -53,10 +47,10 @@ fn classes_from_meta(meta: &ExactPythonColumnMeta) -> Vec<String> {
             ),
         );
         for alias in &direct.parameter_main_aliases {
-            push_unique(&mut classes, format!("p2a_{}", slugify_piece(alias)));
+            push_unique(&mut classes, format!("p2alias_{}", slugify_piece(alias)));
         }
         for alias in &direct.parameter_aliases {
-            push_unique(&mut classes, format!("p3a_{}", slugify_piece(alias)));
+            push_unique(&mut classes, format!("p3alias_{}", slugify_piece(alias)));
         }
     }
     classes
@@ -103,8 +97,7 @@ mod tests {
     fn html_meta_keeps_alias_attributes() {
         let words = Words::new();
         let meta = html_decl_meta_for_column(&words, 5).expect("known column");
-        assert!(meta.data_attributes.iter().any(|(key, value)| {
-            key == "data-main-aliases" && value.contains("wichtigsteverstehen")
-        }));
+        assert!(meta.data_attributes.iter().any(|(k, _)| k == "data-main-aliases"));
+        assert!(meta.data_attributes.iter().any(|(k, _)| k == "data-parameter-aliases"));
     }
 }

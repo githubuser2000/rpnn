@@ -1,5 +1,5 @@
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
-use std::collections::BTreeMap;
+use indexmap::IndexMap;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExactPythonColumn {
@@ -18,81 +18,148 @@ pub struct ExactPythonColumnMeta {
     pub direct_matches: Vec<ExactPythonColumn>,
 }
 
-fn first_non_empty(names: &[String]) -> String {
-    names.iter().find(|value| !value.is_empty()).cloned().unwrap_or_default()
+fn first_name(names: &[String]) -> String {
+    names.first().cloned().unwrap_or_default()
 }
 
-fn dedup_strings_preserve_order(values: &[String]) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
+fn dedup_preserve_order(values: Vec<String>) -> Vec<String> {
+    let mut out = Vec::new();
     for value in values {
-        if !value.is_empty() && !out.contains(value) {
-            out.push(value.clone());
+        if !value.is_empty() && !out.contains(&value) {
+            out.push(value);
         }
     }
     out
 }
 
-fn dedup_i64_preserve_order(values: &[i64]) -> Vec<i64> {
-    let mut out: Vec<i64> = Vec::new();
-    for value in values {
-        if !out.contains(value) {
-            out.push(*value);
-        }
-    }
-    out
+fn normalize_for_alias_match(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| ch.is_alphanumeric())
+        .flat_map(|ch| ch.to_lowercase())
+        .collect()
 }
 
-fn names_match_alias(query: &str, names: &[String]) -> bool {
-    names.iter().any(|name| name == query)
+fn entry_main_aliases(entry: &StoreParameterEntry) -> Vec<String> {
+    dedup_preserve_order(entry.parameterMainNames.clone())
+}
+
+fn entry_parameter_aliases(entry: &StoreParameterEntry) -> Vec<String> {
+    dedup_preserve_order(entry.parameterNames.clone())
 }
 
 fn extract_direct_columns(data: &[PyValue]) -> Vec<i64> {
     let mut out = Vec::new();
     for value in data {
-        match value {
-            PyValue::Int(v) => out.push(*v),
-            // direct columns only; tuples are generator/meta shapes and stay out here on purpose
-            PyValue::Tuple(values) => {
-                if values.iter().all(|item| matches!(item, PyValue::Int(_))) {
-                    // keep strict direct-column semantics: tuples are not direct columns
-                }
-            }
-            PyValue::Str(_) | PyValue::Bool(_) | PyValue::NoneValue => {}
+        if let PyValue::Int(v) = value {
+            out.push(*v);
         }
     }
-    dedup_i64_preserve_order(&out)
+    out
 }
 
 fn entry_to_direct_columns(entry: &StoreParameterEntry, entry_index: usize) -> Vec<ExactPythonColumn> {
-    let parameter_main_aliases = dedup_strings_preserve_order(&entry.parameterMainNames);
-    let parameter_aliases = dedup_strings_preserve_order(&entry.parameterNames);
-    let parameter_main_name = first_non_empty(&parameter_main_aliases);
-    let parameter_name = first_non_empty(&parameter_aliases);
+    let main_aliases = entry_main_aliases(entry);
+    let parameter_aliases = entry_parameter_aliases(entry);
+    let parameter_main_name = first_name(&main_aliases);
+    let parameter_name = first_name(&parameter_aliases);
 
-    let mut out = Vec::new();
-    for (data_index, data) in entry.datas.iter().enumerate() {
-        let columns = extract_direct_columns(data);
-        if !columns.is_empty() {
-            out.push(ExactPythonColumn {
-                parameter_main_name: parameter_main_name.clone(),
-                parameter_name: parameter_name.clone(),
-                parameter_main_aliases: parameter_main_aliases.clone(),
-                parameter_aliases: parameter_aliases.clone(),
-                column_numbers: columns,
-                source_entry_index: entry_index,
-                source_data_index: data_index,
-            });
+    entry
+        .datas
+        .iter()
+        .enumerate()
+        .filter_map(|(data_index, data)| {
+            let column_numbers = extract_direct_columns(data);
+            if column_numbers.is_empty() {
+                None
+            } else {
+                Some(ExactPythonColumn {
+                    parameter_main_name: parameter_main_name.clone(),
+                    parameter_name: parameter_name.clone(),
+                    parameter_main_aliases: main_aliases.clone(),
+                    parameter_aliases: parameter_aliases.clone(),
+                    column_numbers,
+                    source_entry_index: entry_index,
+                    source_data_index: data_index,
+                })
+            }
+        })
+        .collect()
+}
+
+pub fn exact_all_direct_columns(words: &Words) -> Vec<ExactPythonColumn> {
+    words
+        .paraNdataMatrix
+        .iter()
+        .enumerate()
+        .flat_map(|(entry_index, entry)| entry_to_direct_columns(entry, entry_index))
+        .collect()
+}
+
+pub fn all_main_alias_groups(words: &Words) -> Vec<Vec<String>> {
+    let mut out: Vec<Vec<String>> = Vec::new();
+    for entry in &words.paraNdataMatrix {
+        let group = entry_main_aliases(entry);
+        if !group.is_empty() && !out.contains(&group) {
+            out.push(group);
         }
     }
     out
 }
 
-pub fn exact_all_direct_columns(words: &Words) -> Vec<ExactPythonColumn> {
-    let mut out = Vec::new();
-    for (entry_index, entry) in words.paraNdataMatrix.iter().enumerate() {
-        out.extend(entry_to_direct_columns(entry, entry_index));
+pub fn resolve_parameter_main_alias(words: &Words, parameter_main_name: &str) -> Option<String> {
+    let needle = normalize_for_alias_match(parameter_main_name);
+    if needle.is_empty() {
+        return None;
+    }
+    for aliases in all_main_alias_groups(words) {
+        if aliases
+            .iter()
+            .any(|alias| normalize_for_alias_match(alias) == needle)
+        {
+            return aliases.first().cloned();
+        }
+    }
+    None
+}
+
+pub fn parameter_alias_groups_for_main(words: &Words, parameter_main_name: &str) -> Vec<Vec<String>> {
+    let Some(canonical_main) = resolve_parameter_main_alias(words, parameter_main_name) else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<Vec<String>> = Vec::new();
+    for entry in &words.paraNdataMatrix {
+        if first_name(&entry.parameterMainNames) == canonical_main {
+            let group = entry_parameter_aliases(entry);
+            if !group.is_empty() && !out.contains(&group) {
+                out.push(group);
+            }
+        }
     }
     out
+}
+
+pub fn resolve_parameter_alias(words: &Words, parameter_main_name: &str, parameter_name: &str) -> Option<String> {
+    let needle = normalize_for_alias_match(parameter_name);
+    if needle.is_empty() {
+        return None;
+    }
+    for aliases in parameter_alias_groups_for_main(words, parameter_main_name) {
+        if aliases
+            .iter()
+            .any(|alias| normalize_for_alias_match(alias) == needle)
+        {
+            return aliases.first().cloned();
+        }
+    }
+    None
+}
+
+pub fn canonicalize_pair(words: &Words, parameter_main_name: &str, parameter_name: &str) -> Option<(String, String)> {
+    let canonical_main = resolve_parameter_main_alias(words, parameter_main_name)?;
+    let canonical_parameter = resolve_parameter_alias(words, &canonical_main, parameter_name)?;
+    Some((canonical_main, canonical_parameter))
 }
 
 pub fn exact_all_direct_columns_for_pair(
@@ -100,38 +167,18 @@ pub fn exact_all_direct_columns_for_pair(
     parameter_main_name: &str,
     parameter_name: &str,
 ) -> Vec<ExactPythonColumn> {
+    let Some((canonical_main, canonical_parameter)) =
+        canonicalize_pair(words, parameter_main_name, parameter_name)
+    else {
+        return Vec::new();
+    };
+
     exact_all_direct_columns(words)
         .into_iter()
         .filter(|entry| {
-            entry.parameter_main_name == parameter_main_name && entry.parameter_name == parameter_name
+            entry.parameter_main_name == canonical_main && entry.parameter_name == canonical_parameter
         })
         .collect()
-}
-
-pub fn exact_all_direct_columns_for_pair_alias(
-    words: &Words,
-    parameter_main_query: &str,
-    parameter_query: &str,
-) -> Vec<ExactPythonColumn> {
-    exact_all_direct_columns(words)
-        .into_iter()
-        .filter(|entry| {
-            names_match_alias(parameter_main_query, &entry.parameter_main_aliases)
-                && names_match_alias(parameter_query, &entry.parameter_aliases)
-        })
-        .collect()
-}
-
-pub fn exact_column_numbers_for_pair_alias(
-    words: &Words,
-    parameter_main_query: &str,
-    parameter_query: &str,
-) -> Vec<i64> {
-    let mut out = Vec::new();
-    for entry in exact_all_direct_columns_for_pair_alias(words, parameter_main_query, parameter_query) {
-        out.extend(entry.column_numbers);
-    }
-    dedup_i64_preserve_order(&out)
 }
 
 pub fn exact_meta_for_column(words: &Words, column_number: i64) -> Option<ExactPythonColumnMeta> {
@@ -150,67 +197,28 @@ pub fn exact_meta_for_column(words: &Words, column_number: i64) -> Option<ExactP
     }
 }
 
-pub fn all_parameter_main_names(words: &Words) -> Vec<String> {
-    let mut out = Vec::new();
-    for entry in &words.paraNdataMatrix {
-        let name = first_non_empty(&entry.parameterMainNames);
-        if !name.is_empty() && !out.contains(&name) {
-            out.push(name);
+pub fn reverse_map_all_direct_columns(words: &Words) -> IndexMap<i64, Vec<ExactPythonColumn>> {
+    let mut out: IndexMap<i64, Vec<ExactPythonColumn>> = IndexMap::new();
+    for entry in exact_all_direct_columns(words) {
+        for column_number in &entry.column_numbers {
+            out.entry(*column_number).or_default().push(entry.clone());
         }
     }
     out
 }
 
-pub fn all_parameter_main_alias_groups(words: &Words) -> Vec<Vec<String>> {
-    let mut out = Vec::new();
-    for entry in &words.paraNdataMatrix {
-        let aliases = dedup_strings_preserve_order(&entry.parameterMainNames);
-        if !aliases.is_empty() && !out.contains(&aliases) {
-            out.push(aliases);
-        }
-    }
-    out
+pub fn all_parameter_main_names(words: &Words) -> Vec<String> {
+    all_main_alias_groups(words)
+        .into_iter()
+        .filter_map(|aliases| aliases.first().cloned())
+        .collect()
 }
 
 pub fn parameter_names_for_main(words: &Words, parameter_main_name: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for entry in &words.paraNdataMatrix {
-        if first_non_empty(&entry.parameterMainNames) == parameter_main_name {
-            let name = first_non_empty(&entry.parameterNames);
-            if !name.is_empty() && !out.contains(&name) {
-                out.push(name);
-            }
-        }
-    }
-    out
-}
-
-pub fn parameter_alias_groups_for_main_alias(words: &Words, parameter_main_query: &str) -> Vec<Vec<String>> {
-    let mut out = Vec::new();
-    for entry in &words.paraNdataMatrix {
-        let main_aliases = dedup_strings_preserve_order(&entry.parameterMainNames);
-        if names_match_alias(parameter_main_query, &main_aliases) {
-            let aliases = dedup_strings_preserve_order(&entry.parameterNames);
-            if !aliases.is_empty() && !out.contains(&aliases) {
-                out.push(aliases);
-            }
-        }
-    }
-    out
-}
-
-pub fn direct_column_reverse_map(words: &Words) -> BTreeMap<i64, Vec<(String, String)>> {
-    let mut out: BTreeMap<i64, Vec<(String, String)>> = BTreeMap::new();
-    for entry in exact_all_direct_columns(words) {
-        for column in entry.column_numbers {
-            let pair = (entry.parameter_main_name.clone(), entry.parameter_name.clone());
-            let slot = out.entry(column).or_default();
-            if !slot.contains(&pair) {
-                slot.push(pair);
-            }
-        }
-    }
-    out
+    parameter_alias_groups_for_main(words, parameter_main_name)
+        .into_iter()
+        .filter_map(|aliases| aliases.first().cloned())
+        .collect()
 }
 
 #[cfg(test)]
@@ -221,7 +229,7 @@ mod tests {
     #[test]
     fn direct_pair_lookup_finds_menschliches_motive() {
         let words = Words::new();
-        let hits = exact_all_direct_columns_for_pair_alias(&words, "menschliches", "motive")
+        let hits = exact_all_direct_columns_for_pair(&words, "Menschliches", "Motive")
             .into_iter()
             .flat_map(|entry| entry.column_numbers)
             .collect::<Vec<_>>();
@@ -236,23 +244,25 @@ mod tests {
     }
 
     #[test]
+    fn reverse_map_contains_known_column() {
+        let words = Words::new();
+        let reverse = reverse_map_all_direct_columns(&words);
+        assert!(reverse.contains_key(&5));
+    }
+
+    #[test]
     fn all_main_alias_groups_contains_menschliches_alias() {
         let words = Words::new();
-        let groups = all_parameter_main_alias_groups(&words);
-        assert!(groups.iter().any(|group| group.iter().any(|value| value == "menschliches")));
+        let groups = all_main_alias_groups(&words);
+        assert!(groups.iter().any(|group| {
+            group.contains(&"Menschliches".to_string()) && group.contains(&"menschliches".to_string())
+        }));
     }
 
     #[test]
     fn parameter_alias_groups_follow_main_alias() {
         let words = Words::new();
-        let groups = parameter_alias_groups_for_main_alias(&words, "menschliches");
-        assert!(groups.iter().any(|group| group.iter().any(|value| value == "motive")));
-    }
-
-    #[test]
-    fn reverse_map_contains_known_column() {
-        let words = Words::new();
-        let reverse = direct_column_reverse_map(&words);
-        assert!(reverse.contains_key(&5));
+        let groups = parameter_alias_groups_for_main(&words, "menschliches");
+        assert!(groups.iter().any(|group| group.contains(&"Motive".to_string()) || group.contains(&"motive".to_string())));
     }
 }
