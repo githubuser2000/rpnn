@@ -10,7 +10,7 @@ use super::commands::{
     compile_command, execute_command, EditModeKind, PromptCommand, PromptOutput, SessionState,
 };
 use super::completion::build_default_completer;
-use super::history::default_history_path;
+use super::history::{default_history_path, default_log_path};
 use super::tui::launch_preview_ui;
 
 pub fn run_rp_from_env(start_with_vi_mode: bool) -> i32 {
@@ -32,7 +32,12 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
 
     let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
     let history_path = default_history_path(&program_name);
+    let log_path = default_log_path(&program_name);
     let prompt = DefaultPrompt::default();
+
+    if state.logging_enabled {
+        append_log_line(&log_path, "session", &format!("start program={} vi_mode={} implicit_logging={}", program_name, start_with_vi_mode, implicit_logging));
+    }
 
     let mut editor = match build_editor(&history_path, state.current_mode()) {
         Ok(editor) => editor,
@@ -51,9 +56,19 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                     state.history_lines.push(input.clone());
                 }
 
+                if state.logging_enabled {
+                    append_log_line(&log_path, "input", &input);
+                }
+
                 let compiled = match compile_command(&input, state.prompt_mode) {
                     Ok(command) => command,
                     Err(err) => {
+                        if state.logging_enabled {
+                            append_log_line(&log_path, "compile-error", &err);
+                        }
+                        if state.logging_enabled {
+                            append_log_line(&log_path, "ui-error", &err.to_string());
+                        }
                         print_output(&mut state, PromptOutput {
                             title: "error".to_string(),
                             text: err,
@@ -64,10 +79,16 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                 };
 
                 if matches!(compiled, PromptCommand::Exit) {
+                    if state.logging_enabled {
+                        append_log_line(&log_path, "session", "exit command received");
+                    }
                     break;
                 }
 
                 if matches!(compiled, PromptCommand::LaunchUi) {
+                    if state.logging_enabled {
+                        append_log_line(&log_path, "ui", "launch_preview_ui");
+                    }
                     if let Err(err) = launch_preview_ui(&state) {
                         print_output(&mut state, PromptOutput {
                             title: "ui-error".to_string(),
@@ -82,10 +103,16 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
 
                 match execute_command(compiled, &mut state) {
                     Ok(Some(output)) => {
+                        if state.logging_enabled {
+                            append_log_output(&log_path, &output);
+                        }
                         print_output(&mut state, output);
                     }
                     Ok(None) => {}
                     Err(err) => {
+                        if state.logging_enabled {
+                            append_log_line(&log_path, "compile-error", &err);
+                        }
                         print_output(&mut state, PromptOutput {
                             title: "error".to_string(),
                             text: err,
@@ -105,10 +132,16 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                 }
             }
             Ok(Signal::CtrlC) => {
+                if state.logging_enabled {
+                    append_log_line(&log_path, "signal", "CtrlC");
+                }
                 println!("^C");
                 continue;
             }
             Ok(Signal::CtrlD) => {
+                if state.logging_enabled {
+                    append_log_line(&log_path, "signal", "CtrlD");
+                }
                 println!();
                 break;
             }
@@ -120,6 +153,9 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                 });
             }
             Err(err) => {
+                if state.logging_enabled {
+                    append_log_line(&log_path, "read-error", &err.to_string());
+                }
                 eprintln!("Fehler beim Lesen der Eingabe: {err}");
                 return 1;
             }
@@ -160,6 +196,31 @@ fn build_editor(history_path: &PathBuf, mode: EditModeKind) -> Result<Reedline, 
     };
 
     Ok(editor)
+}
+
+fn append_log_line(path: &PathBuf, kind: &str, text: &str) {
+    use std::io::Write;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let _ = writeln!(file, "[{timestamp}] {kind}: {text}");
+    }
+}
+
+fn append_log_output(path: &PathBuf, output: &PromptOutput) {
+    let headline = format!("title={} exit_code={}", output.title, output.exit_code);
+    append_log_line(path, "output-meta", &headline);
+    if !output.text.is_empty() {
+        append_log_line(path, "output-text", &output.text);
+    }
 }
 
 fn print_output(state: &mut SessionState, output: PromptOutput) {
