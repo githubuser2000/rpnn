@@ -127,7 +127,249 @@ impl Program {
         self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect()
     }
 
-    fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
+    
+    fn meta_or_what_exact_py(&self, metavariable: i64) -> ((&'static str, &'static str), (&'static str, &'static str)) {
+        match metavariable {
+            2 => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+            3 => (("Theorie-Thema: ", "Praxis: "), ("Theorie-", "Praxis-")),
+            4 => (("Planungs-Thema: ", "Umsetzungs-Thema: "), ("Planung-", "Umsetzung-")),
+            5 => (("Anlass-Thema: ", "Wirkungs-Thema: "), ("Anlass-", "wirkung-")),
+            6 => (("Kraft-Gebung: ", "Verstärkungs-Thema: "), ("Kraft-geben-", "Verstärkung-")),
+            7 => (("Beherrschung: ", "Richtung-Thema: "), ("beherrschend-", "Richtung-")),
+            _ => (("Meta-Thema: ", "Konkretes: "), ("Meta-", "Konkret-")),
+        }
+    }
+
+
+    fn make_vorwort_exact_py(&self, wiederholungen: usize, vorworte2: (&str, &str), less1ormore2: usize) -> String {
+        let basis = if less1ormore2 == 1 { vorworte2.0 } else { vorworte2.1 };
+        if wiederholungen > 1 {
+            basis.repeat(wiederholungen)
+        } else {
+            basis.to_string()
+        }
+    }
+
+
+    fn py_frac_to_f64_exact(&self, value: PyFrac) -> f64 {
+        value.numerator as f64 / value.denominator as f64
+    }
+
+
+    fn py_frac_display_exact(&self, value: PyFrac) -> String {
+        if value.denominator == 1 {
+            value.numerator.to_string()
+        } else {
+            format!("{}/{}", value.numerator, value.denominator)
+        }
+    }
+
+
+    fn spalteMetaKonkret_switching_exact_py(
+        &self,
+        transzendentalienSpalten: (usize, usize),
+        ifInvers: usize,
+        metavariable: i64,
+        newCol: usize,
+        moreAndLess: (Option<i64>, Option<PyFrac>),
+        gebrRatEtwaSchonMalDabeiGewesen: &mut BTreeSet<PyFrac>,
+    ) -> (usize, (Option<i64>, Option<PyFrac>)) {
+        let next_col = if newCol == transzendentalienSpalten.1 {
+            transzendentalienSpalten.0
+        } else {
+            transzendentalienSpalten.1
+        };
+
+        let a = moreAndLess.0.and_then(|left| {
+            let mulresult = left.saturating_mul(metavariable);
+            if mulresult > 0 && (mulresult as usize) < self.relitable.len() {
+                Some(mulresult)
+            } else {
+                None
+            }
+        });
+
+        let mut right_current = moreAndLess.1;
+        let b = if let Some(mut right) = right_current {
+            let right_f = self.py_frac_to_f64_exact(right);
+            if right_f < 100.0 && right_f > 0.01 {
+                if next_col == (if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 }) && right.denominator == 1 {
+                    if let Some(rec) = right.recip() {
+                        right = rec;
+                        right_current = Some(rec);
+                    }
+                }
+                let candidate = if self.spalteMetaKonkretAbstrakt_isGanzZahlig_py(self.py_frac_to_f64_exact(right), false) {
+                    PyFrac::new(metavariable, right.numerator)
+                } else {
+                    right.recip().and_then(|rec| rec.div(PyFrac::new(metavariable, 1)?))
+                };
+                if let Some(frac) = candidate {
+                    if gebrRatEtwaSchonMalDabeiGewesen.contains(&frac) {
+                        None
+                    } else {
+                        gebrRatEtwaSchonMalDabeiGewesen.insert(frac);
+                        Some(frac)
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let _ = right_current;
+        (next_col, (a, b))
+    }
+
+
+    fn spalteMetaKonkret_vorwort_behandlung_exact_py(
+        &self,
+        metavariable: i64,
+        ifInvers: usize,
+        transzendentalienSpalten: (usize, usize),
+        start_row: i64,
+        metaOrWhat: ((&str, &str), (&str, &str)),
+    ) -> Vec<((Option<i64>, Option<PyFrac>), usize, String, String)> {
+        let mut gebrRatEtwaSchonMalDabeiGewesen: BTreeSet<PyFrac> = BTreeSet::new();
+        let mut moreAndLess = (Some(start_row), PyFrac::new(start_row, 1));
+        let mut newCol = transzendentalienSpalten.0;
+        let mut neue2KoordNeue2Vorwoerter: Vec<((Option<i64>, Option<PyFrac>), usize, String, String)> = vec![];
+        while !(moreAndLess.0.is_none() && moreAndLess.1.is_none()) {
+            let switched = self.spalteMetaKonkret_switching_exact_py(
+                transzendentalienSpalten,
+                ifInvers,
+                metavariable,
+                newCol,
+                moreAndLess,
+                &mut gebrRatEtwaSchonMalDabeiGewesen,
+            );
+            newCol = switched.0;
+            moreAndLess = switched.1;
+            let vorworte2 = if neue2KoordNeue2Vorwoerter.is_empty() {
+                metaOrWhat.0
+            } else {
+                metaOrWhat.1
+            };
+            let vorwort1 = self.make_vorwort_exact_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 1);
+            let vorwort2 = self.make_vorwort_exact_py(neue2KoordNeue2Vorwoerter.len() + 1, vorworte2, 2);
+            neue2KoordNeue2Vorwoerter.push((moreAndLess, newCol, vorwort1, vorwort2));
+        }
+        neue2KoordNeue2Vorwoerter
+    }
+
+
+    fn spalteMetaKonkret_main_inserting_text_exact_py(
+        &self,
+        bothRows: i64,
+        _i: usize,
+        ifInvers: usize,
+        neue2KoordNeue2Vorwoerter: &Vec<((Option<i64>, Option<PyFrac>), usize, String, String)>,
+        transzendentalienSpalten: (usize, usize),
+    ) -> String {
+        let mut intoList: Vec<String> = vec![];
+        let mut thema = String::new();
+        for vier in neue2KoordNeue2Vorwoerter.iter().take(neue2KoordNeue2Vorwoerter.len().saturating_sub(1)) {
+            if bothRows == 0 {
+                if let Some(row_idx) = vier.0.0 {
+                    let text = self.zellenwert_py(row_idx as usize, vier.1);
+                    if text.trim().len() > 3 {
+                        if self.outType == "html" {
+                            intoList.push("<li>".to_string());
+                        } else if self.outType == "bbcode" {
+                            intoList.push("[*]".to_string());
+                        }
+                        intoList.push(vier.2.clone());
+                        intoList.push(thema.clone());
+                        intoList.push(text);
+                        intoList.push(" (".to_string());
+                        if vier.1 != (if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 }) && row_idx != 1 {
+                            intoList.push("1/".to_string());
+                        }
+                        intoList.push(row_idx.to_string());
+                        intoList.push(")".to_string());
+                        if self.outType == "html" {
+                            intoList.push("</li>".to_string());
+                        } else if self.outType != "bbcode" {
+                            intoList.push(" | ".to_string());
+                        }
+                    }
+                }
+            } else if let Some(frac) = vier.0.1 {
+                if frac.denominator == 1 {
+                    let row_idx = frac.numerator;
+                    let text = self.zellenwert_py(row_idx as usize, vier.1);
+                    if text.trim().len() > 3 {
+                        if self.outType == "html" {
+                            intoList.push("<li>".to_string());
+                        } else if self.outType == "bbcode" {
+                            intoList.push("[*]".to_string());
+                        }
+                        intoList.push(vier.3.clone());
+                        intoList.push(thema.clone());
+                        intoList.push(text);
+                        intoList.push(" (".to_string());
+                        if vier.1 != (if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 }) && row_idx != 1 {
+                            intoList.push("1/".to_string());
+                        }
+                        intoList.push(row_idx.to_string());
+                        intoList.push(")".to_string());
+                        if self.outType == "html" {
+                            intoList.push("</li>".to_string());
+                        } else if self.outType != "bbcode" {
+                            intoList.push(" | ".to_string());
+                        }
+                    }
+                } else if let Some(gebrStrukWort) = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                    frac,
+                    transzendentalienSpalten,
+                    &vec![],
+                    false,
+                ) {
+                    if gebrStrukWort.trim().len() > 3 {
+                        if self.outType == "html" {
+                            intoList.push("<li>".to_string());
+                        } else if self.outType == "bbcode" {
+                            intoList.push("[*]".to_string());
+                        }
+                        intoList.push(vier.3.clone());
+                        intoList.push(thema.clone());
+                        intoList.push(gebrStrukWort);
+                        intoList.push("(".to_string());
+                        intoList.push(frac.numerator.to_string());
+                        if frac.denominator > 1 {
+                            intoList.push(format!("/{}", frac.denominator));
+                        }
+                        intoList.push(")".to_string());
+                        if self.outType == "html" {
+                            intoList.push("</li>".to_string());
+                        } else if self.outType != "bbcode" {
+                            intoList.push(" | ".to_string());
+                        }
+                    }
+                }
+            }
+            thema = "thema: ".to_string();
+        }
+        let mut out: Vec<String> = vec![];
+        if self.outType == "html" {
+            out.push("<ul>".to_string());
+            out.extend(intoList);
+            out.push("</ul>".to_string());
+        } else if self.outType == "bbcode" {
+            out.push("[list]".to_string());
+            out.extend(intoList);
+            out.push("[/list]".to_string());
+        } else {
+            out.extend(intoList);
+        }
+        out.join("")
+    }
+
+fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         self.metakonkretPairs.clone()
     }
 
@@ -2008,12 +2250,24 @@ impl Program {
                                     teile.push(", außerdem: ".to_string());
                                 }
                                 let lhsrhs = match null_bis_drei {
-                                    0 => (&kombis_all[zwei][multi.1 as usize].0.0, &kombis_all[zwei][multi.0 as usize].0.1),
-                                    1 => (&kombis_all[zwei][multi.1 as usize].1.0, &kombis_all[zwei][multi.0 as usize].1.1),
-                                    2 => (&kombis_all[zwei][multi.1 as usize].2.0, &kombis_all[zwei][multi.0 as usize].2.1),
-                                    _ => (&kombis_all[zwei][multi.1 as usize].3.0, &kombis_all[zwei][multi.0 as usize].3.1),
-                                };
-                                let lhs = lhsrhs.0.trim();
+    0 => (
+        &kombis_all[zwei][multi.0 as usize].0.0,
+        &kombis_all[zwei][multi.1 as usize].0.1,
+    ),
+    1 => (
+        &kombis_all[zwei][multi.0 as usize].1.0,
+        &kombis_all[zwei][multi.1 as usize].1.1,
+    ),
+    2 => (
+        &kombis_all[zwei][multi.0 as usize].2.0,
+        &kombis_all[zwei][multi.1 as usize].2.1,
+    ),
+    _ => (
+        &kombis_all[zwei][multi.0 as usize].3.0,
+        &kombis_all[zwei][multi.1 as usize].3.1,
+    ),
+};
+                               let lhs = lhsrhs.0.trim();
                                 let rhs = lhsrhs.1.trim();
                                 let lhs_display = if lhs.len() > 3 { lhs.to_string() } else { "...".to_string() };
                                 let rhs_display = if rhs.len() > 3 { rhs.to_string() } else { "...".to_string() };
@@ -2036,19 +2290,25 @@ impl Program {
                             for (k, multi) in multipless.iter().enumerate() {
                                 let csv_von = if null_bis_drei >= 2 { &uni_csv } else { &gal_csv };
                                 let csv_bis = if null_bis_drei == 1 || null_bis_drei == 3 { &uni_csv } else { &gal_csv };
-                                let von = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
-                                    multi.0,
-                                    gal_or_uni_n_or_invers[null_bis_drei].0.into(),
-                                    csv_von,
-                                    !(null_bis_drei >= 2),
-                                );
-                                let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
-                                    multi.1,
-                                    gal_or_uni_n_or_invers[null_bis_drei].1.into(),
-                                    csv_bis,
-                                    !(null_bis_drei == 1 || null_bis_drei == 3),
-                                );
-                                let Some(von) = von else { continue; };
+                                let gal_or_uni_tuple = if zwei == 0 {
+    gal_or_uni_n_or_invers[null_bis_drei].0
+} else {
+    gal_or_uni_n_or_invers[null_bis_drei].1
+};
+
+let von = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+    multi.0,
+    gal_or_uni_tuple.into(),
+    csv_von,
+    !(null_bis_drei >= 2),
+);
+let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+    multi.1,
+    gal_or_uni_tuple.into(),
+    csv_bis,
+    !(null_bis_drei == 1 || null_bis_drei == 3),
+);
+                               let Some(von) = von else { continue; };
                                 let Some(bis) = bis else { continue; };
                                 let von = von.trim();
                                 let bis = bis.trim();
@@ -2278,26 +2538,16 @@ impl Program {
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let geordnetePaare = self.metakonkret_pairs_exact_py();
-        if geordnetePaare.is_empty() {
-            return;
-        }
         for paar in geordnetePaare {
-            self.spalteMetaKontretTheorieAbstrakt_etc(
-                rowsAsNumbers,
-                paar.0,
-                if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 },
-            );
+            let metavariable = paar.0;
+            let lower1greater2both3 = if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 };
+            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, metavariable, lower1greater2both3);
         }
     }
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
-        let row_end = self.generator_row_end_py();
-        let gebr_univ_table = self
-            .csv_fraction_table_name_py(2)
-            .and_then(|n| self.load_csv_rows_semicolon_exact_path(n).ok())
-            .unwrap_or_default();
-
-        let both_rows_liste: Vec<i64> = if lower1greater2both3 == 3 {
+        let metaOrWhat = self.meta_or_what_exact_py(metavariable);
+        let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 {
             vec![0, 1]
         } else if lower1greater2both3 == 1 {
             vec![0]
@@ -2306,22 +2556,39 @@ impl Program {
         } else {
             vec![]
         };
-
-        for (ifInvers, transzendentalienSpalten) in [(0usize, (5usize, 131usize)), (1usize, (131usize, 5usize))] {
-            for bothRows in both_rows_liste.iter().copied() {
-                let mut into: Vec<String> = vec![self.meta_heading_py(metavariable, bothRows, ifInvers)];
-                into.push(String::new());
-                for i in 2..=row_end {
-                    into.push(self.meta_collect_cell_text_py(
+        let struktAndInversSpalten = (5usize, 131usize);
+        for (ifInvers, transzendentalienSpalten) in [
+            struktAndInversSpalten,
+            (struktAndInversSpalten.1, struktAndInversSpalten.0),
+        ].into_iter().enumerate() {
+            for bothRows in bothRowsListe.iter().copied() {
+                let mut into: Vec<String> = vec![];
+                let heading_pair = metaOrWhat.0;
+                let heading = if bothRows == 0 { heading_pair.0 } else { heading_pair.1 };
+                let heading_suffix = if ifInvers == 0 { "für n" } else { "für 1/n statt n" };
+                into.push(format!("{}{}", heading, heading_suffix));
+                if self.generator_row_end_py() >= 1 {
+                    into.push(String::new());
+                }
+                for i in 2..=self.generator_row_end_py() {
+                    let neue2KoordNeue2Vorwoerter = self.spalteMetaKonkret_vorwort_behandlung_exact_py(
+                        metavariable,
+                        ifInvers,
+                        transzendentalienSpalten,
+                        i as i64,
+                        metaOrWhat,
+                    );
+                    let cell = self.spalteMetaKonkret_main_inserting_text_exact_py(
                         bothRows,
                         i,
                         ifInvers,
-                        metavariable,
+                        &neue2KoordNeue2Vorwoerter,
                         transzendentalienSpalten,
-                        &gebr_univ_table,
-                    ));
+                    );
+                    into.push(cell);
                 }
-                let spalte = self.fuege_spalte_hinzu_py(into, &self.meta_heading_py(metavariable, bothRows, ifInvers));
+                let meta_name = if bothRows == 0 { self.meta_prefixes_py(metavariable).0 } else { self.meta_prefixes_py(metavariable).1 };
+                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, if ifInvers == 0 { "n" } else { "1/n" }));
                 Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
