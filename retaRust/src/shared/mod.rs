@@ -11,3 +11,5 @@ pub mod reta_output_py;
 pub mod reta_workflow_py;
 pub mod reta_generators_inventory_py;
 pub mod reta_concat_generators_py;
+
+pub mod reta_runtime_cache;

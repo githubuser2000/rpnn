@@ -2,6 +2,7 @@
 use indexmap::IndexMap;
 
 use crate::shared::reta_program_types::{Generated2Selection, Program, SpaltenTyp};
+use crate::shared::reta_runtime_cache::{shared_reta_static_data, GeneratorFamilyData};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
@@ -650,27 +651,32 @@ impl Program {
         }
     }
 
-    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Generated2Selection>, Vec<Option<i64>>, Vec<(i64, i64)>) {
-        let mut generated1_pairs: Vec<(i64, i64)> = vec![];
-        let mut generated2_codes: Vec<String> = vec![];
-        let mut generated2_selections: Vec<Generated2Selection> = vec![];
-        let mut bool_and_tuple_set1_options: Vec<Option<i64>> = vec![];
-        let mut metakonkret_pairs: Vec<(i64, i64)> = vec![];
+    fn merge_generator_family_from_cache_py(target: &mut GeneratorFamilyData, source: &GeneratorFamilyData) {
+        for value in &source.generated1_pairs {
+            Self::push_unique_pair_py(&mut target.generated1_pairs, *value);
+        }
+        for value in &source.generated2_codes {
+            Self::push_unique_string_py(&mut target.generated2_codes, value.clone());
+        }
+        for value in &source.generated2_selections {
+            Self::push_unique_generated2_selection_py(&mut target.generated2_selections, value.clone());
+        }
+        for value in &source.bool_and_tuple_set1_options {
+            Self::push_unique_option_i64_py(&mut target.bool_and_tuple_set1_options, *value);
+        }
+        for value in &source.metakonkret_pairs {
+            Self::push_unique_pair_py(&mut target.metakonkret_pairs, *value);
+        }
+    }
 
+    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Generated2Selection>, Vec<Option<i64>>, Vec<(i64, i64)>) {
+        let cached = shared_reta_static_data(words);
         let spalten_side_paras = self.side_paras_for_spalten_context_py();
         let run_all_generator_families = spalten_side_paras.iter().any(|token| token == "--alles");
+        let mut merged = GeneratorFamilyData::default();
 
         if run_all_generator_families {
-            for entry in &words.paraNdataMatrix {
-                self.append_generated_family_from_entry_py(
-                    entry,
-                    &mut generated1_pairs,
-                    &mut generated2_codes,
-                    &mut generated2_selections,
-                    &mut bool_and_tuple_set1_options,
-                    &mut metakonkret_pairs,
-                );
-            }
+            Self::merge_generator_family_from_cache_py(&mut merged, &cached.generator_all);
         }
 
         for side_para in spalten_side_paras {
@@ -680,26 +686,27 @@ impl Program {
             let Some((main_name_raw, sub_names_raw)) = side_para[2..].split_once('=') else {
                 continue;
             };
-            let main_name = main_name_raw.trim();
+            let normalized_main = match main_name_raw.trim().to_ascii_lowercase().as_str() {
+                "multiplikationen" | "primvielfache" => "primvielfache".to_string(),
+                other => other.to_string(),
+            };
             let sub_names = Self::split_parameter_values_py(sub_names_raw);
 
             for sub_name in sub_names {
-                for entry in &words.paraNdataMatrix {
-                    if Self::entry_matches_main_and_sub_py(entry, main_name, &sub_name) {
-                        self.append_generated_family_from_entry_py(
-                            entry,
-                            &mut generated1_pairs,
-                            &mut generated2_codes,
-                            &mut generated2_selections,
-                            &mut bool_and_tuple_set1_options,
-                            &mut metakonkret_pairs,
-                        );
-                    }
+                let key = (normalized_main.clone(), sub_name.trim().to_ascii_lowercase());
+                if let Some(found) = cached.generator_lookup.get(&key) {
+                    Self::merge_generator_family_from_cache_py(&mut merged, found);
                 }
             }
         }
 
-        (generated1_pairs, generated2_codes, generated2_selections, bool_and_tuple_set1_options, metakonkret_pairs)
+        (
+            merged.generated1_pairs,
+            merged.generated2_codes,
+            merged.generated2_selections,
+            merged.bool_and_tuple_set1_options,
+            merged.metakonkret_pairs,
+        )
     }
 
 
@@ -785,9 +792,24 @@ impl Program {
         let (paramLinesNot0, rowsAsNumbersNot0, rowsOfcombiNot0, _spaltenreihenfolgeundnurdieseNot, prims2, generRows2) =
             self.parametersToCommandsAndNumbers(argv.clone(), "-", words);
 
+        let cached_runtime = shared_reta_static_data(words);
         self.init_dataDict_and_spaltenTypeNaming_python_like();
         self.init_spalten_arten_python_like();
-        self.storeParamtersForColumns(words);
+        if self.__invertAlles {
+            self.storeParamtersForColumns(words);
+        } else {
+            self.paraMainDict = cached_runtime.paraMainDict.clone();
+            self.paraDict = cached_runtime.paraDict.clone();
+            self.dataDicts = cached_runtime.dataDicts.clone();
+            self.dataDict = cached_runtime.dataDict.clone();
+            self.kombiReverseDict = cached_runtime.kombiReverseDict.clone();
+            self.kombiReverseDict2 = cached_runtime.kombiReverseDict2.clone();
+            self.paraDictGenerated = cached_runtime.paraDictGenerated.clone();
+            self.paraDictGenerated4htmlTags = cached_runtime.paraDictGenerated4htmlTags.clone();
+            self.spaltenTypeNaming = cached_runtime.spaltenTypeNaming.clone();
+            self.AllSimpleCommandSpalten = cached_runtime.AllSimpleCommandSpalten.clone();
+            self.spaltenArtenKey_SpaltennummernValue = cached_runtime.spaltenArtenKeyTemplate.clone();
+        }
         self.produceAllSpaltenNumbers("");
         self.apply_kombination_args_after_reverse_dicts_py("");
         self.apply_kombination_args_after_reverse_dicts_py("-");
