@@ -1,9 +1,9 @@
-use crate::{preload_reta_runtime, run_reta_from_args, RetaRunResult};
+use crate::{run_reta_from_args, RetaRunResult};
 
 use super::completion::candidates_for_prefix;
 use super::python_like::{
-    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    expand_kurz_kurz_befehl, normalize_prompt_tokens, prompt_words, PromptModus,
+    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
+    normalize_prompt_tokens, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -38,6 +38,7 @@ pub enum PromptCommand {
     Shell(String),
     Python(String),
     Math(String),
+    Immediate(PromptOutput),
     Reta(Vec<String>),
     RetaBatch(Vec<Vec<String>>),
 }
@@ -128,6 +129,9 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
         let command_text = trimmed.strip_prefix("math").unwrap_or("").trim().to_string();
         return Ok(PromptCommand::Math(command_text));
     }
+    if let Some(output) = compile_abc_abcd_command(&effective_tokens) {
+        return Ok(PromptCommand::Immediate(output));
+    }
     if effective_tokens[0] == "reta" {
         return Ok(PromptCommand::Reta(effective_tokens));
     }
@@ -136,7 +140,6 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
         argv.extend(effective_tokens);
         return Ok(PromptCommand::Reta(argv));
     }
-
     let calls = build_reta_calls_from_prompt_tokens(&effective_tokens);
     if !calls.is_empty() {
         return if calls.len() == 1 {
@@ -265,10 +268,9 @@ pub fn execute_command(
         }
         PromptCommand::Python(command_text) => run_python_command(&command_text),
         PromptCommand::Math(command_text) => run_math_command(&command_text),
+        PromptCommand::Immediate(output) => Ok(Some(output)),
         PromptCommand::Reta(argv) => {
             let argv = apply_storage_mode(state, argv);
-            preload_reta_runtime()
-                .map_err(|err| format!("reta-Runtime konnte nicht geladen werden: {err}"))?;
             let result: RetaRunResult = run_reta_from_args(argv);
             Ok(Some(PromptOutput {
                 title: "reta".to_string(),
@@ -277,8 +279,6 @@ pub fn execute_command(
             }))
         }
         PromptCommand::RetaBatch(argvs) => {
-            preload_reta_runtime()
-                .map_err(|err| format!("reta-Runtime konnte nicht geladen werden: {err}"))?;
             let mut combined = String::new();
             let mut exit_code = 0;
             for argv in argvs {
@@ -300,6 +300,33 @@ pub fn execute_command(
             }))
         }
     }
+}
+
+
+fn compile_abc_abcd_command(tokens: &[String]) -> Option<PromptOutput> {
+    if tokens.len() != 2 {
+        return None;
+    }
+    let is_abc = tokens.iter().any(|t| t == "abc" || t == "abcd");
+    if !is_abc {
+        return None;
+    }
+    let buchstaben = if tokens[0] == "abc" || tokens[0] == "abcd" {
+        tokens[1].clone()
+    } else {
+        tokens[0].clone()
+    };
+    let converted = buchstaben
+        .chars()
+        .filter(|ch| ch.is_ascii_alphabetic())
+        .map(|ch| ((ch.to_ascii_lowercase() as u8) - b'a' + 1).to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    Some(PromptOutput {
+        title: "abc".to_string(),
+        text: converted,
+        exit_code: 0,
+    })
 }
 
 fn run_python_command(command_text: &str) -> Result<Option<PromptOutput>, String> {
