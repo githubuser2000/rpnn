@@ -1,6 +1,7 @@
 use crate::{run_reta_from_args, RetaRunResult};
 
 use super::completion::candidates_for_prefix;
+use super::python_like::{expand_kurz_kurz_befehl, prompt_words, PromptModus};
 use super::tokenize::split_shell_like;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,6 +21,10 @@ pub struct PromptOutput {
 pub enum PromptCommand {
     Noop,
     Exit,
+    SaveBefore,
+    SaveAfter,
+    DeleteStoredStart,
+    ShowStored,
     Clear,
     LaunchUi,
     PrintHelp,
@@ -38,6 +43,8 @@ pub struct SessionState {
     pub history_lines: Vec<String>,
     pub last_output: PromptOutput,
     pub last_input: String,
+    pub prompt_mode: PromptModus,
+    pub stored_commands: Vec<String>,
 }
 
 impl SessionState {
@@ -49,6 +56,8 @@ impl SessionState {
             history_lines: Vec::new(),
             last_output: PromptOutput::default(),
             last_input: String::new(),
+            prompt_mode: PromptModus::Normal,
+            stored_commands: Vec::new(),
         }
     }
 
@@ -71,6 +80,10 @@ pub fn compile_command(input: &str) -> Result<PromptCommand, String> {
         "q" | ":q" | "exit" | "quit" | "ende" => return Ok(PromptCommand::Exit),
         "help" | "hilfe" => return Ok(PromptCommand::PrintHelp),
         "befehle" | "kurzbefehle" => return Ok(PromptCommand::PrintCommands),
+        "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
+        "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
+        "l" | "BefehlSpeicherungLöschen" => return Ok(PromptCommand::DeleteStoredStart),
+        "o" | "BefehlSpeicherungAusgeben" => return Ok(PromptCommand::ShowStored),
         "leeren" | "clear" => return Ok(PromptCommand::Clear),
         ":ui" | ":preview" => return Ok(PromptCommand::LaunchUi),
         ":history" => return Ok(PromptCommand::PrintHistory),
@@ -84,18 +97,25 @@ pub fn compile_command(input: &str) -> Result<PromptCommand, String> {
         return Ok(PromptCommand::Noop);
     }
 
-    if tokenized.tokens[0] == "shell" {
+    let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &tokenized.tokens);
+    let effective_tokens = if expanded.is_empty() {
+        tokenized.tokens.clone()
+    } else {
+        expanded
+    };
+
+    if effective_tokens[0] == "shell" {
         let shell_text = trimmed.strip_prefix("shell").unwrap_or("").trim().to_string();
         return Ok(PromptCommand::Shell(shell_text));
     }
 
-    if tokenized.tokens[0] == "reta" {
-        return Ok(PromptCommand::Reta(tokenized.tokens));
+    if effective_tokens[0] == "reta" {
+        return Ok(PromptCommand::Reta(effective_tokens));
     }
 
-    if tokenized.tokens[0].starts_with('-') {
+    if effective_tokens[0].starts_with('-') {
         let mut argv = vec!["reta".to_string()];
-        argv.extend(tokenized.tokens);
+        argv.extend(effective_tokens);
         return Ok(PromptCommand::Reta(argv));
     }
 
@@ -104,10 +124,45 @@ pub fn compile_command(input: &str) -> Result<PromptCommand, String> {
     ))
 }
 
-pub fn execute_command(command: PromptCommand, state: &mut SessionState) -> Result<Option<PromptOutput>, String> {
+pub fn execute_command(
+    command: PromptCommand,
+    state: &mut SessionState,
+) -> Result<Option<PromptOutput>, String> {
     match command {
         PromptCommand::Noop => Ok(None),
         PromptCommand::Exit => Ok(None),
+        PromptCommand::SaveBefore => {
+            state.prompt_mode = PromptModus::Speichern;
+            Ok(Some(PromptOutput {
+                title: "speichern".to_string(),
+                text: "Speicher-Modus aktiviert. Nächster reta-Befehl wird vorne gespeichert.".to_string(),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::SaveAfter => {
+            state.prompt_mode = PromptModus::SpeicherungAusgaben;
+            Ok(Some(PromptOutput {
+                title: "speichern".to_string(),
+                text: "Speicher-Modus aktiviert. Nächster reta-Befehl wird hinten gespeichert.".to_string(),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::DeleteStoredStart => {
+            state.prompt_mode = PromptModus::LoeschenStart;
+            Ok(Some(PromptOutput {
+                title: "loeschen".to_string(),
+                text: format!(
+                    "Lösch-Modus aktiviert. Aktuell gespeicherte Befehle:\n{}",
+                    render_history_text(&state.stored_commands)
+                ),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::ShowStored => Ok(Some(PromptOutput {
+            title: "stored".to_string(),
+            text: render_history_text(&state.stored_commands),
+            exit_code: 0,
+        })),
         PromptCommand::Clear => {
             print!("\x1b[2J\x1b[H");
             Ok(Some(PromptOutput {
@@ -168,6 +223,7 @@ pub fn execute_command(command: PromptCommand, state: &mut SessionState) -> Resu
             }))
         }
         PromptCommand::Reta(argv) => {
+            let argv = apply_storage_mode(state, argv);
             let result: RetaRunResult = run_reta_from_args(argv);
             Ok(Some(PromptOutput {
                 title: "reta".to_string(),
@@ -176,6 +232,44 @@ pub fn execute_command(command: PromptCommand, state: &mut SessionState) -> Resu
             }))
         }
     }
+}
+
+pub fn apply_storage_mode(state: &mut SessionState, argv: Vec<String>) -> Vec<String> {
+    if argv.is_empty() {
+        return argv;
+    }
+
+    match state.prompt_mode {
+        PromptModus::Speichern => {
+            if argv.len() > 1 {
+                state.stored_commands.insert(0, argv[1..].join(" "));
+            }
+            state.prompt_mode = PromptModus::Normal;
+        }
+        PromptModus::SpeicherungAusgaben | PromptModus::SpeicherungAusgabenMitZusatz => {
+            if argv.len() > 1 {
+                state.stored_commands.push(argv[1..].join(" "));
+            }
+            state.prompt_mode = PromptModus::Normal;
+        }
+        PromptModus::LoeschenStart | PromptModus::LoeschenSelect => {
+            if argv.len() > 1 {
+                let joined = argv[1..].join(" ");
+                state.stored_commands.retain(|s| s != &joined);
+            }
+            state.prompt_mode = PromptModus::Normal;
+        }
+        PromptModus::AusgabeSelektiv | PromptModus::Normal => {}
+    }
+
+    let mut out = vec![argv[0].clone()];
+    for stored in &state.stored_commands {
+        if let Ok(parts) = split_shell_like(stored) {
+            out.extend(parts.tokens);
+        }
+    }
+    out.extend(argv.into_iter().skip(1));
+    out
 }
 
 pub fn help_text() -> String {
@@ -187,6 +281,12 @@ pub fn help_text() -> String {
         "  - Eine Eingabe, die direkt mit '-zeilen', '-spalten', '--...' beginnt,",
         "    wird automatisch als reta-Befehl behandelt.",
         "  - ':ui' öffnet die ratatui-Ansicht mit Vorschau, History, Kandidaten und Status.",
+        "",
+        "Python-nahe Prompt-Befehle:",
+        "  s / BefehlSpeichernDavor     nächsten reta-Befehl vorne speichern",
+        "  S / BefehlSpeichernDanach    nächsten reta-Befehl hinten speichern",
+        "  l / BefehlSpeicherungLöschen gespeicherten Befehl löschen",
+        "  o / BefehlSpeicherungAusgeben gespeicherte Befehle anzeigen",
         "",
         "Meta-Befehle:",
         "  help | hilfe            Diese Hilfe",
@@ -204,27 +304,35 @@ pub fn help_text() -> String {
         "Beispiele:",
         "  reta -zeilen --vorhervonausschnitt=1-3 -spalten --alles",
         "  -zeilen --vorhervonausschnitt=12-15 -kombination --galaxie=Lebewesen -ausgabe --breite=90",
+        "  av12-15",
         "  :ui",
     ]
     .join("\n")
 }
 
 pub fn commands_text() -> String {
-    [
-        "Bekannte rp-Kommandos:",
-        "",
-        "  help, hilfe, befehle, kurzbefehle",
-        "  :ui, :preview, :history",
-        "  :mode vi, :mode emacs",
-        "  clear, leeren",
-        "  shell <cmd>",
-        "  reta <reta-parameter>",
-        "  q, :q, exit, quit, ende",
-        "",
-        "Completion-Kandidatenbeispiele:",
-        &candidates_for_prefix("--").join("\n  "),
-    ]
-    .join("\n")
+    let mut lines = vec![
+        "Bekannte rp-Kommandos:".to_string(),
+        String::new(),
+        "  help, hilfe, befehle, kurzbefehle".to_string(),
+        "  :ui, :preview, :history".to_string(),
+        "  :mode vi, :mode emacs".to_string(),
+        "  clear, leeren".to_string(),
+        "  shell <cmd>".to_string(),
+        "  reta <reta-parameter>".to_string(),
+        "  q, :q, exit, quit, ende".to_string(),
+        String::new(),
+        "Completion-Kandidatenbeispiele:".to_string(),
+    ];
+    for candidate in candidates_for_prefix("--") {
+        lines.push(format!("  {candidate}"));
+    }
+    lines.push(String::new());
+    lines.push("Python-nahe Prompt-Befehle:".to_string());
+    for cmd in &prompt_words().befehle {
+        lines.push(format!("  {cmd}"));
+    }
+    lines.join("\n")
 }
 
 pub fn render_history_text(history: &[String]) -> String {

@@ -1,3 +1,5 @@
+use crate::preload_reta_runtime;
+
 use std::path::PathBuf;
 
 use reedline::{
@@ -29,6 +31,10 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
     .unwrap_or_else(|| "rp".to_string());
 
     let implicit_logging = program_name == "rpl";
+
+    if let Err(err) = preload_reta_runtime() {
+        eprintln!("Warnung: reta-Runtime konnte beim Start nicht vollständig vorgeladen werden: {err}");
+    }
     let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
     let history_path = default_history_path(&program_name);
     let prompt = DefaultPrompt::default();

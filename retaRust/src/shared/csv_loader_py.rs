@@ -1,10 +1,45 @@
 #![allow(non_snake_case)]
 
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::sync::{OnceLock, RwLock};
 
 use crate::shared::reta_py::Program;
+
+
+static SHARED_CSV_ROOT: OnceLock<PathBuf> = OnceLock::new();
+static PARSED_CSV_CACHE: OnceLock<RwLock<HashMap<PathBuf, Vec<Vec<String>>>>> = OnceLock::new();
+
+fn shared_csv_root() -> &'static PathBuf {
+    SHARED_CSV_ROOT.get_or_init(|| {
+        let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        path.push("csv");
+        path
+    })
+}
+
+fn parsed_csv_cache() -> &'static RwLock<HashMap<PathBuf, Vec<Vec<String>>>> {
+    PARSED_CSV_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+pub fn preload_common_csv_tables() -> io::Result<()> {
+    let program = Program::new(vec!["reta".to_string()]);
+    let csv_file_names = CsvFileNames::new();
+    let mut names = vec![csv_file_names.religion, csv_file_names.kombi13, csv_file_names.kombi15];
+    let change_candidates = [
+        "kr-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv",
+        "cn-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv",
+        "vn-thomas-decodedDekodiert-in-motives-purposesAbsichten.csv",
+    ];
+    names.extend(change_candidates.into_iter().map(str::to_string));
+
+    for name in names {
+        let _ = program.load_csv_rows_semicolon_exact_path(&name)?;
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 pub struct CsvFileNames {
@@ -25,9 +60,7 @@ impl CsvFileNames {
 
 impl Program {
     pub fn csv_root(&self) -> PathBuf {
-        let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        path.push("csv");
-        path
+        shared_csv_root().clone()
     }
 
     pub fn csv_path(&self, csvFileName: &str) -> PathBuf {
@@ -93,8 +126,22 @@ impl Program {
     }
 
     pub fn load_csv_rows_semicolon_exact_path(&self, csvFileName: &str) -> io::Result<Vec<Vec<String>>> {
-        let text = self.load_csv_text_exact_path(csvFileName)?;
-        Ok(self.parse_semicolon_csv_python_like(&text))
+        let path = self.csv_path(csvFileName);
+
+        if let Ok(cache) = parsed_csv_cache().read() {
+            if let Some(rows) = cache.get(&path) {
+                return Ok(rows.clone());
+            }
+        }
+
+        let text = fs::read_to_string(&path)?;
+        let rows = self.parse_semicolon_csv_python_like(&text);
+
+        if let Ok(mut cache) = parsed_csv_cache().write() {
+            cache.entry(path).or_insert_with(|| rows.clone());
+        }
+
+        Ok(rows)
     }
 
     fn language_from_argv_py(&self) -> String {

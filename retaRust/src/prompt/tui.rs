@@ -12,6 +12,7 @@ use ratatui::{
 
 use super::commands::{PromptOutput, SessionState};
 use super::completion::candidates_for_prefix;
+use super::python_like::PromptModus;
 
 #[derive(Clone, Debug)]
 pub struct RpTuiState {
@@ -21,6 +22,8 @@ pub struct RpTuiState {
     pub preview: PromptOutput,
     pub vi_mode: bool,
     pub completions: Vec<String>,
+    pub stored_commands: Vec<String>,
+    pub prompt_mode: PromptModus,
 }
 
 impl RpTuiState {
@@ -32,6 +35,8 @@ impl RpTuiState {
             preview: session.last_output.clone(),
             vi_mode: session.vi_mode,
             completions: candidates_for_prefix(&session.last_input),
+            stored_commands: session.stored_commands.clone(),
+            prompt_mode: session.prompt_mode,
         }
     }
 
@@ -111,9 +116,11 @@ fn render(frame: &mut ratatui::Frame<'_>, state: &mut RpTuiState) {
 fn render_status(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState) {
     let status_text = vec![
         Line::from(format!(
-            "rp Vorschau  |  Modus: {}  |  History: {} Einträge  |  Letzte Ausgabe: {} (code {})",
+            "rp Vorschau  |  Editiermodus: {}  |  PromptModus: {:?}  |  History: {}  |  Gespeichert: {}  |  Letzte Ausgabe: {} (code {})",
             if state.vi_mode { "vi" } else { "emacs" },
+            state.prompt_mode,
             state.history.len(),
+            state.stored_commands.len(),
             if state.preview.title.is_empty() {
                 "-"
             } else {
@@ -153,6 +160,11 @@ fn render_history(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut RpTuiS
 
 fn render_preview(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState) {
     let selected_history = state.selected_history().unwrap_or("<kein Eintrag ausgewählt>");
+    let stored = if state.stored_commands.is_empty() {
+        "<keine gespeicherten Befehle>".to_string()
+    } else {
+        state.stored_commands.join("\n")
+    };
     let body = if state.preview.text.trim().is_empty() {
         "<keine Ausgabe vorhanden>".to_string()
     } else {
@@ -160,9 +172,8 @@ fn render_preview(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState
     };
 
     let text = format!(
-        "Gewählte History:\n{}\n\nLetzte Ausgabe:\n{}",
-        selected_history,
-        body
+        "Gewählte History:\n{}\n\nGespeicherte Befehle:\n{}\n\nLetzte Ausgabe:\n{}",
+        selected_history, stored, body
     );
 
     let paragraph = Paragraph::new(text)
@@ -180,7 +191,9 @@ fn render_candidates(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiSt
             .iter()
             .take(12)
             .enumerate()
-            .map(|(idx, candidate)| Row::new(vec![Cell::from((idx + 1).to_string()), Cell::from(candidate.clone())]))
+            .map(|(idx, candidate)| {
+                Row::new(vec![Cell::from((idx + 1).to_string()), Cell::from(candidate.clone())])
+            })
             .collect::<Vec<_>>()
     };
 

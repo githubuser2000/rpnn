@@ -9,6 +9,7 @@ pub mod prompt;
 
 use std::sync::OnceLock;
 
+use shared::csv_loader_py::preload_common_csv_tables;
 use shared::reta_py::Program;
 use shared::words_py::Words;
 
@@ -39,6 +40,12 @@ static SHARED_WORDS: OnceLock<Words> = OnceLock::new();
 
 pub fn shared_words() -> &'static Words {
     SHARED_WORDS.get_or_init(Words::new)
+}
+
+
+pub fn preload_reta_runtime() -> Result<(), String> {
+    let _ = shared_words();
+    preload_common_csv_tables().map_err(|err| format!("reta-Runtime konnte nicht vorladen: {err}"))
 }
 
 pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {

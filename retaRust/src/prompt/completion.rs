@@ -5,6 +5,7 @@ use reedline::DefaultCompleter;
 
 use crate::domain::python_source_of_truth::{all_main_alias_groups, parameter_alias_groups_for_main};
 use crate::shared_words;
+use super::python_like::prompt_words;
 
 pub const RP_META_COMMANDS: &[&str] = &[
     "help",
@@ -44,6 +45,9 @@ fn build_prompt_metadata() -> PromptMetadata {
 
     for item in RP_META_COMMANDS {
         items.insert((*item).to_string());
+    }
+    for item in &prompt_words().befehle {
+        items.insert(item.clone());
     }
 
     for main in ["-zeilen", "-spalten", "-kombination", "-ausgabe", "-debug", "-h", "-help"] {
