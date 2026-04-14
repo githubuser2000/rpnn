@@ -1803,22 +1803,22 @@ impl Program {
         if !rowsAsNumbers.contains(&64) { return; }
         let mut zeilenInhalte: Vec<String> = vec![];
         let row_end = self.generator_row_end_py();
-        for i in 0..=row_end {
-            if i == 0 {
-                zeilenInhalte.push("Gestirn".to_string());
-                continue;
-            }
+        zeilenInhalte.push("Gestirn".to_string());
+        let mut line1: Vec<String> = vec![];
+        line1.push("Sonne (keine Potenzen)".to_string());
+        zeilenInhalte.push(line1.join(""));
+        for i in 2..=row_end {
             let mut line1: Vec<String> = vec![];
-            if (i - 1) % 3 == 1 {
-                line1.push("wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht".to_string());
-            }
-            if !self.moonNumber((i - 1) as i64).1.is_empty() {
+            if !self.moonNumber(i as i64).1.is_empty() {
                 line1.push("Mond (Potenzen)".to_string());
             } else {
                 line1.push("Sonne (keine Potenzen)".to_string());
             }
-            if (i - 1) % 2 == 0 {
+            if i % 2 == 0 {
                 line1.push("Planet (2*n)".to_string());
+            }
+            if i % 3 == 0 {
+                line1.push("wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht".to_string());
             }
             zeilenInhalte.push(line1.join(", und außerdem "));
         }
