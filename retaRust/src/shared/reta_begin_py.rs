@@ -74,9 +74,9 @@ impl Program {
 
     pub fn collect_side_paras_from_argv(&mut self) {
         self.sideParas.clear();
-        for token in self.argvWithoutProgram.clone() {
+        for token in &self.argvWithoutProgram {
             if token.starts_with("--") {
-                self.sideParas.push(token);
+                self.sideParas.push(token.clone());
             }
         }
     }
@@ -461,7 +461,7 @@ impl Program {
 
     pub fn setRowRangeFromArgv(&mut self) {
         self.rowRange = vec![];
-        for arg in self.argvWithoutProgram.clone() {
+        for arg in &self.argvWithoutProgram {
             if let Some(tail) = arg.strip_prefix("--vorhervonausschnitt=") {
                 for part in Self::split_top_level_commas_py(tail) {
                     let part = part.trim();
@@ -713,7 +713,7 @@ impl Program {
 
     fn apply_kombination_args_after_reverse_dicts_py(&mut self, neg: &str) {
         let mut in_kombination = false;
-        for arg in self.argvWithoutProgram.clone() {
+        for arg in &self.argvWithoutProgram {
             if arg == "-kombination" {
                 in_kombination = neg.is_empty();
                 continue;
