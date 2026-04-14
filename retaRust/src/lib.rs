@@ -9,8 +9,7 @@ pub mod prompt;
 
 use std::sync::OnceLock;
 
-use shared::reta_program_types::Program;
-use shared::reta_runtime_cache::shared_reta_static_data;
+use shared::reta_py::Program;
 use shared::words_py::Words;
 
 #[derive(Clone, Debug, Default)]
@@ -50,9 +49,9 @@ fn shared_program_template() -> &'static Program {
 
 pub fn fresh_program_from_template(argv: Vec<String>) -> Program {
     let mut program = shared_program_template().clone();
-    program.argv = argv;
-    program.argvWithoutProgram = if program.argv.len() > 1 {
-        program.argv[1..].to_vec()
+    program.argv = argv.clone();
+    program.argvWithoutProgram = if argv.len() > 1 {
+        argv[1..].to_vec()
     } else {
         vec![]
     };
@@ -62,9 +61,7 @@ pub fn fresh_program_from_template(argv: Vec<String>) -> Program {
 pub fn preload_reta_runtime() -> Result<(), String> {
     SHARED_PRELOAD_RESULT
         .get_or_init(|| {
-            let words = shared_words();
-            let _ = shared_program_template();
-            let _ = shared_reta_static_data(words);
+            let _ = shared_words();
             Ok(())
         })
         .clone()

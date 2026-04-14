@@ -230,7 +230,9 @@ impl Program {
         self.mainParaCmds.insert("help".to_string(), -1);
 
         let mut last_main_cmd: i64 = -1;
-        for mut cmd in self.argvWithoutProgram.clone() {
+        let argv_without_program_snapshot = self.argvWithoutProgram.clone();
+        for cmd_ref in argv_without_program_snapshot {
+            let mut cmd = cmd_ref;
             if cmd.len() > 1 && cmd.starts_with('-') && !cmd.starts_with("--") {
                 let plain = cmd[1..].to_string();
                 if let Some(v) = self.mainParaCmds.get(&plain) {
@@ -277,10 +279,19 @@ impl Program {
                                     }
                                 }
                                 if !found_exact {
-                                    for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                                        if Self::parameter_main_name_matches_py(&k1, &left_raw) && k2 == one {
-                                            self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
-                                        }
+                                    let matching_tuples: Vec<Vec<Vec<PyValue>>> = self
+                                        .paraDict
+                                        .iter()
+                                        .filter_map(|((k1, k2), tupl)| {
+                                            if Self::parameter_main_name_matches_py(k1, &left_raw) && k2 == &one {
+                                                Some(tupl.clone())
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .collect();
+                                    for tupl in matching_tuples {
+                                        self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
                                     }
                                 }
                             }
@@ -295,10 +306,19 @@ impl Program {
                                 canonical.to_string()
                             }
                         };
-                        for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                            if Self::parameter_main_name_matches_py(&k1, &cmd_raw) && k2.is_empty() {
-                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
-                            }
+                        let matching_tuples: Vec<Vec<Vec<PyValue>>> = self
+                            .paraDict
+                            .iter()
+                            .filter_map(|((k1, k2), tupl)| {
+                                if Self::parameter_main_name_matches_py(k1, &cmd_raw) && k2.is_empty() {
+                                    Some(tupl.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        for tupl in matching_tuples {
+                            self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
                         }
                     }
                 }

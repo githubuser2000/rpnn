@@ -1,9 +1,9 @@
-use crate::{run_reta_from_args, RetaRunResult};
+use crate::{preload_reta_runtime, run_reta_from_args, RetaRunResult};
 
 use super::completion::candidates_for_prefix;
 use super::python_like::{
-    build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl, normalize_prompt_tokens,
-    prompt_words, PromptModus,
+    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
+    expand_kurz_kurz_befehl, normalize_prompt_tokens, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -136,12 +136,17 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
         argv.extend(effective_tokens);
         return Ok(PromptCommand::Reta(argv));
     }
-    let prompt_calls = build_reta_calls_from_prompt_tokens(&effective_tokens);
-    if !prompt_calls.is_empty() {
-        if prompt_calls.len() == 1 {
-            return Ok(PromptCommand::Reta(prompt_calls[0].argv.clone()));
-        }
-        return Ok(PromptCommand::RetaBatch(prompt_calls.into_iter().map(|call| call.argv).collect()));
+
+    let calls = build_reta_calls_from_prompt_tokens(&effective_tokens);
+    if !calls.is_empty() {
+        return if calls.len() == 1 {
+            Ok(PromptCommand::Reta(calls.into_iter().next().unwrap()))
+        } else {
+            Ok(PromptCommand::RetaBatch(calls))
+        };
+    }
+    if let Some(argv) = build_reta_argv_from_prompt_tokens(&effective_tokens) {
+        return Ok(PromptCommand::Reta(argv));
     }
 
     Err(format!(
@@ -262,6 +267,8 @@ pub fn execute_command(
         PromptCommand::Math(command_text) => run_math_command(&command_text),
         PromptCommand::Reta(argv) => {
             let argv = apply_storage_mode(state, argv);
+            preload_reta_runtime()
+                .map_err(|err| format!("reta-Runtime konnte nicht geladen werden: {err}"))?;
             let result: RetaRunResult = run_reta_from_args(argv);
             Ok(Some(PromptOutput {
                 title: "reta".to_string(),
@@ -269,21 +276,26 @@ pub fn execute_command(
                 exit_code: result.exit_code(),
             }))
         }
-        PromptCommand::RetaBatch(arg_sets) => {
-            let mut rendered = Vec::new();
+        PromptCommand::RetaBatch(argvs) => {
+            preload_reta_runtime()
+                .map_err(|err| format!("reta-Runtime konnte nicht geladen werden: {err}"))?;
+            let mut combined = String::new();
             let mut exit_code = 0;
-            for argv in arg_sets {
+            for argv in argvs {
                 let argv = apply_storage_mode(state, argv);
                 let result: RetaRunResult = run_reta_from_args(argv);
-                exit_code = exit_code.max(result.exit_code());
-                let text = result.render_text();
-                if !text.is_empty() {
-                    rendered.push(text);
+                if !combined.is_empty() && !combined.ends_with('\n') {
+                    combined.push('\n');
                 }
+                combined.push_str(&result.render_text());
+                if !combined.ends_with('\n') {
+                    combined.push('\n');
+                }
+                exit_code = exit_code.max(result.exit_code());
             }
             Ok(Some(PromptOutput {
                 title: "reta".to_string(),
-                text: rendered.join("\n\n"),
+                text: combined.trim_end_matches('\n').to_string(),
                 exit_code,
             }))
         }

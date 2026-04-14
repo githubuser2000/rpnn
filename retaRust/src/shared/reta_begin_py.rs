@@ -775,7 +775,7 @@ impl Program {
     }
 
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
-        self.argvWithoutProgram = if argv.len() > 1 { argv[1..].to_vec() } else { vec![] };
+        self.argvWithoutProgram = argv.iter().skip(1).cloned().collect();
         let _ = self.load_religion_csv_exact();
         self.htmlOrBBcode = false;
         self.breiteORbreiten = false;

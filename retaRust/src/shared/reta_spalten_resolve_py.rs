@@ -229,7 +229,8 @@ impl Program {
         self.mainParaCmds.insert("help".to_string(), -1);
 
         let mut last_main_cmd: i64 = -1;
-        for mut cmd in self.argvWithoutProgram.clone() {
+        for cmd_ref in &self.argvWithoutProgram {
+            let mut cmd = cmd_ref.clone();
             if cmd.len() > 1 && cmd.starts_with('-') && !cmd.starts_with("--") {
                 let plain = cmd[1..].to_string();
                 if let Some(v) = self.mainParaCmds.get(&plain) {
@@ -276,9 +277,9 @@ impl Program {
                                     }
                                 }
                                 if !found_exact {
-                                    for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                                        if Self::parameter_main_name_matches_py(&k1, &left_raw) && k2 == one {
-                                            self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                    for ((k1, k2), tupl) in self.paraDict.iter() {
+                                        if Self::parameter_main_name_matches_py(k1, &left_raw) && k2 == &one {
+                                            self.resultingSpaltenFromTuple_py(tupl, neg, Some(&one), Some(&left));
                                         }
                                     }
                                 }
@@ -294,9 +295,9 @@ impl Program {
                                 canonical.to_string()
                             }
                         };
-                        for ((k1, k2), tupl) in self.paraDict.clone().into_iter() {
-                            if Self::parameter_main_name_matches_py(&k1, &cmd_raw) && k2.is_empty() {
-                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
+                        for ((k1, k2), tupl) in self.paraDict.iter() {
+                            if Self::parameter_main_name_matches_py(k1, &cmd_raw) && k2.is_empty() {
+                                self.resultingSpaltenFromTuple_py(tupl, neg, None, Some(&cmd_canonical));
                             }
                         }
                     }
