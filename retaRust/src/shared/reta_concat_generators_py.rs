@@ -417,6 +417,135 @@ impl Program {
         }
     }
 
+
+    fn generated2_coord_tag_values_exact_py(&self, code: &str) -> Vec<((usize, usize, bool), Vec<String>)> {
+        let mk = |poly: &str, gal: bool, uni: bool, gebr: bool| -> Vec<String> {
+            let mut tags: Vec<String> = vec![poly.to_string()];
+            if gal {
+                tags.push("galaxie".to_string());
+            }
+            if uni {
+                tags.push("universum".to_string());
+            }
+            if gebr {
+                tags.push("gebrRat".to_string());
+            }
+            tags
+        };
+        match code {
+            "primMotivSternGebr" => vec![
+                ((0, 0, true), mk("sternPolygon", true, false, true)),
+                ((0, 1, true), mk("sternPolygon", true, true, true)),
+                ((0, 2, true), mk("sternPolygon", true, true, true)),
+            ],
+            "primStrukSternGebr" => vec![
+                ((0, 1, true), mk("sternPolygon", true, true, true)),
+                ((0, 2, true), mk("sternPolygon", true, true, true)),
+                ((0, 3, true), mk("sternPolygon", false, true, true)),
+            ],
+            "primMotivGleichfGebr" => vec![
+                ((1, 0, true), mk("gleichfoermigesPolygon", true, false, true)),
+                ((1, 1, true), mk("gleichfoermigesPolygon", true, true, true)),
+                ((1, 2, true), mk("gleichfoermigesPolygon", true, true, true)),
+            ],
+            "primStrukGleichfGebr" => vec![
+                ((1, 1, true), mk("gleichfoermigesPolygon", true, true, true)),
+                ((1, 2, true), mk("gleichfoermigesPolygon", true, true, true)),
+                ((1, 3, true), mk("gleichfoermigesPolygon", false, true, true)),
+            ],
+            "primMotivStern" => vec![
+                ((0, 0, false), mk("sternPolygon", true, false, false)),
+                ((0, 1, false), mk("sternPolygon", true, true, false)),
+                ((0, 2, false), mk("sternPolygon", true, true, false)),
+            ],
+            "primStrukStern" => vec![
+                ((0, 1, false), mk("sternPolygon", true, true, false)),
+                ((0, 2, false), mk("sternPolygon", true, true, false)),
+                ((0, 3, false), mk("sternPolygon", false, true, false)),
+            ],
+            "primMotivGleichf" => vec![
+                ((1, 0, false), mk("gleichfoermigesPolygon", true, false, false)),
+                ((1, 1, false), mk("gleichfoermigesPolygon", true, true, false)),
+                ((1, 2, false), mk("gleichfoermigesPolygon", true, true, false)),
+            ],
+            "primStrukGleichf" => vec![
+                ((1, 1, false), mk("gleichfoermigesPolygon", true, true, false)),
+                ((1, 2, false), mk("gleichfoermigesPolygon", true, true, false)),
+                ((1, 3, false), mk("gleichfoermigesPolygon", false, true, false)),
+            ],
+            _ => vec![],
+        }
+    }
+
+    fn generated2_coord_parameters_exact_py(
+        &self,
+        generatedSelections: &Vec<Generated2Selection>,
+    ) -> BTreeMap<(usize, usize, bool), Vec<Generated2Selection>> {
+        let mut koord2parameter: BTreeMap<(usize, usize, bool), Vec<Generated2Selection>> = BTreeMap::new();
+        for selection in generatedSelections {
+            if let Some((poly_idx, _poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(&selection.code) {
+                for kombi_idx in kombis {
+                    let entry = koord2parameter.entry((poly_idx, kombi_idx, is_gebr)).or_default();
+                    if !entry.iter().any(|existing| existing.code == selection.code) {
+                        entry.push(selection.clone());
+                    }
+                }
+            }
+        }
+        koord2parameter
+    }
+
+    fn generated2_coord_tags_exact_py(
+        &self,
+        generatedSelections: &Vec<Generated2Selection>,
+    ) -> BTreeMap<(usize, usize, bool), Vec<String>> {
+        let mut koord2tag: BTreeMap<(usize, usize, bool), Vec<String>> = BTreeMap::new();
+        for selection in generatedSelections {
+            for (coord, tags) in self.generated2_coord_tag_values_exact_py(&selection.code) {
+                koord2tag.entry(coord).or_insert(tags);
+            }
+        }
+        koord2tag
+    }
+
+    fn register_generated2_coord_metadata_exact_py(
+        &mut self,
+        coord: (usize, usize, bool),
+        spalte: i64,
+        koord2parameter: &BTreeMap<(usize, usize, bool), Vec<Generated2Selection>>,
+        koord2tag: &BTreeMap<(usize, usize, bool), Vec<String>>,
+    ) {
+        self.spaltenArtenKey_SpaltennummernValue
+            .entry(self.spaltenTypeNaming.generated2)
+            .or_default()
+            .insert(spalte);
+
+        if let Some(selections) = koord2parameter.get(&coord) {
+            for selection in selections {
+                let mut key = (
+                    self.normalize_generated2_display_main_name_py(&selection.parameter_main_name),
+                    self.normalize_generated2_display_parameter_name_py(&selection.parameter_name),
+                );
+                if key.0.is_empty() || key.1.is_empty() {
+                    for spec in GENERATED2_SPECS {
+                        if spec.code == selection.code {
+                            key = (spec.main_name.to_string(), spec.parameter_name.to_string());
+                            break;
+                        }
+                    }
+                }
+                self.paraDictGenerated.insert(key.clone(), spalte);
+                self.paraDictGenerated4htmlTags.insert(key, spalte);
+            }
+        }
+
+        if let Some(tags) = koord2tag.get(&coord) {
+            let tag_label = tags.join("|");
+            self.paraDictGenerated4htmlTags
+                .insert(("generated2_tags".to_string(), tag_label), spalte);
+        }
+    }
+
     fn py_frac_from_f64_key_exact(value: f64) -> Option<PyFrac> {
         let rounded = value.round();
         if (value - rounded).abs() < 0.00001 {
@@ -1765,6 +1894,8 @@ impl Program {
         let kombi_namen2 = ["GalGal", "GalUni", "UniGal", "UniUni"];
         let poly_namen = ["Sternpolygone", "gleichförmige Polygone"];
         let poly_keys = ["stern", "gleichf"];
+        let koord2parameter = self.generated2_coord_parameters_exact_py(&generatedSelections);
+        let koord2tag = self.generated2_coord_tags_exact_py(&generatedSelections);
 
         let mut requested_coords: BTreeSet<(usize, usize, bool)> = BTreeSet::new();
         let mut wants_primcsv = false;
@@ -1802,6 +1933,7 @@ impl Program {
                         into.push(String::new());
                     }
                     let spalte = self.fuege_spalte_hinzu_py(into, "Primzahlvielfache, nicht generiert");
+                    self.register_generated2_spalte_exact_py("PrimCSV", spalte);
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
             }
@@ -1849,7 +1981,8 @@ impl Program {
         for brr in 0..=1usize {
             for zwei in 0..=1usize {
                 for null_bis_drei in 0..=3usize {
-                    if !requested_coords.contains(&(zwei, null_bis_drei, brr == 1)) {
+                    let coord = (zwei, null_bis_drei, brr == 1);
+                    if !requested_coords.contains(&coord) {
                         continue;
                     }
                     let ganz_oder_gebr = if brr == 0 { "" } else { ", mit Faktoren aus gebrochen-rationalen Zahlen" };
@@ -1882,15 +2015,14 @@ impl Program {
                                 };
                                 let lhs = lhsrhs.0.trim();
                                 let rhs = lhsrhs.1.trim();
-                                if lhs.is_empty() || rhs.is_empty() {
-                                    continue;
-                                }
+                                let lhs_display = if lhs.len() > 3 { lhs.to_string() } else { "...".to_string() };
+                                let rhs_display = if rhs.len() > 3 { rhs.to_string() } else { "...".to_string() };
                                 if self.outType == "html" {
-                                    teile.push(format!("<li>({}) * ({})</li>", lhs, rhs));
+                                    teile.push(format!("<li>({}) * ({})</li>", lhs_display, rhs_display));
                                 } else if self.outType == "bbcode" {
-                                    teile.push(format!("[*]({}) * ({})", lhs, rhs));
+                                    teile.push(format!("[*]({}) * ({})", lhs_display, rhs_display));
                                 } else {
-                                    teile.push(format!("({}) * ({})", lhs, rhs));
+                                    teile.push(format!("({}) * ({})", lhs_display, rhs_display));
                                 }
                             }
                         } else {
@@ -1920,7 +2052,7 @@ impl Program {
                                 let Some(bis) = bis else { continue; };
                                 let von = von.trim();
                                 let bis = bis.trim();
-                                if von.is_empty() || bis.is_empty() {
+                                if von.len() <= 3 || bis.len() <= 3 {
                                     continue;
                                 }
                                 if k > 0 && self.outType != "html" && self.outType != "bbcode" && !teile.is_empty() {
@@ -1928,8 +2060,9 @@ impl Program {
                                 }
                                 let frac1 = format!("{}/{}", multi.0.numerator, multi.0.denominator);
                                 let frac2 = format!("{}/{}", multi.1.numerator, multi.1.denominator);
+                                let br = if self.outType == "html" && (von.len() > 30 || bis.len() > 30) { "<br>" } else { " " };
                                 if self.outType == "html" {
-                                    teile.push(format!("<li>\"{}\" ({})*({}) \"{}\"</li>", von, frac1, frac2, bis));
+                                    teile.push(format!("<li>\"{}\"{}({})*({}){}\"{}\"</li>", von, br, frac1, frac2, br, bis));
                                 } else if self.outType == "bbcode" {
                                     teile.push(format!("[*]\"{}\" ({})*({}) \"{}\"", von, frac1, frac2, bis));
                                 } else {
@@ -1945,6 +2078,7 @@ impl Program {
                         into.push(teile.join(""));
                     }
                     let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+                    self.register_generated2_coord_metadata_exact_py(coord, spalte, &koord2parameter, &koord2tag);
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
             }
