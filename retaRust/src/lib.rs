@@ -10,7 +10,7 @@ pub mod prompt;
 use std::sync::OnceLock;
 
 use shared::csv_loader_py::preload_common_csv_tables;
-use shared::reta_py::Program;
+use shared::reta_program_types::Program;
 use shared::reta_runtime_cache::shared_reta_static_data;
 use shared::words_py::Words;
 
@@ -38,20 +38,43 @@ impl RetaRunResult {
 }
 
 static SHARED_WORDS: OnceLock<Words> = OnceLock::new();
+static SHARED_PROGRAM_TEMPLATE: OnceLock<Program> = OnceLock::new();
+static SHARED_PRELOAD_RESULT: OnceLock<Result<(), String>> = OnceLock::new();
 
 pub fn shared_words() -> &'static Words {
     SHARED_WORDS.get_or_init(Words::new)
 }
 
+fn shared_program_template() -> &'static Program {
+    SHARED_PROGRAM_TEMPLATE.get_or_init(|| Program::new(vec!["reta".to_string()]))
+}
+
+pub fn fresh_program_from_template(argv: Vec<String>) -> Program {
+    let mut program = shared_program_template().clone();
+    program.argv = argv;
+    program.argvWithoutProgram = if program.argv.len() > 1 {
+        program.argv[1..].to_vec()
+    } else {
+        vec![]
+    };
+    program
+}
 
 pub fn preload_reta_runtime() -> Result<(), String> {
-    let words = shared_words();
-    let _ = shared_reta_static_data(words);
-    preload_common_csv_tables().map_err(|err| format!("reta-Runtime konnte nicht vorladen: {err}"))
+    SHARED_PRELOAD_RESULT
+        .get_or_init(|| {
+            let words = shared_words();
+            let _ = shared_program_template();
+            let _ = shared_reta_static_data(words);
+            preload_common_csv_tables()
+                .map_err(|err| format!("reta-Runtime konnte nicht vorladen: {err}"))
+        })
+        .clone()
 }
 
 pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {
-    let mut program = Program::new(argv);
+    let _ = preload_reta_runtime();
+    let mut program = fresh_program_from_template(argv);
     let words = shared_words();
     program.runAllesLikePythonInit(words);
     program.run(words);
