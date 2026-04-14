@@ -2448,51 +2448,73 @@ let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
                 } else if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(num) {
                     keine_primzahl2 = true;
                 }
-                for couple_a in self.primzahlkreuz_pairs_exact_py(num) {
-                    if couple_a.0 == 1 || couple_a.1 == 1 {
-                        continue;
+                let mut paare: Vec<(i64, i64)> = Vec::new();
+let mut menge: Vec<(i64, i64)> = Vec::new();
+
+for couple in self.primMultiple_pairs_py(num) {
+    let mut pair = [couple.0, couple.1];
+    pair.sort();
+    let ordered = (pair[0], pair[1]);
+    if !menge.contains(&ordered) {
+        menge.push(ordered);
+    }
+}
+paare.extend(menge);
+
+for couple_a in paare {
+    if couple_a.1 != 1 && couple_a.0 != 1 {
+        let pair_variants: Vec<(i64, i64)> = if couple_a.0 == couple_a.1 {
+            vec![couple_a]
+        } else {
+            vec![couple_a, (couple_a.1, couple_a.0)]
+        };
+
+        for couple in pair_variants {
+            let positions: Vec<usize> = if couple.0 != couple.1 {
+                vec![1usize, 0usize]
+            } else {
+                vec![1usize]
+            };
+
+            for first_or_second in positions {
+                let chosen = if first_or_second == 1 { couple.1 } else { couple.0 };
+                let other = if first_or_second == 1 { couple.0 } else { couple.1 };
+
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(chosen)
+                    || couple.0 % 2 == 0
+                    || couple.1 % 2 == 0
+                {
+                    if let Some(base) = contra_contra.get(&chosen).copied() {
+                        let gegen3 = other * base;
+                        contra_contra.insert(num, gegen3);
+                        Self::push_unique_i64_vec_py(
+                            contra_contra2.entry(num).or_default(),
+                            gegen3,
+                        );
+                        into1.push(format!("gegen {}", gegen3));
                     }
-                    let pair_variants: Vec<(i64, i64)> = if couple_a.0 == couple_a.1 {
-                        vec![couple_a]
-                    } else {
-                        vec![couple_a, (couple_a.1, couple_a.0)]
-                    };
-                    for couple in pair_variants {
-                        let positions: Vec<usize> = if couple.0 != couple.1 {
-                            vec![1usize, 0usize]
-                        } else {
-                            vec![1usize]
-                        };
-                        for first_or_second in positions {
-                            let chosen = if first_or_second == 1 { couple.1 } else { couple.0 };
-                            let other = if first_or_second == 1 { couple.0 } else { couple.1 };
-                            if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(chosen)
-                                || couple.0 % 2 == 0
-                                || couple.1 % 2 == 0
-                            {
-                                if let Some(base) = contra_contra.get(&chosen).copied() {
-                                    let gegen3 = other * base;
-                                    contra_contra.insert(num, gegen3);
-                                    Self::push_unique_i64_vec_py(contra_contra2.entry(num).or_default(), gegen3);
-                                    into1.push(format!("gegen {}", gegen3));
-                                }
-                            }
-                            if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(couple.1)
-                                || couple.1 % 3 == 0
-                                || couple.0 % 3 == 0
-                            {
-                                if let Some(base) = pro_pro.get(&chosen).copied() {
-                                    let pro3 = other * base;
-                                    pro_pro.insert(num, pro3);
-                                    Self::push_unique_i64_vec_py(pro_pro2.entry(num).or_default(), pro3);
-                                    into2.push(format!("pro {}", pro3));
-                                }
-                            }
-                        }
+                }
+
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(couple.1)
+                    || couple.1 % 3 == 0
+                    || couple.0 % 3 == 0
+                {
+                    if let Some(base) = pro_pro.get(&chosen).copied() {
+                        let pro3 = other * base;
+                        pro_pro.insert(num, pro3);
+                        Self::push_unique_i64_vec_py(
+                            pro_pro2.entry(num).or_default(),
+                            pro3,
+                        );
+                        into2.push(format!("pro {}", pro3));
                     }
                 }
             }
-
+        }
+    }
+}
+}
+                
             let text206 = dreli
                 .get(num as usize)
                 .and_then(|row| row.get(206))
