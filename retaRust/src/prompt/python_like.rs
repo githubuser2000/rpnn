@@ -104,6 +104,19 @@ pub fn normalize_prompt_tokens(tokens: &[String]) -> Vec<String> {
     tokens.iter().map(|token| replace_prompt_alias(token)).collect()
 }
 
+pub fn expand_python_prompt_macros(tokens: &[String]) -> Vec<String> {
+    let mut out = normalize_prompt_tokens(tokens);
+    let has_mulpri = out.iter().any(|t| t == "mulpri" || t == "p");
+    if has_mulpri {
+        for extra in ["multis", "prim", "primfaktorenvergleich"] {
+            if !out.iter().any(|t| t == extra) {
+                out.push(extra.to_string());
+            }
+        }
+    }
+    out
+}
+
 pub fn is_15or16_command(text: &str) -> bool {
     if let Some(rest) = text.strip_prefix("15_") {
         return rest.is_empty() || prompt_words().befehle_set.contains(text);
@@ -447,7 +460,7 @@ fn contains_blocking_abc(tokens: &[String]) -> bool {
 }
 
 pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>> {
-    let normalized = normalize_prompt_tokens(tokens);
+    let normalized = expand_python_prompt_macros(tokens);
     if normalized.is_empty() || normalized[0] == "reta" || normalized[0].starts_with('-') {
         return Vec::new();
     }
@@ -550,6 +563,7 @@ fn append_15_16_calls(
             use_range,
             invert,
             teiler,
+            false,
             suppress_empty,
             no_headers,
             &format!("--multiversum={}", values16.join(",")),
@@ -562,6 +576,7 @@ fn append_15_16_calls(
             use_range,
             invert,
             teiler,
+            false,
             suppress_empty,
             no_headers,
             &format!("--grundstrukturen={}", values15.join(",")),
@@ -596,6 +611,7 @@ fn build_single_semantic_call(
         use_range,
         invert,
         teiler,
+        vielfache,
         suppress_empty,
         no_headers,
         para,
@@ -608,16 +624,23 @@ fn build_general_semantic_call(
     use_range: bool,
     invert: bool,
     teiler: bool,
+    vielfache: bool,
     suppress_empty: bool,
     no_headers: bool,
     para: &str,
     cols: Option<&str>,
 ) -> Vec<String> {
-    let row_flag = if use_range { "--zaehlung=" } else { "--vorhervonausschnitt=" };
+    let row_parameter = if vielfache {
+        format!("--vielfachevonzahlen={joined_rows}")
+    } else if use_range {
+        format!("--zaehlung={joined_rows}")
+    } else {
+        format!("--vorhervonausschnitt={joined_rows}")
+    };
     let mut argv = vec![
         "reta".to_string(),
         "-zeilen".to_string(),
-        format!("{row_flag}{joined_rows}"),
+        row_parameter,
     ];
     if teiler {
         argv.push("--vorhervonausschnittteiler".to_string());
@@ -647,7 +670,7 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         return semantic_calls.into_iter().next();
     }
 
-    let normalized = normalize_prompt_tokens(tokens);
+    let normalized = expand_python_prompt_macros(tokens);
     if normalized.is_empty() {
         return None;
     }

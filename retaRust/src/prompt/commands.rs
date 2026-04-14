@@ -3,7 +3,7 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::completion::candidates_for_prefix;
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
-    normalize_prompt_tokens, prompt_words, PromptModus,
+    expand_python_prompt_macros, normalize_prompt_tokens, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -116,6 +116,7 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
         expanded
     };
     effective_tokens = normalize_prompt_tokens(&effective_tokens);
+    effective_tokens = expand_python_prompt_macros(&effective_tokens);
 
     if effective_tokens[0] == "shell" {
         let shell_text = trimmed.strip_prefix("shell").unwrap_or("").trim().to_string();
@@ -128,6 +129,9 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
     if effective_tokens[0] == "math" {
         let command_text = trimmed.strip_prefix("math").unwrap_or("").trim().to_string();
         return Ok(PromptCommand::Math(command_text));
+    }
+    if let Some(output) = compile_direct_number_command(&effective_tokens) {
+        return Ok(PromptCommand::Immediate(output));
     }
     if let Some(output) = compile_abc_abcd_command(&effective_tokens) {
         return Ok(PromptCommand::Immediate(output));
@@ -302,6 +306,238 @@ pub fn execute_command(
     }
 }
 
+
+
+fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
+    let mut out: Vec<i64> = Vec::new();
+    for token in tokens {
+        if token.contains('/') {
+            continue;
+        }
+        for part in token.split(',').filter(|p| !p.trim().is_empty()) {
+            let part = part.trim();
+            if let Some((a, b)) = part.split_once('-') {
+                if !a.is_empty()
+                    && !b.is_empty()
+                    && a.chars().all(|c| c.is_ascii_digit())
+                    && b.chars().all(|c| c.is_ascii_digit())
+                {
+                    let start: i64 = a.parse().ok()?;
+                    let end: i64 = b.parse().ok()?;
+                    if start <= end {
+                        for n in start..=end {
+                            out.push(n);
+                        }
+                    } else {
+                        for n in (end..=start).rev() {
+                            out.push(n);
+                        }
+                    }
+                    continue;
+                }
+            }
+            if part.chars().all(|c| c.is_ascii_digit()) {
+                out.push(part.parse().ok()?);
+            }
+        }
+    }
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
+}
+
+fn prime_factors(n: i64, modulo24: bool) -> Vec<i64> {
+    let mut z = n.abs();
+    let mut factors = Vec::new();
+    if z <= 1 {
+        return factors;
+    }
+    while z > 1 {
+        let mut i = 2;
+        let mut found = None;
+        while i * i <= z {
+            if z % i == 0 {
+                found = Some(i);
+                break;
+            }
+            i += 1;
+        }
+        let p = found.unwrap_or(z);
+        factors.push(if modulo24 { p % 24 } else { p });
+        z /= p;
+    }
+    factors
+}
+
+fn prime_repeat_display(mut factors: Vec<i64>) -> String {
+    if factors.is_empty() {
+        return String::new();
+    }
+    factors.reverse();
+    let mut grouped: Vec<(i64, i64)> = Vec::new();
+    let mut prev: Option<i64> = None;
+    let mut count = 0i64;
+    for a in factors {
+        if prev == Some(a) {
+            count += 1;
+        } else {
+            if let Some(p) = prev {
+                grouped.push((p, count));
+            }
+            prev = Some(a);
+            count = 1;
+        }
+    }
+    if let Some(p) = prev {
+        grouped.push((p, count));
+    }
+    grouped.reverse();
+    grouped
+        .into_iter()
+        .map(|(e, g)| if g == 1 { e.to_string() } else { format!("{e}^{g}") })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn factor_pairs(a: i64) -> Vec<(i64, i64)> {
+    let mut pairs = Vec::new();
+    if a <= 0 {
+        return pairs;
+    }
+    let mut b = 2i64;
+    while b <= (a as f64).sqrt().floor() as i64 {
+        if a % b == 0 {
+            pairs.push((a / b, b));
+        }
+        b += 1;
+    }
+    pairs.push((a, 1));
+    pairs
+}
+
+fn factor_pairs_without_ones(a: i64) -> Vec<(i64, i64)> {
+    factor_pairs(a)
+        .into_iter()
+        .filter(|(x, y)| *x != 1 && *y != 1)
+        .collect()
+}
+
+fn factor_triples(a: i64) -> Vec<(i64, i64, i64)> {
+    let mut set = std::collections::BTreeSet::new();
+    for (m0, m1) in factor_pairs(a) {
+        let (o, n) = if m0 > m1 { (m0, m1) } else { (m1, m0) };
+        for (a1, b1) in factor_pairs(o) {
+            let mut v = [n, a1, b1];
+            v.sort();
+            if !v.contains(&1) {
+                set.insert((v[0], v[1], v[2]));
+            }
+        }
+    }
+    set.into_iter().collect()
+}
+
+fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
+    if tokens.iter().any(|t| t == "abc" || t == "abcd") {
+        return None;
+    }
+    let numbers = parse_row_numbers_from_tokens(tokens)?;
+    let token_set = tokens
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut lines: Vec<String> = Vec::new();
+    let mut matched = false;
+
+    if token_set.contains("prim") || token_set.contains("primfaktorzerlegung") {
+        matched = true;
+        for n in &numbers {
+            lines.push(format!("{}: {}", n, prime_repeat_display(prime_factors(*n, false))));
+        }
+    }
+    if token_set.contains("prim24") || token_set.contains("primfaktorzerlegungModulo24") {
+        matched = true;
+        for n in &numbers {
+            lines.push(format!("{}: {}", n, prime_repeat_display(prime_factors(*n, true))));
+        }
+    }
+    if token_set.contains("multis") {
+        matched = true;
+        let mulpri_info = !(token_set.contains("mulpri") || token_set.contains("p"));
+        for n in &numbers {
+            let pairs = factor_pairs_without_ones(*n);
+            if !pairs.is_empty() || mulpri_info {
+                lines.push(format!("{}: {:?}", n, pairs));
+            } else {
+                lines.push(format!("{}: {} (Primzahl)", n, n));
+            }
+        }
+    }
+    if token_set.contains("multis3") {
+        matched = true;
+        for n in &numbers {
+            lines.push(format!("{}: {:?}", n, factor_triples(*n)));
+        }
+    }
+    if token_set.contains("primfaktorenvergleich") && !numbers.is_empty() {
+        matched = true;
+        let mut common = prime_factors(numbers[0], false);
+        for n in numbers.iter().skip(1) {
+            let mut next = prime_factors(*n, false);
+            let mut out = Vec::new();
+            for c in common {
+                if let Some(pos) = next.iter().position(|x| *x == c) {
+                    out.push(c);
+                    next.remove(pos);
+                }
+            }
+            common = out;
+        }
+        let product = common.iter().copied().fold(1i64, |acc, x| acc.saturating_mul(x));
+        let common_text = if common.is_empty() {
+            "1".to_string()
+        } else {
+            prime_repeat_display(common.clone())
+        };
+        lines.push(format!("gemeinsame Primfaktoren: {}", common_text));
+        lines.push(format!("ggT: {}", product));
+    }
+    if token_set.contains("abstand") || token_set.contains("abstandPrim") {
+        matched = true;
+        if numbers.len() > 1 {
+            let anchor = *numbers.iter().max().unwrap();
+            for n in &numbers {
+                if *n == anchor {
+                    continue;
+                }
+                if token_set.contains("abstand") {
+                    lines.push(format!("{}->: {}: {}", n, anchor, (anchor - *n).abs()));
+                }
+                if token_set.contains("abstandPrim") {
+                    let diff = (anchor - *n).abs();
+                    lines.push(format!(
+                        "{}->: {}: {}",
+                        n,
+                        anchor,
+                        prime_repeat_display(prime_factors(diff, false))
+                    ));
+                }
+            }
+        }
+    }
+
+    if !matched {
+        return None;
+    }
+
+    Some(PromptOutput {
+        title: "prompt-zahlen".to_string(),
+        text: lines.join("\n"),
+        exit_code: 0,
+    })
+}
 
 fn compile_abc_abcd_command(tokens: &[String]) -> Option<PromptOutput> {
     if tokens.len() != 2 {
