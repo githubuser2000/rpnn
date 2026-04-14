@@ -51,7 +51,7 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                     state.history_lines.push(input.clone());
                 }
 
-                let compiled = match compile_command(&input) {
+                let compiled = match compile_command(&input, state.prompt_mode) {
                     Ok(command) => command,
                     Err(err) => {
                         print_output(&mut state, PromptOutput {

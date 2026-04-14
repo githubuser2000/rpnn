@@ -20,6 +20,21 @@ pub struct PromptWords {
     pub one_char_commands: BTreeSet<String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct PromptSemanticCall {
+    pub argv: Vec<String>,
+    pub label: String,
+}
+
+#[derive(Clone, Debug)]
+struct PromptSemanticSpec {
+    names: &'static [&'static str],
+    integer_para: &'static str,
+    fraction_para: Option<&'static str>,
+    integer_cols: &'static str,
+    fraction_cols: &'static str,
+}
+
 static PROMPT_WORDS: OnceLock<PromptWords> = OnceLock::new();
 
 pub fn prompt_words() -> &'static PromptWords {
@@ -29,7 +44,6 @@ pub fn prompt_words() -> &'static PromptWords {
 fn build_prompt_words() -> PromptWords {
     let mut befehle: Vec<String> = Vec::new();
 
-    // Python reference words.py / LibRetaPrompt.py
     for key in [
         "15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16",
         "4", "1", "30", "14", "20", "37", "31", "11", "36", "21", "26", "19", "90",
@@ -74,6 +88,35 @@ fn build_prompt_words() -> PromptWords {
         eig_prefixes: ("EIGN".to_string(), "EIGR".to_string()),
         one_char_commands,
     }
+}
+
+pub fn replace_prompt_alias(token: &str) -> String {
+    match token {
+        "e" => "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar".to_string(),
+        "G" => "geist".to_string(),
+        "R" => "range".to_string(),
+        "a" => "absicht".to_string(),
+        "B" => "bewusstsein".to_string(),
+        "E" => "emotion".to_string(),
+        "u" => "universum".to_string(),
+        "I" => "impulse".to_string(),
+        "T" => "triebe".to_string(),
+        "t" => "thomas".to_string(),
+        "r" => "richtung".to_string(),
+        "v" => "vielfache".to_string(),
+        "h" => "help".to_string(),
+        "w" => "teiler".to_string(),
+        "S" => "BefehlSpeichernDanach".to_string(),
+        "s" => "BefehlSpeichernDavor".to_string(),
+        "l" => "BefehlSpeicherungLöschen".to_string(),
+        "o" => "BefehlSpeicherungAusgeben".to_string(),
+        "W" => "wirklichkeit".to_string(),
+        _ => token.to_string(),
+    }
+}
+
+pub fn normalize_prompt_tokens(tokens: &[String]) -> Vec<String> {
+    tokens.iter().map(|token| replace_prompt_alias(token)).collect()
 }
 
 pub fn is_15or16_command(text: &str) -> bool {
@@ -164,6 +207,10 @@ pub fn looks_like_numeric_or_fraction_range(text: &str) -> bool {
         .all(|part| looks_like_single_numeric_or_fraction_part(part.trim()))
 }
 
+pub fn is_row_spec_token(text: &str) -> bool {
+    looks_like_numeric_or_fraction_range(text)
+}
+
 fn looks_like_single_numeric_or_fraction_part(text: &str) -> bool {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -215,7 +262,7 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
     let words = prompt_words();
 
     for original in &stext2 {
-        let mut s = original.trim_matches(',').to_string();
+        let s = original.trim_matches(',').to_string();
         let original_s = s.clone();
         let mut text_dazu: Vec<String> = Vec::new();
 
@@ -282,6 +329,136 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
     } else {
         (if_kurz_kurz, stext3)
     }
+}
+
+pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<PromptSemanticCall> {
+    let normalized = normalize_prompt_tokens(tokens);
+    if normalized.is_empty() || normalized[0] == "reta" || normalized[0].starts_with('-') {
+        return Vec::new();
+    }
+
+    let row_specs = normalized
+        .iter()
+        .filter(|token| is_row_spec_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    if row_specs.is_empty() {
+        return Vec::new();
+    }
+
+    let suppress_empty = normalized.iter().any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
+    let no_headers = normalized.iter().any(|t| t == "ee" || t == "--keineueberschriften");
+    let use_range = normalized.iter().any(|t| t == "range");
+    let invert = normalized.iter().any(|t| t == "invertieren");
+    let has_fraction = row_specs.iter().any(|t| t.contains('/'));
+    let joined_rows = row_specs.join(",");
+    let command_count = normalized
+        .iter()
+        .filter(|token| prompt_words().befehle_set.contains(*token))
+        .count();
+
+    let specs = semantic_specs();
+    let mut calls = Vec::new();
+    let mut seen_labels = BTreeSet::new();
+
+    for token in &normalized {
+        for spec in specs {
+            if spec.names.contains(&token.as_str()) {
+                let label = spec.names[0].to_string();
+                if seen_labels.insert(label.clone()) {
+                    let argv = build_single_semantic_call(
+                        spec,
+                        &joined_rows,
+                        has_fraction,
+                        use_range,
+                        invert,
+                        suppress_empty,
+                        no_headers,
+                        command_count,
+                    );
+                    calls.push(PromptSemanticCall { argv, label });
+                }
+                break;
+            }
+        }
+    }
+
+    calls
+}
+
+fn semantic_specs() -> &'static [PromptSemanticSpec] {
+    static SPECS: OnceLock<Vec<PromptSemanticSpec>> = OnceLock::new();
+    SPECS.get_or_init(|| {
+        vec![
+            PromptSemanticSpec { names: &["thomas"], integer_para: "--galaxie=thomas", fraction_para: None, integer_cols: "2", fraction_cols: "2" },
+            PromptSemanticSpec { names: &["emotion"], integer_para: "--grundstrukturen=emotion", fraction_para: Some("--gebrochenemotion"), integer_cols: "2,3", fraction_cols: "4,5" },
+            PromptSemanticSpec { names: &["wirklichkeit"], integer_para: "--grundstrukturen=wirklichkeit", fraction_para: None, integer_cols: "1,2", fraction_cols: "5" },
+            PromptSemanticSpec { names: &["triebe"], integer_para: "--grundstrukturen=triebe", fraction_para: None, integer_cols: "1", fraction_cols: "2" },
+            PromptSemanticSpec { names: &["impulse"], integer_para: "--grundstrukturen=impulse", fraction_para: None, integer_cols: "1,4", fraction_cols: "3" },
+            PromptSemanticSpec { names: &["bewusstsein"], integer_para: "--grundstrukturen=bewusstsein", fraction_para: None, integer_cols: "6", fraction_cols: "7" },
+            PromptSemanticSpec { names: &["geist"], integer_para: "--grundstrukturen=geist", fraction_para: None, integer_cols: "3", fraction_cols: "4" },
+            PromptSemanticSpec { names: &["freiheit", "gleichheit"], integer_para: "--planet=freiheit", fraction_para: None, integer_cols: "1-4,8", fraction_cols: "5-7" },
+            PromptSemanticSpec { names: &["groesse"], integer_para: "--strukturgroesse=organisation", fraction_para: Some("--gebrochengroesse"), integer_cols: "1-3", fraction_cols: "99" },
+            PromptSemanticSpec { names: &["kugeln", "kreise"], integer_para: "--universum=kugeln", fraction_para: None, integer_cols: "1-2", fraction_cols: "99" },
+            PromptSemanticSpec { names: &["netzwerk"], integer_para: "--universum=netzwerk", fraction_para: None, integer_cols: "1-3", fraction_cols: "99" },
+            PromptSemanticSpec { names: &["komplex"], integer_para: "--universum=komplex", fraction_para: None, integer_cols: "1", fraction_cols: "3" },
+            PromptSemanticSpec { names: &["absicht", "absichten", "motiv", "motive"], integer_para: "--menschliches=motivation", fraction_para: None, integer_cols: "1", fraction_cols: "3" },
+            PromptSemanticSpec { names: &["universum"], integer_para: "--universum=transzendentalien", fraction_para: Some("--universum=transzendentaliereziproke"), integer_cols: "1", fraction_cols: "1" },
+            PromptSemanticSpec { names: &["richtung"], integer_para: "--primzahlwirkung=richtung", fraction_para: None, integer_cols: "1", fraction_cols: "1" },
+        ]
+    }).as_slice()
+}
+
+fn build_single_semantic_call(
+    spec: &PromptSemanticSpec,
+    joined_rows: &str,
+    has_fraction: bool,
+    use_range: bool,
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    command_count: usize,
+) -> Vec<String> {
+    let (row_flag_name, row_value) = if use_range {
+        ("--zaehlung=", joined_rows)
+    } else {
+        ("--vorhervonausschnitt=", joined_rows)
+    };
+
+    let line_arg = format!("{row_flag_name}{row_value}");
+    let mut argv = vec![
+        "reta".to_string(),
+        "-zeilen".to_string(),
+        line_arg,
+    ];
+    if invert {
+        argv.push("--invertieren".to_string());
+    }
+    argv.push("-spalten".to_string());
+
+    let mut selected_cols = spec.integer_cols.to_string();
+    let mut para = spec.integer_para.to_string();
+    if has_fraction {
+        if let Some(frac_para) = spec.fraction_para {
+            para = frac_para.to_string();
+        }
+        selected_cols = spec.fraction_cols.to_string();
+    }
+    if spec.names[0] == "universum" && command_count <= 2 && !no_headers && !suppress_empty {
+        selected_cols = if has_fraction { "1,2".to_string() } else { "1,4".to_string() };
+    }
+
+    argv.push(para);
+    argv.push("-ausgabe".to_string());
+    argv.push(format!("--spaltenreihenfolgeundnurdiese={selected_cols}"));
+    argv.push("--breite=0".to_string());
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    argv
 }
 
 fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
