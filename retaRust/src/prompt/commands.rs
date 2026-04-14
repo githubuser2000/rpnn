@@ -439,6 +439,18 @@ fn factor_triples(a: i64) -> Vec<(i64, i64, i64)> {
     set.into_iter().collect()
 }
 
+fn modulo_remainders_display(n: i64) -> String {
+    if n == 0 {
+        return "0: Divisionen nicht definiert".to_string();
+    }
+    let upper = n.abs();
+    let parts = (1..=upper)
+        .map(|divisor| format!("{}→{}", divisor, n.rem_euclid(divisor)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{}: {}", n, parts)
+}
+
 fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
     if tokens.iter().any(|t| t == "abc" || t == "abcd") {
         return None;
@@ -503,6 +515,12 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
         };
         lines.push(format!("gemeinsame Primfaktoren: {}", common_text));
         lines.push(format!("ggT: {}", product));
+    }
+    if token_set.contains("modulo") {
+        matched = true;
+        for n in &numbers {
+            lines.push(modulo_remainders_display(*n));
+        }
     }
     if token_set.contains("abstand") || token_set.contains("abstandPrim") {
         matched = true;
