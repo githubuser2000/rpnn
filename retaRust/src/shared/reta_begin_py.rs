@@ -570,7 +570,7 @@ impl Program {
         }
     }
 
-    fn parameter_main_name_matches_local_py(stored: &str, cmd: &str) -> bool {
+    pub(crate) fn parameter_main_name_matches_local_py(stored: &str, cmd: &str) -> bool {
         let normalize = |value: &str| -> String {
             match value.trim().to_ascii_lowercase().as_str() {
                 "multiplikationen" | "primvielfache" => "primvielfache".to_string(),
@@ -580,7 +580,7 @@ impl Program {
         normalize(stored) == normalize(cmd)
     }
 
-    fn entry_matches_main_and_sub_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
+    pub(crate) fn entry_matches_main_and_sub_py(entry: &StoreParameterEntry, main_name: &str, sub_name: &str) -> bool {
         entry.parameterMainNames
             .iter()
             .any(|candidate| Self::parameter_main_name_matches_local_py(candidate, main_name))
@@ -596,7 +596,7 @@ impl Program {
         }
     }
 
-    fn append_generated_family_from_entry_py(
+    pub(crate) fn append_generated_family_from_entry_py(
         &self,
         entry: &StoreParameterEntry,
         generated1_pairs: &mut Vec<(i64, i64)>,
@@ -693,10 +693,27 @@ impl Program {
             let sub_names = Self::split_parameter_values_py(sub_names_raw);
 
             for sub_name in sub_names {
-                let key = (normalized_main.clone(), sub_name.trim().to_ascii_lowercase());
+                let normalized_sub = sub_name.trim().to_ascii_lowercase();
+                let key = (normalized_main.clone(), normalized_sub.clone());
                 if let Some(found) = cached.generator_lookup.get(&key) {
                     Self::merge_generator_family_from_cache_py(&mut merged, found);
+                    continue;
                 }
+
+                let mut fallback = GeneratorFamilyData::default();
+                for entry in &words.paraNdataMatrix {
+                    if Self::entry_matches_main_and_sub_py(entry, &normalized_main, &normalized_sub) {
+                        self.append_generated_family_from_entry_py(
+                            entry,
+                            &mut fallback.generated1_pairs,
+                            &mut fallback.generated2_codes,
+                            &mut fallback.generated2_selections,
+                            &mut fallback.bool_and_tuple_set1_options,
+                            &mut fallback.metakonkret_pairs,
+                        );
+                    }
+                }
+                Self::merge_generator_family_from_cache_py(&mut merged, &fallback);
             }
         }
 

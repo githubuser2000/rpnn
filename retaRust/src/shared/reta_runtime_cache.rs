@@ -164,9 +164,11 @@ fn build_static_data(words: &Words) -> RetaStaticData {
 }
 
 fn normalize_main_name(value: &str) -> String {
-    match value.trim().to_ascii_lowercase().as_str() {
-        "multiplikationen" | "primvielfache" => "primvielfache".to_string(),
-        other => other.to_string(),
+    let normalized = value.trim().to_ascii_lowercase();
+    if Program::parameter_main_name_matches_local_py(&normalized, "primvielfache") {
+        "primvielfache".to_string()
+    } else {
+        normalized
     }
 }
 
