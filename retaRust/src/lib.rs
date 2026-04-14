@@ -7,6 +7,8 @@ pub mod doc_tools;
 pub mod domain;
 pub mod prompt;
 
+use std::sync::OnceLock;
+
 use shared::reta_py::Program;
 use shared::words_py::Words;
 
@@ -33,12 +35,17 @@ impl RetaRunResult {
     }
 }
 
-pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {
-    let words = Words::new();
+static SHARED_WORDS: OnceLock<Words> = OnceLock::new();
 
+pub fn shared_words() -> &'static Words {
+    SHARED_WORDS.get_or_init(Words::new)
+}
+
+pub fn run_reta_from_args(argv: Vec<String>) -> RetaRunResult {
     let mut program = Program::new(argv);
-    program.runAllesLikePythonInit(&words);
-    program.run(&words);
+    let words = shared_words();
+    program.runAllesLikePythonInit(words);
+    program.run(words);
     program.combiTableWorkflow();
 
     RetaRunResult {

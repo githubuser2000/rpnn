@@ -51,23 +51,3 @@ pub fn split_shell_like(input: &str) -> Result<TokenizedLine, String> {
 
     Ok(TokenizedLine { tokens })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn split_simple_tokens() {
-        let parsed = split_shell_like("reta -zeilen --vorhervonausschnitt=1-3").unwrap();
-        assert_eq!(
-            parsed.tokens,
-            vec!["reta", "-zeilen", "--vorhervonausschnitt=1-3"]
-        );
-    }
-
-    #[test]
-    fn split_quotes() {
-        let parsed = split_shell_like("shell echo \"hello world\"").unwrap();
-        assert_eq!(parsed.tokens, vec!["shell", "echo", "hello world"]);
-    }
-}

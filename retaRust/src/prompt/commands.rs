@@ -93,7 +93,7 @@ pub fn compile_command(input: &str) -> Result<PromptCommand, String> {
         return Ok(PromptCommand::Reta(tokenized.tokens));
     }
 
-    if tokenized.tokens[0].starts_with('-') || tokenized.tokens[0].starts_with("--") {
+    if tokenized.tokens[0].starts_with('-') {
         let mut argv = vec!["reta".to_string()];
         argv.extend(tokenized.tokens);
         return Ok(PromptCommand::Reta(argv));

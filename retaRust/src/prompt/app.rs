@@ -1,13 +1,10 @@
 use std::path::PathBuf;
 
-use nu_ansi_term::{Color, Style};
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
     ColumnarMenu, DefaultHinter, DefaultPrompt, DefaultValidator, Emacs, FileBackedHistory,
     MenuBuilder, Reedline, ReedlineMenu, Signal, Vi,
 };
-
-use crate::print_reta_result;
 
 use super::commands::{
     compile_command, execute_command, EditModeKind, PromptCommand, PromptOutput, SessionState,
@@ -33,19 +30,18 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
 
     let implicit_logging = program_name == "rpl";
     let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
-
     let history_path = default_history_path(&program_name);
     let prompt = DefaultPrompt::default();
 
-    loop {
-        let mut editor = match build_editor(&history_path, state.current_mode()) {
-            Ok(editor) => editor,
-            Err(err) => {
-                eprintln!("rp konnte reedline nicht initialisieren: {err}");
-                return 1;
-            }
-        };
+    let mut editor = match build_editor(&history_path, state.current_mode()) {
+        Ok(editor) => editor,
+        Err(err) => {
+            eprintln!("rp konnte reedline nicht initialisieren: {err}");
+            return 1;
+        }
+    };
 
+    loop {
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
@@ -81,6 +77,8 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                     continue;
                 }
 
+                let rebuild_editor = matches!(compiled, PromptCommand::SwitchMode(_));
+
                 match execute_command(compiled, &mut state) {
                     Ok(Some(output)) => {
                         print_output(&mut state, output);
@@ -93,6 +91,16 @@ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
                             exit_code: 1,
                         });
                     }
+                }
+
+                if rebuild_editor {
+                    editor = match build_editor(&history_path, state.current_mode()) {
+                        Ok(editor) => editor,
+                        Err(err) => {
+                            eprintln!("rp konnte reedline nicht neu initialisieren: {err}");
+                            return 1;
+                        }
+                    };
                 }
             }
             Ok(Signal::CtrlC) => {
@@ -131,9 +139,7 @@ fn build_editor(history_path: &PathBuf, mode: EditModeKind) -> Result<Reedline, 
 
     let mut editor = Reedline::create()
         .with_history(history)
-        .with_hinter(Box::new(
-            DefaultHinter::default().with_style(Style::new().fg(Color::LightGray).italic()),
-        ))
+        .with_hinter(Box::new(DefaultHinter::default()))
         .with_validator(Box::new(DefaultValidator))
         .with_completer(completer)
         .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
@@ -159,8 +165,5 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
     state.last_output = output.clone();
     if !output.text.is_empty() {
         println!("{}", output.text);
-    }
-    if output.title == "reta" && output.text.is_empty() {
-        print_reta_result(&crate::RetaRunResult::default());
     }
 }
