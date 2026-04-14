@@ -5,6 +5,7 @@ pub mod runtime;
 pub mod support;
 pub mod doc_tools;
 pub mod domain;
+pub mod prompt;
 
 use shared::reta_py::Program;
 use shared::words_py::Words;
