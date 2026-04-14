@@ -3,6 +3,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use indexmap::IndexMap;
+
 use crate::shared::reta_program_types::{Generated2Selection, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
@@ -157,81 +159,6 @@ impl Program {
     }
 
 
-
-    fn dedup_preserve_order_strings_py(input: Vec<String>) -> Vec<String> {
-        let mut seen: BTreeSet<String> = BTreeSet::new();
-        let mut out: Vec<String> = Vec::new();
-        for item in input {
-            if seen.insert(item.clone()) {
-                out.push(item);
-            }
-        }
-        out
-    }
-
-    fn concat1_main_cell_py(&self, num: i64, into: Vec<String>, into1: Vec<String>, into2: Vec<String>) -> String {
-        if num == 0 {
-            return into.join(" | ");
-        }
-        let mut into_b: Vec<String> = vec![];
-        if !into1.is_empty() {
-            into_b.push(into1.join(", "));
-            into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
-        }
-        if !into2.is_empty() {
-            into_b.push(into2.join(", "));
-            into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
-        }
-        if !into.is_empty() {
-            into_b.push(into.join(", "));
-        }
-        into_b.join(" | ")
-    }
-
-    fn concat1_reverse_hints_py(&self, targets: &[i64], num: i64) -> Vec<String> {
-        let mut hints: Vec<String> = Vec::new();
-        for c in targets {
-            let t = self.zellenwert_py(*c as usize, 206);
-            if let Some((lhs, rhs)) = t.split_once('|') {
-                if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() {
-                    hints.push(rhs.trim().to_string());
-                }
-            }
-        }
-        Self::dedup_preserve_order_strings_py(hints)
-    }
-
-    fn concat1_reverse_cell_py(&self, num: i64, pro2: Vec<i64>, contra2: Vec<i64>) -> String {
-        if pro2.is_empty() && contra2.is_empty() {
-            return "-".to_string();
-        }
-        let mut teile: Vec<String> = vec![];
-        if !pro2.is_empty() {
-            teile.push(if pro2.len() == 1 {
-                format!("pro dieser Zahl ist {}", pro2[0])
-            } else {
-                format!("pro dieser Zahl sind {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
-            });
-            let hints = self.concat1_reverse_hints_py(&pro2, num);
-            if !hints.is_empty() {
-                teile.push(format!("({})", hints.join(", ")));
-            }
-        }
-        if !contra2.is_empty() {
-            teile.push(if contra2.len() == 1 {
-                format!("contra dieser Zahl ist {}", contra2[0])
-            } else {
-                format!("contra dieser Zahl sind {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
-            });
-            let hints = self.concat1_reverse_hints_py(&contra2, num);
-            if !hints.is_empty() {
-                teile.push(format!("({})", hints.join(", ")));
-            }
-        }
-        teile.push("hineinversetzen/empathisch dazu sein".to_string());
-        teile.join(" | ")
-    }
-
     fn nicht_leere_teile_join_py(&self, teile: Vec<String>, sep: &str) -> String {
         let mut neu: Vec<String> = vec![];
         for teil in teile {
@@ -291,6 +218,77 @@ impl Program {
             "primMotivGleichfGebr" => Some((1, "gleichförmige Polygone", vec![0, 1, 2], true)),
             "primStrukGleichfGebr" => Some((1, "gleichförmige Polygone", vec![1, 2, 3], true)),
             _ => None,
+        }
+    }
+
+    fn generated2_coord_tag_label_py(coord: (usize, usize, bool)) -> String {
+        let (poly_idx, kombi_idx, is_gebr) = coord;
+        let poly = if poly_idx == 0 { "sternPolygon" } else { "gleichfoermigesPolygon" };
+        let mut teile: Vec<&str> = vec![poly];
+        match kombi_idx {
+            0 => teile.push("galaxie"),
+            1 | 2 => {
+                teile.push("galaxie");
+                teile.push("universum");
+            }
+            _ => teile.push("universum"),
+        }
+        if is_gebr {
+            teile.push("gebrRat");
+        }
+        teile.join("|")
+    }
+
+    fn generated2_coord_maps_exact_py(
+        &self,
+        generatedSelections: &[Generated2Selection],
+    ) -> (
+        IndexMap<(usize, usize, bool), String>,
+        IndexMap<(usize, usize, bool), Vec<Generated2Selection>>,
+    ) {
+        let mut koord2tag: IndexMap<(usize, usize, bool), String> = IndexMap::new();
+        let mut koord2parameter: IndexMap<(usize, usize, bool), Vec<Generated2Selection>> = IndexMap::new();
+        for selection in generatedSelections {
+            if let Some((poly_idx, _poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(&selection.code) {
+                for kombi_idx in kombis {
+                    let key = (poly_idx, kombi_idx, is_gebr);
+                    koord2tag
+                        .entry(key)
+                        .or_insert_with(|| Self::generated2_coord_tag_label_py(key));
+                    koord2parameter.entry(key).or_default().push(selection.clone());
+                }
+            }
+        }
+        (koord2tag, koord2parameter)
+    }
+
+    fn register_generated2_column_exact_py(
+        &mut self,
+        spalte: i64,
+        selections: &[Generated2Selection],
+        tag_label: Option<&str>,
+    ) {
+        self.spaltenArtenKey_SpaltennummernValue
+            .entry(self.spaltenTypeNaming.generated2)
+            .or_default()
+            .insert(spalte);
+        for selection in selections {
+            self.paraDictGenerated.insert(
+                (
+                    selection.parameter_main_name.clone(),
+                    selection.parameter_name.clone(),
+                ),
+                spalte,
+            );
+            if let Some(tag_label) = tag_label {
+                self.paraDictGenerated4htmlTags.insert(
+                    (
+                        selection.parameter_main_name.clone(),
+                        format!("{}|{}", selection.parameter_name, tag_label),
+                    ),
+                    spalte,
+                );
+            }
         }
     }
 
@@ -1644,6 +1642,12 @@ impl Program {
         let poly_keys = ["stern", "gleichf"];
 
         let mut requested_coords: BTreeSet<(usize, usize, bool)> = BTreeSet::new();
+        let (koord2tag, koord2parameter) = self.generated2_coord_maps_exact_py(&generatedSelections);
+        let primcsv_selections: Vec<Generated2Selection> = generatedSelections
+            .iter()
+            .filter(|selection| selection.code == "PrimCSV")
+            .cloned()
+            .collect();
         let mut wants_primcsv = false;
         for selection in &generatedSelections {
             let code = selection.code.as_str();
@@ -1679,6 +1683,7 @@ impl Program {
                         into.push(String::new());
                     }
                     let spalte = self.fuege_spalte_hinzu_py(into, "Primzahlvielfache, nicht generiert");
+                    self.register_generated2_column_exact_py(spalte, &primcsv_selections, Some("primCSV"));
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
             }
@@ -1822,6 +1827,10 @@ impl Program {
                         into.push(teile.join(""));
                     }
                     let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+                    let key = (zwei, null_bis_drei, brr == 1);
+                    let matched = koord2parameter.get(&key).cloned().unwrap_or_default();
+                    let tag_label = koord2tag.get(&key).map(|s| s.as_str());
+                    self.register_generated2_column_exact_py(spalte, &matched, tag_label);
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
             }
@@ -1958,9 +1967,27 @@ impl Program {
                     into.push(rhs.trim().to_string());
                 }
             }
-            let into1 = Self::dedup_preserve_order_strings_py(into1);
-            let into2 = Self::dedup_preserve_order_strings_py(into2);
-            col_main.push(self.concat1_main_cell_py(num, into, into1, into2));
+            into1.sort();
+            into1.dedup();
+            into2.sort();
+            into2.dedup();
+            if num != 0 {
+                let mut into_b: Vec<String> = vec![];
+                if !into1.is_empty() {
+                    into_b.push(into1.join(", "));
+                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                }
+                if !into2.is_empty() {
+                    into_b.push(into2.join(", "));
+                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+                }
+                if !into.is_empty() {
+                    into_b.push(into.join(", "));
+                }
+                col_main.push(into_b.join(" | "));
+            } else {
+                col_main.push(into.join(" | "));
+            }
         }
 
         let mut reverse_pro: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
@@ -1983,7 +2010,31 @@ impl Program {
             }
             let pro2: Vec<i64> = reverse_pro.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
             let contra2: Vec<i64> = reverse_contra.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
-            col_reverse.push(self.concat1_reverse_cell_py(num, pro2, contra2));
+            if pro2.is_empty() && contra2.is_empty() {
+                col_reverse.push("-".to_string());
+                continue;
+            }
+            let mut teile: Vec<String> = vec![];
+            if !pro2.is_empty() {
+                teile.push(if pro2.len() == 1 { format!("pro dieser Zahl ist {}", pro2[0]) } else { format!("pro dieser Zahl sind {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
+                let hints: Vec<String> = pro2.iter().filter_map(|c| {
+                    let t = self.zellenwert_py(*c as usize, 206);
+                    let (lhs, rhs) = t.split_once('|')?;
+                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
+                }).collect();
+                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
+            }
+            if !contra2.is_empty() {
+                teile.push(if contra2.len() == 1 { format!("contra dieser Zahl ist {}", contra2[0]) } else { format!("contra dieser Zahl sind {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
+                let hints: Vec<String> = contra2.iter().filter_map(|c| {
+                    let t = self.zellenwert_py(*c as usize, 206);
+                    let (lhs, rhs) = t.split_once('|')?;
+                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
+                }).collect();
+                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
+            }
+            teile.push("hineinversetzen/empathisch dazu sein".to_string());
+            col_reverse.push(teile.join(" | "));
         }
 
         let spalte_main = self.fuege_spalte_hinzu_py(col_main, &self.generated2_code_heading_py("primzahlkreuzprocontra"));
