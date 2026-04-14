@@ -157,6 +157,81 @@ impl Program {
     }
 
 
+
+    fn dedup_preserve_order_strings_py(input: Vec<String>) -> Vec<String> {
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        let mut out: Vec<String> = Vec::new();
+        for item in input {
+            if seen.insert(item.clone()) {
+                out.push(item);
+            }
+        }
+        out
+    }
+
+    fn concat1_main_cell_py(&self, num: i64, into: Vec<String>, into1: Vec<String>, into2: Vec<String>) -> String {
+        if num == 0 {
+            return into.join(" | ");
+        }
+        let mut into_b: Vec<String> = vec![];
+        if !into1.is_empty() {
+            into_b.push(into1.join(", "));
+            into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+        }
+        if !into2.is_empty() {
+            into_b.push(into2.join(", "));
+            into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
+        }
+        if !into.is_empty() {
+            into_b.push(into.join(", "));
+        }
+        into_b.join(" | ")
+    }
+
+    fn concat1_reverse_hints_py(&self, targets: &[i64], num: i64) -> Vec<String> {
+        let mut hints: Vec<String> = Vec::new();
+        for c in targets {
+            let t = self.zellenwert_py(*c as usize, 206);
+            if let Some((lhs, rhs)) = t.split_once('|') {
+                if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() {
+                    hints.push(rhs.trim().to_string());
+                }
+            }
+        }
+        Self::dedup_preserve_order_strings_py(hints)
+    }
+
+    fn concat1_reverse_cell_py(&self, num: i64, pro2: Vec<i64>, contra2: Vec<i64>) -> String {
+        if pro2.is_empty() && contra2.is_empty() {
+            return "-".to_string();
+        }
+        let mut teile: Vec<String> = vec![];
+        if !pro2.is_empty() {
+            teile.push(if pro2.len() == 1 {
+                format!("pro dieser Zahl ist {}", pro2[0])
+            } else {
+                format!("pro dieser Zahl sind {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+            });
+            let hints = self.concat1_reverse_hints_py(&pro2, num);
+            if !hints.is_empty() {
+                teile.push(format!("({})", hints.join(", ")));
+            }
+        }
+        if !contra2.is_empty() {
+            teile.push(if contra2.len() == 1 {
+                format!("contra dieser Zahl ist {}", contra2[0])
+            } else {
+                format!("contra dieser Zahl sind {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+            });
+            let hints = self.concat1_reverse_hints_py(&contra2, num);
+            if !hints.is_empty() {
+                teile.push(format!("({})", hints.join(", ")));
+            }
+        }
+        teile.push("hineinversetzen/empathisch dazu sein".to_string());
+        teile.join(" | ")
+    }
+
     fn nicht_leere_teile_join_py(&self, teile: Vec<String>, sep: &str) -> String {
         let mut neu: Vec<String> = vec![];
         for teil in teile {
@@ -1883,27 +1958,9 @@ impl Program {
                     into.push(rhs.trim().to_string());
                 }
             }
-            into1.sort();
-            into1.dedup();
-            into2.sort();
-            into2.dedup();
-            if num != 0 {
-                let mut into_b: Vec<String> = vec![];
-                if !into1.is_empty() {
-                    into_b.push(into1.join(", "));
-                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
-                }
-                if !into2.is_empty() {
-                    into_b.push(into2.join(", "));
-                    into_b.push(format!(" Darin kann sich die {} am Besten hineinversetzen.", num));
-                }
-                if !into.is_empty() {
-                    into_b.push(into.join(", "));
-                }
-                col_main.push(into_b.join(" | "));
-            } else {
-                col_main.push(into.join(" | "));
-            }
+            let into1 = Self::dedup_preserve_order_strings_py(into1);
+            let into2 = Self::dedup_preserve_order_strings_py(into2);
+            col_main.push(self.concat1_main_cell_py(num, into, into1, into2));
         }
 
         let mut reverse_pro: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
@@ -1926,31 +1983,7 @@ impl Program {
             }
             let pro2: Vec<i64> = reverse_pro.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
             let contra2: Vec<i64> = reverse_contra.get(&num).map(|s| s.iter().copied().collect()).unwrap_or_default();
-            if pro2.is_empty() && contra2.is_empty() {
-                col_reverse.push("-".to_string());
-                continue;
-            }
-            let mut teile: Vec<String> = vec![];
-            if !pro2.is_empty() {
-                teile.push(if pro2.len() == 1 { format!("pro dieser Zahl ist {}", pro2[0]) } else { format!("pro dieser Zahl sind {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
-                let hints: Vec<String> = pro2.iter().filter_map(|c| {
-                    let t = self.zellenwert_py(*c as usize, 206);
-                    let (lhs, rhs) = t.split_once('|')?;
-                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
-                }).collect();
-                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
-            }
-            if !contra2.is_empty() {
-                teile.push(if contra2.len() == 1 { format!("contra dieser Zahl ist {}", contra2[0]) } else { format!("contra dieser Zahl sind {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")) });
-                let hints: Vec<String> = contra2.iter().filter_map(|c| {
-                    let t = self.zellenwert_py(*c as usize, 206);
-                    let (lhs, rhs) = t.split_once('|')?;
-                    if lhs.trim().parse::<i64>().ok() == Some(num) && !rhs.trim().is_empty() { Some(rhs.trim().to_string()) } else { None }
-                }).collect();
-                if !hints.is_empty() { teile.push(format!("({})", hints.join(", "))); }
-            }
-            teile.push("hineinversetzen/empathisch dazu sein".to_string());
-            col_reverse.push(teile.join(" | "));
+            col_reverse.push(self.concat1_reverse_cell_py(num, pro2, contra2));
         }
 
         let spalte_main = self.fuege_spalte_hinzu_py(col_main, &self.generated2_code_heading_py("primzahlkreuzprocontra"));
