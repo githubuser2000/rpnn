@@ -11,6 +11,7 @@ use crate::shared::reta_py::Program;
 
 static SHARED_CSV_ROOT: OnceLock<PathBuf> = OnceLock::new();
 static PARSED_CSV_CACHE: OnceLock<RwLock<HashMap<PathBuf, Vec<Vec<String>>>>> = OnceLock::new();
+static PROCESSED_RELIGION_CACHE: OnceLock<RwLock<HashMap<(String, String), Vec<Vec<String>>>>> = OnceLock::new();
 
 fn shared_csv_root() -> &'static PathBuf {
     SHARED_CSV_ROOT.get_or_init(|| {
@@ -22,6 +23,10 @@ fn shared_csv_root() -> &'static PathBuf {
 
 fn parsed_csv_cache() -> &'static RwLock<HashMap<PathBuf, Vec<Vec<String>>>> {
     PARSED_CSV_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn processed_religion_cache() -> &'static RwLock<HashMap<(String, String), Vec<Vec<String>>>> {
+    PROCESSED_RELIGION_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 pub fn preload_common_csv_tables() -> io::Result<()> {
@@ -216,43 +221,62 @@ impl Program {
         }
     }
 
-    pub fn load_religion_csv_exact(&mut self) -> io::Result<()> {
+    fn build_processed_religion_table_exact(&self, mode: &str, change_motives_column: &str) -> io::Result<Vec<Vec<String>>> {
         let csvFileNames = self.csv_file_names();
-        let art_bbcode = self.argvWithoutProgram.iter().any(|a| a == "--art=bbcode");
-        let art_html = self.argvWithoutProgram.iter().any(|a| a == "--art=html");
-        let mode = if art_bbcode { "bbcode" } else if art_html { "html" } else { "" };
-
         let rows = self.load_csv_rows_semicolon_exact_path(&csvFileNames.religion)?;
-        self.relitable = vec![];
-        self.RowsLen = 0;
+        let mut relitable: Vec<Vec<String>> = Vec::with_capacity(rows.len());
         for row in rows {
-            let mut col: Vec<String> = vec![];
+            let mut col: Vec<String> = Vec::with_capacity(row.len());
             for ccc in row {
                 col.push(self.decode_cell_exact_py(&ccc, mode));
             }
-            if self.RowsLen == 0 {
-                self.RowsLen = col.len() as i64;
-            }
-            self.relitable.push(col);
+            relitable.push(col);
         }
-        if self.hoechsteZeile > 0 && !self.relitable.is_empty() {
-            let target = (self.hoechsteZeile + 1) as usize;
-            while self.relitable.len() < target {
-                self.relitable.push(vec![String::new(); self.relitable[0].len()]);
-            }
-        }
-
-        let change_motives_column = self.change_motives_file_py();
         if !change_motives_column.is_empty() {
-            let rows = self.load_csv_rows_semicolon_exact_path(&change_motives_column)?;
+            let rows = self.load_csv_rows_semicolon_exact_path(change_motives_column)?;
             for (i, col) in rows.into_iter().enumerate() {
                 if let Some(first) = col.first() {
-                    if let Some(existing_row) = self.relitable.get_mut(i) {
+                    if let Some(existing_row) = relitable.get_mut(i) {
                         if existing_row.len() > 10 {
                             existing_row[10] = first.clone();
                         }
                     }
                 }
+            }
+        }
+        Ok(relitable)
+    }
+
+    fn processed_religion_table_exact(&self, mode: &str, change_motives_column: &str) -> io::Result<Vec<Vec<String>>> {
+        let key = (mode.to_string(), change_motives_column.to_string());
+        if let Ok(cache) = processed_religion_cache().read() {
+            if let Some(rows) = cache.get(&key) {
+                return Ok(rows.clone());
+            }
+        }
+
+        let relitable = self.build_processed_religion_table_exact(mode, change_motives_column)?;
+
+        if let Ok(mut cache) = processed_religion_cache().write() {
+            cache.entry(key).or_insert_with(|| relitable.clone());
+        }
+
+        Ok(relitable)
+    }
+
+    pub fn load_religion_csv_exact(&mut self) -> io::Result<()> {
+        let art_bbcode = self.argvWithoutProgram.iter().any(|a| a == "--art=bbcode");
+        let art_html = self.argvWithoutProgram.iter().any(|a| a == "--art=html");
+        let mode = if art_bbcode { "bbcode" } else if art_html { "html" } else { "" };
+        let change_motives_column = self.change_motives_file_py();
+
+        self.relitable = self.processed_religion_table_exact(mode, &change_motives_column)?;
+        self.RowsLen = self.relitable.first().map(|row| row.len() as i64).unwrap_or(0);
+
+        if self.hoechsteZeile > 0 && !self.relitable.is_empty() {
+            let target = (self.hoechsteZeile + 1) as usize;
+            while self.relitable.len() < target {
+                self.relitable.push(vec![String::new(); self.relitable[0].len()]);
             }
         }
         Ok(())

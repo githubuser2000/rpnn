@@ -239,7 +239,7 @@ impl Program {
         }
     }
 
-    pub fn parametersToCommandsAndNumbers(&mut self, argv: Vec<String>, neg: &str, _words: &Words) -> (Vec<String>, Vec<i64>, Vec<Vec<String>>, Vec<i64>, Vec<i64>, Vec<i64>) {
+    pub fn parametersToCommandsAndNumbers(&mut self, argv: &[String], neg: &str, _words: &Words) -> (Vec<String>, Vec<i64>, Vec<Vec<String>>, Vec<i64>, Vec<i64>, Vec<i64>) {
         let mut paramLines: Vec<String> = vec![];
         if argv.len() == 1 && neg.is_empty() {
             self.cliErrors.push("Versuche Parameter -h".to_string());
@@ -252,7 +252,7 @@ impl Program {
         self.bigParamaeter.clear();
         self.__willBeOverwritten_rowsOfcombi.clear();
 
-        for arg in argv.into_iter().skip(1) {
+        for arg in argv.iter().skip(1) {
             if arg.is_empty() || !arg.starts_with('-') {
                 continue;
             }
@@ -788,9 +788,9 @@ impl Program {
         self.breiteHasBeenOnceZero = false;
 
         let (paramLines0, _rowsAsNumbers0, _rowsOfcombi0, spaltenreihenfolgeundnurdiese0, _prims1, _generRows1) =
-            self.parametersToCommandsAndNumbers(argv.clone(), "", words);
+            self.parametersToCommandsAndNumbers(&argv, "", words);
         let (paramLinesNot0, rowsAsNumbersNot0, rowsOfcombiNot0, _spaltenreihenfolgeundnurdieseNot, prims2, generRows2) =
-            self.parametersToCommandsAndNumbers(argv.clone(), "-", words);
+            self.parametersToCommandsAndNumbers(&argv, "-", words);
 
         let cached_runtime = shared_reta_static_data(words);
         self.init_dataDict_and_spaltenTypeNaming_python_like();

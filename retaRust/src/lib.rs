@@ -9,7 +9,6 @@ pub mod prompt;
 
 use std::sync::OnceLock;
 
-use shared::csv_loader_py::preload_common_csv_tables;
 use shared::reta_program_types::Program;
 use shared::reta_runtime_cache::shared_reta_static_data;
 use shared::words_py::Words;
@@ -66,8 +65,7 @@ pub fn preload_reta_runtime() -> Result<(), String> {
             let words = shared_words();
             let _ = shared_program_template();
             let _ = shared_reta_static_data(words);
-            preload_common_csv_tables()
-                .map_err(|err| format!("reta-Runtime konnte nicht vorladen: {err}"))
+            Ok(())
         })
         .clone()
 }
