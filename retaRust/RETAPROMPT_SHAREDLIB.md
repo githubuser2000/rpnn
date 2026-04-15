@@ -1,47 +1,77 @@
-# retaPrompt shared-library split
+# retaPrompt Shared-Library Layout
 
-Ziel:
+Die aktive Cargo-Struktur für retaPrompt ist jetzt bewusst so aufgeteilt, dass
+möglichst viel Lauf- und Dispatch-Logik in den drei `.so`-Bibliotheken liegt und
+möglichst wenig in den vier Frontend-Binaries.
 
-- `libreta.so` bleibt der gemeinsame Unterbau und trägt die eigentliche Implementierung.
-- `libretaprompt_commands.so` bündelt die Befehls-/Command-Seite für `rpb`, `rp`, `rpl`, `rpe`.
-- `libretaprompt_input.so` bündelt die eigene/interaktive CLI-Eingabeseite für `rp`, `rpl`, `rpe`.
+## Aktive Bibliotheken
 
-Cargo-Struktur:
+- `libreta.so`
+  - gesamte gemeinsame reta-Implementierung
+  - Prompt-Grundlogik
+  - Profile, Ausführung, Parser, Kommandos, UI-Layer
 
-- Root-Paket `reta` erzeugt `libreta.so`.
-- `crates/retaprompt_commands` erzeugt `libretaprompt_commands.so`.
-- `crates/retaprompt_input` erzeugt `libretaprompt_input.so`.
-- `crates/retaprompt_frontends` erzeugt nur noch die dünnen Launcher-Binaries `rp`, `rpl`, `rpe`, `rpb`.
+- `libretaprompt_commands.so`
+  - gemeinsame retaPrompt-Befehlsbibliothek für `rpb`, `rp`, `rpl`, `rpe`
+  - enthält die kommandoseitige Frontend-Zuordnung
+  - kann anhand von `argv[0]` selbst erkennen, ob `rp`, `rpl`, `rpb` oder `rpe`
+    gestartet wurde
 
-Abhängigkeitsrichtung:
+- `libretaprompt_input.so`
+  - eigene/interaktive Befehlseingabe für `rp`, `rpl`, `rpe`
+  - hängt absichtlich von `libretaprompt_commands.so` ab
+  - verwendet deren gemeinsame Frontend-Zuordnung als Unterbau
+  - kann anhand von `argv[0]` selbst erkennen, ob `rp`, `rpl` oder `rpe`
+    gestartet wurde
 
-- `retaprompt_commands -> reta`
-- `retaprompt_input -> retaprompt_commands -> reta`
-- `rpb -> retaprompt_commands`
-- `rp/rpl/rpe -> retaprompt_input`
+## Aktive Frontend-Binaries
 
-Wichtige Folge:
+Die aktiven Binaries liegen im Paket `crates/retaprompt_frontends` und sind
+absichtlich extrem dünn:
 
-- So viel retaPrompt-Logik wie möglich liegt in den drei `.so`-Libraries.
-- Die vier Executables enthalten nur noch minimale `main()`-Einstiege.
-- Die älteren Root-Binaries unter `src/bin/rp.rs`, `rpl.rs`, `rpe.rs`, `rpb.rs` bleiben als Altcode im Repository erhalten, sind aber nicht der aktive Cargo-Buildweg.
+- `rp`  -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
+- `rpl` -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
+- `rpe` -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
+- `rpb` -> nur Aufruf von `retaprompt_commands::run_current_executable_from_env()`
 
-Bauen mit Cargo:
+Damit liegt nicht nur die eigentliche Prompt-Implementierung, sondern auch die
+Frontend-Auswahl und Profil-Dispatch-Logik in den `.so`-Bibliotheken statt in
+den Executables.
+
+## Abhängigkeitsrichtung
+
+```text
+libreta.so
+  ↑
+libretaprompt_commands.so
+  ↑
+libretaprompt_input.so
+```
+
+und
+
+```text
+rp  ─┐
+rpl ─┼─> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+rpe ─┘
+
+rpb ----> libretaprompt_commands.so -> libreta.so
+```
+
+## Cargo-Bauweg
+
+Die drei `.so`-Bibliotheken und die vier dünnen Frontend-Binaries werden direkt
+über Cargo gebaut:
 
 ```bash
 cargo build --workspace
 ```
 
-Gezielt nur die drei dynamischen Libraries:
+oder gezielt:
 
 ```bash
 cargo build -p reta --lib
 cargo build -p retaprompt_commands --lib
 cargo build -p retaprompt_input --lib
-```
-
-Gezielt nur die dünnen Frontends:
-
-```bash
 cargo build -p retaprompt_frontends --bins
 ```

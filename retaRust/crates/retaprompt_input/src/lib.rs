@@ -39,6 +39,24 @@ impl PromptInputFrontendKind {
         }
     }
 
+    pub fn from_command_kind(kind: PromptCommandFrontendKind) -> Option<Self> {
+        match kind {
+            PromptCommandFrontendKind::Rp => Some(Self::Rp),
+            PromptCommandFrontendKind::Rpl => Some(Self::Rpl),
+            PromptCommandFrontendKind::Rpe => Some(Self::Rpe),
+            PromptCommandFrontendKind::Rpb => None,
+        }
+    }
+
+    pub fn from_program_name(program_name: &str) -> Option<Self> {
+        PromptCommandFrontendKind::from_program_name(program_name)
+            .and_then(Self::from_command_kind)
+    }
+
+    pub fn from_argv(argv: &[String]) -> Option<Self> {
+        PromptCommandFrontendKind::from_argv(argv).and_then(Self::from_command_kind)
+    }
+
     pub fn command_kind(self) -> PromptCommandFrontendKind {
         match self {
             Self::Rp => PromptCommandFrontendKind::Rp,
@@ -49,14 +67,28 @@ impl PromptInputFrontendKind {
 }
 
 pub fn run_kind(argv: Vec<String>, kind: PromptInputFrontendKind) -> i32 {
-    reta::prompt::run_prompt_input_frontend_with_profile(
-        argv,
-        kind.command_kind().profile(),
-    )
+    reta::prompt::run_prompt_input_frontend_with_profile(argv, kind.command_kind().profile())
 }
 
 pub fn run_kind_from_env(kind: PromptInputFrontendKind) -> i32 {
     run_kind(std::env::args().collect(), kind)
+}
+
+pub fn run_current_executable(argv: Vec<String>) -> i32 {
+    match PromptInputFrontendKind::from_argv(&argv) {
+        Some(kind) => run_kind(argv, kind),
+        None => {
+            let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
+            eprintln!(
+                "retaprompt_input cannot infer input frontend kind from executable name: {arg0}"
+            );
+            1
+        }
+    }
+}
+
+pub fn run_current_executable_from_env() -> i32 {
+    run_current_executable(std::env::args().collect())
 }
 
 pub fn run_rp(argv: Vec<String>) -> i32 {
@@ -96,6 +128,11 @@ pub fn run_kind_from_abi_value(kind: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_kind_from_env(kind: i32) -> i32 {
     run_kind_from_abi_value(kind)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_run_current_executable_from_env() -> i32 {
+    run_current_executable_from_env()
 }
 
 #[unsafe(no_mangle)]

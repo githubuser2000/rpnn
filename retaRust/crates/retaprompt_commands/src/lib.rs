@@ -38,6 +38,24 @@ impl PromptCommandFrontendKind {
         }
     }
 
+    pub fn from_program_name(program_name: &str) -> Option<Self> {
+        let base = std::path::Path::new(program_name)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(program_name);
+        match base {
+            "rp" => Some(Self::Rp),
+            "rpl" => Some(Self::Rpl),
+            "rpb" => Some(Self::Rpb),
+            "rpe" => Some(Self::Rpe),
+            _ => None,
+        }
+    }
+
+    pub fn from_argv(argv: &[String]) -> Option<Self> {
+        argv.first().and_then(|arg0| Self::from_program_name(arg0))
+    }
+
     pub fn profile(self) -> PromptFrontendProfile {
         match self {
             Self::Rp => PromptFrontendProfile::rp(),
@@ -88,6 +106,23 @@ pub fn run_kind_from_env(kind: PromptCommandFrontendKind) -> i32 {
     run_kind(std::env::args().collect(), kind)
 }
 
+pub fn run_current_executable(argv: Vec<String>) -> i32 {
+    match PromptCommandFrontendKind::from_argv(&argv) {
+        Some(kind) => run_kind(argv, kind),
+        None => {
+            let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
+            eprintln!(
+                "retaprompt_commands cannot infer frontend kind from executable name: {arg0}"
+            );
+            1
+        }
+    }
+}
+
+pub fn run_current_executable_from_env() -> i32 {
+    run_current_executable(std::env::args().collect())
+}
+
 pub fn run_rp(argv: Vec<String>) -> i32 {
     run_kind(argv, PromptCommandFrontendKind::Rp)
 }
@@ -133,6 +168,11 @@ pub fn run_kind_from_abi_value(kind: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_kind_from_env(kind: i32) -> i32 {
     run_kind_from_abi_value(kind)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_commands_run_current_executable_from_env() -> i32 {
+    run_current_executable_from_env()
 }
 
 #[unsafe(no_mangle)]
