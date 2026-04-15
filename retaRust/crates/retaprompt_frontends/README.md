@@ -15,8 +15,7 @@ That means the layering is now explicit:
 
 This is additive. It does not delete the existing root-package binaries.
 Those old binaries remain untouched. This package adds a dedicated path in which
-all four prompt frontends sit on top of the same single retaPrompt static
-library package.
+the prompt frontends can now sit on top of two separate additive layers without mixing input handling and command-topic handling.
 
 ## Build
 
@@ -40,3 +39,11 @@ Or build both layers together:
 ```bash
 ./tools/build_retaprompt_staticlib.sh debug all
 ```
+
+
+## Current split
+
+- `reta` = core runtime and prompt implementation
+- `retaprompt_input` = own command input layer for `rp`, `rpl`, `rpe`
+- `retaprompt_commands` = command-topic layer for `rp`, `rpl`, `rpe`, `rpb`
+- `retaprompt_frontends` = thin binaries using the split layers

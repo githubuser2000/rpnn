@@ -8,7 +8,8 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-retaprompt = { path = "../retaprompt" }
+retaprompt_input = { path = "../retaprompt_input" }
+retaprompt_commands = { path = "../retaprompt_commands" }
 
 [[bin]]
 name = "rp"

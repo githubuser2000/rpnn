@@ -5,34 +5,33 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 PROFILE="${1:-debug}"
-TARGET="${2:-lib}"
-
 case "$PROFILE" in
   debug)
-    PROFILE_ARGS=()
+    CARGO_FLAGS=()
+    TARGET_DIR="target/debug"
     ;;
   release)
-    PROFILE_ARGS=(--release)
+    CARGO_FLAGS=(--release)
+    TARGET_DIR="target/release"
     ;;
   *)
-    echo "usage: $0 [debug|release] [lib|all]" >&2
+    echo "usage: $0 [debug|release]" >&2
     exit 1
     ;;
 esac
 
-cargo build -p retaprompt --lib "${PROFILE_ARGS[@]}"
+cargo build "${CARGO_FLAGS[@]}" -p reta --lib
+cargo build "${CARGO_FLAGS[@]}" -p retaprompt --lib
 
-case "$TARGET" in
-  lib)
-    ;;
-  all)
-    cargo build -p retaprompt_frontends --bin rp  "${PROFILE_ARGS[@]}"
-    cargo build -p retaprompt_frontends --bin rpl "${PROFILE_ARGS[@]}"
-    cargo build -p retaprompt_frontends --bin rpb "${PROFILE_ARGS[@]}"
-    cargo build -p retaprompt_frontends --bin rpe "${PROFILE_ARGS[@]}"
-    ;;
-  *)
-    echo "usage: $0 [debug|release] [lib|all]" >&2
-    exit 1
-    ;;
-esac
+CC_BIN="${CC:-cc}"
+AR_BIN="${AR:-ar}"
+SHIM_SRC="crates/retaprompt/src/retaprompt_shim.c"
+SHIM_OBJ="$TARGET_DIR/retaprompt_shim.o"
+OUT_LIB="$TARGET_DIR/libretaprompt.a"
+
+"$CC_BIN" -c "$SHIM_SRC" -o "$SHIM_OBJ"
+rm -f "$OUT_LIB"
+"$AR_BIN" rcs "$OUT_LIB" "$SHIM_OBJ"
+
+echo "built $OUT_LIB"
+echo "note: link libretaprompt.a together with $TARGET_DIR/libreta.a"

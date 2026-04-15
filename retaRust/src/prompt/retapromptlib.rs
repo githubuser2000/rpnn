@@ -135,3 +135,34 @@ pub fn retaprompt_run_rpb_from_env_abi() -> i32 {
 pub fn retaprompt_run_rpe_from_env_abi() -> i32 {
     run_rpe_from_env()
 }
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_kind_from_env(kind: i32) -> i32 {
+    retaprompt_run_kind_from_env(kind)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_auto_from_env() -> i32 {
+    run_retaprompt_auto_from_env()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_rp_from_env() -> i32 {
+    retaprompt_run_rp_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_rpl_from_env() -> i32 {
+    retaprompt_run_rpl_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_rpb_from_env() -> i32 {
+    retaprompt_run_rpb_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_run_rpe_from_env() -> i32 {
+    retaprompt_run_rpe_from_env_abi()
+}

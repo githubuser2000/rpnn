@@ -1,11 +1,7 @@
 Cargo.toml
-RETAPROMPT_STATICLIB.md
-CHANGED_FILES.txt
-REMOVED_FILES.txt
-tools/build_retaprompt_staticlib.sh
-crates/retaprompt/README.md
-src/prompt/retapromptlib.rs
-src/prompt/mod.rs
-crates/retaprompt/src/lib.rs
 crates/retaprompt/Cargo.toml
-crates/retaprompt_frontends/README.md
+crates/retaprompt/README.md
+crates/retaprompt/src/retaprompt_shim.c
+src/prompt/retapromptlib.rs
+tools/build_retaprompt_staticlib.sh
+RETAPROMPT_STATICLIB.md
