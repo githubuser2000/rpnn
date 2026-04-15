@@ -1,12 +1,11 @@
 # retaprompt_input
 
-Separate additive library for the own command input layer of `rp`, `rpl`, and `rpe`.
+Separate library for the own command input layer of `rp`, `rpl`, and `rpe`.
 
 Rules of this layer:
 
-- depends on `reta`
+- depends only on `reta`
 - does not embed or copy `reta`
 - does not depend on `retaprompt_commands`
-- keeps the input/front-end responsibility separate from command semantics
-
-The intent is that interactive/self-entered command handling lives here, while pure command-topic handling for `rp`, `rpl`, `rpe`, `rpb` lives in `retaprompt_commands`.
+- does not contain command-topic logic for `rpb`
+- contains only the self-entered frontend/input side for `rp`, `rpl`, `rpe`

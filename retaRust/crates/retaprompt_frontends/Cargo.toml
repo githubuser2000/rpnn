@@ -3,7 +3,7 @@ name = "retaprompt_frontends"
 version = "0.1.0"
 edition = "2024"
 autobins = false
-description = "Additive dedicated frontend package for rp/rpl/rpb/rpe that depends on the shared retaprompt staticlib package."
+description = "Dedicated frontend package for rp/rpl/rpb/rpe on top of the split input and command libraries."
 license = "MIT OR Apache-2.0"
 publish = false
 
