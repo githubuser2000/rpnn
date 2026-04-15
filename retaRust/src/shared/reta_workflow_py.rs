@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
 use crate::shared::words_py::Words;
 
 impl Program {
@@ -169,6 +169,56 @@ impl Program {
         }
     }
 
+
+    fn register_generated_kombi_parameter_exact_py(&mut self, spalte: i64, csvFileName: &str, csv_col_number: i64) {
+        let mut parameter_groups: Vec<Vec<PairStr>> = vec![];
+        let csv_key = csv_col_number.to_string();
+        if csvFileName.contains("meta") {
+            if let Some(entries) = self.dataDict.get(8).and_then(|dict| dict.get(&csv_key)) {
+                let mut into: Vec<PairStr> = vec![];
+                for entry in entries {
+                    for pair in entry {
+                        into.push(PairStr(
+                            "Kombination_(Universum_und_Galaxie)_(14_mit_15)".to_string(),
+                            pair.1.clone(),
+                        ));
+                    }
+                }
+                if !into.is_empty() {
+                    parameter_groups.push(into);
+                }
+            }
+        } else if let Some(entries) = self.dataDict.get(3).and_then(|dict| dict.get(&csv_key)) {
+            let mut into: Vec<PairStr> = vec![];
+            let mut needs_order_group = false;
+            for entry in entries {
+                for pair in entry {
+                    let parameter_name = pair.1.clone();
+                    if parameter_name == "tiere" || parameter_name == "berufe" || parameter_name == "intelligenz" {
+                        needs_order_group = true;
+                    }
+                    into.push(PairStr(
+                        "Kombination_(Galaxie_und_schwarzes_Loch)_(14_mit_13)".to_string(),
+                        parameter_name,
+                    ));
+                }
+            }
+            if !into.is_empty() {
+                parameter_groups.push(into);
+            }
+            if needs_order_group {
+                parameter_groups.push(vec![PairStr(
+                    "Wichtigstes_zum_gedanklich_einordnen".to_string(),
+                    "Zweitwichtigste".to_string(),
+                )]);
+            }
+        }
+
+        if !parameter_groups.is_empty() {
+            self.generatedSpaltenParameter_Exact.insert(spalte, parameter_groups);
+        }
+    }
+
     fn readKombiCsv_py(
         &mut self,
         rowsAsNumbers: &mut Vec<i64>,
@@ -227,6 +277,7 @@ impl Program {
                 if !heading.is_empty() {
                     self.generatedSpaltenParameter.push(heading);
                 }
+                self.register_generated_kombi_parameter_exact_py(new_main_idx, csvFileName, (t + 1) as i64);
                 for i in 1..self.relitable.len() {
                     self.relitable[i].push(String::new());
                 }

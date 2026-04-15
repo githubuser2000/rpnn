@@ -82,6 +82,15 @@ impl Program {
     }
 
 
+
+    fn set_generated_spalten_parameter_exact_from_data_dict_py(&mut self, spalte: i64, data_dict_idx: usize, key: &str) {
+        if let Some(entries) = self.dataDict.get(data_dict_idx).and_then(|dict| dict.get(key)) {
+            if !entries.is_empty() {
+                self.generatedSpaltenParameter_Exact.insert(spalte, entries.clone());
+            }
+        }
+    }
+
     fn set_generated_spalten_tags_exact_py<S: AsRef<str>>(&mut self, spalte: i64, tags: &[S]) {
         let mut collected: Vec<String> = vec![];
         for tag in tags {
@@ -2755,6 +2764,7 @@ for couple_a in paare {
             zeilenInhalte.push(line1.join(", und außerdem "));
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+        self.set_generated_spalten_parameter_exact_from_data_dict_py(spalte, 0, "64");
         self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum", "galaxie"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
