@@ -7,13 +7,144 @@ use reedline::{
 };
 
 use super::commands::{
-    compile_command, execute_command, EditModeKind, PromptCommand, PromptOutput, SessionState,
+    compile_command, execute_command, help_text, EditModeKind, PromptCommand, PromptOutput,
+    SessionState,
 };
 use super::completion::build_default_completer;
 use super::history::{default_history_path, default_log_path};
 use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
+
+#[derive(Clone, Debug)]
+struct StartupArgs {
+    start_with_vi_mode: bool,
+    logging_enabled: bool,
+    one_shot: Option<bool>,
+    show_help: bool,
+    exact_mode: bool,
+    command_text: Option<String>,
+    trailing_args: Vec<String>,
+}
+
+fn parse_startup_args(argv: &[String], preset: &PromptFrontendPreset) -> StartupArgs {
+    let mut startup = StartupArgs {
+        start_with_vi_mode: preset.start_with_vi_mode,
+        logging_enabled: preset.implicit_logging,
+        one_shot: None,
+        show_help: false,
+        exact_mode: false,
+        command_text: None,
+        trailing_args: Vec::new(),
+    };
+
+    let mut index = 1usize;
+    while index < argv.len() {
+        match argv[index].as_str() {
+            "-vi" => {
+                startup.start_with_vi_mode = true;
+                index += 1;
+            }
+            "-log" => {
+                startup.logging_enabled = true;
+                index += 1;
+            }
+            "-e" => {
+                startup.exact_mode = true;
+                index += 1;
+            }
+            "-h" | "-help" | "--help" => {
+                startup.show_help = true;
+                index += 1;
+            }
+            "-debug" => {
+                startup.logging_enabled = true;
+                index += 1;
+            }
+            "-befehl" | "-command" => {
+                startup.one_shot = Some(true);
+                startup.command_text = Some(argv[index + 1..].join(" "));
+                return finalize_startup_args(startup);
+            }
+            _ => {
+                startup.trailing_args = argv[index..].to_vec();
+                break;
+            }
+        }
+    }
+
+    if startup.command_text.is_none() && preset.one_shot && !startup.trailing_args.is_empty() {
+        startup.command_text = Some(startup.trailing_args.join(" "));
+    }
+
+    finalize_startup_args(startup)
+}
+
+fn finalize_startup_args(mut startup: StartupArgs) -> StartupArgs {
+    if startup.exact_mode {
+        if let Some(command_text) = startup.command_text.take() {
+            startup.command_text = Some(apply_exact_mode_to_input(&command_text));
+        }
+    }
+    startup
+}
+
+fn apply_exact_mode_to_input(input: &str) -> String {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    if !should_append_exact_suffix(trimmed) {
+        return trimmed.to_string();
+    }
+
+    format!(
+        "{trimmed} keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+    )
+}
+
+fn should_append_exact_suffix(input: &str) -> bool {
+    let tokenized = match super::tokenize::split_shell_like(input) {
+        Ok(tokens) => tokens,
+        Err(_) => return false,
+    };
+
+    if tokenized.tokens.is_empty() {
+        return false;
+    }
+
+    let first = tokenized.tokens[0].as_str();
+
+    if first == "reta" {
+        return false;
+    }
+    if first.starts_with('-') {
+        return false;
+    }
+    if first.starts_with(':') {
+        return false;
+    }
+
+    !matches!(
+        first,
+        "help"
+            | "hilfe"
+            | "befehle"
+            | "kurzbefehle"
+            | "shell"
+            | "python"
+            | "math"
+            | "q"
+            | "quit"
+            | "exit"
+            | "ende"
+            | "clear"
+            | "leeren"
+            | "loggen"
+            | "nichtloggen"
+    )
+}
 
 pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
     use std::path::PathBuf;
@@ -26,13 +157,26 @@ pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
     .unwrap_or_else(|| "rpb".to_string());
 
     let implicit_logging = program_name == "rpl";
-    let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
-
-    let input = if argv.len() > 1 {
-        argv[1..].join(" ")
-    } else {
-        String::new()
+    let preset = PromptFrontendPreset {
+        start_with_vi_mode,
+        implicit_logging,
+        one_shot: true,
     };
+    let startup = parse_startup_args(&argv, &preset);
+
+    let mut state = SessionState::new(
+        program_name.clone(),
+        startup.start_with_vi_mode,
+        implicit_logging,
+    );
+    state.logging_enabled = startup.logging_enabled;
+
+    if startup.show_help {
+        println!("{}", help_text());
+        return 0;
+    }
+
+    let input = startup.command_text.unwrap_or_default();
 
     let compiled = match compile_command(&input, state.prompt_mode) {
         Ok(cmd) => cmd,
@@ -43,7 +187,13 @@ pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
     };
 
     match execute_command(compiled, &mut state) {
-        Ok(_) => 0,
+        Ok(Some(output)) => {
+            if !output.text.is_empty() {
+                println!("{}", output.text);
+            }
+            output.exit_code
+        }
+        Ok(None) => 0,
         Err(err) => {
             eprintln!("{err}");
             1
@@ -89,30 +239,50 @@ pub fn run_prompt_command_frontend_with_profile(argv: Vec<String>, profile: Prom
 
 fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPreset) -> i32 {
     let program_name = program_name_from_argv(&argv);
+    let startup = parse_startup_args(&argv, &preset);
+
     let mut state = SessionState::new(
         program_name.clone(),
-        preset.start_with_vi_mode,
+        startup.start_with_vi_mode,
         preset.implicit_logging,
     );
+    state.logging_enabled = startup.logging_enabled;
+
     let history_path = default_history_path(&program_name);
     let log_path = default_log_path(&program_name);
+
+    if startup.show_help {
+        print_output(
+            &mut state,
+            PromptOutput {
+                title: "help".to_string(),
+                text: help_text(),
+                exit_code: 0,
+            },
+        );
+        return 0;
+    }
+
+    let effective_one_shot = startup.one_shot.unwrap_or(preset.one_shot);
 
     if state.logging_enabled {
         append_log_line(
             &log_path,
             "session",
             &format!(
-                "start program={} vi_mode={} implicit_logging={} one_shot={}",
+                "start program={} vi_mode={} implicit_logging={} logging_enabled={} one_shot={}",
                 program_name,
-                preset.start_with_vi_mode,
+                state.vi_mode,
                 preset.implicit_logging,
-                preset.one_shot,
+                state.logging_enabled,
+                effective_one_shot,
             ),
         );
     }
 
-    if preset.one_shot {
-        return run_one_shot(argv, &log_path, &mut state);
+    if effective_one_shot {
+        let input = startup.command_text.unwrap_or_else(|| startup.trailing_args.join(" "));
+        return run_one_shot(input, &log_path, &mut state);
     }
 
     run_interactive_loop(history_path, log_path, &mut state)
@@ -129,8 +299,7 @@ fn program_name_from_argv(argv: &[String]) -> String {
         .unwrap_or_else(|| "rp".to_string())
 }
 
-fn run_one_shot(argv: Vec<String>, log_path: &PathBuf, state: &mut SessionState) -> i32 {
-    let input = argv.into_iter().skip(1).collect::<Vec<_>>().join(" ");
+fn run_one_shot(input: String, log_path: &PathBuf, state: &mut SessionState) -> i32 {
     if input.trim().is_empty() {
         let output = PromptOutput {
             title: "usage".to_string(),
