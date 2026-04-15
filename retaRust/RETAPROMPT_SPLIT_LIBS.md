@@ -58,3 +58,12 @@ workspace member list.
 - `crates/retaprompt_commands`
 
 The preserved packages `crates/retaprompt` and `crates/retaprompt_frontends` stay in the repository but are not active workspace members.
+
+
+## Aktive fachliche Trennung
+
+- `reta` bleibt der gemeinsame Kern und enthält die eigentliche Implementierung.
+- `retaprompt_input` bildet nur die interaktive eigene Befehlseingabe für `rp`, `rpl`, `rpe` ab.
+- `retaprompt_commands` bildet nur die Befehlsseite für `rp`, `rpl`, `rpe`, `rpb` ab.
+
+Die Trennung ist absichtlich additiv: es wird kein alter Code gelöscht. Die zwei Zusatzlibs sind nur schmale Fassaden über `reta` und enthalten weder Kopien aus `reta` noch gegenseitige Abhängigkeiten.

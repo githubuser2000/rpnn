@@ -11,10 +11,12 @@ pub mod frontends;
 pub mod retapromptlib;
 
 pub use app::{
+    run_prompt_command_frontend_with_profile,
     run_prompt_frontend,
     run_prompt_frontend_from_env,
     run_prompt_frontend_with_profile,
     run_prompt_frontend_with_profile_from_env,
+    run_prompt_input_frontend_with_profile,
     run_rp_from_env,
 };
 pub use frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
