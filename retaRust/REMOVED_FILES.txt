@@ -1,1 +1,17 @@
 src/bin/reta_min.rs
+crates/rp/Cargo.toml
+crates/rp/src/lib.rs
+crates/rp/include/rp.h
+crates/rp/README.md
+crates/rpl/Cargo.toml
+crates/rpl/src/lib.rs
+crates/rpl/include/rpl.h
+crates/rpl/README.md
+crates/rpb/Cargo.toml
+crates/rpb/src/lib.rs
+crates/rpb/include/rpb.h
+crates/rpb/README.md
+crates/rpe/Cargo.toml
+crates/rpe/src/lib.rs
+crates/rpe/include/rpe.h
+crates/rpe/README.md

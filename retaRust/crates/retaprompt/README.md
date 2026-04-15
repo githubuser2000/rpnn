@@ -25,10 +25,10 @@ Rust API:
 - `run_with_kind(argv, kind)`
 - `run_with_profile(argv, profile)`
 
-The package now imports the stable public `reta::prompt::*` re-exports instead
-of reaching into `reta::prompt::frontend_profile::*` directly. That keeps the
-shared prompt API centered in one public module and makes the separate package a
-thin additive layer.
+The package imports the stable public `reta::prompt::*` re-exports instead of
+reaching into deeper prompt internals directly. That keeps the shared prompt API
+centered in one public module and makes the separate package a thin additive
+layer.
 
 C ABI symbols exported from the static library:
 
@@ -82,6 +82,10 @@ cargo run -p retaprompt --bin rpe
 
 The dedicated static library artifact is emitted as `libretaprompt.a`
 inside the usual Cargo target directory for the selected profile.
+
+This is the only dedicated retaPrompt static library package in the workspace.
+There are no extra `librp.a`, `librpl.a`, `librpb.a`, or `librpe.a` packages in
+this layout.
 
 ## Header for native linkage
 

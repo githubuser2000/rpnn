@@ -104,17 +104,13 @@ That keeps Cargo restricted to the explicit `[[bin]]` entries so the legacy
 `src/bin/reta_min.rs` path is no longer picked up accidentally.
 
 
-## Dedicated per-frontend static libraries
+## Single static library outcome
 
-In addition to the shared `libretaprompt.a`, the workspace now also contains
-four additive per-frontend packages:
+The workspace is intentionally reduced to one dedicated retaPrompt package:
 
-- `crates/rp` -> `librp.a`
-- `crates/rpl` -> `librpl.a`
-- `crates/rpb` -> `librpb.a`
-- `crates/rpe` -> `librpe.a`
+- `crates/retaprompt` -> `libretaprompt.a`
 
-These thin packages exist specifically for workflows that want a direct static
-library artifact per frontend name instead of one combined retaPrompt library.
-Each forwards into the same shared prompt layer and does not duplicate the
-behavior implementation.
+`rp`, `rpl`, `rpb`, and `rpe` stay available as explicit binaries, but there is
+no longer a separate static library package per frontend. The single shared
+static library is the additive packaging layer that unifies the maximal common
+behavior of all four frontends.
