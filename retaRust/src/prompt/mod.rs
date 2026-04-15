@@ -25,6 +25,11 @@ pub use frontends::{
     run_rpl_frontend_from_env,
 };
 pub use retapromptlib::{
+    retaprompt_run_kind_from_env,
+    retaprompt_run_rp_from_env_abi,
+    retaprompt_run_rpb_from_env_abi,
+    retaprompt_run_rpe_from_env_abi,
+    retaprompt_run_rpl_from_env_abi,
     run_retaprompt_auto_from_env,
     run_retaprompt_rp,
     run_retaprompt_rp_from_env,

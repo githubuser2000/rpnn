@@ -64,8 +64,12 @@ From the dedicated package:
 - `retaprompt_run_rpb_from_env`
 - `retaprompt_run_rpe_from_env`
 
-These symbols are exported from the package static library artifact produced by
-`crates/retaprompt` with:
+These symbols are exported only from the dedicated `crates/retaprompt` static
+library artifact. The main `reta` crate keeps the shared Rust prompt logic but no
+longer exports the retaPrompt C ABI itself, so the native linkage target stays
+centered on one dedicated `libretaprompt.a`.
+
+The package artifact is produced by `crates/retaprompt` with:
 
 ```toml
 [lib]

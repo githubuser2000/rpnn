@@ -39,6 +39,11 @@ C ABI symbols exported from the static library:
 - `retaprompt_run_rpb_from_env`
 - `retaprompt_run_rpe_from_env`
 
+These C symbols are exported only by the dedicated `retaprompt` static
+library. The main `reta` crate still owns the shared Rust prompt logic, but it
+no longer exports the retaPrompt C ABI itself, so native linkage stays centered
+on one `libretaprompt.a`.
+
 ABI kind values for `retaprompt_run_kind_from_env`:
 
 - `0` = auto

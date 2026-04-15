@@ -111,8 +111,7 @@ fn kind_from_abi_value(kind: i32) -> PromptFrontendKind {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
+pub fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
     let resolved = kind_from_abi_value(kind);
     if resolved == PromptFrontendKind::Auto {
         run_auto_from_env()
@@ -121,22 +120,18 @@ pub extern "C" fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn retaprompt_run_rp_from_env() -> i32 {
+pub fn retaprompt_run_rp_from_env_abi() -> i32 {
     run_rp_from_env()
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn retaprompt_run_rpl_from_env() -> i32 {
+pub fn retaprompt_run_rpl_from_env_abi() -> i32 {
     run_rpl_from_env()
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn retaprompt_run_rpb_from_env() -> i32 {
+pub fn retaprompt_run_rpb_from_env_abi() -> i32 {
     run_rpb_from_env()
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn retaprompt_run_rpe_from_env() -> i32 {
+pub fn retaprompt_run_rpe_from_env_abi() -> i32 {
     run_rpe_from_env()
 }
