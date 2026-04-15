@@ -1,77 +1,75 @@
-# retaPrompt Shared-Library Layout
+# retaPrompt shared library split
 
-Die aktive Cargo-Struktur für retaPrompt ist jetzt bewusst so aufgeteilt, dass
-möglichst viel Lauf- und Dispatch-Logik in den drei `.so`-Bibliotheken liegt und
-möglichst wenig in den vier Frontend-Binaries.
-
-## Aktive Bibliotheken
+Zielzustand für retaPrompt:
 
 - `libreta.so`
-  - gesamte gemeinsame reta-Implementierung
-  - Prompt-Grundlogik
-  - Profile, Ausführung, Parser, Kommandos, UI-Layer
-
+  - gesamte gemeinsame Implementierung und Python-nahe Kernlogik
 - `libretaprompt_commands.so`
-  - gemeinsame retaPrompt-Befehlsbibliothek für `rpb`, `rp`, `rpl`, `rpe`
-  - enthält die kommandoseitige Frontend-Zuordnung
-  - kann anhand von `argv[0]` selbst erkennen, ob `rp`, `rpl`, `rpb` oder `rpe`
-    gestartet wurde
-
+  - gemeinsame Befehls-/Command-Schicht für `rpb`, `rp`, `rpl`, `rpe`
 - `libretaprompt_input.so`
-  - eigene/interaktive Befehlseingabe für `rp`, `rpl`, `rpe`
-  - hängt absichtlich von `libretaprompt_commands.so` ab
-  - verwendet deren gemeinsame Frontend-Zuordnung als Unterbau
-  - kann anhand von `argv[0]` selbst erkennen, ob `rp`, `rpl` oder `rpe`
-    gestartet wurde
-
-## Aktive Frontend-Binaries
-
-Die aktiven Binaries liegen im Paket `crates/retaprompt_frontends` und sind
-absichtlich extrem dünn:
-
-- `rp`  -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
-- `rpl` -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
-- `rpe` -> nur Aufruf von `retaprompt_input::run_current_executable_from_env()`
-- `rpb` -> nur Aufruf von `retaprompt_commands::run_current_executable_from_env()`
-
-Damit liegt nicht nur die eigentliche Prompt-Implementierung, sondern auch die
-Frontend-Auswahl und Profil-Dispatch-Logik in den `.so`-Bibliotheken statt in
-den Executables.
+  - eigene/interaktive CLI-Eingabeschicht für `rp`, `rpl`, `rpe`
+  - oberster Launcher-Dispatch für `rp`, `rpl`, `rpe`, `rpb`
 
 ## Abhängigkeitsrichtung
 
 ```text
-libreta.so
-  ↑
-libretaprompt_commands.so
-  ↑
-libretaprompt_input.so
+retaprompt_launcher -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
 ```
 
-und
+- `retaprompt_input` hängt bewusst von `retaprompt_commands` ab.
+- `retaprompt_commands` hängt bewusst nur von `reta` ab.
+- `reta` bleibt die Kernbibliothek.
 
-```text
-rp  ─┐
-rpl ─┼─> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
-rpe ─┘
+## Aktiver Cargo-Bauweg
 
-rpb ----> libretaprompt_commands.so -> libreta.so
-```
-
-## Cargo-Bauweg
-
-Die drei `.so`-Bibliotheken und die vier dünnen Frontend-Binaries werden direkt
-über Cargo gebaut:
-
-```bash
-cargo build --workspace
-```
-
-oder gezielt:
+Die drei dynamischen Libraries kommen direkt aus Cargo:
 
 ```bash
 cargo build -p reta --lib
 cargo build -p retaprompt_commands --lib
 cargo build -p retaprompt_input --lib
-cargo build -p retaprompt_frontends --bins
 ```
+
+Der aktive Launcher ist genau **ein** Binary:
+
+```bash
+cargo build -p retaprompt_frontends --bin retaprompt_launcher
+```
+
+## Vier Namen über einen Launcher
+
+`retaprompt_launcher` wertet `argv[0]` aus und entscheidet daraus, ob `rp`, `rpl`, `rpe` oder `rpb` gestartet wurde.
+
+Praktische Nutzung im Build-Verzeichnis:
+
+```bash
+cd target/debug
+ln -sf retaprompt_launcher rp
+ln -sf retaprompt_launcher rpl
+ln -sf retaprompt_launcher rpe
+ln -sf retaprompt_launcher rpb
+```
+
+Dann gilt:
+
+```text
+rp  -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+rpl -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+rpe -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+rpb -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+```
+
+Die fachliche Unterscheidung bleibt dabei in den Libraries:
+
+- `rp`, `rpl`, `rpe` laufen im Input-Pfad
+- `rpb` läuft im Command-Pfad
+
+## Warum nur ein Launcher?
+
+So bleibt in den Executables so wenig wie möglich:
+
+- genau ein `main()`
+- genau ein Sprung in `retaprompt_input`
+- die komplette Namensauswertung und Laufartwahl lebt in den `.so`-Bibliotheken
+
+Die früheren vier separaten Frontend-Binaries bleiben im Repository erhalten, sind aber nicht mehr aktiver Cargo-Bestandteil dieses Launcher-Pakets.
