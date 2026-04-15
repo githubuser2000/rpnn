@@ -14,6 +14,42 @@ use super::history::{default_history_path, default_log_path};
 use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
 
+pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
+    use std::path::PathBuf;
+
+    let program_name = PathBuf::from(
+        argv.first().cloned().unwrap_or_else(|| "rpb".to_string()),
+    )
+    .file_name()
+    .map(|s| s.to_string_lossy().to_string())
+    .unwrap_or_else(|| "rpb".to_string());
+
+    let implicit_logging = program_name == "rpl";
+    let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
+
+    let input = if argv.len() > 1 {
+        argv[1..].join(" ")
+    } else {
+        String::new()
+    };
+
+    let compiled = match compile_command(&input, state.prompt_mode) {
+        Ok(cmd) => cmd,
+        Err(err) => {
+            eprintln!("{err}");
+            return 1;
+        }
+    };
+
+    match execute_command(compiled, &mut state) {
+        Ok(_) => 0,
+        Err(err) => {
+            eprintln!("{err}");
+            1
+        }
+    }
+}
+
 pub fn run_prompt_frontend_from_env(fallback_vi_mode: bool) -> i32 {
     let argv = std::env::args().collect::<Vec<_>>();
     run_prompt_frontend(argv, fallback_vi_mode)

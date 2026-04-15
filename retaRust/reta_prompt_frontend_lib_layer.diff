@@ -1,0 +1,223 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 1111111..2222222 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -31,6 +31,14 @@ path = "src/bin/rp.rs"
+ name = "rpl"
+ path = "src/bin/rpl.rs"
+
++[[bin]]
++name = "rpb"
++path = "src/bin/rpb.rs"
++
++[[bin]]
++name = "rpe"
++path = "src/bin/rpe.rs"
++
+ [[bin]]
+ name = "reta_domain_probe"
+ path = "src/bin/reta_domain_probe.rs"
+diff --git a/src/prompt/mod.rs b/src/prompt/mod.rs
+index 1111111..2222222 100644
+--- a/src/prompt/mod.rs
++++ b/src/prompt/mod.rs
+@@ -1,9 +1,11 @@
+ pub mod app;
+ pub mod commands;
+ pub mod completion;
++pub mod frontends;
+ pub mod history;
+ pub mod python_like;
+ pub mod tokenize;
+ pub mod tui;
+
++pub use frontends::run_prompt_frontend_from_env;
+ pub use app::run_rp_from_env;
+diff --git a/src/prompt/frontends.rs b/src/prompt/frontends.rs
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/src/prompt/frontends.rs
+@@ -0,0 +1,86 @@
++use std::path::PathBuf;
++
++use super::app::{run_rp, run_rp_one_shot};
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum PromptFrontendKind {
++    Rp,
++    Rpl,
++    Rpb,
++    Rpe,
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct PromptFrontendPreset {
++    pub kind: PromptFrontendKind,
++    pub start_with_vi_mode: bool,
++    pub one_shot: bool,
++}
++
++impl PromptFrontendPreset {
++    pub fn from_program_name(program_name: &str) -> Self {
++        match program_name {
++            "rpl" => Self {
++                kind: PromptFrontendKind::Rpl,
++                start_with_vi_mode: true,
++                one_shot: false,
++            },
++            "rpb" => Self {
++                kind: PromptFrontendKind::Rpb,
++                start_with_vi_mode: true,
++                one_shot: true,
++            },
++            "rpe" => Self {
++                kind: PromptFrontendKind::Rpe,
++                start_with_vi_mode: false,
++                one_shot: false,
++            },
++            _ => Self {
++                kind: PromptFrontendKind::Rp,
++                start_with_vi_mode: true,
++                one_shot: false,
++            },
++        }
++    }
++}
++
++pub fn run_prompt_frontend_from_env() -> i32 {
++    let argv = std::env::args().collect::<Vec<_>>();
++    run_prompt_frontend(argv)
++}
++
++pub fn run_prompt_frontend(argv: Vec<String>) -> i32 {
++    let program_name = PathBuf::from(
++        argv.first()
++            .cloned()
++            .unwrap_or_else(|| "rp".to_string()),
++    )
++    .file_name()
++    .map(|s| s.to_string_lossy().to_string())
++    .unwrap_or_else(|| "rp".to_string());
++
++    let preset = PromptFrontendPreset::from_program_name(&program_name);
++
++    if preset.one_shot {
++        run_rp_one_shot(argv, preset.start_with_vi_mode)
++    } else {
++        run_rp(argv, preset.start_with_vi_mode)
++    }
++}
+diff --git a/src/prompt/app.rs b/src/prompt/app.rs
+index 1111111..2222222 100644
+--- a/src/prompt/app.rs
++++ b/src/prompt/app.rs
+@@ -1,4 +1,4 @@
+-use std::path::PathBuf;
++use std::path::PathBuf;
+
+ use reedline::{
+     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
+@@ -21,6 +21,54 @@ pub fn run_rp_from_env(start_with_vi_mode: bool) -> i32 {
+     run_rp(argv, start_with_vi_mode)
+ }
+
++pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
++    let program_name = PathBuf::from(
++        argv.first()
++            .cloned()
++            .unwrap_or_else(|| "rpb".to_string()),
++    )
++    .file_name()
++    .map(|s| s.to_string_lossy().to_string())
++    .unwrap_or_else(|| "rpb".to_string());
++
++    let implicit_logging = program_name == "rpl";
++    let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
++    let log_path = default_log_path(&program_name);
++
++    let input = if argv.len() > 1 {
++        argv[1..].join(" ")
++    } else {
++        String::new()
++    };
++
++    state.last_input = input.clone();
++    if !input.is_empty() {
++        state.history_lines.push(input.clone());
++    }
++
++    if state.logging_enabled {
++        append_log_line(&log_path, "input", &input);
++    }
++
++    let compiled = match compile_command(&input, state.prompt_mode) {
++        Ok(command) => command,
++        Err(err) => {
++            print_output(&mut state, PromptOutput {
++                title: "error".to_string(),
++                text: err,
++                exit_code: 1,
++            });
++            return 1;
++        }
++    };
++
++    match execute_command(compiled, &mut state) {
++        Ok(Some(output)) => {
++            let exit_code = output.exit_code;
++            print_output(&mut state, output);
++            exit_code
++        }
++        Ok(None) => 0,
++        Err(err) => { eprintln!("{err}"); 1 }
++    }
++}
++
+ pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
+     let program_name = PathBuf::from(
+         argv.first()
+diff --git a/src/bin/rp.rs b/src/bin/rp.rs
+index 1111111..2222222 100644
+--- a/src/bin/rp.rs
++++ b/src/bin/rp.rs
+@@ -1,5 +1,5 @@
+ #![allow(non_snake_case)]
+
+ fn main() {
+-    std::process::exit(reta::prompt::run_rp_from_env(false));
++    std::process::exit(reta::prompt::run_prompt_frontend_from_env());
+ }
+diff --git a/src/bin/rpl.rs b/src/bin/rpl.rs
+index 1111111..2222222 100644
+--- a/src/bin/rpl.rs
++++ b/src/bin/rpl.rs
+@@ -1,5 +1,5 @@
+ #![allow(non_snake_case)]
+
+ fn main() {
+-    std::process::exit(reta::prompt::run_rp_from_env(true));
++    std::process::exit(reta::prompt::run_prompt_frontend_from_env());
+ }
+diff --git a/src/bin/rpb.rs b/src/bin/rpb.rs
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/src/bin/rpb.rs
+@@ -0,0 +1,5 @@
++#![allow(non_snake_case)]
++
++fn main() {
++    std::process::exit(reta::prompt::run_prompt_frontend_from_env());
++}
+diff --git a/src/bin/rpe.rs b/src/bin/rpe.rs
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/src/bin/rpe.rs
+@@ -0,0 +1,5 @@
++#![allow(non_snake_case)]
++
++fn main() {
++    std::process::exit(reta::prompt::run_prompt_frontend_from_env());
++}

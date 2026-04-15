@@ -39,15 +39,14 @@ name = "rpl"
 path = "src/bin/rpl.rs"
 
 [[bin]]
+name = "reta_domain_probe"
+path = "src/bin/reta_domain_probe.rs"
+
+
+[[bin]]
 name = "rpb"
 path = "src/bin/rpb.rs"
 
 [[bin]]
 name = "rpe"
 path = "src/bin/rpe.rs"
-
-[[bin]]
-name = "reta_domain_probe"
-path = "src/bin/reta_domain_probe.rs"
-
-
