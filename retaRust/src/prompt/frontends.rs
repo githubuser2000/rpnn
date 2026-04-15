@@ -1,24 +1,29 @@
-use std::path::PathBuf;
-
-use super::app::{run_rp, run_rp_one_shot};
+use super::app::run_prompt_frontend_with_profile_from_env;
+use super::frontend_profile::PromptFrontendProfile;
 
 pub fn run_prompt_frontend_from_env() -> i32 {
     let argv = std::env::args().collect::<Vec<_>>();
-    run_prompt_frontend(argv)
+    let program_name = argv
+        .first()
+        .and_then(|value| std::path::Path::new(value).file_name())
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| "rp".to_string());
+    let profile = PromptFrontendProfile::from_program_name(&program_name, true);
+    run_prompt_frontend_with_profile_from_env(profile)
 }
 
-pub fn run_prompt_frontend(argv: Vec<String>) -> i32 {
-    let program_name = PathBuf::from(
-        argv.first().cloned().unwrap_or_else(|| "rp".to_string()),
-    )
-    .file_name()
-    .map(|s| s.to_string_lossy().to_string())
-    .unwrap_or_else(|| "rp".to_string());
+pub fn run_rp_frontend_from_env() -> i32 {
+    run_prompt_frontend_with_profile_from_env(PromptFrontendProfile::rp())
+}
 
-    match program_name.as_str() {
-        "rpb" => run_rp_one_shot(argv, true),
-        "rpe" => run_rp(argv, false),
-        "rpl" => run_rp(argv, true),
-        _ => run_rp(argv, true),
-    }
+pub fn run_rpl_frontend_from_env() -> i32 {
+    run_prompt_frontend_with_profile_from_env(PromptFrontendProfile::rpl())
+}
+
+pub fn run_rpb_frontend_from_env() -> i32 {
+    run_prompt_frontend_with_profile_from_env(PromptFrontendProfile::rpb())
+}
+
+pub fn run_rpe_frontend_from_env() -> i32 {
+    run_prompt_frontend_with_profile_from_env(PromptFrontendProfile::rpe())
 }

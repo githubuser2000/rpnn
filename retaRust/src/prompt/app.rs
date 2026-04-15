@@ -11,6 +11,7 @@ use super::commands::{
 };
 use super::completion::build_default_completer;
 use super::history::{default_history_path, default_log_path};
+use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
 
@@ -55,13 +56,24 @@ pub fn run_prompt_frontend_from_env(fallback_vi_mode: bool) -> i32 {
     run_prompt_frontend(argv, fallback_vi_mode)
 }
 
+pub fn run_prompt_frontend_with_profile_from_env(profile: PromptFrontendProfile) -> i32 {
+    let argv = std::env::args().collect::<Vec<_>>();
+    run_prompt_frontend_with_profile(argv, profile)
+}
+
 pub fn run_rp_from_env(start_with_vi_mode: bool) -> i32 {
     run_prompt_frontend_from_env(start_with_vi_mode)
 }
 
 pub fn run_prompt_frontend(argv: Vec<String>, fallback_vi_mode: bool) -> i32 {
     let program_name = program_name_from_argv(&argv);
-    let preset = PromptFrontendPreset::from_program_name(&program_name, fallback_vi_mode);
+    let profile = PromptFrontendProfile::from_program_name(&program_name, fallback_vi_mode);
+    run_prompt_frontend_with_profile(argv, profile)
+}
+
+pub fn run_prompt_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
+    let program_name = program_name_from_argv(&argv);
+    let preset = PromptFrontendPreset::from_profile(profile);
     let mut state = SessionState::new(
         program_name.clone(),
         preset.start_with_vi_mode,
