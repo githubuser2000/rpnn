@@ -1,8 +1,9 @@
 # retaPrompt split library layout
 
 This repository keeps `reta` as the unchanged shared core library.
-The retaPrompt side is split additively into two independent libraries plus a
-thin frontend package.
+The retaPrompt side is split additively into two independent libraries.
+A thin frontend package may stay in the repository as preserved wrapper code,
+but it is not part of the active split itself.
 
 ## Active layout
 
@@ -23,9 +24,10 @@ thin frontend package.
    - no dependency on `retaprompt_input`
    - no copied code from `reta`
 
-4. `retaprompt_frontends`
+4. optional preserved wrapper package: `retaprompt_frontends`
    - only thin binaries
-   - depends on the two split prompt libraries
+   - preserved so old code is not destroyed
+   - intentionally inactive in the workspace
    - contains no duplicated `reta` implementation
 
 ## Binary-to-library mapping
@@ -48,3 +50,11 @@ thin frontend package.
 The older mixed `crates/retaprompt` package is kept in the repository so old
 code is not destroyed. It is intentionally inactive and not part of the active
 workspace member list.
+
+## Active workspace members
+
+- root package `reta`
+- `crates/retaprompt_input`
+- `crates/retaprompt_commands`
+
+The preserved packages `crates/retaprompt` and `crates/retaprompt_frontends` stay in the repository but are not active workspace members.

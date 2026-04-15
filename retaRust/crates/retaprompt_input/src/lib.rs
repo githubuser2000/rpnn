@@ -1,5 +1,8 @@
 #![allow(non_snake_case)]
 
+//! This crate is intentionally narrow: it only offers the self-entered frontend side
+//! for rp/rpl/rpe and forwards into `reta` without copying implementation.
+
 //! Own-command-input layer for rp/rpl/rpe.
 //!
 //! This crate intentionally only exposes the self-entered frontend side.

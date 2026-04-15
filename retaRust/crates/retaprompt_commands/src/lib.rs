@@ -1,5 +1,9 @@
 #![allow(non_snake_case)]
 
+//! This crate is intentionally narrow: it only offers command parsing/execution
+//! related API plus the direct rpb entry and forwards into `reta` without copying
+//! implementation.
+
 //! Command-topic layer for rp/rpl/rpe/rpb.
 //!
 //! This crate intentionally does not expose the interactive self-input frontend

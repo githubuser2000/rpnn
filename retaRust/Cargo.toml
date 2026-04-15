@@ -55,12 +55,14 @@ path = "src/bin/reta_domain_probe.rs"
 
 [workspace]
 # Active additive split for retaPrompt:
-# - reta = unchanged shared core library
-# - retaprompt_input = own command input for rp/rpl/rpe
-# - retaprompt_commands = command-topic layer for rp/rpl/rpe/rpb
-# - retaprompt_frontends = thin frontend binaries above the split libs
+# - reta = unchanged shared core library at the workspace root
+# - retaprompt_input = own command input library for rp/rpl/rpe
+# - retaprompt_commands = command-topic library for rp/rpl/rpe/rpb
 #
-# The older mixed crate `crates/retaprompt` is intentionally kept in the
-# repository as inactive legacy code, but it is not an active workspace member.
-members = ["crates/retaprompt_frontends", "crates/retaprompt_input", "crates/retaprompt_commands"]
+# The older mixed crate `crates/retaprompt` and the thin wrapper package
+# `crates/retaprompt_frontends` are intentionally kept in the repository so
+# older code is not destroyed. They are inactive and not active workspace
+# members. This keeps the active split focused on exactly the two extra
+# libraries which both depend only on `reta`.
+members = ["crates/retaprompt_input", "crates/retaprompt_commands"]
 resolver = "2"

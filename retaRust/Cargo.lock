@@ -1282,14 +1282,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "retaprompt_frontends"
-version = "0.1.0"
-dependencies = [
- "retaprompt_commands",
- "retaprompt_input",
-]
-
-[[package]]
 name = "retaprompt_input"
 version = "0.1.0"
 dependencies = [
