@@ -38,42 +38,34 @@ if [[ ! -f "$CORE_SO" ]]; then
   exit 1
 fi
 
+COMMON_RPATH=(
+  -Wl,-rpath,'$ORIGIN'
+  -Wl,-rpath,'$ORIGIN/lib'
+  -Wl,-rpath,'$ORIGIN/../lib'
+)
+
 build_shared_forwarder() {
   local source="$1"
   local output="$2"
   local soname="$3"
   shift 3
-  "$CC" -fPIC -shared "$source" \
-    -Wl,-soname,"$soname" \
-    -Wl,-rpath,'$ORIGIN' \
-    -L "$TARGET_DIR" -lreta \
-    -o "$output"
+  "$CC" -fPIC -shared "$source"     -Wl,-soname,"$soname"     "${COMMON_RPATH[@]}"     "$@"     -o "$output"
 }
 
-build_shared_forwarder \
-  crates/retaprompt_input/src/retaprompt_input_shim.c \
-  "$INPUT_SO" \
-  libretaprompt_input.so
+build_shared_forwarder   crates/retaprompt_commands/src/retaprompt_commands_shim.c   "$COMMANDS_SO"   libretaprompt_commands.so   -Wl,--no-as-needed   -L "$TARGET_DIR" -lreta
 
-build_shared_forwarder \
-  crates/retaprompt_commands/src/retaprompt_commands_shim.c \
-  "$COMMANDS_SO" \
-  libretaprompt_commands.so
+build_shared_forwarder   crates/retaprompt_input/src/retaprompt_input_shim.c   "$INPUT_SO"   libretaprompt_input.so   -Wl,--no-as-needed   -L "$TARGET_DIR" -lretaprompt_commands -lreta
 
 build_launcher() {
   local source="$1"
   local output="$2"
-  local libname="$3"
-  "$CC" "$source" \
-    -Wl,-rpath,'$ORIGIN' \
-    -L "$TARGET_DIR" -l"$libname" \
-    -o "$output"
+  "$CC" "$source"     "${COMMON_RPATH[@]}"     -L "$TARGET_DIR" -lretaprompt_input     -o "$output"
 }
 
-build_launcher tools/launchers/rp.c "$TARGET_DIR/rp" retaprompt_input
-build_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl" retaprompt_input
-build_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe" retaprompt_input
-build_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb" retaprompt_commands
+build_launcher tools/launchers/rp.c "$TARGET_DIR/rp"
+build_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl"
+build_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe"
+build_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb"
 
 verify_shared_defined_symbols() {
   local shared="$1"
@@ -82,14 +74,17 @@ verify_shared_defined_symbols() {
   local actual
   actual="$($NM -D --defined-only "$shared" | awk '{print $3}' | sort)"
   local wanted
-  wanted="$(printf '%s\n' "${expected[@]}" | sort)"
+  wanted="$(printf '%s
+' "${expected[@]}" | sort)"
   if [[ "$actual" != "$wanted" ]]; then
     echo "defined-symbol verification failed for $shared" >&2
     echo "expected:" >&2
-    printf '  %s\n' "${expected[@]}" >&2
+    printf '  %s
+' "${expected[@]}" >&2
     echo "actual:" >&2
     if [[ -n "$actual" ]]; then
-      while IFS= read -r line; do printf '  %s\n' "$line" >&2; done <<<"$actual"
+      while IFS= read -r line; do printf '  %s
+' "$line" >&2; done <<<"$actual"
     else
       echo "  <none>" >&2
     fi
@@ -106,22 +101,16 @@ verify_needed_entry() {
   fi
 }
 
-verify_shared_defined_symbols "$INPUT_SO" \
-  retaprompt_input_run_rp_from_env \
-  retaprompt_input_run_rpl_from_env \
-  retaprompt_input_run_rpe_from_env
-verify_shared_defined_symbols "$COMMANDS_SO" \
-  retaprompt_commands_run_rp_from_env \
-  retaprompt_commands_run_rpl_from_env \
-  retaprompt_commands_run_rpb_from_env \
-  retaprompt_commands_run_rpe_from_env
+verify_shared_defined_symbols "$INPUT_SO"   retaprompt_input_run_launcher_kind_from_env   retaprompt_input_run_rp_from_env   retaprompt_input_run_rpl_from_env   retaprompt_input_run_rpe_from_env
+verify_shared_defined_symbols "$COMMANDS_SO"   retaprompt_commands_run_rp_from_env   retaprompt_commands_run_rpl_from_env   retaprompt_commands_run_rpb_from_env   retaprompt_commands_run_rpe_from_env
 
-verify_needed_entry "$INPUT_SO" "libreta.so"
 verify_needed_entry "$COMMANDS_SO" "libreta.so"
+verify_needed_entry "$INPUT_SO" "libretaprompt_commands.so"
+verify_needed_entry "$INPUT_SO" "libreta.so"
 verify_needed_entry "$TARGET_DIR/rp" "libretaprompt_input.so"
 verify_needed_entry "$TARGET_DIR/rpl" "libretaprompt_input.so"
 verify_needed_entry "$TARGET_DIR/rpe" "libretaprompt_input.so"
-verify_needed_entry "$TARGET_DIR/rpb" "libretaprompt_commands.so"
+verify_needed_entry "$TARGET_DIR/rpb" "libretaprompt_input.so"
 
 cat > "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" <<MANIFEST
 {
@@ -132,18 +121,8 @@ cat > "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" <<MANIFEST
       "contains_core_implementation": true
     },
     {
-      "path": "$INPUT_SO",
-      "role": "own command input for rp/rpl/rpe",
-      "depends_on": ["libreta.so"],
-      "exports": [
-        "retaprompt_input_run_rp_from_env",
-        "retaprompt_input_run_rpl_from_env",
-        "retaprompt_input_run_rpe_from_env"
-      ]
-    },
-    {
       "path": "$COMMANDS_SO",
-      "role": "command frontend for rp/rpl/rpe/rpb",
+      "role": "command frontend for rpb and shared command layer for rp/rpl/rpe",
       "depends_on": ["libreta.so"],
       "exports": [
         "retaprompt_commands_run_rp_from_env",
@@ -151,35 +130,61 @@ cat > "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" <<MANIFEST
         "retaprompt_commands_run_rpb_from_env",
         "retaprompt_commands_run_rpe_from_env"
       ]
+    },
+    {
+      "path": "$INPUT_SO",
+      "role": "own command input for rp/rpl/rpe and launcher dispatch for all four frontends",
+      "depends_on": ["libretaprompt_commands.so", "libreta.so"],
+      "exports": [
+        "retaprompt_input_run_launcher_kind_from_env",
+        "retaprompt_input_run_rp_from_env",
+        "retaprompt_input_run_rpl_from_env",
+        "retaprompt_input_run_rpe_from_env"
+      ]
     }
   ],
   "launchers": [
     {
       "path": "$TARGET_DIR/rp",
-      "depends_on": ["libretaprompt_input.so"]
+      "depends_on": ["libretaprompt_input.so"],
+      "launcher_kind": "rp"
     },
     {
       "path": "$TARGET_DIR/rpl",
-      "depends_on": ["libretaprompt_input.so"]
+      "depends_on": ["libretaprompt_input.so"],
+      "launcher_kind": "rpl"
     },
     {
       "path": "$TARGET_DIR/rpe",
-      "depends_on": ["libretaprompt_input.so"]
+      "depends_on": ["libretaprompt_input.so"],
+      "launcher_kind": "rpe"
     },
     {
       "path": "$TARGET_DIR/rpb",
-      "depends_on": ["libretaprompt_commands.so"]
+      "depends_on": ["libretaprompt_input.so"],
+      "launcher_kind": "rpb"
     }
   ]
 }
 MANIFEST
 
-printf 'built split shared libraries and launchers:\n'
-printf '  %s\n' "$CORE_SO"
-printf '  %s\n' "$INPUT_SO"
-printf '  %s\n' "$COMMANDS_SO"
-printf '  %s\n' "$TARGET_DIR/rp"
-printf '  %s\n' "$TARGET_DIR/rpl"
-printf '  %s\n' "$TARGET_DIR/rpe"
-printf '  %s\n' "$TARGET_DIR/rpb"
-printf '\nmanifest:\n  %s\n' "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"
+printf 'built split shared libraries and launchers:
+'
+printf '  %s
+' "$CORE_SO"
+printf '  %s
+' "$COMMANDS_SO"
+printf '  %s
+' "$INPUT_SO"
+printf '  %s
+' "$TARGET_DIR/rp"
+printf '  %s
+' "$TARGET_DIR/rpl"
+printf '  %s
+' "$TARGET_DIR/rpe"
+printf '  %s
+' "$TARGET_DIR/rpb"
+printf '
+manifest:
+  %s
+' "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"

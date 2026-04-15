@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::shared::reta_program_types::{Generated2Selection, Program};
+use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
 
@@ -81,6 +81,30 @@ impl Program {
         self.relitable[zeile][spalte] = wert;
     }
 
+
+    fn set_generated_spalten_tags_exact_py<S: AsRef<str>>(&mut self, spalte: i64, tags: &[S]) {
+        let mut collected: Vec<String> = vec![];
+        for tag in tags {
+            let value = tag.as_ref().trim();
+            if !value.is_empty() && !collected.iter().any(|existing| existing == value) {
+                collected.push(value.to_string());
+            }
+        }
+        if !collected.is_empty() {
+            self.generatedSpaltenParameter_Tags.insert(spalte, collected);
+        }
+    }
+
+    fn concat_table_generated_tags_exact_py(&self, concatTable: i64) -> Vec<String> {
+        match concatTable {
+            1 => vec!["sternPolygon".to_string(), "universum".to_string(), "galaxie".to_string()],
+            2 | 3 => vec!["sternPolygon".to_string(), "galaxie".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
+            4 | 5 => vec!["sternPolygon".to_string(), "universum".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
+            6 | 7 => vec!["sternPolygon".to_string(), "keinParaOdMetaP".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
+            8 | 9 => vec!["sternPolygon".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string(), "keinParaOdMetaP".to_string()],
+            _ => vec![],
+        }
+    }
     fn fuege_spalte_hinzu_py(&mut self, zeilenInhalte: Vec<String>, meta_name: &str) -> i64 {
         let spaltenNummer = self.relitable.first().map(|row| row.len()).unwrap_or(0) as i64;
         let zielZeilen = std::cmp::max(self.relitable.len(), zeilenInhalte.len());
@@ -384,6 +408,50 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         let mut zahl = if spaltenWahl { 1.0 / zahl } else { zahl };
         zahl = zahl.fract().abs();
         zahl < 0.00001 || zahl > 0.99999
+    }
+
+    fn generated1_selections_exact_py(&self) -> Vec<GeneratorPairSelection> {
+        if !self.generated1Selections.is_empty() {
+            return self.generated1Selections.clone();
+        }
+        self.generated1Pairs
+            .iter()
+            .map(|pair| GeneratorPairSelection {
+                parameter_main_name: String::new(),
+                parameter_name: String::new(),
+                left: pair.0,
+                right: pair.1,
+            })
+            .collect()
+    }
+
+    fn metakonkret_selections_exact_py(&self) -> Vec<GeneratorPairSelection> {
+        if !self.metakonkretSelections.is_empty() {
+            return self.metakonkretSelections.clone();
+        }
+        self.metakonkretPairs
+            .iter()
+            .map(|pair| GeneratorPairSelection {
+                parameter_main_name: String::new(),
+                parameter_name: String::new(),
+                left: pair.0,
+                right: pair.1,
+            })
+            .collect()
+    }
+
+    fn generator_pair_selection_meta_name_exact_py(&self, selection: &GeneratorPairSelection, fallback_spalte: i64) -> String {
+        let mut teile: Vec<String> = Vec::new();
+        if !selection.parameter_main_name.trim().is_empty() {
+            teile.push(selection.parameter_main_name.trim().to_string());
+        }
+        if !selection.parameter_name.trim().is_empty() {
+            teile.push(selection.parameter_name.trim().replace('_', " "));
+        }
+        if !teile.is_empty() {
+            return teile.join(" ");
+        }
+        self.generierte_spalte_meta_name_py(fallback_spalte)
     }
 
     fn generated1_pairs_exact_py(&self) -> Vec<(i64, i64)> {
@@ -1553,6 +1621,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(9));
+        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "galaxie", "gleichfoermigesPolygon"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1568,6 +1637,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(132));
+        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1583,6 +1653,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(242));
+        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1605,6 +1676,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             zeilenInhalte.push(wert);
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "galaxie"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1646,6 +1718,11 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 }
             }
             let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+            if rownum == 44 {
+                self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum", "galaxie"]);
+            } else {
+                self.set_generated_spalten_tags_exact_py(spalte, &["gleichfoermigesPolygon", "universum", "galaxie"]);
+            }
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -1816,6 +1893,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 zeilenInhalte.push(joined);
             }
             let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, "Primzahlwirkung (7, Richtung)");
+            self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -1866,6 +1944,35 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         tableToAdd
     }
 
+    fn readConcatCsv_set_generated_metadata_exact_py(&mut self, concatTable: i64, heading: &str, u: usize) {
+        if concatTable == 1 {
+            self.generatedSpaltenParameter.push("Multiplikationen Nicht generiert".to_string());
+            return;
+        }
+        let rangeToDataDict: std::collections::BTreeMap<i64, i64> = [(2, 6), (3, 6), (4, 5), (5, 5), (6, 9), (7, 9), (8, 10), (9, 10)].into_iter().collect();
+        if let Some(dict_idx) = rangeToDataDict.get(&concatTable) {
+            if let Some(dict) = self.dataDict.get(*dict_idx as usize) {
+                if let Some(eintrag) = dict.get(&(u as i64 + 2).to_string()) {
+                    let mut teile: Vec<String> = Vec::new();
+                    for gruppe in eintrag {
+                        for paar in gruppe {
+                            if !paar.0.is_empty() {
+                                teile.push(paar.0.clone());
+                            } else if !paar.1.is_empty() {
+                                teile.push(paar.1.clone());
+                            }
+                        }
+                    }
+                    if !teile.is_empty() {
+                        self.generatedSpaltenParameter.push(teile.join(" / "));
+                        return;
+                    }
+                }
+            }
+        }
+        self.generatedSpaltenParameter.push(heading.to_string());
+    }
+
     pub fn readConcatCsv(&mut self, rowsAsNumbers: &mut Vec<i64>, concatTableSelection: Vec<i64>, concatTable: i64) -> Vec<i64> {
         let mut concatCSVspalten: Vec<i64> = vec![];
         if concatTableSelection.is_empty() { return concatCSVspalten; }
@@ -1907,6 +2014,10 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                         let selectedSpalten = start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
                         Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
                         concatCSVspalten.push(selectedSpalten);
+                        let concat_tags = self.concat_table_generated_tags_exact_py(concatTable);
+                        self.set_generated_spalten_tags_exact_py(selectedSpalten, &concat_tags);
+                        let heading = tableToAdd.get(0).and_then(|row| row.get(u)).cloned().unwrap_or_default();
+                        self.readConcatCsv_set_generated_metadata_exact_py(concatTable, &heading, u);
                     }
                 }
             }
@@ -1952,8 +2063,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let conceptsRowsSetOfTuple2 = self.generated1_pairs_exact_py();
-        if conceptsRowsSetOfTuple2.is_empty() {
+        let conceptSelections = self.generated1_selections_exact_py();
+        if conceptSelections.is_empty() {
             return;
         }
         let reliTableCopy = self.relitable.clone();
@@ -1966,7 +2077,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             vervielfachter: Vec<usize>,
         }
 
-        for concept in conceptsRowsSetOfTuple2 {
+        for selection in conceptSelections {
+            let concept = (selection.left, selection.right);
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
             let mut into: Vec<String> = vec![String::new(); reliTableCopy.len()];
@@ -2078,7 +2190,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 }
             }
 
-            let spalte = self.fuege_spalte_hinzu_py(into, &self.generierte_spalte_meta_name_py(concept.0));
+            let meta_name = self.generator_pair_selection_meta_name_exact_py(&selection, concept.0);
+            let spalte = self.fuege_spalte_hinzu_py(into, &meta_name);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -2559,8 +2672,9 @@ for couple_a in paare {
     }
 
     pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        let geordnetePaare = self.metakonkret_pairs_exact_py();
-        for paar in geordnetePaare {
+        let geordneteSelections = self.metakonkret_selections_exact_py();
+        for selection in geordneteSelections {
+            let paar = (selection.left, selection.right);
             let metavariable = paar.0;
             let lower1greater2both3 = if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 };
             self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, metavariable, lower1greater2both3);
@@ -2611,6 +2725,7 @@ for couple_a in paare {
                 }
                 let meta_name = if bothRows == 0 { self.meta_prefixes_py(metavariable).0 } else { self.meta_prefixes_py(metavariable).1 };
                 let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, if ifInvers == 0 { "n" } else { "1/n" }));
+                self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
                 Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
@@ -2640,6 +2755,7 @@ for couple_a in paare {
             zeilenInhalte.push(line1.join(", und außerdem "));
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum", "galaxie"]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 

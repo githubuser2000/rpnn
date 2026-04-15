@@ -33,16 +33,37 @@ cp "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" "$OUT_DIR/"
 cp RETAPROMPT_SHAREDLIB.md "$OUT_DIR/"
 
 cat > "$OUT_DIR/RUN_LAYOUT.txt" <<'LAYOUT'
-Keep these files in the same directory:
+Supported runtime layouts:
+
+1. All files in one directory:
 - libreta.so
-- libretaprompt_input.so
 - libretaprompt_commands.so
+- libretaprompt_input.so
 - rp
 - rpl
 - rpe
 - rpb
 
-The launchers use rpath=$ORIGIN and load the shared libraries from their own directory.
+2. Executables in one directory and libraries in ./lib:
+- ./rp ./rpl ./rpe ./rpb
+- ./lib/libreta.so
+- ./lib/libretaprompt_commands.so
+- ./lib/libretaprompt_input.so
+
+3. Executables in bin and libraries in ../lib relative to bin:
+- ./bin/rp ./bin/rpl ./bin/rpe ./bin/rpb
+- ./lib/libreta.so
+- ./lib/libretaprompt_commands.so
+- ./lib/libretaprompt_input.so
+
+Embedded search paths:
+- $ORIGIN
+- $ORIGIN/lib
+- $ORIGIN/../lib
+
+Dependency chain:
+- rp/rpl/rpe/rpb -> libretaprompt_input.so
+- libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
 LAYOUT
 
 printf 'packaged split shared libraries and launchers in:\n'

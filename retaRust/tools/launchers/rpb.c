@@ -1,4 +1,4 @@
-#include "../../crates/retaprompt_commands/include/retaprompt_commands.h"
+#include "../../crates/retaprompt_input/include/retaprompt_input.h"
 int main(void) {
-    return retaprompt_commands_run_rpb_from_env();
+    return retaprompt_input_run_launcher_kind_from_env(3);
 }

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use indexmap::IndexMap;
 
-use crate::shared::reta_program_types::{Generated2Selection, Program, SpaltenTyp};
+use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, Program, SpaltenTyp};
 use crate::shared::reta_runtime_cache::{shared_reta_static_data, GeneratorFamilyData};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
@@ -596,20 +596,34 @@ impl Program {
         }
     }
 
+    fn push_unique_pair_selection_py(target: &mut Vec<GeneratorPairSelection>, value: GeneratorPairSelection) {
+        if !target.iter().any(|existing| existing == &value) {
+            target.push(value);
+        }
+    }
+
     pub(crate) fn append_generated_family_from_entry_py(
         &self,
         entry: &StoreParameterEntry,
         generated1_pairs: &mut Vec<(i64, i64)>,
+        generated1_selections: &mut Vec<GeneratorPairSelection>,
         generated2_codes: &mut Vec<String>,
         generated2_selections: &mut Vec<Generated2Selection>,
         bool_and_tuple_set1_options: &mut Vec<Option<i64>>,
         metakonkret_pairs: &mut Vec<(i64, i64)>,
+        metakonkret_selections: &mut Vec<GeneratorPairSelection>,
     ) {
         for value in entry.datas.get(self.spaltenTypeNaming.generated1.1).into_iter().flatten() {
             if let PyValue::Tuple(inner) = value {
                 let numbers: Vec<i64> = inner.iter().filter_map(|item| match item { PyValue::Int(n) => Some(*n), _ => None }).collect();
                 if numbers.len() >= 2 {
                     Self::push_unique_pair_py(generated1_pairs, (numbers[0], numbers[1]));
+                    Self::push_unique_pair_selection_py(generated1_selections, GeneratorPairSelection {
+                        parameter_main_name: entry.parameterMainNames.first().cloned().unwrap_or_default(),
+                        parameter_name: entry.parameterNames.first().cloned().unwrap_or_default(),
+                        left: numbers[0],
+                        right: numbers[1],
+                    });
                 }
             }
         }
@@ -646,6 +660,12 @@ impl Program {
                 let numbers: Vec<i64> = inner.iter().filter_map(|item| match item { PyValue::Int(n) => Some(*n), _ => None }).collect();
                 if numbers.len() >= 2 {
                     Self::push_unique_pair_py(metakonkret_pairs, (numbers[0], numbers[1]));
+                    Self::push_unique_pair_selection_py(metakonkret_selections, GeneratorPairSelection {
+                        parameter_main_name: entry.parameterMainNames.first().cloned().unwrap_or_default(),
+                        parameter_name: entry.parameterNames.first().cloned().unwrap_or_default(),
+                        left: numbers[0],
+                        right: numbers[1],
+                    });
                 }
             }
         }
@@ -654,6 +674,9 @@ impl Program {
     fn merge_generator_family_from_cache_py(target: &mut GeneratorFamilyData, source: &GeneratorFamilyData) {
         for value in &source.generated1_pairs {
             Self::push_unique_pair_py(&mut target.generated1_pairs, *value);
+        }
+        for value in &source.generated1_selections {
+            Self::push_unique_pair_selection_py(&mut target.generated1_selections, value.clone());
         }
         for value in &source.generated2_codes {
             Self::push_unique_string_py(&mut target.generated2_codes, value.clone());
@@ -667,9 +690,12 @@ impl Program {
         for value in &source.metakonkret_pairs {
             Self::push_unique_pair_py(&mut target.metakonkret_pairs, *value);
         }
+        for value in &source.metakonkret_selections {
+            Self::push_unique_pair_selection_py(&mut target.metakonkret_selections, value.clone());
+        }
     }
 
-    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<String>, Vec<Generated2Selection>, Vec<Option<i64>>, Vec<(i64, i64)>) {
+    fn parse_exact_generator_selections_from_words_py(&self, words: &Words) -> (Vec<(i64, i64)>, Vec<GeneratorPairSelection>, Vec<String>, Vec<Generated2Selection>, Vec<Option<i64>>, Vec<(i64, i64)>, Vec<GeneratorPairSelection>) {
         let cached = shared_reta_static_data(words);
         let spalten_side_paras = self.side_paras_for_spalten_context_py();
         let run_all_generator_families = spalten_side_paras.iter().any(|token| token == "--alles");
@@ -706,10 +732,12 @@ impl Program {
                         self.append_generated_family_from_entry_py(
                             entry,
                             &mut fallback.generated1_pairs,
+                            &mut fallback.generated1_selections,
                             &mut fallback.generated2_codes,
                             &mut fallback.generated2_selections,
                             &mut fallback.bool_and_tuple_set1_options,
                             &mut fallback.metakonkret_pairs,
+                            &mut fallback.metakonkret_selections,
                         );
                     }
                 }
@@ -719,10 +747,12 @@ impl Program {
 
         (
             merged.generated1_pairs,
+            merged.generated1_selections,
             merged.generated2_codes,
             merged.generated2_selections,
             merged.bool_and_tuple_set1_options,
             merged.metakonkret_pairs,
+            merged.metakonkret_selections,
         )
     }
 
@@ -851,9 +881,10 @@ impl Program {
         self.onlyGenerated = Self::ordered_set_to_onlyGenerated_py(
             self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.boolAndTupleSet1).cloned().unwrap_or_default(),
         );
-        let (generated1Pairs_exact, generated2Codes_exact, generated2Selections_exact, boolAndTupleSet1Options_exact, metakonkretPairs_exact) =
+        let (generated1Pairs_exact, generated1Selections_exact, generated2Codes_exact, generated2Selections_exact, boolAndTupleSet1Options_exact, metakonkretPairs_exact, metakonkretSelections_exact) =
             self.parse_exact_generator_selections_from_words_py(words);
         self.generated1Pairs = generated1Pairs_exact;
+        self.generated1Selections = generated1Selections_exact;
         let mut ones = vec![];
         for a in self.onlyGenerated.clone() {
             if a.len() == 1 {
@@ -866,6 +897,7 @@ impl Program {
         self.generated2Selections = generated2Selections_exact;
         self.boolAndTupleSet1Options = boolAndTupleSet1Options_exact;
         self.metakonkretPairs = metakonkretPairs_exact;
+        self.metakonkretSelections = metakonkretSelections_exact;
 
         let has_alles_spalten = self.argvWithoutProgram.iter().any(|a| a == "--alles");
         if has_alles_spalten {

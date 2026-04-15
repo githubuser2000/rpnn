@@ -8,6 +8,7 @@ extern "C" {
 int retaprompt_input_run_rp_from_env(void);
 int retaprompt_input_run_rpl_from_env(void);
 int retaprompt_input_run_rpe_from_env(void);
+int retaprompt_input_run_launcher_kind_from_env(int kind);
 
 #ifdef __cplusplus
 }

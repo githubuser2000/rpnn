@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use indexmap::IndexMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BTreeMap};
 use crate::shared::words_py::PyValue;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -87,6 +87,15 @@ pub struct Generated2Selection {
     pub code: String,
 }
 
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GeneratorPairSelection {
+    pub parameter_main_name: String,
+    pub parameter_name: String,
+    pub left: i64,
+    pub right: i64,
+}
+
 #[derive(Clone, Debug)]
 pub struct Program {
     pub argv: Vec<String>,
@@ -131,6 +140,7 @@ pub struct Program {
     pub newerRows: Vec<Vec<String>>,
     pub oldTable: Vec<Vec<String>>,
     pub generatedSpaltenParameter: Vec<String>,
+    pub generatedSpaltenParameter_Tags: BTreeMap<i64, Vec<String>>,
     pub allEquColumns: Vec<i64>,
     pub finallyDisplayTable: Vec<Vec<String>>,
     pub rowsRangeLen: i64,
@@ -166,10 +176,12 @@ pub struct Program {
     pub SpaltenVanillaAmount: i64,
     pub CsvTheirsSpalten: IndexMap<i64, Vec<i64>>,
     pub generated1Pairs: Vec<(i64, i64)>,
+    pub generated1Selections: Vec<GeneratorPairSelection>,
     pub generated2Codes: Vec<String>,
     pub generated2Selections: Vec<Generated2Selection>,
     pub boolAndTupleSet1Options: Vec<Option<i64>>,
     pub metakonkretPairs: Vec<(i64, i64)>,
+    pub metakonkretSelections: Vec<GeneratorPairSelection>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
     pub AllSimpleCommandSpalten: Vec<i64>,
     pub lastLineNumber: i64,
@@ -233,6 +245,7 @@ impl Program {
             newerRows: vec![],
             oldTable: vec![],
             generatedSpaltenParameter: vec![],
+            generatedSpaltenParameter_Tags: BTreeMap::new(),
             allEquColumns: vec![],
             finallyDisplayTable: vec![],
             rowsRangeLen: 0,
@@ -268,10 +281,12 @@ impl Program {
             SpaltenVanillaAmount: 0,
             CsvTheirsSpalten: IndexMap::new(),
             generated1Pairs: vec![],
+            generated1Selections: vec![],
             generated2Codes: vec![],
             generated2Selections: vec![],
             boolAndTupleSet1Options: vec![],
             metakonkretPairs: vec![],
+            metakonkretSelections: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
             AllSimpleCommandSpalten: vec![],
             lastLineNumber: 0,

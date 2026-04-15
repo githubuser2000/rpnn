@@ -13,7 +13,7 @@ Zielzustand für retaPrompt:
 ## Abhängigkeitsrichtung
 
 ```text
-retaprompt_launcher -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+rp/rpl/rpe/rpb -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
 ```
 
 - `retaprompt_input` hängt bewusst von `retaprompt_commands` ab.
@@ -22,33 +22,24 @@ retaprompt_launcher -> libretaprompt_input.so -> libretaprompt_commands.so -> li
 
 ## Aktiver Cargo-Bauweg
 
-Die drei dynamischen Libraries kommen direkt aus Cargo:
+Die drei dynamischen Libraries werden im aktiven Verpackungsweg bewusst als kleine Forwarder mit expliziter Link-Abhängigkeitskette gebaut, damit `libreta.so` nicht mehrfach dupliziert wird und die Dateibeziehungen im ELF-Metadatenraum sichtbar bleiben:
 
 ```bash
-cargo build -p reta --lib
-cargo build -p retaprompt_commands --lib
-cargo build -p retaprompt_input --lib
+./tools/build_prompt_split_sharedlibs.sh
 ```
 
-Der aktive Launcher ist genau **ein** Binary:
+Die vier Launcher sind dabei absichtlich extrem klein und enthalten nur den festen Einstiegspunkt je Frontend.
 
-```bash
-cargo build -p retaprompt_frontends --bin retaprompt_launcher
-```
+## Vier dünne Launcher
 
-## Vier Namen über einen Launcher
+Es gibt vier extrem kleine Launcher-Binaries:
 
-`retaprompt_launcher` wertet `argv[0]` aus und entscheidet daraus, ob `rp`, `rpl`, `rpe` oder `rpb` gestartet wurde.
+- `rp` ruft fest `retaprompt_input_run_launcher_kind_from_env(1)` auf
+- `rpl` ruft fest `retaprompt_input_run_launcher_kind_from_env(2)` auf
+- `rpb` ruft fest `retaprompt_input_run_launcher_kind_from_env(3)` auf
+- `rpe` ruft fest `retaprompt_input_run_launcher_kind_from_env(4)` auf
 
-Praktische Nutzung im Build-Verzeichnis:
-
-```bash
-cd target/debug
-ln -sf retaprompt_launcher rp
-ln -sf retaprompt_launcher rpl
-ln -sf retaprompt_launcher rpe
-ln -sf retaprompt_launcher rpb
-```
+Damit wissen die Executables selbst bereits, welches Frontend sie starten sollen, und müssen nicht erst über Dateinamen geraten.
 
 Dann gilt:
 
@@ -64,12 +55,16 @@ Die fachliche Unterscheidung bleibt dabei in den Libraries:
 - `rp`, `rpl`, `rpe` laufen im Input-Pfad
 - `rpb` läuft im Command-Pfad
 
-## Warum nur ein Launcher?
+## Warum vier feste Mini-Launcher?
 
-So bleibt in den Executables so wenig wie möglich:
+So bleibt in den Executables fast nichts übrig:
 
 - genau ein `main()`
-- genau ein Sprung in `retaprompt_input`
-- die komplette Namensauswertung und Laufartwahl lebt in den `.so`-Bibliotheken
+- genau ein fester Sprung in `retaprompt_input`
+- die komplette Fachlogik lebt weiter in den `.so`-Bibliotheken
 
-Die früheren vier separaten Frontend-Binaries bleiben im Repository erhalten, sind aber nicht mehr aktiver Cargo-Bestandteil dieses Launcher-Pakets.
+Zusätzlich ist die Abhängigkeit jetzt auch auf ELF-Ebene klar:
+
+- `rp/rpl/rpe/rpb` kennen `libretaprompt_input.so`
+- `libretaprompt_input.so` kennt `libretaprompt_commands.so`
+- `libretaprompt_commands.so` kennt `libreta.so`
