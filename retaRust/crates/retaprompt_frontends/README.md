@@ -1,19 +1,18 @@
 # retaprompt_frontends
 
-Frontend package for `rp`, `rpl`, `rpb`, and `rpe`.
+Aktive dünne Binärschicht für `rp`, `rpl`, `rpe`, `rpb`.
 
-The layering is explicit and separated:
+Diese Crate enthält absichtlich nahezu keine Fachlogik.
+Die eigentliche retaPrompt-Logik liegt in den drei dynamischen Libraries:
 
-- `reta` = unchanged core library
-- `retaprompt_input` = own command input for `rp`, `rpl`, `rpe`
-- `retaprompt_commands` = command-topic layer for `rp`, `rpl`, `rpe`, `rpb`
-- `retaprompt_frontends` = thin binaries
+- `libreta.so` — gemeinsamer Unterbau
+- `libretaprompt_commands.so` — gemeinsame Befehls-/Command-Schicht für `rpb`, `rp`, `rpl`, `rpe`
+- `libretaprompt_input.so` — eigene/interaktive CLI-Eingabeschicht für `rp`, `rpl`, `rpe`
 
-The frontend binaries use the split strictly:
+Abhängigkeitsrichtung:
 
-- `rp`, `rpl`, `rpe` -> `retaprompt_input`
-- `rpb` -> `retaprompt_commands`
+- `retaprompt_input -> retaprompt_commands -> reta`
+- `rpb -> retaprompt_commands`
+- `rp/rpl/rpe -> retaprompt_input`
 
-
-This package is now the active binary layer for `rp`, `rpl`, `rpb`, and `rpe`.
-The root `reta` package keeps the old source files only as preserved legacy code, but the active Cargo build for these four prompt binaries runs through this package so no dependency cycle is created around the core `reta` library.
+Die vier Binärdateien sollen nur noch minimale `main()`-Einstiege sein.
