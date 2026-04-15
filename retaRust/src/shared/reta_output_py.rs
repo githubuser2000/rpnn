@@ -50,6 +50,54 @@ fn html_exact_header_attrs_py(
     let r_part = format!("z_0 r_{}", html_col_idx);
     format!(r#" class="{}""#, r_part)
 }
+
+    fn ordinary_column_tags_exact_py(&self, original_col: i64) -> Option<Vec<String>> {
+        let in_set = |key: (usize, usize)| -> bool {
+            self.spaltenArtenKey_SpaltennummernValue
+                .get(&key)
+                .map(|set| set.contains(&original_col))
+                .unwrap_or(false)
+        };
+
+        if self.puniverseprims.contains(&original_col) {
+            return Some(vec!["sternPolygon".to_string(), "universum".to_string(), "galaxie".to_string()]);
+        }
+        if in_set(self.spaltenTypeNaming.gebrGal1) {
+            return Some(vec!["sternPolygon".to_string(), "galaxie".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()]);
+        }
+        if in_set(self.spaltenTypeNaming.gebroUni1) {
+            return Some(vec!["sternPolygon".to_string(), "universum".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()]);
+        }
+        if in_set(self.spaltenTypeNaming.gebrEmo1) {
+            return Some(vec!["sternPolygon".to_string(), "keinParaOdMetaP".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()]);
+        }
+        if in_set(self.spaltenTypeNaming.gebrGroe1) {
+            return Some(vec!["sternPolygon".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string(), "keinParaOdMetaP".to_string()]);
+        }
+        None
+    }
+
+    fn register_visible_column_metadata_exact_py(&mut self, original_col: i64) {
+        if original_col < 0 {
+            return;
+        }
+        if !self.generatedSpaltenParameter_Exact.contains_key(&original_col) {
+            if let Some(entries) = self
+                .dataDict
+                .get(0)
+                .and_then(|dict| dict.get(&original_col.to_string()))
+                .cloned()
+            {
+                self.generatedSpaltenParameter_Exact.insert(original_col, entries);
+            }
+        }
+        if !self.generatedSpaltenParameter_Tags.contains_key(&original_col) {
+            if let Some(tags) = self.ordinary_column_tags_exact_py(original_col) {
+                self.generatedSpaltenParameter_Tags.insert(original_col, tags);
+            }
+        }
+    }
+
     pub(crate) fn prepare4out_py(
         &mut self,
         paramLines: Vec<String>,
@@ -114,6 +162,9 @@ fn html_exact_header_attrs_py(
         }
 
         let rowsRange: Vec<i64> = selected_cols.clone();
+        for original_col in rowsRange.iter().copied() {
+            self.register_visible_column_metadata_exact_py(original_col);
+        }
         let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
         (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
     }
