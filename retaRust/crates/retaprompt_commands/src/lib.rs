@@ -194,3 +194,5 @@ pub extern "C" fn retaprompt_commands_run_rpb_from_env() -> i32 {
 pub extern "C" fn retaprompt_commands_run_rpe_from_env() -> i32 {
     run_rpe_from_env()
 }
+
+
