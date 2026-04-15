@@ -67,6 +67,73 @@ verify_archive_symbols() {
   done
 }
 
+verify_archive_has_only_expected_defined_symbols() {
+  local archive="$1"
+  shift
+  local expected_defined=("$@")
+  local nm_out
+  local actual_defined
+  local expected_sorted
+  nm_out="$("$NM" -g "$archive")"
+  actual_defined="$({ grep -E "[[:space:]]T[[:space:]]" <<<"$nm_out" || true; } | awk '{print $3}' | sort)"
+  expected_sorted="$(printf '%s
+' "${expected_defined[@]}" | sort)"
+  if [[ "$actual_defined" != "$expected_sorted" ]]; then
+    echo "defined-symbol verification failed for $archive" >&2
+    echo "expected defined symbols:" >&2
+    printf '  %s
+' "${expected_defined[@]}" >&2
+    echo "actual defined symbols:" >&2
+    if [[ -n "$actual_defined" ]]; then
+      while IFS= read -r line; do
+        printf '  %s
+' "$line" >&2
+      done <<<"$actual_defined"
+    else
+      echo "  <none>" >&2
+    fi
+    exit 1
+  fi
+}
+
+write_split_manifest() {
+  local manifest="$1"
+  cat >"$manifest" <<EOF
+{
+  "archives": [
+    {
+      "path": "$TARGET_DIR/libreta.a",
+      "role": "core implementation",
+      "contains_forwarder_only": false
+    },
+    {
+      "path": "$TARGET_DIR/libretaprompt_input.a",
+      "role": "own command input for rp/rpl/rpe",
+      "contains_forwarder_only": true,
+      "object": "retaprompt_input_shim.o",
+      "defined_symbols": [
+        "retaprompt_input_run_rp_from_env",
+        "retaprompt_input_run_rpl_from_env",
+        "retaprompt_input_run_rpe_from_env"
+      ]
+    },
+    {
+      "path": "$TARGET_DIR/libretaprompt_commands.a",
+      "role": "command frontend for rp/rpl/rpe/rpb",
+      "contains_forwarder_only": true,
+      "object": "retaprompt_commands_shim.o",
+      "defined_symbols": [
+        "retaprompt_commands_run_rp_from_env",
+        "retaprompt_commands_run_rpl_from_env",
+        "retaprompt_commands_run_rpb_from_env",
+        "retaprompt_commands_run_rpe_from_env"
+      ]
+    }
+  ]
+}
+EOF
+}
+
 verify_archive_has_single_forwarder_object \
   "$TARGET_DIR/libretaprompt_input.a" \
   "retaprompt_input_shim.o"

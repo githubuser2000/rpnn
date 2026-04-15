@@ -71,3 +71,35 @@ Damit ist die Archivstruktur selbst maschinell abgesichert.
 ```
 
 Die beiden kleineren Archive referenzieren Symbole aus `libreta.a`.
+
+
+## Paketieren der drei Archive
+
+Wenn die drei Archive samt Headern und Manifest in ein gemeinsames Ausgabeverzeichnis
+kopiert werden sollen, geht das mit:
+
+```bash
+./tools/package_prompt_split_staticlibs.sh release
+```
+
+Dann entsteht zusätzlich:
+
+```text
+target/release/retaprompt_split_staticlibs_package/
+```
+
+Darin liegen:
+
+- `libreta.a`
+- `libretaprompt_input.a`
+- `libretaprompt_commands.a`
+- `include/retaprompt_input.h`
+- `include/retaprompt_commands.h`
+- `retaprompt_split_staticlibs_manifest.json`
+- `LINK_ORDER.txt`
+
+## Zusätzliche Verifikation
+
+Das Build-Skript prüft jetzt nicht nur, dass jedes Zusatzarchiv genau ein einziges
+Shim-Objekt enthält, sondern auch, dass es **nur die erwarteten Forwarder-Symbole**
+definiert. Dadurch wird Doppelinhalt noch härter ausgeschlossen.
