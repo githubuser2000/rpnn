@@ -1,0 +1,31 @@
+[package]
+name = "retaprompt"
+version = "0.1.0"
+edition = "2024"
+description = "Additive static library and binary frontend package for retaPrompt (rp/rpl/rpb/rpe)."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "retaprompt"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+reta = { path = "../.." }
+
+[[bin]]
+name = "rp"
+path = "src/bin/rp.rs"
+
+[[bin]]
+name = "rpl"
+path = "src/bin/rpl.rs"
+
+[[bin]]
+name = "rpb"
+path = "src/bin/rpb.rs"
+
+[[bin]]
+name = "rpe"
+path = "src/bin/rpe.rs"

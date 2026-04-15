@@ -1,0 +1,6 @@
+src/prompt/mod.rs
+crates/retaprompt/src/lib.rs
+crates/retaprompt/include/retaprompt.h
+crates/retaprompt/README.md
+RETAPROMPT_STATICLIB.md
+tools/build_retaprompt_staticlib.sh
