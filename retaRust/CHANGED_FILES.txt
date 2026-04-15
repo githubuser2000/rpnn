@@ -5,3 +5,4 @@ crates/retaprompt/src/retaprompt_shim.c
 src/prompt/retapromptlib.rs
 tools/build_retaprompt_staticlib.sh
 RETAPROMPT_STATICLIB.md
+RETAPROMPT_SPLIT_LIBS.md
