@@ -2,7 +2,7 @@
 set -e
 
 cargo clean
-cargo build --release
+cargo build --workspace --release
 
 for bin in rp rpl rpe rpb; do
   cc tools/launchers/$bin.c -o target/debug/$bin \
