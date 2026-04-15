@@ -2,9 +2,9 @@
 
 Additive static library package for the shared retaPrompt frontend layer.
 
-This package exists so `rp`, `rpl`, `rpb`, and `rpe` can be built and linked
-through a dedicated `retaprompt` static library artifact instead of only through
-the main `reta` static library.
+This package exists so `rp`, `rpl`, `rpb`, and `rpe` can be linked through one
+dedicated `retaprompt` static library artifact instead of being treated as
+separate native library targets.
 
 It does **not** delete or replace the existing `reta` crate. The current project
 keeps the old code paths intact and adds a dedicated package on top.
@@ -67,22 +67,13 @@ Build the dedicated static library:
 cargo build -p retaprompt --lib
 ```
 
-Build one of the dedicated prompt binaries from the package:
+Build the separate frontend wrappers from the dedicated frontend package:
 
 ```bash
-cargo build -p retaprompt --bin rp
-cargo build -p retaprompt --bin rpl
-cargo build -p retaprompt --bin rpb
-cargo build -p retaprompt --bin rpe
-```
-
-Run the dedicated package binaries directly:
-
-```bash
-cargo run -p retaprompt --bin rp
-cargo run -p retaprompt --bin rpl
-cargo run -p retaprompt --bin rpb -- av12-15
-cargo run -p retaprompt --bin rpe
+cargo build -p retaprompt_frontends --bin rp
+cargo build -p retaprompt_frontends --bin rpl
+cargo build -p retaprompt_frontends --bin rpb
+cargo build -p retaprompt_frontends --bin rpe
 ```
 
 The dedicated static library artifact is emitted as `libretaprompt.a`
@@ -99,9 +90,3 @@ A minimal C header is included at:
 - `crates/retaprompt/include/retaprompt.h`
 
 This header matches the exported no-mangle symbols from the static library.
-
-## Cargo bin discovery
-
-The root package and the dedicated `retaprompt` package both set `autobins = false`.
-That keeps Cargo restricted to the explicit `[[bin]]` entries so the legacy
-`src/bin/reta_min.rs` path is no longer picked up accidentally.

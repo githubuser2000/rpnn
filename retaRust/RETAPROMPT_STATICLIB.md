@@ -1,12 +1,13 @@
 # retaPrompt static library layer
 
-This project now contains a **dedicated** additive `retaprompt` package for the
-shared retaPrompt frontend layer.
+This project now contains one **dedicated** additive `retaprompt` package for the
+shared retaPrompt frontend layer and one separate `retaprompt_frontends`
+package for the executable wrappers.
 
 It does **not** introduce a second `reta` runtime implementation and does not
-remove the existing `reta` crate. Instead, it adds a thin package on top of the
-existing prompt/runtime code so `rp`, `rpl`, `rpb`, and `rpe` can be built as a
-separate static library artifact.
+remove the existing `reta` crate. Instead, it adds a thin library package on top
+of the existing prompt/runtime code so `rp`, `rpl`, `rpb`, and `rpe` can share a
+single dedicated static library artifact.
 
 ## Central shared layer
 
@@ -16,15 +17,16 @@ The real prompt behavior remains centralized in the existing Rust prompt code:
 - `src/prompt/retapromptlib.rs`
 - `src/prompt/mod.rs`
 
-The additive package layer lives here:
+The additive package layers now live here:
 
 - `crates/retaprompt/Cargo.toml`
 - `crates/retaprompt/src/lib.rs`
-- `crates/retaprompt/src/bin/rp.rs`
-- `crates/retaprompt/src/bin/rpl.rs`
-- `crates/retaprompt/src/bin/rpb.rs`
-- `crates/retaprompt/src/bin/rpe.rs`
 - `crates/retaprompt/include/retaprompt.h`
+- `crates/retaprompt_frontends/Cargo.toml`
+- `crates/retaprompt_frontends/src/bin/rp.rs`
+- `crates/retaprompt_frontends/src/bin/rpl.rs`
+- `crates/retaprompt_frontends/src/bin/rpb.rs`
+- `crates/retaprompt_frontends/src/bin/rpe.rs`
 
 ## Frontend defaults
 
@@ -78,43 +80,36 @@ crate-type = ["rlib", "staticlib"]
 
 ## Build commands
 
-Dedicated package library:
+Build only the single shared retaPrompt static library:
 
 ```bash
 cargo build -p retaprompt --lib
 ```
 
-Dedicated package binaries:
+Build the thin frontend executables that sit on top of it:
 
 ```bash
-cargo build -p retaprompt --bin rp
-cargo build -p retaprompt --bin rpl
-cargo build -p retaprompt --bin rpb
-cargo build -p retaprompt --bin rpe
+cargo build -p retaprompt_frontends --bin rp
+cargo build -p retaprompt_frontends --bin rpl
+cargo build -p retaprompt_frontends --bin rpb
+cargo build -p retaprompt_frontends --bin rpe
+```
+
+Or use the helper script:
+
+```bash
+./tools/build_retaprompt_staticlib.sh debug lib
+./tools/build_retaprompt_staticlib.sh debug all
 ```
 
 ## Intent
 
 This is additive. Old code paths are preserved and delegate forward where
-useful. The main structural completion here is that the dedicated `retaprompt`
-package now depends on the **public** `reta::prompt` API rather than reaching
-into deeper internal module paths, so the separate static library becomes a thin
-consumer of the same shared prompt layer instead of another ad-hoc integration.
+useful. The structural completion here is now explicit:
 
-## Cargo bin discovery
+- `retaprompt` = one shared dedicated static library package
+- `retaprompt_frontends` = the four thin executable wrappers
 
-The root package and the dedicated `retaprompt` package both set `autobins = false`.
-That keeps Cargo restricted to the explicit `[[bin]]` entries so the legacy
-`src/bin/reta_min.rs` path is no longer picked up accidentally.
-
-
-## Single static library outcome
-
-The workspace is intentionally reduced to one dedicated retaPrompt package:
-
-- `crates/retaprompt` -> `libretaprompt.a`
-
-`rp`, `rpl`, `rpb`, and `rpe` stay available as explicit binaries, but there is
-no longer a separate static library package per frontend. The single shared
-static library is the additive packaging layer that unifies the maximal common
-behavior of all four frontends.
+That means the project no longer models the four prompt executables as four
+separate static library targets. Instead, they all converge on the same shared
+`libretaprompt.a`.

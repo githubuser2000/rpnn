@@ -7,3 +7,5 @@ crates/retaprompt/README.md
 src/prompt/retapromptlib.rs
 src/prompt/mod.rs
 crates/retaprompt/src/lib.rs
+crates/retaprompt/Cargo.toml
+crates/retaprompt_frontends/README.md

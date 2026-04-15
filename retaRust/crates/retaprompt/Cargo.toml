@@ -15,18 +15,3 @@ crate-type = ["rlib", "staticlib"]
 [dependencies]
 reta = { path = "../.." }
 
-[[bin]]
-name = "rp"
-path = "src/bin/rp.rs"
-
-[[bin]]
-name = "rpl"
-path = "src/bin/rpl.rs"
-
-[[bin]]
-name = "rpb"
-path = "src/bin/rpb.rs"
-
-[[bin]]
-name = "rpe"
-path = "src/bin/rpe.rs"

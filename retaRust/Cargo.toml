@@ -54,5 +54,6 @@ path = "src/bin/reta_domain_probe.rs"
 
 
 [workspace]
-members = ["crates/retaprompt"]
+members = ["crates/retaprompt", "crates/retaprompt_frontends"]
+default-members = [".", "crates/retaprompt", "crates/retaprompt_frontends"]
 resolver = "2"
