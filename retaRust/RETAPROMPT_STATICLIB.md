@@ -1,95 +1,97 @@
-# retaPrompt static library layer
+# retaPrompt split static libraries
 
-This project keeps the existing `reta` crate and adds an additive retaPrompt layer on top.
+The project now targets three distinct static archives with no code copied from one archive into another:
 
-The important native-linking distinction is now:
+- `libreta.a` = full shared implementation base
+- `libretaprompt_input.a` = tiny ABI forwarding archive for the self-entered prompt input side (`rp`, `rpl`, `rpe`)
+- `libretaprompt_commands.a` = tiny ABI forwarding archive for the command-topic side (`rp`, `rpl`, `rpe`, `rpb`)
 
-- `libreta.a` = heavy implementation base
-- `libretaprompt.a` = small retaPrompt ABI forwarding archive
+The two prompt-side archives must **not** be built as Rust `staticlib`, because that would pull `reta` into them again and duplicate code from `libreta.a`.
 
-That means `libretaprompt.a` must not be produced by Rust `crate-type = ["staticlib"]`, because that would bundle `reta` again and duplicate `libreta.a`.
-Instead, the retaPrompt ABI implementation is exported from `libreta.a` under prefixed C symbols, and `tools/build_retaprompt_staticlib.sh` builds a tiny forwarding `libretaprompt.a` on top.
+Instead, `libreta.a` exports the implementation symbols, and the two prompt-side archives are built from small C shim objects that forward into `libreta.a`.
 
-## Shared Rust prompt code
+## Functional split
 
-The real prompt behavior remains centralized in the existing Rust prompt code:
+### Input-side library
 
-- `src/prompt/frontend_profile.rs`
-- `src/prompt/retapromptlib.rs`
-- `src/prompt/mod.rs`
+`libretaprompt_input.a` covers own command input only:
 
-The additive Rust package layer lives here:
+- `rp`
+- `rpl`
+- `rpe`
 
-- `crates/retaprompt/Cargo.toml`
-- `crates/retaprompt/src/lib.rs`
-- `crates/retaprompt/include/retaprompt.h`
-- `crates/retaprompt/src/retaprompt_shim.c`
-- `crates/retaprompt_frontends/Cargo.toml`
-- `crates/retaprompt_frontends/src/bin/rp.rs`
-- `crates/retaprompt_frontends/src/bin/rpl.rs`
-- `crates/retaprompt_frontends/src/bin/rpb.rs`
-- `crates/retaprompt_frontends/src/bin/rpe.rs`
+Exported public ABI symbols:
 
-## Frontend defaults
+- `retaprompt_input_run_rp_from_env`
+- `retaprompt_input_run_rpl_from_env`
+- `retaprompt_input_run_rpe_from_env`
 
-- `rp`: vi mode, no implicit logging, interactive
-- `rpl`: vi mode, implicit logging, interactive
-- `rpb`: vi mode, no implicit logging, one-shot
-- `rpe`: emacs mode, no implicit logging, interactive
+Forwarded implementation symbols in `libreta.a`:
 
-## Stable Rust entry points
+- `reta_retaprompt_input_run_rp_from_env`
+- `reta_retaprompt_input_run_rpl_from_env`
+- `reta_retaprompt_input_run_rpe_from_env`
 
-From the main crate public API:
+### Command-side library
 
-- `reta::prompt::PromptFrontendKind`
-- `reta::prompt::PromptFrontendProfile`
-- `reta::prompt::run_retaprompt_rp_from_env()`
-- `reta::prompt::run_retaprompt_rpl_from_env()`
-- `reta::prompt::run_retaprompt_rpb_from_env()`
-- `reta::prompt::run_retaprompt_rpe_from_env()`
-- `reta::prompt::run_retaprompt_auto_from_env()`
-- `reta::prompt::run_retaprompt_with_kind(argv, kind)`
-- `reta::prompt::run_retaprompt_with_profile(argv, profile)`
+`libretaprompt_commands.a` covers command-topic entry points only:
 
-From the additive `retaprompt` Rust crate:
+- `rp`
+- `rpl`
+- `rpe`
+- `rpb`
 
-- `retaprompt::run_rp_from_env()`
-- `retaprompt::run_rpl_from_env()`
-- `retaprompt::run_rpb_from_env()`
-- `retaprompt::run_rpe_from_env()`
-- `retaprompt::run_auto_from_env()`
+Exported public ABI symbols:
 
-## Native ABI split
+- `retaprompt_commands_run_rp_from_env`
+- `retaprompt_commands_run_rpl_from_env`
+- `retaprompt_commands_run_rpb_from_env`
+- `retaprompt_commands_run_rpe_from_env`
 
-`libreta.a` exports the implementation symbols:
+Forwarded implementation symbols in `libreta.a`:
 
-- `reta_retaprompt_run_kind_from_env`
-- `reta_retaprompt_run_auto_from_env`
-- `reta_retaprompt_run_rp_from_env`
-- `reta_retaprompt_run_rpl_from_env`
-- `reta_retaprompt_run_rpb_from_env`
-- `reta_retaprompt_run_rpe_from_env`
+- `reta_retaprompt_commands_run_rp_from_env`
+- `reta_retaprompt_commands_run_rpl_from_env`
+- `reta_retaprompt_commands_run_rpb_from_env`
+- `reta_retaprompt_commands_run_rpe_from_env`
 
-`libretaprompt.a` exports the public retaPrompt ABI symbols and forwards to the symbols above:
+## Rust crate layout
 
-- `retaprompt_run_kind_from_env`
-- `retaprompt_run_auto_from_env`
-- `retaprompt_run_rp_from_env`
-- `retaprompt_run_rpl_from_env`
-- `retaprompt_run_rpb_from_env`
-- `retaprompt_run_rpe_from_env`
+The Rust crate split remains additive:
+
+- root crate `reta` = unchanged core implementation
+- `crates/retaprompt_input` = Rust input-side facade on top of `reta`
+- `crates/retaprompt_commands` = Rust command-side facade on top of `reta`
+
+These two Rust crates depend only on `reta` and not on each other.
 
 ## Build
 
-Build both archives with the dedicated helper:
+Use the dedicated helper:
 
 ```bash
-./tools/build_retaprompt_staticlib.sh debug
-./tools/build_retaprompt_staticlib.sh release
+./tools/build_prompt_split_staticlibs.sh debug
+./tools/build_prompt_split_staticlibs.sh release
 ```
 
-Correct native link model:
+This builds:
 
 ```text
-... libretaprompt.a libreta.a ...
+target/<profile>/libreta.a
+target/<profile>/libretaprompt_input.a
+target/<profile>/libretaprompt_commands.a
 ```
+
+## Correct native link model
+
+```text
+... libretaprompt_input.a libretaprompt_commands.a libreta.a ...
+```
+
+In this model:
+
+- `libretaprompt_input.a` contains only input-side C forwarders
+- `libretaprompt_commands.a` contains only command-side C forwarders
+- `libreta.a` contains the Rust implementation
+
+So the three archives stay disjoint in contained code.

@@ -1,4 +1,7 @@
-use super::app::{run_prompt_frontend_with_profile, run_rp_one_shot};
+use super::app::{
+    run_prompt_command_frontend_with_profile, run_prompt_frontend_with_profile,
+    run_prompt_input_frontend_with_profile, run_rp_one_shot,
+};
 use super::frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
 
 fn env_args() -> Vec<String> {
@@ -12,6 +15,16 @@ pub fn run_with_kind(argv: Vec<String>, kind: PromptFrontendKind) -> i32 {
 
 pub fn run_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
     run_prompt_frontend_with_profile(argv, profile)
+}
+
+pub fn run_input_with_kind(argv: Vec<String>, kind: PromptFrontendKind) -> i32 {
+    let profile = PromptFrontendProfile::for_kind(kind, true);
+    run_prompt_input_frontend_with_profile(argv, profile)
+}
+
+pub fn run_command_with_kind(argv: Vec<String>, kind: PromptFrontendKind) -> i32 {
+    let profile = PromptFrontendProfile::for_kind(kind, true);
+    run_prompt_command_frontend_with_profile(argv, profile)
 }
 
 pub fn run_rp(argv: Vec<String>) -> i32 {
@@ -30,6 +43,34 @@ pub fn run_rpe(argv: Vec<String>) -> i32 {
     run_with_kind(argv, PromptFrontendKind::Rpe)
 }
 
+pub fn run_input_rp(argv: Vec<String>) -> i32 {
+    run_input_with_kind(argv, PromptFrontendKind::Rp)
+}
+
+pub fn run_input_rpl(argv: Vec<String>) -> i32 {
+    run_input_with_kind(argv, PromptFrontendKind::Rpl)
+}
+
+pub fn run_input_rpe(argv: Vec<String>) -> i32 {
+    run_input_with_kind(argv, PromptFrontendKind::Rpe)
+}
+
+pub fn run_command_rp(argv: Vec<String>) -> i32 {
+    run_command_with_kind(argv, PromptFrontendKind::Rp)
+}
+
+pub fn run_command_rpl(argv: Vec<String>) -> i32 {
+    run_command_with_kind(argv, PromptFrontendKind::Rpl)
+}
+
+pub fn run_command_rpb(argv: Vec<String>) -> i32 {
+    run_command_with_kind(argv, PromptFrontendKind::Rpb)
+}
+
+pub fn run_command_rpe(argv: Vec<String>) -> i32 {
+    run_command_with_kind(argv, PromptFrontendKind::Rpe)
+}
+
 pub fn run_rp_from_env() -> i32 {
     run_rp(env_args())
 }
@@ -44,6 +85,34 @@ pub fn run_rpb_from_env() -> i32 {
 
 pub fn run_rpe_from_env() -> i32 {
     run_rpe(env_args())
+}
+
+pub fn run_input_rp_from_env() -> i32 {
+    run_input_rp(env_args())
+}
+
+pub fn run_input_rpl_from_env() -> i32 {
+    run_input_rpl(env_args())
+}
+
+pub fn run_input_rpe_from_env() -> i32 {
+    run_input_rpe(env_args())
+}
+
+pub fn run_command_rp_from_env() -> i32 {
+    run_command_rp(env_args())
+}
+
+pub fn run_command_rpl_from_env() -> i32 {
+    run_command_rpl(env_args())
+}
+
+pub fn run_command_rpb_from_env() -> i32 {
+    run_command_rpb(env_args())
+}
+
+pub fn run_command_rpe_from_env() -> i32 {
+    run_command_rpe(env_args())
 }
 
 pub fn run_auto_from_env() -> i32 {
@@ -136,6 +205,33 @@ pub fn retaprompt_run_rpe_from_env_abi() -> i32 {
     run_rpe_from_env()
 }
 
+pub fn retaprompt_input_run_rp_from_env_abi() -> i32 {
+    run_input_rp_from_env()
+}
+
+pub fn retaprompt_input_run_rpl_from_env_abi() -> i32 {
+    run_input_rpl_from_env()
+}
+
+pub fn retaprompt_input_run_rpe_from_env_abi() -> i32 {
+    run_input_rpe_from_env()
+}
+
+pub fn retaprompt_commands_run_rp_from_env_abi() -> i32 {
+    run_command_rp_from_env()
+}
+
+pub fn retaprompt_commands_run_rpl_from_env_abi() -> i32 {
+    run_command_rpl_from_env()
+}
+
+pub fn retaprompt_commands_run_rpb_from_env_abi() -> i32 {
+    run_command_rpb_from_env()
+}
+
+pub fn retaprompt_commands_run_rpe_from_env_abi() -> i32 {
+    run_command_rpe_from_env()
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_kind_from_env(kind: i32) -> i32 {
@@ -165,4 +261,39 @@ pub extern "C" fn reta_retaprompt_run_rpb_from_env() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rpe_from_env() -> i32 {
     retaprompt_run_rpe_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_rp_from_env() -> i32 {
+    retaprompt_input_run_rp_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_rpl_from_env() -> i32 {
+    retaprompt_input_run_rpl_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_rpe_from_env() -> i32 {
+    retaprompt_input_run_rpe_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_commands_run_rp_from_env() -> i32 {
+    retaprompt_commands_run_rp_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_commands_run_rpl_from_env() -> i32 {
+    retaprompt_commands_run_rpl_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_commands_run_rpb_from_env() -> i32 {
+    retaprompt_commands_run_rpb_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_commands_run_rpe_from_env() -> i32 {
+    retaprompt_commands_run_rpe_from_env_abi()
 }

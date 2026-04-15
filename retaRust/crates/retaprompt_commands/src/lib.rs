@@ -63,17 +63,17 @@ pub fn run_rpe(argv: Vec<String>) -> i32 {
 }
 
 pub fn run_rp_from_env() -> i32 {
-    run_rp(std::env::args().collect())
+    reta::prompt::run_command_rp_from_env()
 }
 
 pub fn run_rpl_from_env() -> i32 {
-    run_rpl(std::env::args().collect())
+    reta::prompt::run_command_rpl_from_env()
 }
 
 pub fn run_rpb_from_env() -> i32 {
-    run_rpb(std::env::args().collect())
+    reta::prompt::run_command_rpb_from_env()
 }
 
 pub fn run_rpe_from_env() -> i32 {
-    run_rpe(std::env::args().collect())
+    reta::prompt::run_command_rpe_from_env()
 }
