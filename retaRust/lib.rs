@@ -100,8 +100,5 @@ pub fn run_reta_and_print_from_env() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_run_and_print_from_env_ffi() -> i32 {
-    match std::panic::catch_unwind(run_reta_and_print_from_env) {
-        Ok(code) => code,
-        Err(_) => 1,
-    }
+    run_reta_and_print_from_env()
 }

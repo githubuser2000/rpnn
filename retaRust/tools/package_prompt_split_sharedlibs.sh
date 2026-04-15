@@ -21,6 +21,7 @@ OUT_DIR="$TARGET_DIR/retaprompt_split_sharedlibs_package"
 mkdir -p "$OUT_DIR/include"
 
 cp "$TARGET_DIR/libreta.so" "$OUT_DIR/"
+cp "$TARGET_DIR/reta" "$OUT_DIR/"
 cp "$TARGET_DIR/libretaprompt_input.so" "$OUT_DIR/"
 cp "$TARGET_DIR/libretaprompt_commands.so" "$OUT_DIR/"
 cp "$TARGET_DIR/rp" "$OUT_DIR/"
@@ -36,6 +37,7 @@ cat > "$OUT_DIR/RUN_LAYOUT.txt" <<'LAYOUT'
 Supported runtime layouts:
 
 1. All files in one directory:
+- reta
 - libreta.so
 - libretaprompt_commands.so
 - libretaprompt_input.so
@@ -45,13 +47,13 @@ Supported runtime layouts:
 - rpb
 
 2. Executables in one directory and libraries in ./lib:
-- ./rp ./rpl ./rpe ./rpb
+- ./reta ./rp ./rpl ./rpe ./rpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
 
 3. Executables in bin and libraries in ../lib relative to bin:
-- ./bin/rp ./bin/rpl ./bin/rpe ./bin/rpb
+- ./bin/reta ./bin/rp ./bin/rpl ./bin/rpe ./bin/rpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
@@ -62,8 +64,9 @@ Embedded search paths:
 - $ORIGIN/../lib
 
 Dependency chain:
-- rp/rpl/rpe/rpb -> libretaprompt_input.so
-- libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+- reta -> libreta.so
+- rp/rpl/rpe -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+- rpb -> libretaprompt_commands.so -> libreta.so
 LAYOUT
 
 printf 'packaged split shared libraries and launchers in:\n'

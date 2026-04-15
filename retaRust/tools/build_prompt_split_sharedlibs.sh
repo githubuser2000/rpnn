@@ -33,6 +33,8 @@ cargo build "${CARGO_FLAGS[@]}" \
 mkdir -p "$TARGET_DIR/retaprompt-split-shared"
 
 CORE_SO="$TARGET_DIR/libreta.so"
+RETA_BIN="$TARGET_DIR/reta"
+RETA_RUST_BIN="$TARGET_DIR/reta_rust"
 INPUT_RUST_SO="$TARGET_DIR/libretaprompt_input_rust.so"
 INPUT_SO="$TARGET_DIR/libretaprompt_input.so"
 COMMANDS_RUST_SO="$TARGET_DIR/libretaprompt_commands_rust.so"
@@ -63,6 +65,7 @@ rename_if_needed() {
 
 rename_if_needed "$TARGET_DIR/libretaprompt_input.so" "$INPUT_RUST_SO"
 rename_if_needed "$TARGET_DIR/libretaprompt_commands.so" "$COMMANDS_RUST_SO"
+rename_if_needed "$RETA_BIN" "$RETA_RUST_BIN"
 
 build_shared_forwarder() {
   local source="$1"
@@ -104,10 +107,11 @@ build_launcher() {
     -o "$output"
 }
 
-build_launcher tools/launchers/rp.c  "$TARGET_DIR/rp"  retaprompt_input
-build_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl" retaprompt_input
-build_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe" retaprompt_input
-build_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb" retaprompt_commands 
+build_launcher tools/launchers/reta.c "$RETA_BIN" reta
+build_launcher tools/launchers/rp.c   "$TARGET_DIR/rp"  retaprompt_input
+build_launcher tools/launchers/rpl.c  "$TARGET_DIR/rpl" retaprompt_input
+build_launcher tools/launchers/rpe.c  "$TARGET_DIR/rpe" retaprompt_input
+build_launcher tools/launchers/rpb.c  "$TARGET_DIR/rpb" retaprompt_commands
 
 verify_defined_symbol() {
   local shared="$1"
@@ -140,6 +144,7 @@ verify_defined_symbol "$INPUT_SO" "retaprompt_input_run_launcher_kind_from_env"
 
 verify_needed_entry "$COMMANDS_SO" "libreta.so"
 verify_needed_entry "$INPUT_SO" "libretaprompt_commands.so"
+verify_needed_entry "$RETA_BIN" "libreta.so"
 verify_needed_entry "$TARGET_DIR/rp"  "libretaprompt_input.so"
 verify_needed_entry "$TARGET_DIR/rpl" "libretaprompt_input.so"
 verify_needed_entry "$TARGET_DIR/rpe" "libretaprompt_input.so"
@@ -165,6 +170,10 @@ cat > "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" <<MANIFEST
   ],
   "launchers": [
     {
+      "path": "$RETA_BIN",
+      "depends_on": ["libreta.so"]
+    },
+    {
       "path": "$TARGET_DIR/rp",
       "depends_on": ["libretaprompt_input.so"]
     },
@@ -178,7 +187,7 @@ cat > "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" <<MANIFEST
     },
     {
       "path": "$TARGET_DIR/rpb",
-      "depends_on": ["libretaprompt_input.so"]
+      "depends_on": ["libretaprompt_commands.so"]
     }
   ]
 }
@@ -188,6 +197,7 @@ printf 'built split shared libraries and launchers:\n'
 printf '  %s\n' "$CORE_SO"
 printf '  %s\n' "$COMMANDS_SO"
 printf '  %s\n' "$INPUT_SO"
+printf '  %s\n' "$RETA_BIN"
 printf '  %s\n' "$TARGET_DIR/rp"
 printf '  %s\n' "$TARGET_DIR/rpl"
 printf '  %s\n' "$TARGET_DIR/rpe"
