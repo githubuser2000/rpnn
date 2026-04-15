@@ -1,4 +1,5 @@
 #include "../../crates/retaprompt_input/include/retaprompt_input.h"
+
 int main(void) {
-    return retaprompt_input_run_launcher_kind_from_env(4);
+    return retaprompt_input_run_rpe_from_env();
 }
