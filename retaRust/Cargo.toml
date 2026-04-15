@@ -17,7 +17,7 @@ nu-ansi-term = "0.50.3"
 [lib]
 name = "reta"
 path = "src/lib.rs"
-crate-type = ["rlib", "staticlib"]
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "reta"
@@ -32,22 +32,6 @@ name = "generate4readme"
 path = "src/bin/generate4readme.rs"
 
 [[bin]]
-name = "rp"
-path = "src/bin/rp.rs"
-
-[[bin]]
-name = "rpl"
-path = "src/bin/rpl.rs"
-
-[[bin]]
-name = "rpb"
-path = "src/bin/rpb.rs"
-
-[[bin]]
-name = "rpe"
-path = "src/bin/rpe.rs"
-
-[[bin]]
 name = "reta_domain_probe"
 path = "src/bin/reta_domain_probe.rs"
 
@@ -55,14 +39,14 @@ path = "src/bin/reta_domain_probe.rs"
 
 [workspace]
 # Active additive split for retaPrompt:
-# - reta = unchanged shared core library at the workspace root
-# - retaprompt_input = own command input library for rp/rpl/rpe
-# - retaprompt_commands = command-topic library for rp/rpl/rpe/rpb
+# - reta = unchanged shared core library at the workspace root (`libreta.so`)
+# - retaprompt_commands = shared command library for rp/rpl/rpe/rpb (`libretaprompt_commands.so`)
+# - retaprompt_input = shared own-input library for rp/rpl/rpe (`libretaprompt_input.so`)
+# - retaprompt_frontends = active thin binary package for rp/rpl/rpe/rpb
 #
-# The older mixed crate `crates/retaprompt` and the thin wrapper package
-# `crates/retaprompt_frontends` are intentionally kept in the repository so
-# older code is not destroyed. They are inactive and not active workspace
-# members. This keeps the active split focused on exactly the two extra
-# libraries which both depend only on `reta`.
-members = ["crates/retaprompt_input", "crates/retaprompt_commands"]
+# The older mixed crate `crates/retaprompt` is intentionally kept in the
+# repository so old code is not destroyed, but it is not an active workspace
+# member.
+members = ["crates/retaprompt_input", "crates/retaprompt_commands", "crates/retaprompt_frontends"]
+default-members = [".", "crates/retaprompt_input", "crates/retaprompt_commands", "crates/retaprompt_frontends"]
 resolver = "2"

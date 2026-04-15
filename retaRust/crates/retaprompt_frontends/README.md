@@ -15,5 +15,5 @@ The frontend binaries use the split strictly:
 - `rpb` -> `retaprompt_commands`
 
 
-This package is preserved additively, but it is intentionally not an active workspace member.
-The root `reta` package still contains the established binaries, so this wrapper package remains optional and inactive to avoid turning the split into a second active binary layer.
+This package is now the active binary layer for `rp`, `rpl`, `rpb`, and `rpe`.
+The root `reta` package keeps the old source files only as preserved legacy code, but the active Cargo build for these four prompt binaries runs through this package so no dependency cycle is created around the core `reta` library.

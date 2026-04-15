@@ -16,7 +16,24 @@ pub use reta::prompt::commands::{
     PromptOutput,
     SessionState,
 };
+pub use reta::prompt::frontend_profile::PromptFrontendProfile;
 pub use reta::prompt::python_like::PromptModus;
+
+pub fn profile_rp() -> PromptFrontendProfile {
+    reta::prompt::frontend_profile::PromptFrontendProfile::rp()
+}
+
+pub fn profile_rpl() -> PromptFrontendProfile {
+    reta::prompt::frontend_profile::PromptFrontendProfile::rpl()
+}
+
+pub fn profile_rpb() -> PromptFrontendProfile {
+    reta::prompt::frontend_profile::PromptFrontendProfile::rpb()
+}
+
+pub fn profile_rpe() -> PromptFrontendProfile {
+    reta::prompt::frontend_profile::PromptFrontendProfile::rpe()
+}
 
 pub fn compile_for_rp(input: &str) -> Result<PromptCommand, String> {
     compile_command(input, PromptModus::Normal)
@@ -37,28 +54,28 @@ pub fn compile_for_rpe(input: &str) -> Result<PromptCommand, String> {
 pub fn run_rp(argv: Vec<String>) -> i32 {
     reta::prompt::run_prompt_command_frontend_with_profile(
         argv,
-        reta::prompt::frontend_profile::PromptFrontendProfile::rp(),
+        profile_rp(),
     )
 }
 
 pub fn run_rpl(argv: Vec<String>) -> i32 {
     reta::prompt::run_prompt_command_frontend_with_profile(
         argv,
-        reta::prompt::frontend_profile::PromptFrontendProfile::rpl(),
+        profile_rpl(),
     )
 }
 
 pub fn run_rpb(argv: Vec<String>) -> i32 {
     reta::prompt::run_prompt_command_frontend_with_profile(
         argv,
-        reta::prompt::frontend_profile::PromptFrontendProfile::rpb(),
+        profile_rpb(),
     )
 }
 
 pub fn run_rpe(argv: Vec<String>) -> i32 {
     reta::prompt::run_prompt_command_frontend_with_profile(
         argv,
-        reta::prompt::frontend_profile::PromptFrontendProfile::rpe(),
+        profile_rpe(),
     )
 }
 

@@ -10,7 +10,8 @@ publish = false
 [lib]
 name = "retaprompt_input"
 path = "src/lib.rs"
-crate-type = ["rlib"]
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 reta = { path = "../.." }
+retaprompt_commands = { path = "../retaprompt_commands" }
