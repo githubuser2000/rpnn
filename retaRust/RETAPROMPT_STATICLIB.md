@@ -1,97 +1,73 @@
-# retaPrompt split static libraries
+# reta prompt split static libraries
 
-The project now targets three distinct static archives with no code copied from one archive into another:
+Ziel ist **genau drei** statische Archive ohne gegenseitigen Implementierungs-Doppelinhalt:
 
-- `libreta.a` = full shared implementation base
-- `libretaprompt_input.a` = tiny ABI forwarding archive for the self-entered prompt input side (`rp`, `rpl`, `rpe`)
-- `libretaprompt_commands.a` = tiny ABI forwarding archive for the command-topic side (`rp`, `rpl`, `rpe`, `rpb`)
+- `libreta.a`
+- `libretaprompt_input.a`
+- `libretaprompt_commands.a`
 
-The two prompt-side archives must **not** be built as Rust `staticlib`, because that would pull `reta` into them again and duplicate code from `libreta.a`.
+## Fachliche Trennung
 
-Instead, `libreta.a` exports the implementation symbols, and the two prompt-side archives are built from small C shim objects that forward into `libreta.a`.
+### `libreta.a`
+Trägt die eigentliche Rust-Implementierung und bleibt die Kernbibliothek.
 
-## Functional split
-
-### Input-side library
-
-`libretaprompt_input.a` covers own command input only:
+### `libretaprompt_input.a`
+Thematisiert nur die **eigene Befehlseingabe** für:
 
 - `rp`
 - `rpl`
 - `rpe`
 
-Exported public ABI symbols:
-
-- `retaprompt_input_run_rp_from_env`
-- `retaprompt_input_run_rpl_from_env`
-- `retaprompt_input_run_rpe_from_env`
-
-Forwarded implementation symbols in `libreta.a`:
-
-- `reta_retaprompt_input_run_rp_from_env`
-- `reta_retaprompt_input_run_rpl_from_env`
-- `reta_retaprompt_input_run_rpe_from_env`
-
-### Command-side library
-
-`libretaprompt_commands.a` covers command-topic entry points only:
+### `libretaprompt_commands.a`
+Thematisiert nur die **Befehlsseite** für:
 
 - `rp`
 - `rpl`
 - `rpe`
 - `rpb`
 
-Exported public ABI symbols:
+## Warum die zwei Zusatzarchive keine Rust-`staticlib`-Crates sind
 
-- `retaprompt_commands_run_rp_from_env`
-- `retaprompt_commands_run_rpl_from_env`
-- `retaprompt_commands_run_rpb_from_env`
-- `retaprompt_commands_run_rpe_from_env`
+Wenn `retaprompt_input` oder `retaprompt_commands` selbst als Rust-`staticlib` gebaut würden,
+würde Cargo deren Rust-Abhängigkeiten in die Archive hineinziehen. Dann würde `reta` in beiden
+Zusatzarchiven wieder stecken. Genau das soll vermieden werden.
 
-Forwarded implementation symbols in `libreta.a`:
+Darum ist die Aufteilung hier absichtlich zweistufig:
 
-- `reta_retaprompt_commands_run_rp_from_env`
-- `reta_retaprompt_commands_run_rpl_from_env`
-- `reta_retaprompt_commands_run_rpb_from_env`
-- `reta_retaprompt_commands_run_rpe_from_env`
+1. `reta` wird als echte Rust-`staticlib` gebaut und erzeugt `libreta.a`.
+2. `libretaprompt_input.a` und `libretaprompt_commands.a` werden als **kleine C-Archive** gebaut,
+   die nur Forwarder-Symbole enthalten und in `libreta.a` weiterleiten.
 
-## Rust crate layout
-
-The Rust crate split remains additive:
-
-- root crate `reta` = unchanged core implementation
-- `crates/retaprompt_input` = Rust input-side facade on top of `reta`
-- `crates/retaprompt_commands` = Rust command-side facade on top of `reta`
-
-These two Rust crates depend only on `reta` and not on each other.
+So bleibt die Implementierung genau einmal in `libreta.a`.
 
 ## Build
 
-Use the dedicated helper:
-
 ```bash
-./tools/build_prompt_split_staticlibs.sh debug
 ./tools/build_prompt_split_staticlibs.sh release
 ```
 
-This builds:
+Danach liegen die Archive hier:
 
 ```text
-target/<profile>/libreta.a
-target/<profile>/libretaprompt_input.a
-target/<profile>/libretaprompt_commands.a
+target/release/libreta.a
+target/release/libretaprompt_input.a
+target/release/libretaprompt_commands.a
 ```
 
-## Correct native link model
+## Harte Verifikation im Build-Skript
+
+Das Build-Skript prüft nach dem Bauen zusätzlich:
+
+- `libretaprompt_input.a` enthält **nur** `retaprompt_input_shim.o`
+- `libretaprompt_commands.a` enthält **nur** `retaprompt_commands_shim.o`
+- die erwarteten exportierten Forwarder-Symbole sind vorhanden
+
+Damit ist die Archivstruktur selbst maschinell abgesichert.
+
+## Link-Reihenfolge
 
 ```text
 ... libretaprompt_input.a libretaprompt_commands.a libreta.a ...
 ```
 
-In this model:
-
-- `libretaprompt_input.a` contains only input-side C forwarders
-- `libretaprompt_commands.a` contains only command-side C forwarders
-- `libreta.a` contains the Rust implementation
-
-So the three archives stay disjoint in contained code.
+Die beiden kleineren Archive referenzieren Symbole aus `libreta.a`.

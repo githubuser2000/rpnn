@@ -1,11 +1,11 @@
 # retaprompt_input
 
-Separate library for the own command input layer of `rp`, `rpl`, and `rpe`.
+Diese Zusatzbibliothek thematisiert ausschließlich die **eigene Befehlseingabe** für:
 
-Rules of this layer:
+- `rp`
+- `rpl`
+- `rpe`
 
-- depends only on `reta`
-- does not embed or copy `reta`
-- does not depend on `retaprompt_commands`
-- does not contain command-topic logic for `rpb`
-- contains only the self-entered frontend/input side for `rp`, `rpl`, `rpe`
+Sie enthält keinen `reta`-Kerncode, sondern ruft nur `reta::prompt` auf.
+Für das statische Archiv `libretaprompt_input.a` wird absichtlich **kein** Rust-`staticlib`
+benutzt, sondern ein winziger C-Forwarder, damit `libreta.a` nicht dupliziert wird.
