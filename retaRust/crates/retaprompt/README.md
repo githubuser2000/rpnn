@@ -90,3 +90,9 @@ A minimal C header is included at:
 - `crates/retaprompt/include/retaprompt.h`
 
 This header matches the exported no-mangle symbols from the static library.
+
+## Cargo bin discovery
+
+The root package and the dedicated `retaprompt` package both set `autobins = false`.
+That keeps Cargo restricted to the explicit `[[bin]]` entries so the legacy
+`src/bin/reta_min.rs` path is no longer picked up accidentally.

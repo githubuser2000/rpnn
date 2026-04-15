@@ -96,3 +96,25 @@ useful. The main structural completion here is that the dedicated `retaprompt`
 package now depends on the **public** `reta::prompt` API rather than reaching
 into deeper internal module paths, so the separate static library becomes a thin
 consumer of the same shared prompt layer instead of another ad-hoc integration.
+
+## Cargo bin discovery
+
+The root package and the dedicated `retaprompt` package both set `autobins = false`.
+That keeps Cargo restricted to the explicit `[[bin]]` entries so the legacy
+`src/bin/reta_min.rs` path is no longer picked up accidentally.
+
+
+## Dedicated per-frontend static libraries
+
+In addition to the shared `libretaprompt.a`, the workspace now also contains
+four additive per-frontend packages:
+
+- `crates/rp` -> `librp.a`
+- `crates/rpl` -> `librpl.a`
+- `crates/rpb` -> `librpb.a`
+- `crates/rpe` -> `librpe.a`
+
+These thin packages exist specifically for workflows that want a direct static
+library artifact per frontend name instead of one combined retaPrompt library.
+Each forwards into the same shared prompt layer and does not duplicate the
+behavior implementation.

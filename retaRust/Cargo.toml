@@ -2,6 +2,7 @@
 name = "reta"
 version = "0.1.0"
 edition = "2024"
+autobins = false
 default-run = "reta"
 
 [dependencies]
@@ -53,5 +54,5 @@ path = "src/bin/reta_domain_probe.rs"
 
 
 [workspace]
-members = ["crates/retaprompt"]
+members = ["crates/retaprompt", "crates/rp", "crates/rpl", "crates/rpb", "crates/rpe"]
 resolver = "2"

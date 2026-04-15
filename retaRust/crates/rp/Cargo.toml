@@ -1,0 +1,16 @@
+[package]
+name = "rp"
+version = "0.1.0"
+edition = "2024"
+autobins = false
+description = "Dedicated static library for retaPrompt rp frontend."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "rp"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+retaprompt = { path = "../retaprompt" }

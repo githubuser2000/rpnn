@@ -1282,6 +1282,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "rp"
+version = "0.1.0"
+dependencies = [
+ "retaprompt",
+]
+
+[[package]]
+name = "rpb"
+version = "0.1.0"
+dependencies = [
+ "retaprompt",
+]
+
+[[package]]
+name = "rpe"
+version = "0.1.0"
+dependencies = [
+ "retaprompt",
+]
+
+[[package]]
+name = "rpl"
+version = "0.1.0"
+dependencies = [
+ "retaprompt",
+]
+
+[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
