@@ -67,6 +67,20 @@ verify_archive_symbols() {
   done
 }
 
+verify_archive_does_not_contain_members() {
+  local archive="$1"
+  shift
+  local forbidden=("$@")
+  local listed
+  listed="$("$AR" t "$archive")"
+  for member in "${forbidden[@]}"; do
+    if grep -Fxq "$member" <<<"$listed"; then
+      echo "archive $archive must not contain $member" >&2
+      exit 1
+    fi
+  done
+}
+
 verify_archive_has_only_expected_defined_symbols() {
   local archive="$1"
   shift
@@ -76,18 +90,15 @@ verify_archive_has_only_expected_defined_symbols() {
   local expected_sorted
   nm_out="$("$NM" -g "$archive")"
   actual_defined="$({ grep -E "[[:space:]]T[[:space:]]" <<<"$nm_out" || true; } | awk '{print $3}' | sort)"
-  expected_sorted="$(printf '%s
-' "${expected_defined[@]}" | sort)"
+  expected_sorted="$(printf '%s\n' "${expected_defined[@]}" | sort)"
   if [[ "$actual_defined" != "$expected_sorted" ]]; then
     echo "defined-symbol verification failed for $archive" >&2
     echo "expected defined symbols:" >&2
-    printf '  %s
-' "${expected_defined[@]}" >&2
+    printf '  %s\n' "${expected_defined[@]}" >&2
     echo "actual defined symbols:" >&2
     if [[ -n "$actual_defined" ]]; then
       while IFS= read -r line; do
-        printf '  %s
-' "$line" >&2
+        printf '  %s\n' "$line" >&2
       done <<<"$actual_defined"
     else
       echo "  <none>" >&2
@@ -98,13 +109,17 @@ verify_archive_has_only_expected_defined_symbols() {
 
 write_split_manifest() {
   local manifest="$1"
-  cat >"$manifest" <<EOF
+  cat >"$manifest" <<MANIFEST
 {
   "archives": [
     {
       "path": "$TARGET_DIR/libreta.a",
       "role": "core implementation",
-      "contains_forwarder_only": false
+      "contains_forwarder_only": false,
+      "forbidden_members": [
+        "retaprompt_input_shim.o",
+        "retaprompt_commands_shim.o"
+      ]
     },
     {
       "path": "$TARGET_DIR/libretaprompt_input.a",
@@ -131,7 +146,7 @@ write_split_manifest() {
     }
   ]
 }
-EOF
+MANIFEST
 }
 
 verify_archive_has_single_forwarder_object \
@@ -151,6 +166,22 @@ verify_archive_symbols "$TARGET_DIR/libretaprompt_commands.a" \
   retaprompt_commands_run_rpb_from_env \
   retaprompt_commands_run_rpe_from_env
 
+verify_archive_has_only_expected_defined_symbols "$TARGET_DIR/libretaprompt_input.a" \
+  retaprompt_input_run_rp_from_env \
+  retaprompt_input_run_rpl_from_env \
+  retaprompt_input_run_rpe_from_env
+verify_archive_has_only_expected_defined_symbols "$TARGET_DIR/libretaprompt_commands.a" \
+  retaprompt_commands_run_rp_from_env \
+  retaprompt_commands_run_rpl_from_env \
+  retaprompt_commands_run_rpb_from_env \
+  retaprompt_commands_run_rpe_from_env
+
+verify_archive_does_not_contain_members "$TARGET_DIR/libreta.a" \
+  retaprompt_input_shim.o \
+  retaprompt_commands_shim.o
+
+write_split_manifest "$TARGET_DIR/retaprompt_split_staticlibs_manifest.json"
+
 printf 'built split static archives:\n'
 printf '  %s\n' "$TARGET_DIR/libreta.a"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_input.a"
@@ -163,3 +194,6 @@ printf '  libretaprompt_commands.a -> retaprompt_commands_shim.o only\n'
 printf '\n'
 printf 'link order example:\n'
 printf '  ... libretaprompt_input.a libretaprompt_commands.a libreta.a ...\n'
+printf '\n'
+printf 'manifest:\n'
+printf '  %s\n' "$TARGET_DIR/retaprompt_split_staticlibs_manifest.json"

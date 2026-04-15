@@ -61,6 +61,8 @@ Das Build-Skript prüft nach dem Bauen zusätzlich:
 - `libretaprompt_input.a` enthält **nur** `retaprompt_input_shim.o`
 - `libretaprompt_commands.a` enthält **nur** `retaprompt_commands_shim.o`
 - die erwarteten exportierten Forwarder-Symbole sind vorhanden
+- die beiden Zusatzarchive definieren nur ihre erwarteten Forwarder-Symbole
+- `libreta.a` enthält keine Shim-Objekte der zwei Zusatzarchive
 
 Damit ist die Archivstruktur selbst maschinell abgesichert.
 
@@ -102,4 +104,5 @@ Darin liegen:
 
 Das Build-Skript prüft jetzt nicht nur, dass jedes Zusatzarchiv genau ein einziges
 Shim-Objekt enthält, sondern auch, dass es **nur die erwarteten Forwarder-Symbole**
-definiert. Dadurch wird Doppelinhalt noch härter ausgeschlossen.
+definiert und dass `libreta.a` selbst **keine Shim-Objekte** enthält. Dadurch wird
+Doppelinhalt noch härter ausgeschlossen.

@@ -28,13 +28,16 @@ cp crates/retaprompt_commands/include/retaprompt_commands.h "$OUT_DIR/include/"
 cp RETAPROMPT_STATICLIB.md "$OUT_DIR/"
 cp "$TARGET_DIR/retaprompt_split_staticlibs_manifest.json" "$OUT_DIR/"
 
-cat > "$OUT_DIR/LINK_ORDER.txt" <<'EOF'
+if [[ ! -f "$OUT_DIR/retaprompt_split_staticlibs_manifest.json" ]]; then
+  echo "missing packaged manifest" >&2
+  exit 1
+fi
+
+cat > "$OUT_DIR/LINK_ORDER.txt" <<'ORDER'
 libretaprompt_input.a
 libretaprompt_commands.a
 libreta.a
-EOF
+ORDER
 
-printf 'packaged split static libraries in:
-'
-printf '  %s
-' "$OUT_DIR"
+printf 'packaged split static libraries in:\n'
+printf '  %s\n' "$OUT_DIR"
