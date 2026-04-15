@@ -5,8 +5,8 @@ cargo clean
 cargo build --workspace --release
 
 for bin in rp rpl rpe rpb; do
-  cc tools/launchers/$bin.c -o target/debug/$bin \
-    -Ltarget/debug -lretaprompt_input \
+  cc tools/launchers/$bin.c -o target/release/$bin \
+    -Ltarget/release -lretaprompt_input \
     -Wl,-rpath,'$ORIGIN'
 done
 
