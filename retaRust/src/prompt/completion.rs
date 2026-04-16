@@ -338,6 +338,8 @@ fn completion_candidates_for_line_in_mode(
             &state,
             &parameter_token,
             &value_fragment,
+            &current_token,
+            current_start,
             replace_start,
         );
     }
@@ -450,10 +452,30 @@ fn parameter_options_for_main(main_switch: &str) -> (Vec<String>, ComplSitua) {
     }
 }
 
+fn parameter_tokens_for_section(section: RetaMainSection) -> Vec<String> {
+    match section {
+        RetaMainSection::Zeilen => zeilen_parameter_tokens()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        RetaMainSection::Spalten => spalten_parameter_tokens(),
+        RetaMainSection::Kombination => kombi_parameter_tokens()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        RetaMainSection::Ausgabe => ausgabe_parameter_tokens()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+    }
+}
+
 fn build_value_candidates_from_state(
     state: &PythonCompletionState,
     parameter_token: &str,
     fragment: &str,
+    current_token: &str,
+    token_start: usize,
     replace_start: usize,
 ) -> Vec<CompletionCandidate> {
     let stripped = parameter_token.trim_start_matches('-');
@@ -467,7 +489,15 @@ fn build_value_candidates_from_state(
         None => Vec::new(),
     };
 
-    build_completion_candidates(candidates, fragment, replace_start, None, false)
+    if !candidates.is_empty() {
+        return build_completion_candidates(candidates, fragment, replace_start, None, true);
+    }
+
+    let Some(section) = section else {
+        return Vec::new();
+    };
+    let parameter_candidates = parameter_tokens_for_section(section);
+    build_completion_candidates(parameter_candidates, current_token, token_start, None, true)
 }
 
 fn safe_prefix(line: &str, pos: usize) -> &str {
@@ -710,36 +740,116 @@ fn build_completion_candidates(
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct FuzzyMatchScore {
+    kind: u8,
+    start: usize,
+    gaps: usize,
+    candidate_len: usize,
+}
+
 fn filter_candidate_values(
     candidates: &[String],
     fragment: &str,
-    fallback_contains: bool,
+    allow_fuzzy: bool,
 ) -> Vec<String> {
     let normalized_fragment = normalize_completion_text(fragment);
-    let mut prefix_matches = Vec::new();
-    let mut contains_matches = Vec::new();
-    let mut prefix_seen = BTreeSet::new();
-    let mut contains_seen = BTreeSet::new();
+    let mut seen = BTreeSet::new();
 
-    for candidate in candidates {
+    if normalized_fragment.is_empty() {
+        let mut out = Vec::new();
+        for candidate in candidates {
+            let normalized_candidate = normalize_completion_text(candidate);
+            if seen.insert(normalized_candidate) {
+                out.push(candidate.clone());
+            }
+        }
+        return out;
+    }
+
+    let mut matches = Vec::new();
+    for (index, candidate) in candidates.iter().enumerate() {
         let normalized_candidate = normalize_completion_text(candidate);
-        if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment)
-        {
-            if prefix_seen.insert(normalized_candidate.clone()) {
-                prefix_matches.push(candidate.clone());
-            }
-        } else if fallback_contains && normalized_candidate.contains(&normalized_fragment) {
-            if contains_seen.insert(normalized_candidate) {
-                contains_matches.push(candidate.clone());
-            }
+        if !seen.insert(normalized_candidate) {
+            continue;
+        }
+        if let Some(score) = fuzzy_match_score(candidate, &normalized_fragment, allow_fuzzy) {
+            matches.push((score, index, candidate.clone()));
         }
     }
 
-    if !prefix_matches.is_empty() {
-        prefix_matches
-    } else {
-        contains_matches
+    matches.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| normalize_completion_text(&left.2).cmp(&normalize_completion_text(&right.2)))
+    });
+
+    matches.into_iter().map(|(_, _, candidate)| candidate).collect()
+}
+
+fn fuzzy_match_score(candidate: &str, normalized_fragment: &str, allow_fuzzy: bool) -> Option<FuzzyMatchScore> {
+    let normalized_candidate = normalize_completion_text(candidate);
+    let candidate_len = normalized_candidate.chars().count();
+
+    if normalized_candidate.starts_with(normalized_fragment) {
+        return Some(FuzzyMatchScore {
+            kind: 0,
+            start: 0,
+            gaps: 0,
+            candidate_len,
+        });
     }
+
+    if !allow_fuzzy {
+        return None;
+    }
+
+    if let Some(byte_index) = normalized_candidate.find(normalized_fragment) {
+        return Some(FuzzyMatchScore {
+            kind: 1,
+            start: normalized_candidate[..byte_index].chars().count(),
+            gaps: 0,
+            candidate_len,
+        });
+    }
+
+    let (start, gaps) = subsequence_match_score(&normalized_candidate, normalized_fragment)?;
+    Some(FuzzyMatchScore {
+        kind: 2,
+        start,
+        gaps,
+        candidate_len,
+    })
+}
+
+fn subsequence_match_score(candidate: &str, query: &str) -> Option<(usize, usize)> {
+    let candidate_chars = candidate.chars().collect::<Vec<_>>();
+    let mut search_from = 0usize;
+    let mut first_match = None;
+    let mut previous_match = None;
+    let mut gaps = 0usize;
+
+    for query_char in query.chars() {
+        let mut found = None;
+        for index in search_from..candidate_chars.len() {
+            if candidate_chars[index] == query_char {
+                found = Some(index);
+                break;
+            }
+        }
+        let index = found?;
+        if first_match.is_none() {
+            first_match = Some(index);
+        }
+        if let Some(previous_index) = previous_match {
+            gaps += index.saturating_sub(previous_index + 1);
+        }
+        previous_match = Some(index);
+        search_from = index + 1;
+    }
+
+    Some((first_match.unwrap_or(0), gaps))
 }
 
 fn normalize_completion_text(text: &str) -> String {
@@ -787,7 +897,7 @@ fn reta_main_switches() -> [&'static str; 6] {
     ]
 }
 
-fn zeilen_parameter_tokens() -> [&'static str; 14] {
+fn zeilen_parameter_tokens() -> [&'static str; 15] {
     [
         "--zeit=",
         "--zaehlung=",
@@ -803,10 +913,11 @@ fn zeilen_parameter_tokens() -> [&'static str; 14] {
         "--oberesmaximum=",
         "--primzahlen=",
         "--invertieren",
+        "--*=",
     ]
 }
 
-fn ausgabe_parameter_tokens() -> [&'static str; 11] {
+fn ausgabe_parameter_tokens() -> [&'static str; 14] {
     [
         "--art=",
         "--breite=",
@@ -818,6 +929,9 @@ fn ausgabe_parameter_tokens() -> [&'static str; 11] {
         "--nocolor",
         "--onetable",
         "--spaltenreihenfolgeundnurdiese=",
+        "--endlessscreen",
+        "--endless",
+        "--dontwrap",
         "--*=",
     ]
 }
@@ -828,14 +942,17 @@ fn kombi_parameter_tokens() -> [&'static str; 3] {
 
 fn spalten_parameter_tokens() -> Vec<String> {
     let words = shared_words();
-    let mut out = BTreeSet::new();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
     for group in all_main_alias_groups(words) {
         for alias in group.aliases {
-            out.insert(format!("--{alias}="));
+            push_unique_ordered(&mut out, &mut seen, format!("--{alias}="));
         }
     }
-    out.insert("--*=".to_string());
-    out.into_iter().collect()
+    for extra in ["--=", "--breite=", "--breiten=", "--keinenummerierung", "--*="] {
+        push_unique_ordered(&mut out, &mut seen, extra);
+    }
+    out
 }
 
 fn zeilen_value_candidates(key: &str) -> Vec<String> {
@@ -1082,5 +1199,36 @@ mod tests {
                 "4".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn fuzzy_top_level_completion_matches_python_like_geist() {
+        let values = candidates_for_input("gst");
+        assert!(contains_normalized(&values, "geist"));
+    }
+
+    #[test]
+    fn spalten_special_equals_parameter_exposes_all_values() {
+        let values = candidates_for_input("reta -spalten --=");
+        assert!(contains_normalized(&values, "bewusstsein"));
+    }
+
+    #[test]
+    fn ausgabe_completion_includes_endless_variants() {
+        let values = candidates_for_input("reta -ausgabe --end");
+        assert!(contains_normalized(&values, "--endless"));
+        assert!(contains_normalized(&values, "--endlessscreen"));
+    }
+
+    #[test]
+    fn unknown_value_parameter_context_suggests_full_parameter_token() {
+        let values = candidates_for_input("reta -zeilen --ty=");
+        assert!(contains_normalized(&values, "--typ="));
+    }
+
+    #[test]
+    fn top_level_contains_python_prefix_commands_15_and_16() {
+        let values = candidates_for_input("15");
+        assert!(contains_normalized(&values, "15_"));
     }
 }

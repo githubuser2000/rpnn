@@ -3,6 +3,7 @@
 use std::collections::BTreeSet;
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
+use crate::reta_runtime_bridge::terminal_width_override;
 use crate::shared::words_py::PyValue;
 
 impl Program {
@@ -445,6 +446,10 @@ impl Program {
     }
 
     pub(crate) fn detect_terminal_columns_py() -> i64 {
+        if let Some(width) = terminal_width_override() {
+            return width;
+        }
+
         if let Ok(v) = std::env::var("COLUMNS") {
             if let Ok(n) = v.trim().parse::<i64>() {
                 if n > 0 {

@@ -35,12 +35,14 @@ fn build_prompt_words() -> PromptWords {
     ] {
         befehle.push(format!("15_{key}"));
     }
+    befehle.push("15_".to_string());
     for key in ["15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16", "4", "1"] {
         befehle.push(format!("16_15_{key}"));
     }
     for key in ["15", "10", "11"] {
         befehle.push(format!("16_{key}"));
     }
+    befehle.push("16_".to_string());
 
     for cmd in [
         "invertieren", "netzwerk", "komplex", "ee", "groesse", "emotion", "freiheit", "gleichheit",

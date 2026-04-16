@@ -11,9 +11,13 @@ pub mod reta_resulting_table_py;
 pub mod reta_spalten_py;
 pub mod reta_workflow_py;
 
+mod reta_runtime_bridge;
+
 pub mod ffi;
 
 use std::sync::OnceLock;
+
+use crate::shared::reta_program_types::Program;
 
 pub use crate::reta_begin_py::{build_cli_request, parse_cli_options};
 pub use crate::reta_program_types::{
@@ -62,6 +66,38 @@ impl From<RetaResponse> for RetaRunResult {
     }
 }
 
+static SHARED_WORDS: OnceLock<crate::shared::words_py::Words> = OnceLock::new();
+static SHARED_PROGRAM_TEMPLATE: OnceLock<Program> = OnceLock::new();
+static SHARED_PRELOAD_RESULT: OnceLock<Result<(), String>> = OnceLock::new();
+
+pub fn shared_words() -> &'static crate::shared::words_py::Words {
+    SHARED_WORDS.get_or_init(crate::shared::words_py::Words::new)
+}
+
+fn shared_program_template() -> &'static Program {
+    SHARED_PROGRAM_TEMPLATE.get_or_init(|| Program::new(vec!["reta".to_string()]))
+}
+
+pub fn fresh_program_from_template(argv: Vec<String>) -> Program {
+    let mut program = shared_program_template().clone();
+    program.argv = argv.clone();
+    program.argvWithoutProgram = if argv.len() > 1 {
+        argv[1..].to_vec()
+    } else {
+        vec![]
+    };
+    program
+}
+
+pub fn preload_reta_runtime() -> Result<(), String> {
+    SHARED_PRELOAD_RESULT
+        .get_or_init(|| {
+            let _ = shared_words();
+            Ok(())
+        })
+        .clone()
+}
+
 pub fn run_reta_from_args<A>(argv: A) -> RetaRunResult
 where
     A: AsRef<[String]>,
@@ -88,7 +124,23 @@ where
     }
 }
 
-pub fn shared_words() -> &'static crate::shared::words_py::Words {
-    static WORDS: OnceLock<crate::shared::words_py::Words> = OnceLock::new();
-    WORDS.get_or_init(|| crate::shared::words_py::Words::new())
+pub fn run_reta_from_env_args() -> RetaRunResult {
+    let argv = std::env::args().collect::<Vec<_>>();
+    run_reta_from_args(argv)
+}
+
+pub fn print_reta_result(result: &RetaRunResult) {
+    println!("{}", result.render_text());
+}
+
+pub fn run_reta_and_print_from_env() -> i32 {
+    let result = run_reta_from_env_args();
+    let exit_code = result.exit_code();
+    print_reta_result(&result);
+    exit_code
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_run_and_print_from_env_ffi() -> i32 {
+    run_reta_and_print_from_env()
 }

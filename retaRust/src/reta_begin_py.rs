@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use crate::reta_program_types::{
     NormalizedRequest, RetaDiagnostic, RetaError, RetaInput, RetaOptions, RetaRequest,
@@ -11,6 +12,7 @@ pub fn build_cli_request(
     runtime: RetaRuntime,
 ) -> RetaRequest {
     RetaRequest {
+        raw_args: raw_args.to_vec(),
         options: parse_cli_options(raw_args),
         input: RetaInput { stdin_text },
         runtime,
@@ -20,7 +22,7 @@ pub fn build_cli_request(
 pub fn parse_cli_options(raw_args: &[String]) -> RetaOptions {
     let mut options = RetaOptions::default();
 
-    for arg in raw_args {
+    for arg in normalize_invocation_args(raw_args) {
         if arg == "--onetable" {
             options.onetable = true;
             continue;
@@ -51,6 +53,26 @@ pub fn parse_cli_options(raw_args: &[String]) -> RetaOptions {
     }
 
     options
+}
+
+fn normalize_invocation_args(raw_args: &[String]) -> &[String] {
+    match raw_args.split_first() {
+        Some((first, rest)) if looks_like_reta_binary_name(first) => rest,
+        _ => raw_args,
+    }
+}
+
+fn looks_like_reta_binary_name(raw: &str) -> bool {
+    if raw.starts_with('-') || raw.is_empty() {
+        return false;
+    }
+
+    let candidate = Path::new(raw)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(raw);
+
+    candidate == "reta"
 }
 
 pub fn normalize_request(request: &RetaRequest) -> Result<NormalizedRequest, RetaError> {
@@ -175,4 +197,44 @@ fn parse_positive_line_number(raw: &str) -> Result<usize, RetaError> {
     }
 
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_cli_options;
+
+    #[test]
+    fn parse_cli_options_accepts_bare_args() {
+        let argv = vec!["--onetable".to_string(), "--breite=80".to_string()];
+        let parsed = parse_cli_options(&argv);
+        assert!(parsed.onetable);
+        assert_eq!(parsed.breite, Some(80));
+    }
+
+    #[test]
+    fn parse_cli_options_ignores_plain_reta_program_name() {
+        let argv = vec![
+            "reta".to_string(),
+            "--onetable".to_string(),
+            "--vorhervonausschnitt=1-3".to_string(),
+        ];
+        let parsed = parse_cli_options(&argv);
+        assert!(parsed.onetable);
+        assert_eq!(parsed.vorhervonausschnitt.as_deref(), Some("1-3"));
+        assert!(parsed.passthrough_flags.is_empty());
+    }
+
+    #[test]
+    fn parse_cli_options_ignores_path_like_reta_program_name() {
+        let argv = vec![
+            "/tmp/target/debug/reta".to_string(),
+            "--spaltenreihenfolgeundnurdiese=a,b".to_string(),
+        ];
+        let parsed = parse_cli_options(&argv);
+        assert_eq!(
+            parsed.spaltenreihenfolgeundnurdiese,
+            Some(vec!["a".to_string(), "b".to_string()])
+        );
+        assert!(parsed.passthrough_flags.is_empty());
+    }
 }

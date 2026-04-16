@@ -4,6 +4,7 @@ use std::fmt;
 
 #[derive(Debug, Clone, Default)]
 pub struct RetaRequest {
+    pub raw_args: Vec<String>,
     pub options: RetaOptions,
     pub input: RetaInput,
     pub runtime: RetaRuntime,

@@ -1,7 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use crate::{build_cli_request, run_reta, RetaRuntime};
+use crate::{run_reta_from_args_with_runtime, RetaRuntime};
 
 #[repr(C)]
 pub struct RetaFfiResponse {
@@ -23,28 +23,29 @@ pub unsafe extern "C" fn reta_run_argv(
     let args = read_argv(argc, argv).unwrap_or_else(|message| vec![format!("--ffi-error={message}")]);
     let stdin_text = read_optional_string(stdin_text).ok().flatten();
 
-    let request = build_cli_request(
-        &args,
+    let result = run_reta_from_args_with_runtime(
+        args,
         stdin_text,
         RetaRuntime {
-            terminal_width: if terminal_width == 0 { None } else { Some(terminal_width) },
+            terminal_width: if terminal_width == 0 {
+                None
+            } else {
+                Some(terminal_width)
+            },
             stdout_is_tty: Some(stdout_is_tty != 0),
             stderr_is_tty: Some(stderr_is_tty != 0),
             stdin_is_tty: Some(stdin_is_tty != 0),
         },
     );
 
-    match run_reta(request) {
-        Ok(response) => RetaFfiResponse {
-            stdout_text: into_c_string(response.rendered_text),
-            stderr_text: into_c_string(response.stderr_text),
-            exit_code: response.exit_code,
-        },
-        Err(error) => RetaFfiResponse {
-            stdout_text: into_c_string(String::new()),
-            stderr_text: into_c_string(format!("reta failed: {error}\n")),
-            exit_code: error.exit_code(),
-        },
+    let exit_code = result.exit_code;
+    let stdout_text = into_c_string(result.stdout);
+    let stderr_text = into_c_string(result.stderr);
+
+    RetaFfiResponse {
+        stdout_text,
+        stderr_text,
+        exit_code,
     }
 }
 
