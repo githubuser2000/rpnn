@@ -1,11 +1,20 @@
+use std::path::Path;
+
 use super::app::{
-    run_prompt_command_frontend_with_profile, run_prompt_frontend_with_profile,
+    run_prompt_command_frontend_with_profile, run_prompt_frontend, run_prompt_frontend_with_profile,
     run_prompt_input_frontend_with_profile, run_rp_one_shot,
 };
 use super::frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
 
 fn env_args() -> Vec<String> {
     std::env::args().collect::<Vec<_>>()
+}
+
+fn program_name_from_argv(argv: &[String]) -> String {
+    argv.first()
+        .and_then(|arg0| Path::new(arg0).file_name())
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "rp".to_string())
 }
 
 pub fn run_with_kind(argv: Vec<String>, kind: PromptFrontendKind) -> i32 {
@@ -116,10 +125,7 @@ pub fn run_command_rpe_from_env() -> i32 {
 }
 
 pub fn run_auto_from_env() -> i32 {
-    run_prompt_frontend_with_profile(
-        env_args(),
-        PromptFrontendProfile::for_kind(PromptFrontendKind::Auto, true),
-    )
+    run_prompt_frontend(env_args(), true)
 }
 
 pub fn run_one_shot_direct(argv: Vec<String>) -> i32 {
@@ -186,6 +192,70 @@ pub fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
         run_auto_from_env()
     } else {
         run_with_kind(env_args(), resolved)
+    }
+}
+
+fn input_kind_from_program_name(program_name: &str) -> Option<PromptFrontendKind> {
+    match program_name {
+        "rp" => Some(PromptFrontendKind::Rp),
+        "rpl" => Some(PromptFrontendKind::Rpl),
+        "rpe" => Some(PromptFrontendKind::Rpe),
+        _ => None,
+    }
+}
+
+fn launcher_kind_from_program_name(program_name: &str) -> Option<PromptFrontendKind> {
+    match program_name {
+        "rp" => Some(PromptFrontendKind::Rp),
+        "rpl" => Some(PromptFrontendKind::Rpl),
+        "rpb" => Some(PromptFrontendKind::Rpb),
+        "rpe" => Some(PromptFrontendKind::Rpe),
+        _ => None,
+    }
+}
+
+pub fn run_input_current_executable_from_env() -> i32 {
+    let argv = env_args();
+    let program_name = program_name_from_argv(&argv);
+    match input_kind_from_program_name(&program_name) {
+        Some(kind) => run_input_with_kind(argv, kind),
+        None => {
+            eprintln!(
+                "retaprompt_input cannot infer input frontend kind from executable name: {program_name}"
+            );
+            1
+        }
+    }
+}
+
+pub fn run_input_any_current_executable_from_env() -> i32 {
+    let argv = env_args();
+    let program_name = program_name_from_argv(&argv);
+    match launcher_kind_from_program_name(&program_name) {
+        Some(PromptFrontendKind::Rp) => run_input_with_kind(argv, PromptFrontendKind::Rp),
+        Some(PromptFrontendKind::Rpl) => run_input_with_kind(argv, PromptFrontendKind::Rpl),
+        Some(PromptFrontendKind::Rpb) => run_command_with_kind(argv, PromptFrontendKind::Rpb),
+        Some(PromptFrontendKind::Rpe) => run_input_with_kind(argv, PromptFrontendKind::Rpe),
+        Some(PromptFrontendKind::Auto) | None => {
+            eprintln!(
+                "retaprompt_input cannot infer launcher kind from executable name: {program_name}"
+            );
+            eprintln!("expected one of: rp, rpl, rpb, rpe");
+            1
+        }
+    }
+}
+
+pub fn run_input_launcher_kind_from_env(kind: i32) -> i32 {
+    match kind_from_abi_value(kind) {
+        PromptFrontendKind::Rp => run_input_rp_from_env(),
+        PromptFrontendKind::Rpl => run_input_rpl_from_env(),
+        PromptFrontendKind::Rpb => run_command_rpb_from_env(),
+        PromptFrontendKind::Rpe => run_input_rpe_from_env(),
+        PromptFrontendKind::Auto => {
+            eprintln!("invalid retaprompt launcher kind: {kind}");
+            1
+        }
     }
 }
 
@@ -261,6 +331,21 @@ pub extern "C" fn reta_retaprompt_run_rpb_from_env() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rpe_from_env() -> i32 {
     retaprompt_run_rpe_from_env_abi()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_current_executable_from_env() -> i32 {
+    run_input_current_executable_from_env()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_any_current_executable_from_env() -> i32 {
+    run_input_any_current_executable_from_env()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_retaprompt_input_run_launcher_kind_from_env(kind: i32) -> i32 {
+    run_input_launcher_kind_from_env(kind)
 }
 
 #[unsafe(no_mangle)]

@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use super::commands::{PromptOutput, SessionState};
-use super::completion::candidates_for_prefix;
+use super::completion::candidates_for_input;
 use super::python_like::PromptModus;
 
 #[derive(Clone, Debug)]
@@ -34,7 +34,7 @@ impl RpTuiState {
             current_input: session.last_input.clone(),
             preview: session.last_output.clone(),
             vi_mode: session.vi_mode,
-            completions: candidates_for_prefix(&session.last_input),
+            completions: candidates_for_input(&session.last_input),
             stored_commands: session.stored_commands.clone(),
             prompt_mode: session.prompt_mode,
         }
