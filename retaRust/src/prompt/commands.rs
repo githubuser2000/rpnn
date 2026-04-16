@@ -133,15 +133,27 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     effective_tokens = expand_python_prompt_macros(&effective_tokens);
 
     if effective_tokens[0] == "shell" {
-        let shell_text = trimmed.strip_prefix("shell").unwrap_or("").trim().to_string();
+        let shell_text = trimmed
+            .strip_prefix("shell")
+            .unwrap_or("")
+            .trim()
+            .to_string();
         return Ok(PromptCommand::Shell(shell_text));
     }
     if effective_tokens[0] == "python" {
-        let command_text = trimmed.strip_prefix("python").unwrap_or("").trim().to_string();
+        let command_text = trimmed
+            .strip_prefix("python")
+            .unwrap_or("")
+            .trim()
+            .to_string();
         return Ok(PromptCommand::Python(command_text));
     }
     if effective_tokens[0] == "math" {
-        let command_text = trimmed.strip_prefix("math").unwrap_or("").trim().to_string();
+        let command_text = trimmed
+            .strip_prefix("math")
+            .unwrap_or("")
+            .trim()
+            .to_string();
         return Ok(PromptCommand::Math(command_text));
     }
     if let Some(output) = compile_direct_number_command(&effective_tokens) {
@@ -175,14 +187,24 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     ))
 }
 
-
 pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
     compile_command_inner(input, prompt_mode)
 }
 
-pub fn compile_command_with_state(input: &str, state: &SessionState) -> Result<PromptCommand, String> {
+pub fn compile_command_with_state(
+    input: &str,
+    state: &SessionState,
+) -> Result<PromptCommand, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
+        if state.has_stored_placeholder()
+            && matches!(
+                state.prompt_mode,
+                PromptModus::Normal | PromptModus::AusgabeSelektiv
+            )
+        {
+            return Ok(PromptCommand::ShowStored(None));
+        }
         return Ok(PromptCommand::Noop);
     }
 
@@ -206,14 +228,14 @@ pub fn compile_command_with_state(input: &str, state: &SessionState) -> Result<P
         return Ok(command);
     }
 
-    if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens) || !state.has_stored_placeholder() {
+    if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens)
+        || !state.has_stored_placeholder()
+    {
         return compile_command_inner(trimmed, state.prompt_mode);
     }
 
-    let effective_input = compose_input_with_stored_placeholder(
-        &state.stored_expanded_tokens,
-        &tokenized.tokens,
-    );
+    let effective_input =
+        compose_input_with_stored_placeholder(&state.stored_expanded_tokens, &tokenized.tokens);
 
     compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
 }
@@ -223,7 +245,10 @@ fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
         return None;
     }
 
-    if tokens.iter().any(|token| is_store_before_token(token) || is_store_after_token(token)) {
+    if tokens
+        .iter()
+        .any(|token| is_store_before_token(token) || is_store_after_token(token))
+    {
         let payload = tokens
             .iter()
             .filter(|token| !is_store_before_token(token) && !is_store_after_token(token))
@@ -253,8 +278,7 @@ fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
 fn raw_input_bypasses_stored_merge(trimmed: &str, tokens: &[String]) -> bool {
     if matches!(
         trimmed,
-        "q"
-            | ":q"
+        "q" | ":q"
             | "exit"
             | "quit"
             | "ende"
@@ -301,7 +325,10 @@ fn is_show_stored_token(token: &str) -> bool {
     matches!(token, "o" | "BefehlSpeicherungAusgeben")
 }
 
-fn compose_input_with_stored_placeholder(stored_tokens: &[String], input_tokens: &[String]) -> String {
+fn compose_input_with_stored_placeholder(
+    stored_tokens: &[String],
+    input_tokens: &[String],
+) -> String {
     if stored_tokens.is_empty() {
         return input_tokens.join(" ");
     }
@@ -411,7 +438,8 @@ fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
 fn refresh_stored_placeholder_cache(state: &mut SessionState) {
     state.stored_placeholder = state.stored_placeholder.trim().to_string();
     state.stored_commands = split_storage_text(&state.stored_placeholder);
-    state.stored_expanded_tokens = prepare_stored_prefix_tokens_from_text(&state.stored_placeholder);
+    state.stored_expanded_tokens =
+        prepare_stored_prefix_tokens_from_text(&state.stored_placeholder);
 }
 
 fn store_text_in_placeholder(state: &mut SessionState, text: &str) {
@@ -447,7 +475,9 @@ fn delete_from_stored_placeholder(state: &mut SessionState, selection_text: &str
     let delete_by_index = should_delete_stored_by_index(trimmed, &tokens);
     if delete_by_index {
         if let Some(indexes) = parse_delete_selection_indexes(trimmed) {
-            let index_set = indexes.into_iter().collect::<std::collections::BTreeSet<_>>();
+            let index_set = indexes
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>();
             tokens = tokens
                 .into_iter()
                 .enumerate()
@@ -485,11 +515,16 @@ fn parse_delete_selection_indexes(selection_text: &str) -> Option<Vec<usize>> {
     (!out.is_empty()).then_some(out)
 }
 
-fn run_nested_prompt_input(input: &str, state: &mut SessionState) -> Result<Option<PromptOutput>, String> {
+fn run_nested_prompt_input(
+    input: &str,
+    state: &mut SessionState,
+) -> Result<Option<PromptOutput>, String> {
     let nested_command = compile_command_inner(input, PromptModus::AusgabeSelektiv)?;
     match nested_command {
         PromptCommand::Noop => Ok(None),
-        PromptCommand::Exit => Err("Gespeicherte Platzhalter dürfen keinen Exit-Befehl auslösen.".to_string()),
+        PromptCommand::Exit => {
+            Err("Gespeicherte Platzhalter dürfen keinen Exit-Befehl auslösen.".to_string())
+        }
         PromptCommand::SaveBefore
         | PromptCommand::SaveAfter
         | PromptCommand::StoreCurrentInput(_)
@@ -652,7 +687,11 @@ pub fn execute_command(
                 title: "logging".to_string(),
                 text: format!(
                     "Logging ist jetzt {}.",
-                    if state.logging_enabled { "aktiv" } else { "inaktiv" }
+                    if state.logging_enabled {
+                        "aktiv"
+                    } else {
+                        "inaktiv"
+                    }
                 ),
                 exit_code: 0,
             }))
@@ -714,8 +753,6 @@ pub fn execute_command(
         }
     }
 }
-
-
 
 fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
     let mut out: Vec<i64> = Vec::new();
@@ -805,7 +842,13 @@ fn prime_repeat_display(mut factors: Vec<i64>) -> String {
     grouped.reverse();
     grouped
         .into_iter()
-        .map(|(e, g)| if g == 1 { e.to_string() } else { format!("{e}^{g}") })
+        .map(|(e, g)| {
+            if g == 1 {
+                e.to_string()
+            } else {
+                format!("{e}^{g}")
+            }
+        })
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -875,13 +918,21 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
     if token_set.contains("prim") || token_set.contains("primfaktorzerlegung") {
         matched = true;
         for n in &numbers {
-            lines.push(format!("{}: {}", n, prime_repeat_display(prime_factors(*n, false))));
+            lines.push(format!(
+                "{}: {}",
+                n,
+                prime_repeat_display(prime_factors(*n, false))
+            ));
         }
     }
     if token_set.contains("prim24") || token_set.contains("primfaktorzerlegungModulo24") {
         matched = true;
         for n in &numbers {
-            lines.push(format!("{}: {}", n, prime_repeat_display(prime_factors(*n, true))));
+            lines.push(format!(
+                "{}: {}",
+                n,
+                prime_repeat_display(prime_factors(*n, true))
+            ));
         }
     }
     if token_set.contains("multis") {
@@ -916,7 +967,10 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
             }
             common = out;
         }
-        let product = common.iter().copied().fold(1i64, |acc, x| acc.saturating_mul(x));
+        let product = common
+            .iter()
+            .copied()
+            .fold(1i64, |acc, x| acc.saturating_mul(x));
         let common_text = if common.is_empty() {
             "1".to_string()
         } else {
@@ -1072,6 +1126,7 @@ pub fn help_text() -> String {
         "  S / BefehlSpeichernDanach     nächste Eingabe nur im Platzhalter speichern",
         "  l / BefehlSpeicherungLöschen  Lösch-Auswahl für den Platzhalter starten",
         "  o / BefehlSpeicherungAusgeben gespeicherten Platzhalter ausführen",
+        "  Enter bei gespeichertem Platzhalter  führt denselben Platzhalter ebenfalls aus",
         "  loggen | nichtloggen          Logging umschalten",
         "",
         "Meta-Befehle:",
@@ -1088,6 +1143,8 @@ pub fn help_text() -> String {
         "  Tab                     Vorschlagsliste öffnen / nächsten Kandidaten wählen",
         "  Shift+Tab               vorherigen Kandidaten wählen",
         "  Pfeiltasten             im geöffneten Completion-Menü navigieren",
+        "  r\"absi\"               filtert Kandidaten Python-nah per Muster/Teiltreffer",
+        "  * / -*                  zeigt alle bzw. alle negativen Kandidaten im aktuellen Kontext",
         "",
         "Spezial:",
         "  shell <cmd>             Führt einen Shell-Befehl aus",
@@ -1150,4 +1207,28 @@ pub fn render_history_text(history: &[String]) -> String {
         .map(|(index, line)| format!("{:>4}: {}", index + 1, line))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        compile_command_with_state, refresh_stored_placeholder_cache, PromptCommand, SessionState,
+    };
+
+    #[test]
+    fn empty_input_executes_stored_placeholder_like_python_prompt() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "reta -zeilen --zeit=heute".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let command = compile_command_with_state("", &state).unwrap();
+        assert!(matches!(command, PromptCommand::ShowStored(None)));
+    }
+
+    #[test]
+    fn empty_input_without_placeholder_stays_noop() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("", &state).unwrap();
+        assert!(matches!(command, PromptCommand::Noop));
+    }
 }

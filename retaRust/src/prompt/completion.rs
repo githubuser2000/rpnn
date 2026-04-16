@@ -269,7 +269,11 @@ pub fn candidates_for_input_in_mode_with_context(
 impl ReedlineCompleter for PromptContextCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
         let before_cursor = safe_prefix(line, pos);
-        let runtime_state = self.runtime.lock().map(|state| state.clone()).unwrap_or_default();
+        let runtime_state = self
+            .runtime
+            .lock()
+            .map(|state| state.clone())
+            .unwrap_or_default();
 
         completion_candidates_for_line_in_mode_with_context(
             before_cursor,
@@ -277,23 +281,28 @@ impl ReedlineCompleter for PromptContextCompleter {
             &runtime_state.stored_prefix_tokens,
             &runtime_state.stored_commands,
         )
-            .into_iter()
-            .map(|candidate| Suggestion {
-                value: candidate.value,
-                display_override: None,
-                description: candidate.description,
-                style: None,
-                extra: None,
-                span: Span::new(candidate.replace_start, before_cursor.len()),
-                append_whitespace: candidate.append_whitespace,
-                match_indices: None,
-            })
-            .collect()
+        .into_iter()
+        .map(|candidate| Suggestion {
+            value: candidate.value,
+            display_override: None,
+            description: candidate.description,
+            style: None,
+            extra: None,
+            span: Span::new(candidate.replace_start, before_cursor.len()),
+            append_whitespace: candidate.append_whitespace,
+            match_indices: None,
+        })
+        .collect()
     }
 }
 
 fn completion_candidates_for_line(before_cursor: &str) -> Vec<CompletionCandidate> {
-    completion_candidates_for_line_in_mode_with_context(before_cursor, PromptModus::Normal, &[], &[])
+    completion_candidates_for_line_in_mode_with_context(
+        before_cursor,
+        PromptModus::Normal,
+        &[],
+        &[],
+    )
 }
 
 fn completion_candidates_for_line_in_mode(
@@ -423,14 +432,16 @@ fn stored_context_precedes_current_input(
     stored_prefix_tokens: &[String],
 ) -> bool {
     !(matches!(raw_text_tokens.first().map(String::as_str), Some("reta"))
-        && !matches!(stored_prefix_tokens.first().map(String::as_str), Some("reta")))
+        && !matches!(
+            stored_prefix_tokens.first().map(String::as_str),
+            Some("reta")
+        ))
 }
 
 fn completion_bypasses_stored_context(trimmed: &str, tokens: &[String]) -> bool {
     if matches!(
         trimmed,
-        "q"
-            | ":q"
+        "q" | ":q"
             | "exit"
             | "quit"
             | "ende"
@@ -820,7 +831,6 @@ fn prompt_non_reta_commands() -> Vec<String> {
         .collect()
 }
 
-
 fn prompt_eig_commands_ordered() -> Vec<String> {
     let words = shared_words();
     let mut out = Vec::new();
@@ -940,11 +950,30 @@ fn build_completion_candidates(
         .collect()
 }
 
+#[derive(Clone, Debug)]
+enum SpecialFragmentMatcher {
+    Any {
+        negative_only: bool,
+    },
+    Glob {
+        negative_only: bool,
+        pattern: String,
+    },
+    RegexLike {
+        negative_only: bool,
+        pattern: String,
+    },
+}
+
 fn filter_candidate_values(
     candidates: &[String],
     fragment: &str,
     fallback_contains: bool,
 ) -> Vec<String> {
+    if let Some(matches) = filter_candidates_for_special_fragment(candidates, fragment) {
+        return matches;
+    }
+
     let normalized_fragment = normalize_completion_text(fragment);
     let mut prefix_matches = Vec::new();
     let mut contains_matches = Vec::new();
@@ -970,6 +999,241 @@ fn filter_candidate_values(
     } else {
         contains_matches
     }
+}
+
+fn filter_candidates_for_special_fragment(
+    candidates: &[String],
+    fragment: &str,
+) -> Option<Vec<String>> {
+    let matcher = parse_special_fragment_matcher(fragment)?;
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for candidate in candidates {
+        if !special_fragment_matches_candidate(candidate, &matcher) {
+            continue;
+        }
+        let key = normalize_completion_text(candidate);
+        if seen.insert(key) {
+            out.push(candidate.clone());
+        }
+    }
+
+    Some(out)
+}
+
+fn parse_special_fragment_matcher(fragment: &str) -> Option<SpecialFragmentMatcher> {
+    let trimmed = fragment.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let (negative_only, core) = if let Some(rest) = trimmed.strip_prefix('-') {
+        (true, rest)
+    } else {
+        (false, trimmed)
+    };
+
+    if core == "*" {
+        return Some(SpecialFragmentMatcher::Any { negative_only });
+    }
+
+    if let Some(pattern) = parse_python_raw_regex_fragment(core) {
+        return Some(SpecialFragmentMatcher::RegexLike {
+            negative_only,
+            pattern: pattern.to_string(),
+        });
+    }
+
+    if core.contains('*') {
+        return Some(SpecialFragmentMatcher::Glob {
+            negative_only,
+            pattern: core.to_string(),
+        });
+    }
+
+    None
+}
+
+fn parse_python_raw_regex_fragment(text: &str) -> Option<&str> {
+    if let Some(rest) = text.strip_prefix("r\"") {
+        return Some(rest.strip_suffix('\"').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("r'") {
+        return Some(rest.strip_suffix('\'').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("R\"") {
+        return Some(rest.strip_suffix('\"').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("R'") {
+        return Some(rest.strip_suffix('\'').unwrap_or(rest));
+    }
+    None
+}
+fn special_fragment_matches_candidate(candidate: &str, matcher: &SpecialFragmentMatcher) -> bool {
+    let (negative_only, body) = match matcher {
+        SpecialFragmentMatcher::Any { negative_only }
+        | SpecialFragmentMatcher::Glob { negative_only, .. }
+        | SpecialFragmentMatcher::RegexLike { negative_only, .. } => (*negative_only, candidate),
+    };
+
+    let Some(candidate_body) = strip_optional_negative_prefix(body, negative_only) else {
+        return false;
+    };
+
+    match matcher {
+        SpecialFragmentMatcher::Any { .. } => true,
+        SpecialFragmentMatcher::Glob { pattern, .. } => glob_like_match(
+            &normalize_completion_text(pattern),
+            &normalize_completion_text(candidate_body),
+        ),
+        SpecialFragmentMatcher::RegexLike { pattern, .. } => regex_like_search(
+            &normalize_completion_text(pattern),
+            &normalize_completion_text(candidate_body),
+        ),
+    }
+}
+
+fn strip_optional_negative_prefix<'a>(candidate: &'a str, negative_only: bool) -> Option<&'a str> {
+    if !negative_only {
+        return Some(candidate);
+    }
+    candidate.strip_prefix('-')
+}
+
+fn glob_like_match(pattern: &str, text: &str) -> bool {
+    if pattern.is_empty() {
+        return text.is_empty();
+    }
+
+    let pattern_chars = pattern.chars().collect::<Vec<_>>();
+    let text_chars = text.chars().collect::<Vec<_>>();
+    let mut memo = std::collections::BTreeMap::new();
+    glob_like_match_chars(&pattern_chars, &text_chars, 0, 0, &mut memo)
+}
+
+fn glob_like_match_chars(
+    pattern: &[char],
+    text: &[char],
+    pattern_index: usize,
+    text_index: usize,
+    memo: &mut std::collections::BTreeMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
+        return *cached;
+    }
+
+    let result = if pattern_index == pattern.len() {
+        text_index == text.len()
+    } else if pattern[pattern_index] == '*' {
+        glob_like_match_chars(pattern, text, pattern_index + 1, text_index, memo)
+            || (text_index < text.len()
+                && glob_like_match_chars(pattern, text, pattern_index, text_index + 1, memo))
+    } else {
+        text_index < text.len()
+            && pattern[pattern_index] == text[text_index]
+            && glob_like_match_chars(pattern, text, pattern_index + 1, text_index + 1, memo)
+    };
+
+    memo.insert((pattern_index, text_index), result);
+    result
+}
+
+fn regex_like_search(pattern: &str, text: &str) -> bool {
+    if pattern.is_empty() {
+        return true;
+    }
+
+    let (start_anchor, end_anchor, core) = strip_regex_like_anchors(pattern);
+    if core.is_empty() {
+        return true;
+    }
+
+    if !contains_regex_like_metacharacters(core) {
+        return text.contains(core);
+    }
+
+    let core_chars = core.chars().collect::<Vec<_>>();
+    let text_chars = text.chars().collect::<Vec<_>>();
+    let starts = if start_anchor {
+        vec![0usize]
+    } else {
+        (0..=text_chars.len()).collect::<Vec<_>>()
+    };
+
+    for start in starts {
+        let end_range = if end_anchor {
+            text_chars.len()..=text_chars.len()
+        } else {
+            start..=text_chars.len()
+        };
+
+        for end in end_range {
+            let mut memo = std::collections::BTreeMap::new();
+            if regex_like_full_match_chars(&core_chars, &text_chars[start..end], 0, 0, &mut memo) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn strip_regex_like_anchors(pattern: &str) -> (bool, bool, &str) {
+    let start_anchor = pattern.starts_with('^');
+    let without_start = pattern.strip_prefix('^').unwrap_or(pattern);
+    let end_anchor = without_start.ends_with('$');
+    let core = without_start.strip_suffix('$').unwrap_or(without_start);
+    (start_anchor, end_anchor, core)
+}
+
+fn contains_regex_like_metacharacters(pattern: &str) -> bool {
+    pattern
+        .chars()
+        .any(|ch| matches!(ch, '.' | '*' | '^' | '$'))
+}
+
+fn regex_like_full_match_chars(
+    pattern: &[char],
+    text: &[char],
+    pattern_index: usize,
+    text_index: usize,
+    memo: &mut std::collections::BTreeMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
+        return *cached;
+    }
+
+    let result = if pattern_index == pattern.len() {
+        text_index == text.len()
+    } else {
+        let first_match = text_index < text.len()
+            && (pattern[pattern_index] == '.' || pattern[pattern_index] == text[text_index]);
+
+        if pattern_index + 1 < pattern.len() && pattern[pattern_index + 1] == '*' {
+            regex_like_full_match_chars(pattern, text, pattern_index + 2, text_index, memo)
+                || (first_match
+                    && regex_like_full_match_chars(
+                        pattern,
+                        text,
+                        pattern_index,
+                        text_index + 1,
+                        memo,
+                    ))
+        } else {
+            first_match
+                && regex_like_full_match_chars(
+                    pattern,
+                    text,
+                    pattern_index + 1,
+                    text_index + 1,
+                    memo,
+                )
+        }
+    };
+
+    memo.insert((pattern_index, text_index), result);
+    result
 }
 
 fn normalize_completion_text(text: &str) -> String {
@@ -1070,7 +1334,13 @@ fn spalten_parameter_tokens() -> Vec<String> {
         }
     }
 
-    for extra in ["--=", "--breite=", "--breiten=", "--keinenummerierung", "--*="] {
+    for extra in [
+        "--=",
+        "--breite=",
+        "--breiten=",
+        "--keinenummerierung",
+        "--*=",
+    ] {
         push_unique_ordered(&mut out, &mut seen, extra);
     }
 
@@ -1211,8 +1481,8 @@ fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<Stri
 #[cfg(test)]
 mod tests {
     use super::{
-        candidates_for_input, candidates_for_input_in_mode_with_context,
-        normalize_completion_text, PromptModus,
+        candidates_for_input, candidates_for_input_in_mode_with_context, normalize_completion_text,
+        PromptModus,
     };
 
     fn contains_normalized(values: &[String], expected: &str) -> bool {
@@ -1338,7 +1608,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn stored_prefix_context_suggests_section_parameters_without_retyping_prefix() {
         let values = candidates_for_input_in_mode_with_context(
@@ -1368,7 +1637,11 @@ mod tests {
             "",
             PromptModus::LoeschenSelect,
             &[],
-            &["reta".to_string(), "-zeilen".to_string(), "--zeit=heute".to_string()],
+            &[
+                "reta".to_string(),
+                "-zeilen".to_string(),
+                "--zeit=heute".to_string(),
+            ],
         );
         assert!(contains_normalized(&values, "1"));
         assert!(contains_normalized(&values, "--zeit=heute"));
@@ -1380,7 +1653,11 @@ mod tests {
             "1-",
             PromptModus::LoeschenSelect,
             &[],
-            &["reta".to_string(), "-zeilen".to_string(), "--zeit=heute".to_string()],
+            &[
+                "reta".to_string(),
+                "-zeilen".to_string(),
+                "--zeit=heute".to_string(),
+            ],
         );
         assert!(contains_normalized(&values, "1-2"));
     }
@@ -1419,5 +1696,34 @@ mod tests {
                 "planet".to_string(),
             ]
         );
+    }
+    #[test]
+    fn raw_regex_fragment_matches_prompt_commands_like_python() {
+        let values = candidates_for_input(r#"2 r"absi"#);
+        assert!(contains_normalized(&values, "absicht"));
+        assert!(contains_normalized(&values, "absichten"));
+    }
+
+    #[test]
+    fn wildcard_value_fragment_expands_to_all_section_values() {
+        let values = candidates_for_input("reta -zeilen --zeit=*");
+        assert!(contains_normalized(&values, "heute"));
+        assert!(contains_normalized(&values, "gestern"));
+        assert!(contains_normalized(&values, "morgen"));
+    }
+
+    #[test]
+    fn negative_wildcard_fragment_keeps_only_negative_value_candidates() {
+        let values = candidates_for_input("reta -zeilen --typ=-*");
+        assert!(contains_normalized(&values, "-sonne"));
+        assert!(contains_normalized(&values, "-mond"));
+        assert!(!contains_normalized(&values, "sonne"));
+    }
+
+    #[test]
+    fn raw_regex_fragment_after_equals_filters_value_candidates() {
+        let values = candidates_for_input(r#"reta -zeilen --zeit=r"mor"#);
+        assert!(contains_normalized(&values, "morgen"));
+        assert!(!contains_normalized(&values, "heute"));
     }
 }
