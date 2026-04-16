@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::shared::lib4tables_enum_py::ST;
 use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
 
@@ -91,26 +92,21 @@ impl Program {
         }
     }
 
-    fn set_generated_spalten_tags_exact_py<S: AsRef<str>>(&mut self, spalte: i64, tags: &[S]) {
-        let mut collected: Vec<String> = vec![];
-        for tag in tags {
-            let value = tag.as_ref().trim();
-            if !value.is_empty() && !collected.iter().any(|existing| existing == value) {
-                collected.push(value.to_string());
-            }
-        }
+    fn set_generated_spalten_tags_exact_py(&mut self, spalte: i64, tags: &[ST]) {
+        let mut collected = BTreeSet::new();
+        collected.extend(tags.iter().copied());
         if !collected.is_empty() {
             self.generatedSpaltenParameter_Tags.insert(spalte, collected);
         }
     }
 
-    fn concat_table_generated_tags_exact_py(&self, concatTable: i64) -> Vec<String> {
+    fn concat_table_generated_tags_exact_py(&self, concatTable: i64) -> Vec<ST> {
         match concatTable {
-            1 => vec!["sternPolygon".to_string(), "universum".to_string(), "galaxie".to_string()],
-            2 | 3 => vec!["sternPolygon".to_string(), "galaxie".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
-            4 | 5 => vec!["sternPolygon".to_string(), "universum".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
-            6 | 7 => vec!["sternPolygon".to_string(), "keinParaOdMetaP".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string()],
-            8 | 9 => vec!["sternPolygon".to_string(), "gleichfoermigesPolygon".to_string(), "gebrRat".to_string(), "keinParaOdMetaP".to_string()],
+            1 => vec![ST::sternPolygon, ST::universum, ST::galaxie],
+            2 | 3 => vec![ST::sternPolygon, ST::galaxie, ST::gleichfoermigesPolygon, ST::gebrRat],
+            4 | 5 => vec![ST::sternPolygon, ST::universum, ST::gleichfoermigesPolygon, ST::gebrRat],
+            6 | 7 => vec![ST::sternPolygon, ST::keinParaOdMetaP, ST::gleichfoermigesPolygon, ST::gebrRat],
+            8 | 9 => vec![ST::sternPolygon, ST::gleichfoermigesPolygon, ST::gebrRat, ST::keinParaOdMetaP],
             _ => vec![],
         }
     }
@@ -737,60 +733,60 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
 
-    fn generated2_coord_tag_values_exact_py(&self, code: &str) -> Vec<((usize, usize, bool), Vec<String>)> {
-        let mk = |poly: &str, gal: bool, uni: bool, gebr: bool| -> Vec<String> {
-            let mut tags: Vec<String> = vec![poly.to_string()];
+    fn generated2_coord_tag_values_exact_py(&self, code: &str) -> Vec<((usize, usize, bool), Vec<ST>)> {
+        let mk = |poly: ST, gal: bool, uni: bool, gebr: bool| -> Vec<ST> {
+            let mut tags: Vec<ST> = vec![poly];
             if gal {
-                tags.push("galaxie".to_string());
+                tags.push(ST::galaxie);
             }
             if uni {
-                tags.push("universum".to_string());
+                tags.push(ST::universum);
             }
             if gebr {
-                tags.push("gebrRat".to_string());
+                tags.push(ST::gebrRat);
             }
             tags
         };
         match code {
             "primMotivSternGebr" => vec![
-                ((0, 0, true), mk("sternPolygon", true, false, true)),
-                ((0, 1, true), mk("sternPolygon", true, true, true)),
-                ((0, 2, true), mk("sternPolygon", true, true, true)),
+                ((0, 0, true), mk(ST::sternPolygon, true, false, true)),
+                ((0, 1, true), mk(ST::sternPolygon, true, true, true)),
+                ((0, 2, true), mk(ST::sternPolygon, true, true, true)),
             ],
             "primStrukSternGebr" => vec![
-                ((0, 1, true), mk("sternPolygon", true, true, true)),
-                ((0, 2, true), mk("sternPolygon", true, true, true)),
-                ((0, 3, true), mk("sternPolygon", false, true, true)),
+                ((0, 1, true), mk(ST::sternPolygon, true, true, true)),
+                ((0, 2, true), mk(ST::sternPolygon, true, true, true)),
+                ((0, 3, true), mk(ST::sternPolygon, false, true, true)),
             ],
             "primMotivGleichfGebr" => vec![
-                ((1, 0, true), mk("gleichfoermigesPolygon", true, false, true)),
-                ((1, 1, true), mk("gleichfoermigesPolygon", true, true, true)),
-                ((1, 2, true), mk("gleichfoermigesPolygon", true, true, true)),
+                ((1, 0, true), mk(ST::gleichfoermigesPolygon, true, false, true)),
+                ((1, 1, true), mk(ST::gleichfoermigesPolygon, true, true, true)),
+                ((1, 2, true), mk(ST::gleichfoermigesPolygon, true, true, true)),
             ],
             "primStrukGleichfGebr" => vec![
-                ((1, 1, true), mk("gleichfoermigesPolygon", true, true, true)),
-                ((1, 2, true), mk("gleichfoermigesPolygon", true, true, true)),
-                ((1, 3, true), mk("gleichfoermigesPolygon", false, true, true)),
+                ((1, 1, true), mk(ST::gleichfoermigesPolygon, true, true, true)),
+                ((1, 2, true), mk(ST::gleichfoermigesPolygon, true, true, true)),
+                ((1, 3, true), mk(ST::gleichfoermigesPolygon, false, true, true)),
             ],
             "primMotivStern" => vec![
-                ((0, 0, false), mk("sternPolygon", true, false, false)),
-                ((0, 1, false), mk("sternPolygon", true, true, false)),
-                ((0, 2, false), mk("sternPolygon", true, true, false)),
+                ((0, 0, false), mk(ST::sternPolygon, true, false, false)),
+                ((0, 1, false), mk(ST::sternPolygon, true, true, false)),
+                ((0, 2, false), mk(ST::sternPolygon, true, true, false)),
             ],
             "primStrukStern" => vec![
-                ((0, 1, false), mk("sternPolygon", true, true, false)),
-                ((0, 2, false), mk("sternPolygon", true, true, false)),
-                ((0, 3, false), mk("sternPolygon", false, true, false)),
+                ((0, 1, false), mk(ST::sternPolygon, true, true, false)),
+                ((0, 2, false), mk(ST::sternPolygon, true, true, false)),
+                ((0, 3, false), mk(ST::sternPolygon, false, true, false)),
             ],
             "primMotivGleichf" => vec![
-                ((1, 0, false), mk("gleichfoermigesPolygon", true, false, false)),
-                ((1, 1, false), mk("gleichfoermigesPolygon", true, true, false)),
-                ((1, 2, false), mk("gleichfoermigesPolygon", true, true, false)),
+                ((1, 0, false), mk(ST::gleichfoermigesPolygon, true, false, false)),
+                ((1, 1, false), mk(ST::gleichfoermigesPolygon, true, true, false)),
+                ((1, 2, false), mk(ST::gleichfoermigesPolygon, true, true, false)),
             ],
             "primStrukGleichf" => vec![
-                ((1, 1, false), mk("gleichfoermigesPolygon", true, true, false)),
-                ((1, 2, false), mk("gleichfoermigesPolygon", true, true, false)),
-                ((1, 3, false), mk("gleichfoermigesPolygon", false, true, false)),
+                ((1, 1, false), mk(ST::gleichfoermigesPolygon, true, true, false)),
+                ((1, 2, false), mk(ST::gleichfoermigesPolygon, true, true, false)),
+                ((1, 3, false), mk(ST::gleichfoermigesPolygon, false, true, false)),
             ],
             _ => vec![],
         }
@@ -817,8 +813,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     fn generated2_coord_tags_exact_py(
         &self,
         generatedSelections: &Vec<Generated2Selection>,
-    ) -> BTreeMap<(usize, usize, bool), Vec<String>> {
-        let mut koord2tag: BTreeMap<(usize, usize, bool), Vec<String>> = BTreeMap::new();
+    ) -> BTreeMap<(usize, usize, bool), Vec<ST>> {
+        let mut koord2tag: BTreeMap<(usize, usize, bool), Vec<ST>> = BTreeMap::new();
         for selection in generatedSelections {
             for (coord, tags) in self.generated2_coord_tag_values_exact_py(&selection.code) {
                 koord2tag.entry(coord).or_insert(tags);
@@ -832,7 +828,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         coord: (usize, usize, bool),
         spalte: i64,
         koord2parameter: &BTreeMap<(usize, usize, bool), Vec<Generated2Selection>>,
-        koord2tag: &BTreeMap<(usize, usize, bool), Vec<String>>,
+        koord2tag: &BTreeMap<(usize, usize, bool), Vec<ST>>,
     ) {
         self.spaltenArtenKey_SpaltennummernValue
             .entry(self.spaltenTypeNaming.generated2)
@@ -859,7 +855,11 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         }
 
         if let Some(tags) = koord2tag.get(&coord) {
-            let tag_label = tags.join("|");
+            let tag_label = tags
+                .iter()
+                .map(|tag| tag.py_name())
+                .collect::<Vec<_>>()
+                .join("|");
             self.paraDictGenerated4htmlTags
                 .insert(("generated2_tags".to_string(), tag_label), spalte);
         }
@@ -1630,7 +1630,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(9));
-        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "galaxie", "gleichfoermigesPolygon"]);
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie, ST::gleichfoermigesPolygon]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1646,7 +1646,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(132));
-        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1662,7 +1662,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(242));
-        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1685,7 +1685,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             zeilenInhalte.push(wert);
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
-        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "galaxie"]);
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -1728,9 +1728,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
             let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
             if rownum == 44 {
-                self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum", "galaxie"]);
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum, ST::galaxie]);
             } else {
-                self.set_generated_spalten_tags_exact_py(spalte, &["gleichfoermigesPolygon", "universum", "galaxie"]);
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::gleichfoermigesPolygon, ST::universum, ST::galaxie]);
             }
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
@@ -1902,7 +1902,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 zeilenInhalte.push(joined);
             }
             let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, "Primzahlwirkung (7, Richtung)");
-            self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
+            self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -2734,7 +2734,7 @@ for couple_a in paare {
                 }
                 let meta_name = if bothRows == 0 { self.meta_prefixes_py(metavariable).0 } else { self.meta_prefixes_py(metavariable).1 };
                 let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, if ifInvers == 0 { "n" } else { "1/n" }));
-                self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum"]);
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
                 Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
@@ -2765,7 +2765,7 @@ for couple_a in paare {
         }
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
         self.set_generated_spalten_parameter_exact_from_data_dict_py(spalte, 0, "64");
-        self.set_generated_spalten_tags_exact_py(spalte, &["sternPolygon", "universum", "galaxie"]);
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum, ST::galaxie]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 

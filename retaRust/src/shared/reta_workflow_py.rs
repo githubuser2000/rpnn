@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::shared::reta_exact_tags_py::{kombi13_table_tags_exact_py, kombi15_table_tags_exact_py};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
 use crate::shared::words_py::Words;
 
@@ -220,6 +221,19 @@ impl Program {
 
         if !parameter_groups.is_empty() {
             self.generatedSpaltenParameter_Exact.insert(spalte, parameter_groups);
+        }
+
+        let exact_tags = if csvFileName.contains("meta") {
+            kombi15_table_tags_exact_py(csv_col_number as usize)
+        } else {
+            kombi13_table_tags_exact_py(csv_col_number as usize)
+        };
+        if let Some(tags) = exact_tags {
+            let mut collected = BTreeSet::new();
+            collected.extend(tags.iter().copied());
+            if !collected.is_empty() {
+                self.generatedSpaltenParameter_Tags.insert(spalte, collected);
+            }
         }
     }
 

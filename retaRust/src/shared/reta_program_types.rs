@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use std::collections::{BTreeSet, BTreeMap};
 use crate::shared::words_py::PyValue;
+use crate::shared::lib4tables_enum_py::ST;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PairStr(pub String, pub String);
@@ -141,7 +142,7 @@ pub struct Program {
     pub oldTable: Vec<Vec<String>>,
     pub generatedSpaltenParameter: Vec<String>,
     pub generatedSpaltenParameter_Exact: BTreeMap<i64, Vec<Vec<PairStr>>>,
-    pub generatedSpaltenParameter_Tags: BTreeMap<i64, Vec<String>>,
+    pub generatedSpaltenParameter_Tags: BTreeMap<i64, BTreeSet<ST>>,
     pub allEquColumns: Vec<i64>,
     pub finallyDisplayTable: Vec<Vec<String>>,
     pub rowsRangeLen: i64,
