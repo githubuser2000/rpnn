@@ -271,7 +271,7 @@ impl Program {
             oneTable: false,
             nocolor: false,
             outType: "shell".to_string(),
-            textWidth: 0,
+            textWidth: 21,
             ifZeilenSetted: false,
             dataDict: vec![],
             paraDictGenerated: IndexMap::new(),

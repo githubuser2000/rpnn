@@ -105,23 +105,36 @@ impl Program {
 
 
     pub(crate) fn bereich_to_numbers2_ausgabe_py(txt: &str) -> Vec<i64> {
-        let parsed: Vec<i64> = Self::bereich_to_numbers2_py(txt, false, 0, false)
-            .into_iter()
-            .collect();
-        if parsed.is_empty() {
-            let mut fallback = vec![];
-            for part in Self::split_top_level_commas_py(txt) {
-                let trimmed = part.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if let Ok(v) = trimmed.parse::<i64>() {
-                    fallback.push(v);
+        let mut ordered: Vec<i64> = vec![];
+        for part in Self::split_top_level_commas_py(txt) {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Some((a, b)) = trimmed.split_once('-') {
+                let a = a.trim();
+                let b = b.trim();
+                if a.chars().all(|c| c.is_ascii_digit()) && b.chars().all(|c| c.is_ascii_digit()) {
+                    let start = a.parse::<i64>().unwrap_or(0);
+                    let end = b.parse::<i64>().unwrap_or(0);
+                    if start > 0 && end >= start {
+                        for value in start..=end {
+                            ordered.push(value);
+                        }
+                        continue;
+                    }
                 }
             }
-            fallback
+            if trimmed.chars().all(|c| c.is_ascii_digit()) {
+                ordered.push(trimmed.parse::<i64>().unwrap_or(0));
+            }
+        }
+        if !ordered.is_empty() {
+            ordered
         } else {
-            parsed
+            Self::bereich_to_numbers2_py(txt, false, 0, false)
+                .into_iter()
+                .collect()
         }
     }
 

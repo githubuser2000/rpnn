@@ -101,13 +101,17 @@ impl Program {
             );
         }
 
+        let visible_rows_range = self.onlyThatColumns_i64_py(
+            rowsRange.clone(),
+            self.spaltenreihenfolgeundnurdiese.clone(),
+        );
         newTable = self.onlyThatColumns_py(newTable, self.spaltenreihenfolgeundnurdiese.clone());
         self.newTable = !newTable.is_empty();
         self.finallyDisplayLines = finallyDisplayLines.clone();
         self.numlen = numlen;
         let _old2newTable = old2newTable.clone();
 
-        let out: Vec<Vec<String>> = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, rowsRange);
+        let out: Vec<Vec<String>> = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, visible_rows_range);
         self.tableGenerated = self.newTable || !out.is_empty();
         self.__resultingTable = out.clone();
         self.addResultingTableToTables();

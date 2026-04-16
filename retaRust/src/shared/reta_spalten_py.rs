@@ -384,8 +384,9 @@ impl Program {
                 }
                 if neg.is_empty() {
                     self.breite = breite;
-                    if breite > self.textWidth {
-                        self.textWidth = breite;
+                    let normalized = self.normalize_text_width_py(breite);
+                    if normalized > self.textWidth {
+                        self.textWidth = normalized;
                     }
                 }
                 self.breiteORbreiten = true;
@@ -407,11 +408,26 @@ impl Program {
         false
     }
 
-    pub fn setShellRowsAmount(&mut self) {
-        self.shellRowsAmount = 0;
-        if let Ok(v) = std::env::var("LINES") {
-            self.shellRowsAmount = v.parse::<i64>().unwrap_or(0);
+    fn normalize_text_width_py(&self, value: i64) -> i64 {
+        let shell_width = if self.shellRowsAmount > 0 {
+            self.shellRowsAmount
+        } else {
+            Self::detect_terminal_columns_py()
+        };
+        if shell_width <= 0 {
+            return value;
         }
+        if (shell_width > value + 7 || shell_width == 0)
+            && (value != 0 || self.outType == "bbcode" || self.outType == "html" || self.oneTable)
+        {
+            value
+        } else {
+            shell_width - 7
+        }
+    }
+
+    pub fn setShellRowsAmount(&mut self) {
+        self.shellRowsAmount = Self::detect_terminal_columns_py();
     }
 
     pub(crate) fn detect_terminal_columns_py() -> i64 {

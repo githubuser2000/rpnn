@@ -7,34 +7,57 @@ impl Program {
         self.__resultingTable.clone()
     }
 
-pub fn onlyThatColumns_py(&self, table: Vec<Vec<String>>, onlyThatColumns: Vec<i64>) -> Vec<Vec<String>> {
-    if onlyThatColumns.len() == 0 {
-        return table;
+    pub fn onlyThatColumns_py(&self, table: Vec<Vec<String>>, onlyThatColumns: Vec<i64>) -> Vec<Vec<String>> {
+        if onlyThatColumns.is_empty() {
+            return table;
+        }
+
+        let mut newTable: Vec<Vec<String>> = vec![];
+
+        for row in &table {
+            let mut newCol: Vec<String> = vec![];
+
+            for i in onlyThatColumns.iter() {
+                if *i <= 0 {
+                    continue;
+                }
+                let idx = (*i - 1) as usize;
+                if idx < row.len() {
+                    newCol.push(row[idx].clone());
+                }
+            }
+
+            // Python hängt auch leere Zeilen an
+            newTable.push(newCol);
+        }
+
+        if !newTable.is_empty() {
+            newTable
+        } else {
+            table
+        }
     }
 
-    let mut newTable: Vec<Vec<String>> = vec![];
+    pub fn onlyThatColumns_i64_py(&self, values: Vec<i64>, onlyThatColumns: Vec<i64>) -> Vec<i64> {
+        if onlyThatColumns.is_empty() {
+            return values;
+        }
 
-    for row in &table {
-        let mut newCol: Vec<String> = vec![];
-
+        let mut out: Vec<i64> = vec![];
         for i in onlyThatColumns.iter() {
             if *i <= 0 {
                 continue;
             }
             let idx = (*i - 1) as usize;
-            if idx < row.len() {
-                newCol.push(row[idx].clone());
+            if idx < values.len() {
+                out.push(values[idx]);
             }
         }
 
-        // Python hängt auch leere Zeilen an
-        newTable.push(newCol);
+        if !out.is_empty() {
+            out
+        } else {
+            values
+        }
     }
-
-    if newTable.len() > 0 {
-        newTable
-    } else {
-        table
-    }
-}
 }

@@ -1358,23 +1358,43 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             return newTable;
         }
 
-        // Python-like default shell width behavior:
-        // without explicit --breite / --breiten, columns start at width 21.
-        // Only explicit width arguments should override this.
-        let mut widths: Vec<usize> = vec![21; col_count];
-        for i in 0..col_count {
-            let forced = if i < self.breiten.len() {
-                self.breiten[i]
-            } else {
-                self.breite
-            };
-            if forced > 0 {
-                widths[i] = forced as usize;
+        let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+        for row in &newTable {
+            for col_idx in 0..col_count {
+                let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                let cell_width = cell
+                    .split('\n')
+                    .map(|part| part.chars().count())
+                    .max()
+                    .unwrap_or(0);
+                if cell_width > max_cell_widths[col_idx] {
+                    max_cell_widths[col_idx] = cell_width;
+                }
             }
         }
 
+        let mut widths: Vec<usize> = vec![0; col_count];
+        for col_idx in 0..col_count {
+            let certain = if col_idx < self.breiten.len() {
+                self.breiten[col_idx]
+            } else {
+                self.textWidth
+            };
+            widths[col_idx] = if certain > max_cell_widths[col_idx] as i64 || certain == 0 {
+                max_cell_widths[col_idx]
+            } else if certain < 0 {
+                0
+            } else {
+                certain as usize
+            };
+        }
+
         let num_prefix_width = if self.nummeriere {
-            finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
+            finallyDisplayLines
+                .iter()
+                .map(|s| s.chars().count())
+                .max()
+                .unwrap_or(0)
         } else {
             0usize
         };
@@ -1385,42 +1405,42 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             let detected = Self::detect_terminal_columns_py();
             if detected > 0 {
                 detected as usize
-            } else if self.textWidth > 0 {
-                self.textWidth as usize
             } else {
-                80usize
+                0usize
             }
         };
-        let chunk_budget = detected_shell_width.max(21usize);
+        let chunk_budget = if detected_shell_width > 0 {
+            detected_shell_width.saturating_sub(if self.nummeriere { num_prefix_width + 1 } else { 0 })
+        } else {
+            0usize
+        };
 
-        let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
+        let chunks: Vec<(usize, usize)> = if self.oneTable || chunk_budget == 0 {
+            vec![(0, col_count)]
+        } else {
+            let mut chunks: Vec<(usize, usize)> = vec![];
+            let mut start_col = 0usize;
+            while start_col < col_count {
+                let mut used = 0usize;
+                let mut end_col = start_col;
 
-        let mut chunks: Vec<(usize, usize)> = vec![];
-        let mut start_col = 0usize;
-        while start_col < col_count {
-            let mut used = left_prefix;
-            let mut end_col = start_col;
-
-            while end_col < col_count {
-                let add = if end_col == start_col {
-                    widths[end_col]
-                } else {
-                    1 + widths[end_col]
-                };
-
-                if end_col > start_col && used + add > chunk_budget {
-                    break;
+                while end_col < col_count {
+                    let add = widths[end_col].saturating_add(1);
+                    if end_col > start_col && used.saturating_add(add) >= chunk_budget {
+                        break;
+                    }
+                    used = used.saturating_add(add);
+                    end_col += 1;
                 }
-                used += add;
-                end_col += 1;
-            }
 
-            if end_col == start_col {
-                end_col += 1;
+                if end_col == start_col {
+                    end_col += 1;
+                }
+                chunks.push((start_col, end_col));
+                start_col = end_col;
             }
-            chunks.push((start_col, end_col));
-            start_col = end_col;
-        }
+            chunks
+        };
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
@@ -1428,17 +1448,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             let mut one_chunk_lines: Vec<String> = vec![];
 
             for (row_idx, row) in newTable.iter().enumerate() {
-                let mut wrapped_cells: Vec<Vec<String>> = vec![];
-                let mut max_sub = 1usize;
-
-                for i in chunk_start..chunk_end {
-                    let cell = if i < row.len() { row[i].as_str() } else { "" };
-                    let wrapped = Self::wrap_text_py(cell, widths[i]);
-                    max_sub = max_sub.max(wrapped.len());
-                    wrapped_cells.push(wrapped);
-                }
-
-                let mut should_skip_row = false;
                 if self.keineleereninhalte {
                     let joined = (chunk_start..chunk_end)
                         .filter_map(|i| row.get(i))
@@ -1447,17 +1456,29 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         .join(" ");
                     let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
                     if stripped.is_empty() {
-                        should_skip_row = true;
+                        continue;
                     }
-                }
-                if should_skip_row {
-                    continue;
                 }
 
                 let row_number = finallyDisplayLines
                     .get(row_idx)
                     .and_then(|s| s.trim().parse::<i64>().ok());
                 let is_header = row_number.is_none();
+
+                let mut wrapped_cells: Vec<Vec<String>> = vec![];
+                let mut max_sub = 1usize;
+                for col_idx in chunk_start..chunk_end {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let wrapped = if widths[col_idx] == 0 {
+                        vec![cell.to_string()]
+                    } else {
+                        Self::wrap_text_py(cell, widths[col_idx])
+                    };
+                    if wrapped.len() > max_sub {
+                        max_sub = wrapped.len();
+                    }
+                    wrapped_cells.push(wrapped);
+                }
 
                 for sub_idx in 0..max_sub {
                     let mut line = String::new();
@@ -1487,7 +1508,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
                         let part = maybe_part.clone().unwrap_or_default();
                         let is_rest = maybe_part.is_none();
-                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
+                        let rendered = if widths[abs_i] == 0 {
+                            part
+                        } else {
+                            format!("{:<width$}", part, width = widths[abs_i])
+                        };
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
