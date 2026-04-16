@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use indexmap::IndexMap;
 
-use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, Program, SpaltenTyp};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, Generated2Selection, GeneratorPairSelection, Program, SpaltenTyp};
 use crate::shared::reta_runtime_cache::{shared_reta_static_data, GeneratorFamilyData};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
@@ -186,13 +186,8 @@ impl Program {
         out
     }
 
-    fn is_zeilen_angabe_between_kommas_py(txt: &str) -> bool {
+    fn is_plain_zeilen_angabe_between_kommas_py(txt: &str) -> bool {
         let txt = txt.trim();
-        if txt.is_empty() {
-            return false;
-        }
-        let txt = if let Some(rest) = txt.strip_prefix('v') { rest } else { txt };
-        let txt = if let Some(rest) = txt.strip_prefix('-') { rest } else { txt };
         if txt.is_empty() {
             return false;
         }
@@ -207,6 +202,24 @@ impl Program {
             return false;
         }
         parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    }
+
+    fn is_zeilen_angabe_between_kommas_py(txt: &str) -> bool {
+        let txt = txt.trim();
+        if txt.is_empty() {
+            return false;
+        }
+        let stripped_v = txt.strip_prefix('v').unwrap_or(txt);
+        let stripped_plain = stripped_v.strip_prefix('-').unwrap_or(stripped_v);
+        let generated_after_first = txt
+            .char_indices()
+            .nth(1)
+            .map(|(idx, _)| &txt[idx..])
+            .and_then(Self::parse_python_like_int_set_expr_py)
+            .is_some();
+        (!stripped_plain.is_empty() && Self::is_plain_zeilen_angabe_between_kommas_py(stripped_plain))
+            || Self::parse_python_like_int_set_expr_py(txt).is_some()
+            || generated_after_first
     }
 
     fn is_zeilen_angabe_py(txt: &str) -> bool {
@@ -482,27 +495,10 @@ impl Program {
         self.rowRange = vec![];
         for arg in &self.argvWithoutProgram {
             if let Some(tail) = arg.strip_prefix("--vorhervonausschnitt=") {
-                for part in Self::split_top_level_commas_py(tail) {
-                    let part = part.trim();
-                    if part.is_empty() {
-                        continue;
-                    }
-                    if let Some((a, b)) = part.split_once('-') {
-                        let start = a.parse::<i64>().unwrap_or(0);
-                        let end = b.parse::<i64>().unwrap_or(0);
-                        if start > 0 && end >= start {
-                            for v in start..=end {
-                                self.rowRange.push(v);
-                            }
-                        }
-                    } else if let Ok(v) = part.parse::<i64>() {
-                        if v > 0 {
-                            self.rowRange.push(v);
-                        }
-                    }
-                }
+                self.rowRange.extend(Self::bereich_to_numbers2_py(tail, false, 0, false));
             }
         }
+        self.rowRange = dedup_preserve_order_i64(std::mem::take(&mut self.rowRange));
         self.rowsRangeLen = self.rowRange.len() as i64;
     }
 
@@ -985,14 +981,15 @@ impl Program {
             }
         } else if arg.starts_with("--vorhervonausschnitt=") {
             let tail = &arg["--vorhervonausschnitt=".len()..];
-            if let Some((a,b)) = tail.split_once('-') {
-                let start = a.parse::<i64>().unwrap_or(0);
-                let end = b.parse::<i64>().unwrap_or(0);
-                for w in start..=end {
-                    werte.push(std::cmp::max(w + 1, 1024));
-                }
-                return (werte, false);
-            }
+            let werte_list: Vec<i64> = Self::bereich_to_numbers2_py(tail, false, 0, false)
+                .into_iter()
+                .map(|a| a.saturating_add(1))
+                .collect();
+            werte = werte_list
+                .into_iter()
+                .map(|w| std::cmp::max(w, 1024))
+                .collect();
+            return (werte, false);
         }
         (werte, false)
     }

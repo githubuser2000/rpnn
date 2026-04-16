@@ -6,6 +6,193 @@ use hypher::{hyphenate, Lang};
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
+
+struct PyLikeIntExprParser<'a> {
+    chars: Vec<char>,
+    pos: usize,
+    variable: Option<(&'a str, i64)>,
+}
+
+impl<'a> PyLikeIntExprParser<'a> {
+    fn parse(text: &str, variable: Option<(&'a str, i64)>) -> Option<i64> {
+        let mut parser = Self {
+            chars: text.chars().collect(),
+            pos: 0,
+            variable,
+        };
+        let value = parser.parse_expr()?;
+        parser.skip_ws();
+        if parser.pos == parser.chars.len() {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn skip_ws(&mut self) {
+        while self.pos < self.chars.len() && self.chars[self.pos].is_whitespace() {
+            self.pos += 1;
+        }
+    }
+
+    fn starts_with(&mut self, needle: &str) -> bool {
+        self.skip_ws();
+        let mut idx = self.pos;
+        for expected in needle.chars() {
+            if self.chars.get(idx).copied() != Some(expected) {
+                return false;
+            }
+            idx += 1;
+        }
+        true
+    }
+
+    fn consume_str(&mut self, needle: &str) -> bool {
+        if !self.starts_with(needle) {
+            return false;
+        }
+        self.pos += needle.chars().count();
+        true
+    }
+
+    fn consume_char(&mut self, needle: char) -> bool {
+        self.skip_ws();
+        if self.chars.get(self.pos).copied() == Some(needle) {
+            self.pos += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn parse_expr(&mut self) -> Option<i64> {
+        self.parse_add_sub()
+    }
+
+    fn parse_add_sub(&mut self) -> Option<i64> {
+        let mut value = self.parse_mul_mod()?;
+        loop {
+            if self.consume_char('+') {
+                value = value.checked_add(self.parse_mul_mod()?)?;
+            } else if self.consume_char('-') {
+                value = value.checked_sub(self.parse_mul_mod()?)?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_mul_mod(&mut self) -> Option<i64> {
+        let mut value = self.parse_unary()?;
+        loop {
+            if self.consume_str("//") {
+                let rhs = self.parse_unary()?;
+                if rhs == 0 {
+                    return None;
+                }
+                value = value.checked_div(rhs)?;
+            } else if self.starts_with("**") {
+                break;
+            } else if self.consume_char('*') {
+                value = value.checked_mul(self.parse_unary()?)?;
+            } else if self.consume_char('%') {
+                let rhs = self.parse_unary()?;
+                if rhs == 0 {
+                    return None;
+                }
+                value = value.checked_rem(rhs)?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_unary(&mut self) -> Option<i64> {
+        if self.consume_char('+') {
+            self.parse_unary()
+        } else if self.consume_char('-') {
+            self.parse_unary()?.checked_neg()
+        } else {
+            self.parse_power()
+        }
+    }
+
+    fn parse_power(&mut self) -> Option<i64> {
+        let base = self.parse_primary()?;
+        if self.consume_str("**") {
+            let exponent = self.parse_unary()?;
+            if exponent < 0 {
+                return None;
+            }
+            base.checked_pow(exponent as u32)
+        } else {
+            Some(base)
+        }
+    }
+
+    fn parse_primary(&mut self) -> Option<i64> {
+        if self.consume_char('(') {
+            let value = self.parse_expr()?;
+            if !self.consume_char(')') {
+                return None;
+            }
+            return Some(value);
+        }
+
+        self.skip_ws();
+        let ch = self.chars.get(self.pos).copied()?;
+        if ch.is_ascii_digit() {
+            return self.parse_number();
+        }
+        if ch.is_ascii_alphabetic() || ch == '_' {
+            return self.parse_identifier();
+        }
+        None
+    }
+
+    fn parse_number(&mut self) -> Option<i64> {
+        self.skip_ws();
+        let start = self.pos;
+        while self.pos < self.chars.len() && self.chars[self.pos].is_ascii_digit() {
+            self.pos += 1;
+        }
+        if start == self.pos {
+            return None;
+        }
+        self.chars[start..self.pos].iter().collect::<String>().parse::<i64>().ok()
+    }
+
+    fn parse_identifier(&mut self) -> Option<i64> {
+        self.skip_ws();
+        let start = self.pos;
+        if self.pos >= self.chars.len() {
+            return None;
+        }
+        let first = self.chars[self.pos];
+        if !(first.is_ascii_alphabetic() || first == '_') {
+            return None;
+        }
+        self.pos += 1;
+        while self.pos < self.chars.len() {
+            let ch = self.chars[self.pos];
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+        let name = self.chars[start..self.pos].iter().collect::<String>();
+        if let Some((variable_name, variable_value)) = self.variable {
+            if name == variable_name {
+                return Some(variable_value);
+            }
+        }
+        None
+    }
+}
+
 impl Program {
     fn displayed_column_numbers_for_html_py(rowsRange: &[i64]) -> Vec<Option<u32>> {
     rowsRange
@@ -234,13 +421,8 @@ fn html_exact_header_attrs_py(
         out
     }
 
-    fn is_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
+    fn is_plain_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
         let txt = txt.trim();
-        if txt.is_empty() {
-            return false;
-        }
-        let txt = txt.strip_prefix('v').unwrap_or(txt);
-        let txt = txt.strip_prefix('-').unwrap_or(txt);
         if txt.is_empty() {
             return false;
         }
@@ -252,6 +434,135 @@ fn html_exact_header_attrs_py(
             first.chars().all(|c| c.is_ascii_digit())
         };
         first_ok && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    }
+
+    fn is_python_identifier_py(txt: &str) -> bool {
+        let mut chars = txt.chars();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        if !(first.is_ascii_alphabetic() || first == '_') {
+            return false;
+        }
+        chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    }
+
+    fn eval_python_int_expr_py(text: &str, variable: Option<(&str, i64)>) -> Option<i64> {
+        PyLikeIntExprParser::parse(text, variable)
+    }
+
+    fn parse_python_like_range_values_py(start: i64, stop: i64, step: i64) -> Option<Vec<i64>> {
+        if step == 0 {
+            return None;
+        }
+        let mut values: Vec<i64> = vec![];
+        let mut current = start;
+        if step > 0 {
+            while current < stop {
+                values.push(current);
+                current = current.checked_add(step)?;
+            }
+        } else {
+            while current > stop {
+                values.push(current);
+                current = current.checked_add(step)?;
+            }
+        }
+        Some(values)
+    }
+
+    fn parse_python_like_range_comprehension_py(inner: &str) -> Option<BTreeSet<i64>> {
+        let (expr, rest) = inner.split_once(" for ")?;
+        let (variable, iterable) = rest.split_once(" in ")?;
+        let variable = variable.trim();
+        if !Self::is_python_identifier_py(variable) {
+            return None;
+        }
+        let iterable = iterable.trim();
+        if !(iterable.starts_with("range(") && iterable.ends_with(')')) {
+            return None;
+        }
+        let args_txt = &iterable["range(".len()..iterable.len() - 1];
+        let args_parts: Vec<String> = Self::split_top_level_commas_filter_py(args_txt)
+            .into_iter()
+            .map(|part| part.trim().to_string())
+            .filter(|part| !part.is_empty())
+            .collect();
+        if args_parts.is_empty() || args_parts.len() > 3 {
+            return None;
+        }
+        let mut args: Vec<i64> = vec![];
+        for part in args_parts {
+            args.push(Self::eval_python_int_expr_py(&part, None)?);
+        }
+        let (start, stop, step) = match args.as_slice() {
+            [stop] => (0, *stop, 1),
+            [start, stop] => (*start, *stop, 1),
+            [start, stop, step] => (*start, *stop, *step),
+            _ => return None,
+        };
+        let mut out = BTreeSet::new();
+        for value in Self::parse_python_like_range_values_py(start, stop, step)? {
+            out.insert(Self::eval_python_int_expr_py(expr.trim(), Some((variable, value)))?);
+        }
+        Some(out)
+    }
+
+    pub(crate) fn parse_python_like_int_set_expr_py(text: &str) -> Option<BTreeSet<i64>> {
+        let trimmed = text.trim();
+        if trimmed.len() < 2 {
+            return None;
+        }
+        let normalized = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+            format!("[{}]", &trimmed[1..trimmed.len() - 1])
+        } else {
+            trimmed.to_string()
+        };
+        let inner = if (normalized.starts_with('[') && normalized.ends_with(']'))
+            || (normalized.starts_with('{') && normalized.ends_with('}'))
+        {
+            &normalized[1..normalized.len() - 1]
+        } else {
+            return None;
+        };
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return Some(BTreeSet::new());
+        }
+        if let Some(values) = Self::parse_python_like_range_comprehension_py(inner) {
+            return Some(values);
+        }
+        let mut out = BTreeSet::new();
+        let parts: Vec<String> = Self::split_top_level_commas_filter_py(inner)
+            .into_iter()
+            .map(|part| part.trim().to_string())
+            .filter(|part| !part.is_empty())
+            .collect();
+        if parts.is_empty() {
+            return None;
+        }
+        for part in parts {
+            out.insert(Self::eval_python_int_expr_py(&part, None)?);
+        }
+        Some(out)
+    }
+
+    fn is_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
+        let txt = txt.trim();
+        if txt.is_empty() {
+            return false;
+        }
+        let stripped_v = txt.strip_prefix('v').unwrap_or(txt);
+        let stripped_plain = stripped_v.strip_prefix('-').unwrap_or(stripped_v);
+        let generated_after_first = txt
+            .char_indices()
+            .nth(1)
+            .map(|(idx, _)| &txt[idx..])
+            .and_then(Self::parse_python_like_int_set_expr_py)
+            .is_some();
+        (!stripped_plain.is_empty() && Self::is_plain_zeilen_angabe_between_kommas_filter_py(stripped_plain))
+            || Self::parse_python_like_int_set_expr_py(txt).is_some()
+            || generated_after_first
     }
 
     fn is_zeilen_angabe_filter_py(txt: &str) -> bool {
@@ -275,6 +586,18 @@ fn html_exact_header_attrs_py(
             if ein_bereich.is_empty() {
                 continue;
             }
+            if ein_bereich.len() > 1 && ein_bereich.starts_with('-') {
+                if let Some(generated) = Self::parse_python_like_int_set_expr_py(&ein_bereich[1..]) {
+                    hinfort.extend(generated);
+                    continue;
+                }
+            } else if !ein_bereich.starts_with('-') {
+                if let Some(generated) = Self::parse_python_like_int_set_expr_py(&ein_bereich) {
+                    dazu.extend(generated);
+                    continue;
+                }
+            }
+
             let mut vielfache2 = vielfache;
             if let Some(rest) = ein_bereich.strip_prefix('v') {
                 ein_bereich = rest.to_string();
