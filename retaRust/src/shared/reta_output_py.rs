@@ -7,18 +7,26 @@ use hypher::{hyphenate, Lang};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 
-struct PyLikeIntExprParser<'a> {
+struct PyLikeIntExprParser {
     chars: Vec<char>,
     pos: usize,
-    variable: Option<(&'a str, i64)>,
+    variables: BTreeMap<String, i64>,
 }
 
-impl<'a> PyLikeIntExprParser<'a> {
-    fn parse(text: &str, variable: Option<(&'a str, i64)>) -> Option<i64> {
+impl PyLikeIntExprParser {
+    fn parse(text: &str, variable: Option<(&str, i64)>) -> Option<i64> {
+        let mut variables = BTreeMap::new();
+        if let Some((name, value)) = variable {
+            variables.insert(name.to_string(), value);
+        }
+        Self::parse_with_scope(text, &variables)
+    }
+
+    fn parse_with_scope(text: &str, variables: &BTreeMap<String, i64>) -> Option<i64> {
         let mut parser = Self {
             chars: text.chars().collect(),
             pos: 0,
-            variable,
+            variables: variables.clone(),
         };
         let value = parser.parse_expr()?;
         parser.skip_ws();
@@ -147,7 +155,7 @@ impl<'a> PyLikeIntExprParser<'a> {
             return self.parse_number();
         }
         if ch.is_ascii_alphabetic() || ch == '_' {
-            return self.parse_identifier();
+            return self.parse_identifier_or_call();
         }
         None
     }
@@ -164,7 +172,7 @@ impl<'a> PyLikeIntExprParser<'a> {
         self.chars[start..self.pos].iter().collect::<String>().parse::<i64>().ok()
     }
 
-    fn parse_identifier(&mut self) -> Option<i64> {
+    fn parse_identifier_name(&mut self) -> Option<String> {
         self.skip_ws();
         let start = self.pos;
         if self.pos >= self.chars.len() {
@@ -183,14 +191,53 @@ impl<'a> PyLikeIntExprParser<'a> {
                 break;
             }
         }
-        let name = self.chars[start..self.pos].iter().collect::<String>();
-        if let Some((variable_name, variable_value)) = self.variable {
-            if name == variable_name {
-                return Some(variable_value);
-            }
-        }
-        None
+        Some(self.chars[start..self.pos].iter().collect::<String>())
     }
+
+    fn parse_call_args(&mut self) -> Option<Vec<i64>> {
+        let mut args: Vec<i64> = vec![];
+        if self.consume_char(')') {
+            return Some(args);
+        }
+        loop {
+            args.push(self.parse_expr()?);
+            if self.consume_char(',') {
+                continue;
+            }
+            if self.consume_char(')') {
+                break;
+            }
+            return None;
+        }
+        Some(args)
+    }
+
+    fn eval_builtin_call(&self, name: &str, args: &[i64]) -> Option<i64> {
+        match name {
+            "abs" if args.len() == 1 => args[0].checked_abs(),
+            "int" if args.len() == 1 => Some(args[0]),
+            "min" if !args.is_empty() => args.iter().copied().min(),
+            "max" if !args.is_empty() => args.iter().copied().max(),
+            _ => None,
+        }
+    }
+
+    fn parse_identifier_or_call(&mut self) -> Option<i64> {
+        let name = self.parse_identifier_name()?;
+        self.skip_ws();
+        if self.consume_char('(') {
+            let args = self.parse_call_args()?;
+            self.eval_builtin_call(&name, &args)
+        } else {
+            self.variables.get(&name).copied()
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum PyLikeComprehensionClause {
+    For { variable: String, iterable: String },
+    If { condition: String },
 }
 
 impl Program {
@@ -447,8 +494,198 @@ fn html_exact_header_attrs_py(
         chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
     }
 
+    fn is_wrapped_by_matching_parens_py(text: &str) -> bool {
+        let trimmed = text.trim();
+        if !(trimmed.starts_with('(') && trimmed.ends_with(')')) {
+            return false;
+        }
+        let mut depth = 0i32;
+        for (idx, ch) in trimmed.char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 && idx + ch.len_utf8() != trimmed.len() {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+            if depth < 0 {
+                return false;
+            }
+        }
+        depth == 0
+    }
+
+    fn strip_wrapping_parens_py<'a>(text: &'a str) -> &'a str {
+        let mut current = text.trim();
+        while Self::is_wrapped_by_matching_parens_py(current) {
+            current = current[1..current.len() - 1].trim();
+        }
+        current
+    }
+
     fn eval_python_int_expr_py(text: &str, variable: Option<(&str, i64)>) -> Option<i64> {
         PyLikeIntExprParser::parse(text, variable)
+    }
+
+    fn eval_python_int_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<i64> {
+        if scope.is_empty() {
+            return Self::eval_python_int_expr_py(text, None);
+        }
+        if scope.len() == 1 {
+            if let Some((name, value)) = scope.iter().next() {
+                return Self::eval_python_int_expr_py(text, Some((name.as_str(), *value)));
+            }
+        }
+        PyLikeIntExprParser::parse_with_scope(text, scope)
+    }
+
+    fn find_top_level_keyword_py<'a>(text: &str, keywords: &'a [&'a str]) -> Option<(usize, &'a str)> {
+        let mut depth_round = 0i32;
+        let mut depth_square = 0i32;
+        let mut depth_curly = 0i32;
+        for (idx, ch) in text.char_indices() {
+            match ch {
+                '(' => depth_round += 1,
+                ')' => depth_round -= 1,
+                '[' => depth_square += 1,
+                ']' => depth_square -= 1,
+                '{' => depth_curly += 1,
+                '}' => depth_curly -= 1,
+                _ => {}
+            }
+            if depth_round == 0 && depth_square == 0 && depth_curly == 0 {
+                for keyword in keywords {
+                    if text[idx..].starts_with(*keyword) {
+                        return Some((idx, *keyword));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn split_top_level_comparison_ops_py(text: &str) -> Option<(Vec<String>, Vec<String>)> {
+        let mut depth_round = 0i32;
+        let mut depth_square = 0i32;
+        let mut depth_curly = 0i32;
+        let mut parts: Vec<String> = vec![];
+        let mut ops: Vec<String> = vec![];
+        let mut start = 0usize;
+        let mut idx = 0usize;
+        while idx < text.len() {
+            let ch = text.as_bytes()[idx] as char;
+            match ch {
+                '(' => depth_round += 1,
+                ')' => depth_round -= 1,
+                '[' => depth_square += 1,
+                ']' => depth_square -= 1,
+                '{' => depth_curly += 1,
+                '}' => depth_curly -= 1,
+                _ => {}
+            }
+            if depth_round == 0 && depth_square == 0 && depth_curly == 0 {
+                let rest = &text[idx..];
+                let matched = if rest.starts_with(" not in ") {
+                    Some(("not in", " not in ".len()))
+                } else if rest.starts_with(" in ") {
+                    Some(("in", " in ".len()))
+                } else if rest.starts_with("==") {
+                    Some(("==", 2usize))
+                } else if rest.starts_with("!=") {
+                    Some(("!=", 2usize))
+                } else if rest.starts_with("<=") {
+                    Some(("<=", 2usize))
+                } else if rest.starts_with(">=") {
+                    Some((">=", 2usize))
+                } else if rest.starts_with('<') {
+                    Some(("<", 1usize))
+                } else if rest.starts_with('>') {
+                    Some((">", 1usize))
+                } else {
+                    None
+                };
+                if let Some((op, op_len)) = matched {
+                    parts.push(text[start..idx].trim().to_string());
+                    ops.push(op.to_string());
+                    idx += op_len;
+                    start = idx;
+                    continue;
+                }
+            }
+            idx += 1;
+        }
+        if ops.is_empty() {
+            return None;
+        }
+        parts.push(text[start..].trim().to_string());
+        Some((parts, ops))
+    }
+
+    fn eval_python_bool_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<bool> {
+        let trimmed = Self::strip_wrapping_parens_py(text);
+        if trimmed.is_empty() {
+            return None;
+        }
+        if let Some((idx, _)) = Self::find_top_level_keyword_py(trimmed, &[" or "]) {
+            return Some(
+                Self::eval_python_bool_expr_with_scope_py(&trimmed[..idx], scope)?
+                    || Self::eval_python_bool_expr_with_scope_py(&trimmed[idx + 4..], scope)?,
+            );
+        }
+        if let Some((idx, _)) = Self::find_top_level_keyword_py(trimmed, &[" and "]) {
+            return Some(
+                Self::eval_python_bool_expr_with_scope_py(&trimmed[..idx], scope)?
+                    && Self::eval_python_bool_expr_with_scope_py(&trimmed[idx + 5..], scope)?,
+            );
+        }
+        if let Some(rest) = trimmed.strip_prefix("not ") {
+            return Some(!Self::eval_python_bool_expr_with_scope_py(rest, scope)?);
+        }
+        if let Some((parts, ops)) = Self::split_top_level_comparison_ops_py(trimmed) {
+            if parts.iter().any(|part| part.is_empty()) {
+                return None;
+            }
+            if ops.len() == 1 && (ops[0] == "in" || ops[0] == "not in") {
+                if parts.len() != 2 {
+                    return None;
+                }
+                let left = Self::eval_python_int_expr_with_scope_py(&parts[0], scope)?;
+                let right_values = Self::parse_python_like_iterable_values_py(&parts[1], scope)?;
+                let contains = right_values.contains(&left);
+                return Some(if ops[0] == "in" { contains } else { !contains });
+            }
+            if ops.iter().any(|op| op == "in" || op == "not in") {
+                return None;
+            }
+            let values: Vec<i64> = parts
+                .iter()
+                .map(|part| Self::eval_python_int_expr_with_scope_py(part, scope))
+                .collect::<Option<Vec<_>>>()?;
+            if values.len() != ops.len() + 1 {
+                return None;
+            }
+            for (idx, op) in ops.iter().enumerate() {
+                let left = values[idx];
+                let right = values[idx + 1];
+                let ok = match op.as_str() {
+                    "==" => left == right,
+                    "!=" => left != right,
+                    "<=" => left <= right,
+                    ">=" => left >= right,
+                    "<" => left < right,
+                    ">" => left > right,
+                    _ => return None,
+                };
+                if !ok {
+                    return Some(false);
+                }
+            }
+            return Some(true);
+        }
+        Some(Self::eval_python_int_expr_with_scope_py(trimmed, scope)? != 0)
     }
 
     fn parse_python_like_range_values_py(start: i64, stop: i64, step: i64) -> Option<Vec<i64>> {
@@ -471,18 +708,7 @@ fn html_exact_header_attrs_py(
         Some(values)
     }
 
-    fn parse_python_like_range_comprehension_py(inner: &str) -> Option<BTreeSet<i64>> {
-        let (expr, rest) = inner.split_once(" for ")?;
-        let (variable, iterable) = rest.split_once(" in ")?;
-        let variable = variable.trim();
-        if !Self::is_python_identifier_py(variable) {
-            return None;
-        }
-        let iterable = iterable.trim();
-        if !(iterable.starts_with("range(") && iterable.ends_with(')')) {
-            return None;
-        }
-        let args_txt = &iterable["range(".len()..iterable.len() - 1];
+    fn parse_python_like_range_values_from_args_py(args_txt: &str, scope: &BTreeMap<String, i64>) -> Option<Vec<i64>> {
         let args_parts: Vec<String> = Self::split_top_level_commas_filter_py(args_txt)
             .into_iter()
             .map(|part| part.trim().to_string())
@@ -493,7 +719,7 @@ fn html_exact_header_attrs_py(
         }
         let mut args: Vec<i64> = vec![];
         for part in args_parts {
-            args.push(Self::eval_python_int_expr_py(&part, None)?);
+            args.push(Self::eval_python_int_expr_with_scope_py(&part, scope)?);
         }
         let (start, stop, step) = match args.as_slice() {
             [stop] => (0, *stop, 1),
@@ -501,14 +727,125 @@ fn html_exact_header_attrs_py(
             [start, stop, step] => (*start, *stop, *step),
             _ => return None,
         };
-        let mut out = BTreeSet::new();
-        for value in Self::parse_python_like_range_values_py(start, stop, step)? {
-            out.insert(Self::eval_python_int_expr_py(expr.trim(), Some((variable, value)))?);
+        Self::parse_python_like_range_values_py(start, stop, step)
+    }
+
+    fn parse_python_like_iterable_values_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<Vec<i64>> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return None;
         }
+        if trimmed.starts_with("range(") && trimmed.ends_with(')') {
+            return Self::parse_python_like_range_values_from_args_py(&trimmed["range(".len()..trimmed.len() - 1], scope);
+        }
+        Self::parse_python_like_int_set_expr_with_scope_py(trimmed, scope)
+            .map(|values| values.into_iter().collect())
+    }
+
+    fn parse_python_like_comprehension_clauses_py(text: &str) -> Option<Vec<PyLikeComprehensionClause>> {
+        let mut clauses: Vec<PyLikeComprehensionClause> = vec![];
+        let mut remaining = text.trim();
+        if remaining.is_empty() {
+            return None;
+        }
+        while !remaining.is_empty() {
+            if let Some(after_for) = remaining.strip_prefix("for ") {
+                let (in_idx, _) = Self::find_top_level_keyword_py(after_for, &[" in "])?;
+                let variable = after_for[..in_idx].trim();
+                if !Self::is_python_identifier_py(variable) {
+                    return None;
+                }
+                let after_in = after_for[in_idx + 4..].trim_start();
+                if after_in.is_empty() {
+                    return None;
+                }
+                let (iterable_txt, next_remaining) = if let Some((next_idx, _)) = Self::find_top_level_keyword_py(after_in, &[" for ", " if "]) {
+                    (&after_in[..next_idx], after_in[next_idx + 1..].trim_start())
+                } else {
+                    (after_in, "")
+                };
+                let iterable_txt = iterable_txt.trim();
+                if iterable_txt.is_empty() {
+                    return None;
+                }
+                clauses.push(PyLikeComprehensionClause::For {
+                    variable: variable.to_string(),
+                    iterable: iterable_txt.to_string(),
+                });
+                remaining = next_remaining;
+            } else if let Some(after_if) = remaining.strip_prefix("if ") {
+                let (condition_txt, next_remaining) = if let Some((next_idx, _)) = Self::find_top_level_keyword_py(after_if, &[" for ", " if "]) {
+                    (&after_if[..next_idx], after_if[next_idx + 1..].trim_start())
+                } else {
+                    (after_if, "")
+                };
+                let condition_txt = condition_txt.trim();
+                if condition_txt.is_empty() {
+                    return None;
+                }
+                clauses.push(PyLikeComprehensionClause::If {
+                    condition: condition_txt.to_string(),
+                });
+                remaining = next_remaining;
+            } else {
+                return None;
+            }
+        }
+        Some(clauses)
+    }
+
+    fn eval_python_like_comprehension_clauses_py(
+        body_expr: &str,
+        clauses: &[PyLikeComprehensionClause],
+        clause_idx: usize,
+        scope: &mut BTreeMap<String, i64>,
+        out: &mut BTreeSet<i64>,
+    ) -> Option<()> {
+        if clause_idx >= clauses.len() {
+            out.insert(Self::eval_python_int_expr_with_scope_py(body_expr, scope)?);
+            return Some(());
+        }
+        match &clauses[clause_idx] {
+            PyLikeComprehensionClause::For { variable, iterable } => {
+                let values = Self::parse_python_like_iterable_values_py(iterable, scope)?;
+                let previous = scope.get(variable).copied();
+                for value in values {
+                    scope.insert(variable.clone(), value);
+                    Self::eval_python_like_comprehension_clauses_py(body_expr, clauses, clause_idx + 1, scope, out)?;
+                }
+                if let Some(old_value) = previous {
+                    scope.insert(variable.clone(), old_value);
+                } else {
+                    scope.remove(variable);
+                }
+            }
+            PyLikeComprehensionClause::If { condition } => {
+                if Self::eval_python_bool_expr_with_scope_py(condition, scope)? {
+                    Self::eval_python_like_comprehension_clauses_py(body_expr, clauses, clause_idx + 1, scope, out)?;
+                }
+            }
+        }
+        Some(())
+    }
+
+    fn parse_python_like_comprehension_py(inner: &str, scope: &BTreeMap<String, i64>) -> Option<BTreeSet<i64>> {
+        let (body_idx, _) = Self::find_top_level_keyword_py(inner, &[" for "])?;
+        let body_expr = inner[..body_idx].trim();
+        if body_expr.is_empty() {
+            return None;
+        }
+        let rest = inner[body_idx + 1..].trim_start();
+        let clauses = Self::parse_python_like_comprehension_clauses_py(rest)?;
+        if clauses.is_empty() {
+            return None;
+        }
+        let mut out = BTreeSet::new();
+        let mut nested_scope = scope.clone();
+        Self::eval_python_like_comprehension_clauses_py(body_expr, &clauses, 0, &mut nested_scope, &mut out)?;
         Some(out)
     }
 
-    pub(crate) fn parse_python_like_int_set_expr_py(text: &str) -> Option<BTreeSet<i64>> {
+    fn parse_python_like_int_set_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<BTreeSet<i64>> {
         let trimmed = text.trim();
         if trimmed.len() < 2 {
             return None;
@@ -529,10 +866,9 @@ fn html_exact_header_attrs_py(
         if inner.is_empty() {
             return Some(BTreeSet::new());
         }
-        if let Some(values) = Self::parse_python_like_range_comprehension_py(inner) {
+        if let Some(values) = Self::parse_python_like_comprehension_py(inner, scope) {
             return Some(values);
         }
-        let mut out = BTreeSet::new();
         let parts: Vec<String> = Self::split_top_level_commas_filter_py(inner)
             .into_iter()
             .map(|part| part.trim().to_string())
@@ -541,10 +877,16 @@ fn html_exact_header_attrs_py(
         if parts.is_empty() {
             return None;
         }
+        let mut out = BTreeSet::new();
         for part in parts {
-            out.insert(Self::eval_python_int_expr_py(&part, None)?);
+            out.insert(Self::eval_python_int_expr_with_scope_py(&part, scope)?);
         }
         Some(out)
+    }
+
+    pub(crate) fn parse_python_like_int_set_expr_py(text: &str) -> Option<BTreeSet<i64>> {
+        let scope = BTreeMap::new();
+        Self::parse_python_like_int_set_expr_with_scope_py(text, &scope)
     }
 
     fn is_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
@@ -1653,6 +1995,56 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
     }
 
 
+    fn cell_visual_width_py(cell: &str) -> usize {
+        if cell.is_empty() {
+            return 0;
+        }
+        cell.split('\n')
+            .map(|part| part.chars().count())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn max_cell_text_widths_py(newTable: &[Vec<String>], col_count: usize) -> Vec<usize> {
+        let mut max_widths: Vec<usize> = vec![0; col_count];
+
+        for row in newTable {
+            for col_idx in 0..col_count {
+                let cell = row.get(col_idx).map(|s| s.as_str()).unwrap_or("");
+                let width = Self::cell_visual_width_py(cell);
+                if width > max_widths[col_idx] {
+                    max_widths[col_idx] = width;
+                }
+            }
+        }
+
+        max_widths
+    }
+
+    fn default_shell_column_width_py(&self) -> i64 {
+        if self.breiteHasBeenOnceZero {
+            0
+        } else if self.breite > 0 {
+            self.breite
+        } else {
+            21
+        }
+    }
+
+    fn effective_shell_column_width_py(&self, col_idx: usize, max_cell_width: usize) -> usize {
+        let certaintextwidth = if col_idx < self.breiten.len() {
+            self.breiten[col_idx]
+        } else {
+            self.default_shell_column_width_py()
+        };
+
+        if certaintextwidth <= 0 || (certaintextwidth as usize) > max_cell_width {
+            max_cell_width
+        } else {
+            certaintextwidth as usize
+        }
+    }
+
     pub(crate) fn cliOut_py(
         &mut self,
         finallyDisplayLines: Vec<String>,
@@ -1681,43 +2073,13 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             return newTable;
         }
 
-        let mut max_cell_widths: Vec<usize> = vec![0; col_count];
-        for row in &newTable {
-            for col_idx in 0..col_count {
-                let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                let cell_width = cell
-                    .split('\n')
-                    .map(|part| part.chars().count())
-                    .max()
-                    .unwrap_or(0);
-                if cell_width > max_cell_widths[col_idx] {
-                    max_cell_widths[col_idx] = cell_width;
-                }
-            }
-        }
-
-        let mut widths: Vec<usize> = vec![0; col_count];
-        for col_idx in 0..col_count {
-            let certain = if col_idx < self.breiten.len() {
-                self.breiten[col_idx]
-            } else {
-                self.textWidth
-            };
-            widths[col_idx] = if certain > max_cell_widths[col_idx] as i64 || certain == 0 {
-                max_cell_widths[col_idx]
-            } else if certain < 0 {
-                0
-            } else {
-                certain as usize
-            };
-        }
+        let max_cell_widths = Self::max_cell_text_widths_py(&newTable, col_count);
+        let widths: Vec<usize> = (0..col_count)
+            .map(|i| self.effective_shell_column_width_py(i, max_cell_widths[i]))
+            .collect();
 
         let num_prefix_width = if self.nummeriere {
-            finallyDisplayLines
-                .iter()
-                .map(|s| s.chars().count())
-                .max()
-                .unwrap_or(0)
+            finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
         } else {
             0usize
         };
@@ -1728,31 +2090,36 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             let detected = Self::detect_terminal_columns_py();
             if detected > 0 {
                 detected as usize
+            } else if self.textWidth > 0 {
+                self.textWidth as usize
             } else {
-                0usize
+                80usize
             }
         };
-        let chunk_budget = if detected_shell_width > 0 {
-            detected_shell_width.saturating_sub(if self.nummeriere { num_prefix_width + 1 } else { 0 })
-        } else {
-            0usize
-        };
+        let chunk_budget = detected_shell_width.max(21usize);
 
-        let chunks: Vec<(usize, usize)> = if self.oneTable || chunk_budget == 0 {
-            vec![(0, col_count)]
+        let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
+
+        let mut chunks: Vec<(usize, usize)> = vec![];
+        if self.oneTable {
+            chunks.push((0, col_count));
         } else {
-            let mut chunks: Vec<(usize, usize)> = vec![];
             let mut start_col = 0usize;
             while start_col < col_count {
-                let mut used = 0usize;
+                let mut used = left_prefix;
                 let mut end_col = start_col;
 
                 while end_col < col_count {
-                    let add = widths[end_col].saturating_add(1);
-                    if end_col > start_col && used.saturating_add(add) >= chunk_budget {
+                    let add = if end_col == start_col {
+                        widths[end_col]
+                    } else {
+                        1 + widths[end_col]
+                    };
+
+                    if end_col > start_col && used + add > chunk_budget {
                         break;
                     }
-                    used = used.saturating_add(add);
+                    used += add;
                     end_col += 1;
                 }
 
@@ -1762,8 +2129,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 chunks.push((start_col, end_col));
                 start_col = end_col;
             }
-            chunks
-        };
+        }
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
@@ -1771,6 +2137,17 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             let mut one_chunk_lines: Vec<String> = vec![];
 
             for (row_idx, row) in newTable.iter().enumerate() {
+                let mut wrapped_cells: Vec<Vec<String>> = vec![];
+                let mut max_sub = 1usize;
+
+                for i in chunk_start..chunk_end {
+                    let cell = if i < row.len() { row[i].as_str() } else { "" };
+                    let wrapped = Self::wrap_text_py(cell, widths[i]);
+                    max_sub = max_sub.max(wrapped.len());
+                    wrapped_cells.push(wrapped);
+                }
+
+                let mut should_skip_row = false;
                 if self.keineleereninhalte {
                     let joined = (chunk_start..chunk_end)
                         .filter_map(|i| row.get(i))
@@ -1779,29 +2156,17 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         .join(" ");
                     let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
                     if stripped.is_empty() {
-                        continue;
+                        should_skip_row = true;
                     }
+                }
+                if should_skip_row {
+                    continue;
                 }
 
                 let row_number = finallyDisplayLines
                     .get(row_idx)
                     .and_then(|s| s.trim().parse::<i64>().ok());
                 let is_header = row_number.is_none();
-
-                let mut wrapped_cells: Vec<Vec<String>> = vec![];
-                let mut max_sub = 1usize;
-                for col_idx in chunk_start..chunk_end {
-                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                    let wrapped = if widths[col_idx] == 0 {
-                        vec![cell.to_string()]
-                    } else {
-                        Self::wrap_text_py(cell, widths[col_idx])
-                    };
-                    if wrapped.len() > max_sub {
-                        max_sub = wrapped.len();
-                    }
-                    wrapped_cells.push(wrapped);
-                }
 
                 for sub_idx in 0..max_sub {
                     let mut line = String::new();
@@ -1831,11 +2196,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
                         let part = maybe_part.clone().unwrap_or_default();
                         let is_rest = maybe_part.is_none();
-                        let rendered = if widths[abs_i] == 0 {
-                            part
-                        } else {
-                            format!("{:<width$}", part, width = widths[abs_i])
-                        };
+                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,
