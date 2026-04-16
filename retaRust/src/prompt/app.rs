@@ -33,7 +33,7 @@ fn parse_startup_args(argv: &[String], preset: &PromptFrontendPreset) -> Startup
         logging_enabled: preset.implicit_logging,
         one_shot: None,
         show_help: false,
-        exact_mode: false,
+        exact_mode: preset.default_exact_mode,
         command_text: None,
         trailing_args: Vec::new(),
     };
@@ -58,7 +58,6 @@ fn parse_startup_args(argv: &[String], preset: &PromptFrontendPreset) -> Startup
                 index += 1;
             }
             "-debug" => {
-                startup.logging_enabled = true;
                 index += 1;
             }
             "-befehl" | "-command" => {
@@ -104,6 +103,59 @@ fn apply_exact_mode_to_input(input: &str) -> String {
     )
 }
 
+fn input_starts_with_reta(input: &str) -> bool {
+    match super::tokenize::split_shell_like(input.trim()) {
+        Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
+        Err(_) => false,
+    }
+}
+
+fn rpe_output_group() -> Vec<String> {
+    vec![
+        "-ausgabe".to_string(),
+        "--art=emacs".to_string(),
+        "--keineueberschriften".to_string(),
+    ]
+}
+
+fn apply_rpe_emacs_output_to_argv(
+    mut argv: Vec<String>,
+    append_after_user_args: bool,
+) -> Vec<String> {
+    let output_group = rpe_output_group();
+
+    if argv.is_empty() {
+        return output_group;
+    }
+
+    if append_after_user_args {
+        argv.extend(output_group);
+        argv
+    } else {
+        let mut rebuilt = vec![argv[0].clone()];
+        rebuilt.extend(output_group);
+        rebuilt.extend(argv.into_iter().skip(1));
+        rebuilt
+    }
+}
+
+fn apply_rpe_emacs_output_to_command(command: PromptCommand, input: &str) -> PromptCommand {
+    let append_after_user_args = input_starts_with_reta(input);
+
+    match command {
+        PromptCommand::Reta(argv) => {
+            PromptCommand::Reta(apply_rpe_emacs_output_to_argv(argv, append_after_user_args))
+        }
+        PromptCommand::RetaBatch(argvs) => PromptCommand::RetaBatch(
+            argvs
+                .into_iter()
+                .map(|argv| apply_rpe_emacs_output_to_argv(argv, append_after_user_args))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 fn should_append_exact_suffix(input: &str) -> bool {
     let tokenized = match super::tokenize::split_shell_like(input) {
         Ok(tokens) => tokens,
@@ -147,58 +199,11 @@ fn should_append_exact_suffix(input: &str) -> bool {
 }
 
 pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
-    use std::path::PathBuf;
-
-    let program_name = PathBuf::from(
-        argv.first().cloned().unwrap_or_else(|| "rpb".to_string()),
-    )
-    .file_name()
-    .map(|s| s.to_string_lossy().to_string())
-    .unwrap_or_else(|| "rpb".to_string());
-
-    let implicit_logging = program_name == "rpl";
-    let preset = PromptFrontendPreset {
-        start_with_vi_mode,
-        implicit_logging,
-        one_shot: true,
-    };
-    let startup = parse_startup_args(&argv, &preset);
-
-    let mut state = SessionState::new(
-        program_name.clone(),
-        startup.start_with_vi_mode,
-        implicit_logging,
-    );
-    state.logging_enabled = startup.logging_enabled;
-
-    if startup.show_help {
-        println!("{}", help_text());
-        return 0;
-    }
-
-    let input = startup.command_text.unwrap_or_default();
-
-    let compiled = match compile_command(&input, state.prompt_mode) {
-        Ok(cmd) => cmd,
-        Err(err) => {
-            eprintln!("{err}");
-            return 1;
-        }
-    };
-
-    match execute_command(compiled, &mut state) {
-        Ok(Some(output)) => {
-            if !output.text.is_empty() {
-                println!("{}", output.text);
-            }
-            output.exit_code
-        }
-        Ok(None) => 0,
-        Err(err) => {
-            eprintln!("{err}");
-            1
-        }
-    }
+    let program_name = program_name_from_argv(&argv);
+    let profile = PromptFrontendProfile::from_program_name(&program_name, start_with_vi_mode);
+    let mut preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
+    preset.one_shot = true;
+    run_prompt_frontend_with_preset(argv, preset)
 }
 
 pub fn run_prompt_frontend_from_env(fallback_vi_mode: bool) -> i32 {
@@ -222,17 +227,17 @@ pub fn run_prompt_frontend(argv: Vec<String>, fallback_vi_mode: bool) -> i32 {
 }
 
 pub fn run_prompt_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
-    run_prompt_frontend_with_preset(argv, PromptFrontendPreset::from_profile(profile))
+    let preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
+    run_prompt_frontend_with_preset(argv, preset)
 }
 
 pub fn run_prompt_input_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
-    let mut preset = PromptFrontendPreset::from_profile(profile);
-    preset.one_shot = false;
+    let preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
     run_prompt_frontend_with_preset(argv, preset)
 }
 
 pub fn run_prompt_command_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
-    let mut preset = PromptFrontendPreset::from_profile(profile);
+    let mut preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
     preset.one_shot = true;
     run_prompt_frontend_with_preset(argv, preset)
 }
@@ -282,10 +287,10 @@ fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPres
 
     if effective_one_shot {
         let input = startup.command_text.unwrap_or_else(|| startup.trailing_args.join(" "));
-        return run_one_shot(input, &log_path, &mut state);
+        return run_one_shot(input, &log_path, preset.emacs_output_mode, &mut state);
     }
 
-    run_interactive_loop(history_path, log_path, &mut state)
+    run_interactive_loop(history_path, log_path, startup.exact_mode, &mut state)
 }
 
 pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
@@ -299,7 +304,12 @@ fn program_name_from_argv(argv: &[String]) -> String {
         .unwrap_or_else(|| "rp".to_string())
 }
 
-fn run_one_shot(input: String, log_path: &PathBuf, state: &mut SessionState) -> i32 {
+fn run_one_shot(
+    input: String,
+    log_path: &PathBuf,
+    emacs_output_mode: bool,
+    state: &mut SessionState,
+) -> i32 {
     if input.trim().is_empty() {
         let output = PromptOutput {
             title: "usage".to_string(),
@@ -321,7 +331,13 @@ fn run_one_shot(input: String, log_path: &PathBuf, state: &mut SessionState) -> 
     }
 
     let compiled = match compile_command(&input, state.prompt_mode) {
-        Ok(command) => command,
+        Ok(command) => {
+            if emacs_output_mode {
+                apply_rpe_emacs_output_to_command(command, &input)
+            } else {
+                command
+            }
+        }
         Err(err) => {
             if state.logging_enabled {
                 append_log_line(log_path, "compile-error", &err);
@@ -336,14 +352,14 @@ fn run_one_shot(input: String, log_path: &PathBuf, state: &mut SessionState) -> 
         }
     };
 
-    if matches!(compiled, PromptCommand::Exit) {
+    if matches!(&compiled, PromptCommand::Exit) {
         if state.logging_enabled {
             append_log_line(log_path, "session", "exit command received in one-shot mode");
         }
         return 0;
     }
 
-    if matches!(compiled, PromptCommand::LaunchUi) {
+    if matches!(&compiled, PromptCommand::LaunchUi) {
         let output = PromptOutput {
             title: "ui-error".to_string(),
             text: format!(
@@ -380,10 +396,15 @@ fn run_one_shot(input: String, log_path: &PathBuf, state: &mut SessionState) -> 
     }
 }
 
-fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut SessionState) -> i32 {
+fn run_interactive_loop(
+    history_path: PathBuf,
+    log_path: PathBuf,
+    exact_mode_enabled: bool,
+    state: &mut SessionState,
+) -> i32 {
     let prompt = DefaultPrompt::default();
 
-    let mut editor = match build_editor(&history_path, state.current_mode()) {
+    let mut editor = match build_editor(&history_path, state.current_mode(), state.logging_enabled) {
         Ok(editor) => editor,
         Err(err) => {
             eprintln!("rp konnte reedline nicht initialisieren: {err}");
@@ -404,7 +425,13 @@ fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut Se
                     append_log_line(&log_path, "input", &input);
                 }
 
-                let compiled = match compile_command(&input, state.prompt_mode) {
+                let compile_input = if exact_mode_enabled {
+                    apply_exact_mode_to_input(&input)
+                } else {
+                    input.clone()
+                };
+
+                let compiled = match compile_command(&compile_input, state.prompt_mode) {
                     Ok(command) => command,
                     Err(err) => {
                         if state.logging_enabled {
@@ -423,14 +450,14 @@ fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut Se
                     }
                 };
 
-                if matches!(compiled, PromptCommand::Exit) {
+                if matches!(&compiled, PromptCommand::Exit) {
                     if state.logging_enabled {
                         append_log_line(&log_path, "session", "exit command received");
                     }
                     break;
                 }
 
-                if matches!(compiled, PromptCommand::LaunchUi) {
+                if matches!(&compiled, PromptCommand::LaunchUi) {
                     if state.logging_enabled {
                         append_log_line(&log_path, "ui", "launch_preview_ui");
                     }
@@ -449,7 +476,10 @@ fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut Se
                     continue;
                 }
 
-                let rebuild_editor = matches!(compiled, PromptCommand::SwitchMode(_));
+                let rebuild_editor = matches!(
+                    &compiled,
+                    PromptCommand::SwitchMode(_) | PromptCommand::ToggleLogging(_)
+                );
 
                 match execute_command(compiled, state) {
                     Ok(Some(output)) => {
@@ -475,7 +505,7 @@ fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut Se
                 }
 
                 if rebuild_editor {
-                    editor = match build_editor(&history_path, state.current_mode()) {
+                    editor = match build_editor(&history_path, state.current_mode(), state.logging_enabled) {
                         Ok(editor) => editor,
                         Err(err) => {
                             eprintln!("rp konnte reedline nicht neu initialisieren: {err}");
@@ -521,9 +551,19 @@ fn run_interactive_loop(history_path: PathBuf, log_path: PathBuf, state: &mut Se
     0
 }
 
-fn build_editor(history_path: &PathBuf, mode: EditModeKind) -> Result<Reedline, String> {
+fn build_editor(
+    history_path: &PathBuf,
+    mode: EditModeKind,
+    logging_enabled: bool,
+) -> Result<Reedline, String> {
+    let effective_history_path = if logging_enabled {
+        history_path.clone()
+    } else {
+        PathBuf::from("/dev/null")
+    };
+
     let history = Box::new(
-        FileBackedHistory::with_file(2_000, history_path.clone())
+        FileBackedHistory::with_file(2_000, effective_history_path)
             .map_err(|err| format!("History-Datei konnte nicht geöffnet werden: {err}"))?,
     );
 

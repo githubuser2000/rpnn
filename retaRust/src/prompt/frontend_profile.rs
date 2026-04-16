@@ -22,7 +22,7 @@ impl PromptFrontendProfile {
             kind: PromptFrontendKind::Rp,
             program_name: "rp",
             start_with_vi_mode: true,
-            implicit_logging: false,
+            implicit_logging: true,
             one_shot: false,
         }
     }
@@ -32,7 +32,7 @@ impl PromptFrontendProfile {
             kind: PromptFrontendKind::Rpl,
             program_name: "rpl",
             start_with_vi_mode: true,
-            implicit_logging: true,
+            implicit_logging: false,
             one_shot: false,
         }
     }
@@ -51,9 +51,9 @@ impl PromptFrontendProfile {
         Self {
             kind: PromptFrontendKind::Rpe,
             program_name: "rpe",
-            start_with_vi_mode: false,
+            start_with_vi_mode: true,
             implicit_logging: false,
-            one_shot: false,
+            one_shot: true,
         }
     }
 
@@ -86,6 +86,22 @@ impl PromptFrontendProfile {
                 implicit_logging: false,
                 one_shot: false,
             },
+        }
+    }
+
+    pub fn default_exact_mode(&self, argv: &[String]) -> bool {
+        match self.kind {
+            PromptFrontendKind::Rp => false,
+            PromptFrontendKind::Rpl => !argv.iter().any(|arg| arg == "-debug"),
+            PromptFrontendKind::Rpb | PromptFrontendKind::Rpe => true,
+            PromptFrontendKind::Auto => false,
+        }
+    }
+
+    pub const fn emacs_output_mode(&self) -> bool {
+        match self.kind {
+            PromptFrontendKind::Rpe => true,
+            _ => false,
         }
     }
 

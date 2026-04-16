@@ -1,15 +1,16 @@
 #![allow(non_snake_case)]
 
-//! Own-command-input layer for rp/rpl/rpe.
+//! Own launcher/input layer for rp/rpl/rpe.
 //!
-//! This crate intentionally owns the interactive self-entered frontend side and
-//! depends on `retaprompt_commands` so the shared command/runtime layer remains
-//! the single common API foundation for all retaPrompt frontends.
+//! This crate intentionally owns the Python-like launcher defaults for the
+//! frontends that ship together (`rp`, `rpl`, `rpe`) and depends on
+//! `retaprompt_commands` so the shared command/runtime layer remains the single
+//! common API foundation for all retaPrompt frontends.
 //!
 //! It also provides the highest-level launcher-facing dispatch API: for `rp`,
-//! `rpl`, and `rpe` it runs the input frontend directly, and for `rpb` it
-//! forwards into `retaprompt_commands`. This keeps the actual executable binary
-//! layer as small as possible while preserving the dependency direction
+//! `rpl`, and `rpe` it resolves the normal frontend profile directly, and for
+//! `rpb` it forwards into `retaprompt_commands`. This keeps the executable
+//! binary layer as small as possible while preserving the dependency direction
 //! `retaprompt_input -> retaprompt_commands -> reta`.
 
 pub use retaprompt_commands::{
@@ -107,7 +108,7 @@ impl PromptLauncherKind {
 }
 
 pub fn run_kind(argv: Vec<String>, kind: PromptInputFrontendKind) -> i32 {
-    reta::prompt::run_prompt_input_frontend_with_profile(argv, kind.command_kind().profile())
+    reta::prompt::run_prompt_frontend_with_profile(argv, kind.command_kind().profile())
 }
 
 pub fn run_kind_from_env(kind: PromptInputFrontendKind) -> i32 {
