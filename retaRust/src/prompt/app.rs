@@ -13,7 +13,7 @@ use super::commands::{
 };
 use super::completion::{
     build_default_completer_with_runtime, new_completion_runtime_handle,
-    set_completion_prompt_mode, CompletionRuntimeHandle,
+    set_completion_runtime_context, CompletionRuntimeHandle,
 };
 use super::history::{default_history_path, default_log_path};
 use super::frontend_profile::PromptFrontendProfile;
@@ -464,7 +464,12 @@ fn run_interactive_loop(
     state: &mut SessionState,
 ) -> i32 {
     let completion_runtime = new_completion_runtime_handle();
-    set_completion_prompt_mode(&completion_runtime, state.prompt_mode);
+    set_completion_runtime_context(
+        &completion_runtime,
+        state.prompt_mode,
+        &state.stored_expanded_tokens,
+        &state.stored_commands,
+    );
 
     let mut editor = match build_editor(
         &history_path,
@@ -480,7 +485,12 @@ fn run_interactive_loop(
     };
 
     loop {
-        set_completion_prompt_mode(&completion_runtime, state.prompt_mode);
+        set_completion_runtime_context(
+            &completion_runtime,
+            state.prompt_mode,
+            &state.stored_expanded_tokens,
+            &state.stored_commands,
+        );
 
         let prompt = RpPrompt {
             text: prompt_text_for_state(state),

@@ -50,8 +50,12 @@ impl Program {
             "  --universum=...".to_string(),
             "-ausgabe".to_string(),
             "  --nocolor".to_string(),
-            "  --art=shell,html,csv,markdown,bbcode".to_string(),
+            "  --justtext".to_string(),
+            "  --art=shell,html,csv,markdown,bbcode,emacs,nichts".to_string(),
             "  --onetable".to_string(),
+            "  --endlessscreen".to_string(),
+            "  --endless".to_string(),
+            "  --dontwrap".to_string(),
             "  --spaltenreihenfolgeundnurdiese=3,5,1".to_string(),
             "  --keineleereninhalte".to_string(),
             "  --keineueberschriften".to_string(),
@@ -456,6 +460,9 @@ impl Program {
             }
         }
 
+        if self.argv.iter().any(|arg| arg == "--breite=0") {
+            self.breiteBreitenSysArgvPara("breite=0", "");
+        }
         if !self.oneTable {
             self.setShellRowsAmount();
             self.textWidth = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
