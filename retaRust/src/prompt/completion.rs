@@ -53,18 +53,10 @@ enum RetaMainSection {
 enum ComplSitua {
     HauptPara,
     ZeilenPara,
-    Value,
-    NeitherNor,
     RetaAnfang,
-    Unbekannt,
     SpaltenPara,
     KomiPara,
-    KombiMetaPara,
     AusgabePara,
-    SpaltenValPara,
-    ZeilenValPara,
-    KombiValPara,
-    AusgabeValPara,
     BefehleNichtReta,
 }
 
@@ -111,10 +103,6 @@ struct PythonCompletionState {
     options: Vec<String>,
     if_reta_anfang: bool,
     situation: ComplSitua,
-    spalten_para_wort: Option<String>,
-    kombi_para_wort: Option<String>,
-    ausgabe_para_wort: Option<String>,
-    zeilen_para_wort: Option<String>,
     neben_para_wort: Option<String>,
     last_commands: Vec<String>,
 }
@@ -125,10 +113,6 @@ impl PythonCompletionState {
             options: ordered_prompt_commands(),
             if_reta_anfang: false,
             situation: ComplSitua::RetaAnfang,
-            spalten_para_wort: None,
-            kombi_para_wort: None,
-            ausgabe_para_wort: None,
-            zeilen_para_wort: None,
             neben_para_wort: None,
             last_commands: Vec::new(),
         }
@@ -818,6 +802,10 @@ fn ordered_prompt_commands() -> Vec<String> {
         push_unique_ordered(&mut out, &mut seen, item);
     }
 
+    for item in prompt_eig_commands_ordered() {
+        push_unique_ordered(&mut out, &mut seen, item);
+    }
+
     for item in RP_META_COMMANDS {
         push_unique_ordered(&mut out, &mut seen, *item);
     }
@@ -830,6 +818,38 @@ fn prompt_non_reta_commands() -> Vec<String> {
         .into_iter()
         .filter(|command| normalize_completion_text(command) != "reta")
         .collect()
+}
+
+
+fn prompt_eig_commands_ordered() -> Vec<String> {
+    let words = shared_words();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    let eig_prefixes = &prompt_words().eig_prefixes;
+
+    for entry in &words.paraNdataMatrix {
+        let prefix = if entry
+            .parameterMainNames
+            .iter()
+            .any(|name| normalize_completion_text(name) == "konzept")
+        {
+            eig_prefixes.0.as_str()
+        } else if entry
+            .parameterMainNames
+            .iter()
+            .any(|name| normalize_completion_text(name) == "konzept2")
+        {
+            eig_prefixes.1.as_str()
+        } else {
+            continue;
+        };
+
+        for alias in &entry.parameterNames {
+            push_unique_ordered(&mut out, &mut seen, format!("{prefix}{alias}"));
+        }
+    }
+
+    out
 }
 
 fn prompt_command_sort_key(command: &str) -> (u8, String) {
@@ -1016,18 +1036,21 @@ fn zeilen_parameter_tokens() -> [&'static str; 14] {
     ]
 }
 
-fn ausgabe_parameter_tokens() -> [&'static str; 11] {
+fn ausgabe_parameter_tokens() -> [&'static str; 14] {
     [
+        "--nocolor",
+        "--justtext",
         "--art=",
+        "--onetable",
+        "--spaltenreihenfolgeundnurdiese=",
+        "--endlessscreen",
+        "--endless",
+        "--dontwrap",
         "--breite=",
         "--breiten=",
-        "--justtext",
         "--keineleereninhalte",
         "--keinenummerierung",
         "--keineueberschriften",
-        "--nocolor",
-        "--onetable",
-        "--spaltenreihenfolgeundnurdiese=",
         "--*=",
     ]
 }
@@ -1038,14 +1061,20 @@ fn kombi_parameter_tokens() -> [&'static str; 3] {
 
 fn spalten_parameter_tokens() -> Vec<String> {
     let words = shared_words();
-    let mut out = BTreeSet::new();
-    for group in all_main_alias_groups(words) {
-        for alias in group.aliases {
-            out.insert(format!("--{alias}="));
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for entry in &words.paraNdataMatrix {
+        for alias in &entry.parameterMainNames {
+            push_unique_ordered(&mut out, &mut seen, format!("--{alias}="));
         }
     }
-    out.insert("--*=".to_string());
-    out.into_iter().collect()
+
+    for extra in ["--=", "--breite=", "--breiten=", "--keinenummerierung", "--*="] {
+        push_unique_ordered(&mut out, &mut seen, extra);
+    }
+
+    out
 }
 
 fn zeilen_value_candidates(key: &str) -> Vec<String> {
@@ -1063,17 +1092,18 @@ fn zeilen_value_candidates(key: &str) -> Vec<String> {
         }
         "zeit" => with_negative_variants(["heute", "gestern", "morgen", "*"]),
         "*" => {
-            let mut set = BTreeSet::new();
+            let mut out = Vec::new();
+            let mut seen = BTreeSet::new();
             for value in zeilen_value_candidates("typ") {
-                set.insert(value);
+                push_unique_ordered(&mut out, &mut seen, value);
             }
             for value in zeilen_value_candidates("primzahlen") {
-                set.insert(value);
+                push_unique_ordered(&mut out, &mut seen, value);
             }
             for value in zeilen_value_candidates("zeit") {
-                set.insert(value);
+                push_unique_ordered(&mut out, &mut seen, value);
             }
-            set.into_iter().collect()
+            out
         }
         "zaehlung"
         | "vorhervonausschnitt"
@@ -1102,28 +1132,30 @@ fn ausgabe_value_candidates(key: &str) -> Vec<String> {
 
 fn kombi_value_candidates(key: &str) -> Vec<String> {
     let words = shared_words();
-    let mut set = BTreeSet::new();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
 
-    let add_flattened = |target: &mut BTreeSet<String>,
+    let add_flattened = |target: &mut Vec<String>,
+                         seen: &mut BTreeSet<String>,
                          values: &indexmap::IndexMap<i64, Vec<String>>| {
         for entries in values.values() {
             for entry in entries {
-                target.insert(entry.clone());
+                push_unique_ordered(target, seen, entry.clone());
             }
         }
     };
 
     match key {
-        "galaxie" => add_flattened(&mut set, &words.kombiParaNdataMatrix),
-        "universum" => add_flattened(&mut set, &words.kombiParaNdataMatrix2),
+        "galaxie" => add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix),
+        "universum" => add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2),
         "*" => {
-            add_flattened(&mut set, &words.kombiParaNdataMatrix);
-            add_flattened(&mut set, &words.kombiParaNdataMatrix2);
+            add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix);
+            add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2);
         }
         _ => {}
     }
 
-    set.into_iter().collect()
+    out
 }
 
 fn spalten_value_candidates(key: &str) -> Vec<String> {
@@ -1132,39 +1164,48 @@ fn spalten_value_candidates(key: &str) -> Vec<String> {
     }
 
     let words = shared_words();
-    let mut out = BTreeSet::new();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
 
     if key == "*" || key.is_empty() {
-        for group in all_main_alias_groups(words) {
-            for parameter_group in parameter_alias_groups_for_main(words, &group.canonical) {
-                for alias in parameter_group.aliases {
-                    out.insert(alias);
-                }
+        for entry in &words.paraNdataMatrix {
+            for alias in &entry.parameterNames {
+                push_unique_ordered(&mut out, &mut seen, alias.clone());
             }
         }
-        return out.into_iter().collect();
+        return out;
     }
 
-    if let Some(canonical_main) = resolve_parameter_main_alias(words, key) {
-        for parameter_group in parameter_alias_groups_for_main(words, &canonical_main) {
-            for alias in parameter_group.aliases {
-                out.insert(alias);
+    let Some(canonical_main) = resolve_parameter_main_alias(words, key) else {
+        return out;
+    };
+    let wanted = normalize_completion_text(&canonical_main);
+
+    for entry in &words.paraNdataMatrix {
+        if entry
+            .parameterMainNames
+            .iter()
+            .any(|name| normalize_completion_text(name) == wanted)
+        {
+            for alias in &entry.parameterNames {
+                push_unique_ordered(&mut out, &mut seen, alias.clone());
             }
         }
     }
 
-    out.into_iter().collect()
+    out
 }
 
 fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<String> {
-    let mut out = BTreeSet::new();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
     for value in values {
-        out.insert(value.to_string());
+        push_unique_ordered(&mut out, &mut seen, value);
         if value != "*" {
-            out.insert(format!("-{value}"));
+            push_unique_ordered(&mut out, &mut seen, format!("-{value}"));
         }
     }
-    out.into_iter().collect()
+    out
 }
 
 #[cfg(test)]
@@ -1342,5 +1383,41 @@ mod tests {
             &["reta".to_string(), "-zeilen".to_string(), "--zeit=heute".to_string()],
         );
         assert!(contains_normalized(&values, "1-2"));
+    }
+
+    #[test]
+    fn prompt_top_level_includes_python_eig_commands() {
+        let values = candidates_for_input("EIGNwei");
+        assert!(contains_normalized(&values, "EIGNweisheit"));
+    }
+
+    #[test]
+    fn spalten_parameters_include_python_special_passthrough_options() {
+        let values = candidates_for_input("reta -spalten --");
+        assert!(contains_normalized(&values, "--="));
+        assert!(contains_normalized(&values, "--breite="));
+        assert!(contains_normalized(&values, "--keinenummerierung"));
+    }
+
+    #[test]
+    fn ausgabe_parameters_include_python_endless_variants() {
+        let values = candidates_for_input("reta -ausgabe --en");
+        assert!(contains_normalized(&values, "--endlessscreen"));
+        assert!(contains_normalized(&values, "--endless"));
+    }
+
+    #[test]
+    fn wildcard_zeilen_values_follow_python_like_source_order() {
+        let values = candidates_for_input("reta -zeilen --*=");
+        assert_eq!(
+            values.iter().take(5).cloned().collect::<Vec<_>>(),
+            vec![
+                "sonne".to_string(),
+                "-sonne".to_string(),
+                "mond".to_string(),
+                "-mond".to_string(),
+                "planet".to_string(),
+            ]
+        );
     }
 }
