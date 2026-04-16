@@ -56,6 +56,8 @@ impl Program {
             "  --endlessscreen".to_string(),
             "  --endless".to_string(),
             "  --dontwrap".to_string(),
+            "  --breite=50".to_string(),
+            "  --breiten=20,30,40".to_string(),
             "  --spaltenreihenfolgeundnurdiese=3,5,1".to_string(),
             "  --keineleereninhalte".to_string(),
             "  --keineueberschriften".to_string(),
@@ -109,23 +111,36 @@ impl Program {
 
 
     pub(crate) fn bereich_to_numbers2_ausgabe_py(txt: &str) -> Vec<i64> {
-        let parsed: Vec<i64> = Self::bereich_to_numbers2_py(txt, false, 0, false)
-            .into_iter()
-            .collect();
-        if parsed.is_empty() {
-            let mut fallback = vec![];
-            for part in Self::split_top_level_commas_py(txt) {
-                let trimmed = part.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if let Ok(v) = trimmed.parse::<i64>() {
-                    fallback.push(v);
+        let mut ordered: Vec<i64> = vec![];
+        for part in Self::split_top_level_commas_py(txt) {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Some((a, b)) = trimmed.split_once('-') {
+                let a = a.trim();
+                let b = b.trim();
+                if a.chars().all(|c| c.is_ascii_digit()) && b.chars().all(|c| c.is_ascii_digit()) {
+                    let start = a.parse::<i64>().unwrap_or(0);
+                    let end = b.parse::<i64>().unwrap_or(0);
+                    if start > 0 && end >= start {
+                        for value in start..=end {
+                            ordered.push(value);
+                        }
+                        continue;
+                    }
                 }
             }
-            fallback
+            if trimmed.chars().all(|c| c.is_ascii_digit()) {
+                ordered.push(trimmed.parse::<i64>().unwrap_or(0));
+            }
+        }
+        if !ordered.is_empty() {
+            ordered
         } else {
-            parsed
+            Self::bereich_to_numbers2_py(txt, false, 0, false)
+                .into_iter()
+                .collect()
         }
     }
 
@@ -460,16 +475,19 @@ impl Program {
             }
         }
 
-        if self.argv.iter().any(|arg| arg == "--breite=0") {
-            self.breiteBreitenSysArgvPara("breite=0", "");
+        let breite_ist_null = "--breite=0";
+        if argv.iter().any(|arg| arg == breite_ist_null) {
+            self.breiteBreitenSysArgvPara(&breite_ist_null[2..], "");
         }
+
         if !self.oneTable {
             self.setShellRowsAmount();
-            self.textWidth = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
+            let normalized_text_width = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
                 self.textWidth
             } else {
                 self.shellRowsAmount - 7
             };
+            self.set_text_width_property_py(normalized_text_width);
         }
         self.ifZeilenSetted = self.obZeilenBereicheAngegeben;
         (paramLines, rowsAsNumbers, self.__willBeOverwritten_rowsOfcombi.clone(), spaltenreihenfolgeundnurdiese, puniverseprims_only, generRows)
@@ -835,6 +853,14 @@ impl Program {
         self.oneTable = false;
         self.nocolor = false;
         self.outType = "shell".to_string();
+        self.breite = 0;
+        self.breiten = vec![];
+        self.textWidth = 21;
+        self.shellRowsAmount = 0;
+        self.shellWidth = 0;
+        self.spaltenreihenfolgeundnurdiese = vec![];
+        self.generatedSpaltenParameter_Exact.clear();
+        self.generatedSpaltenParameter_Tags.clear();
         self.breiteHasBeenOnceZero = false;
 
         let (paramLines0, _rowsAsNumbers0, _rowsOfcombi0, spaltenreihenfolgeundnurdiese0, _prims1, _generRows1) =
@@ -947,7 +973,7 @@ impl Program {
         self.setShellWidth();
         if self.htmlOrBBcode && !self.breiteORbreiten {
             self.shellRowsAmount = 0;
-            self.textWidth = 0;
+            self.set_text_width_property_py(0);
         }
 
         self.setRowRangeFromArgv();

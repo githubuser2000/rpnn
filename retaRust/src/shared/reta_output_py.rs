@@ -7,26 +7,18 @@ use hypher::{hyphenate, Lang};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 
-struct PyLikeIntExprParser {
+struct PyLikeIntExprParser<'a> {
     chars: Vec<char>,
     pos: usize,
-    variables: BTreeMap<String, i64>,
+    variable: Option<(&'a str, i64)>,
 }
 
-impl PyLikeIntExprParser {
-    fn parse(text: &str, variable: Option<(&str, i64)>) -> Option<i64> {
-        let mut variables = BTreeMap::new();
-        if let Some((name, value)) = variable {
-            variables.insert(name.to_string(), value);
-        }
-        Self::parse_with_scope(text, &variables)
-    }
-
-    fn parse_with_scope(text: &str, variables: &BTreeMap<String, i64>) -> Option<i64> {
+impl<'a> PyLikeIntExprParser<'a> {
+    fn parse(text: &str, variable: Option<(&'a str, i64)>) -> Option<i64> {
         let mut parser = Self {
             chars: text.chars().collect(),
             pos: 0,
-            variables: variables.clone(),
+            variable,
         };
         let value = parser.parse_expr()?;
         parser.skip_ws();
@@ -192,14 +184,13 @@ impl PyLikeIntExprParser {
             }
         }
         let name = self.chars[start..self.pos].iter().collect::<String>();
-        self.variables.get(&name).copied()
+        if let Some((variable_name, variable_value)) = self.variable {
+            if name == variable_name {
+                return Some(variable_value);
+            }
+        }
+        None
     }
-}
-
-#[derive(Clone, Debug)]
-enum PyLikeComprehensionClause {
-    For { variable: String, iterable: String },
-    If { condition: String },
 }
 
 impl Program {
@@ -232,19 +223,22 @@ fn html_exact_header_attrs_py(
     html_col_idx: usize,
 ) -> String {
     let _ = words;
-    let _ = original_col;
 
-    if html_col_idx == 0 {
+    if original_col.is_none() && html_col_idx == 0 {
         return r#" class="z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_" style="background-color:#ffffff;color:#000000;""#
             .to_string();
     }
-    if html_col_idx == 1 {
+    if original_col.is_none() && html_col_idx == 1 {
         return r#" class="z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_""#
             .to_string();
     }
 
     let r_part = format!("z_0 r_{}", html_col_idx);
-    format!(r#" class="{}""#, r_part)
+    if let Some(original_col) = original_col {
+        format!(r#" class="{} c_{}""#, r_part, original_col)
+    } else {
+        format!(r#" class="{}""#, r_part)
+    }
 }
 
     fn ordinary_column_tags_exact_py(&self, original_col: i64) -> Option<Vec<String>> {
@@ -330,7 +324,6 @@ fn html_exact_header_attrs_py(
             rowsAsNumbers.clone()
         };
         selected_cols = dedup_preserve_order_i64(selected_cols);
-        let selected_cols_set: BTreeSet<i64> = selected_cols.iter().cloned().collect();
 
         for row_no in selected_rows.iter() {
             let idx = *row_no as usize;
@@ -338,8 +331,12 @@ fn html_exact_header_attrs_py(
                 continue;
             }
             let mut new2Lines: Vec<String> = vec![];
-            for (t, cell) in relitable[idx].iter().enumerate() {
-                if selected_cols_set.contains(&(t as i64)) {
+            for original_col in selected_cols.iter().copied() {
+                if original_col < 0 {
+                    continue;
+                }
+                let col_idx = original_col as usize;
+                if let Some(cell) = relitable[idx].get(col_idx) {
                     new2Lines.push(cell.clone());
                 }
             }
@@ -456,174 +453,8 @@ fn html_exact_header_attrs_py(
         chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
     }
 
-    fn is_wrapped_by_matching_parens_py(text: &str) -> bool {
-        let trimmed = text.trim();
-        if !(trimmed.starts_with('(') && trimmed.ends_with(')')) {
-            return false;
-        }
-        let mut depth = 0i32;
-        for (idx, ch) in trimmed.char_indices() {
-            match ch {
-                '(' => depth += 1,
-                ')' => {
-                    depth -= 1;
-                    if depth == 0 && idx + ch.len_utf8() != trimmed.len() {
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-            if depth < 0 {
-                return false;
-            }
-        }
-        depth == 0
-    }
-
-    fn strip_wrapping_parens_py<'a>(text: &'a str) -> &'a str {
-        let mut current = text.trim();
-        while Self::is_wrapped_by_matching_parens_py(current) {
-            current = current[1..current.len() - 1].trim();
-        }
-        current
-    }
-
     fn eval_python_int_expr_py(text: &str, variable: Option<(&str, i64)>) -> Option<i64> {
         PyLikeIntExprParser::parse(text, variable)
-    }
-
-    fn eval_python_int_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<i64> {
-        PyLikeIntExprParser::parse_with_scope(text, scope)
-    }
-
-    fn find_top_level_keyword_py<'a>(text: &str, keywords: &'a [&'a str]) -> Option<(usize, &'a str)> {
-        let mut depth_round = 0i32;
-        let mut depth_square = 0i32;
-        let mut depth_curly = 0i32;
-        for (idx, ch) in text.char_indices() {
-            match ch {
-                '(' => depth_round += 1,
-                ')' => depth_round -= 1,
-                '[' => depth_square += 1,
-                ']' => depth_square -= 1,
-                '{' => depth_curly += 1,
-                '}' => depth_curly -= 1,
-                _ => {}
-            }
-            if depth_round == 0 && depth_square == 0 && depth_curly == 0 {
-                for keyword in keywords {
-                    if text[idx..].starts_with(*keyword) {
-                        return Some((idx, *keyword));
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn split_top_level_comparison_ops_py(text: &str) -> Option<(Vec<String>, Vec<String>)> {
-        let mut depth_round = 0i32;
-        let mut depth_square = 0i32;
-        let mut depth_curly = 0i32;
-        let mut parts: Vec<String> = vec![];
-        let mut ops: Vec<String> = vec![];
-        let mut start = 0usize;
-        let mut idx = 0usize;
-        while idx < text.len() {
-            let ch = text.as_bytes()[idx] as char;
-            match ch {
-                '(' => depth_round += 1,
-                ')' => depth_round -= 1,
-                '[' => depth_square += 1,
-                ']' => depth_square -= 1,
-                '{' => depth_curly += 1,
-                '}' => depth_curly -= 1,
-                _ => {}
-            }
-            if depth_round == 0 && depth_square == 0 && depth_curly == 0 {
-                let rest = &text[idx..];
-                let matched = if rest.starts_with("==") {
-                    Some(("==", 2usize))
-                } else if rest.starts_with("!=") {
-                    Some(("!=", 2usize))
-                } else if rest.starts_with("<=") {
-                    Some(("<=", 2usize))
-                } else if rest.starts_with(">=") {
-                    Some((">=", 2usize))
-                } else if rest.starts_with('<') {
-                    Some(("<", 1usize))
-                } else if rest.starts_with('>') {
-                    Some((">", 1usize))
-                } else {
-                    None
-                };
-                if let Some((op, op_len)) = matched {
-                    parts.push(text[start..idx].trim().to_string());
-                    ops.push(op.to_string());
-                    idx += op_len;
-                    start = idx;
-                    continue;
-                }
-            }
-            idx += 1;
-        }
-        if ops.is_empty() {
-            return None;
-        }
-        parts.push(text[start..].trim().to_string());
-        Some((parts, ops))
-    }
-
-    fn eval_python_bool_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<bool> {
-        let trimmed = Self::strip_wrapping_parens_py(text);
-        if trimmed.is_empty() {
-            return None;
-        }
-        if let Some((idx, _)) = Self::find_top_level_keyword_py(trimmed, &[" or "]) {
-            return Some(
-                Self::eval_python_bool_expr_with_scope_py(&trimmed[..idx], scope)?
-                    || Self::eval_python_bool_expr_with_scope_py(&trimmed[idx + 4..], scope)?,
-            );
-        }
-        if let Some((idx, _)) = Self::find_top_level_keyword_py(trimmed, &[" and "]) {
-            return Some(
-                Self::eval_python_bool_expr_with_scope_py(&trimmed[..idx], scope)?
-                    && Self::eval_python_bool_expr_with_scope_py(&trimmed[idx + 5..], scope)?,
-            );
-        }
-        if let Some(rest) = trimmed.strip_prefix("not ") {
-            return Some(!Self::eval_python_bool_expr_with_scope_py(rest, scope)?);
-        }
-        if let Some((parts, ops)) = Self::split_top_level_comparison_ops_py(trimmed) {
-            if parts.iter().any(|part| part.is_empty()) {
-                return None;
-            }
-            let values: Vec<i64> = parts
-                .iter()
-                .map(|part| Self::eval_python_int_expr_with_scope_py(part, scope))
-                .collect::<Option<Vec<_>>>()?;
-            if values.len() != ops.len() + 1 {
-                return None;
-            }
-            for (idx, op) in ops.iter().enumerate() {
-                let left = values[idx];
-                let right = values[idx + 1];
-                let ok = match op.as_str() {
-                    "==" => left == right,
-                    "!=" => left != right,
-                    "<=" => left <= right,
-                    ">=" => left >= right,
-                    "<" => left < right,
-                    ">" => left > right,
-                    _ => return None,
-                };
-                if !ok {
-                    return Some(false);
-                }
-            }
-            return Some(true);
-        }
-        Some(Self::eval_python_int_expr_with_scope_py(trimmed, scope)? != 0)
     }
 
     fn parse_python_like_range_values_py(start: i64, stop: i64, step: i64) -> Option<Vec<i64>> {
@@ -646,7 +477,18 @@ fn html_exact_header_attrs_py(
         Some(values)
     }
 
-    fn parse_python_like_range_values_from_args_py(args_txt: &str, scope: &BTreeMap<String, i64>) -> Option<Vec<i64>> {
+    fn parse_python_like_range_comprehension_py(inner: &str) -> Option<BTreeSet<i64>> {
+        let (expr, rest) = inner.split_once(" for ")?;
+        let (variable, iterable) = rest.split_once(" in ")?;
+        let variable = variable.trim();
+        if !Self::is_python_identifier_py(variable) {
+            return None;
+        }
+        let iterable = iterable.trim();
+        if !(iterable.starts_with("range(") && iterable.ends_with(')')) {
+            return None;
+        }
+        let args_txt = &iterable["range(".len()..iterable.len() - 1];
         let args_parts: Vec<String> = Self::split_top_level_commas_filter_py(args_txt)
             .into_iter()
             .map(|part| part.trim().to_string())
@@ -657,7 +499,7 @@ fn html_exact_header_attrs_py(
         }
         let mut args: Vec<i64> = vec![];
         for part in args_parts {
-            args.push(Self::eval_python_int_expr_with_scope_py(&part, scope)?);
+            args.push(Self::eval_python_int_expr_py(&part, None)?);
         }
         let (start, stop, step) = match args.as_slice() {
             [stop] => (0, *stop, 1),
@@ -665,125 +507,14 @@ fn html_exact_header_attrs_py(
             [start, stop, step] => (*start, *stop, *step),
             _ => return None,
         };
-        Self::parse_python_like_range_values_py(start, stop, step)
-    }
-
-    fn parse_python_like_iterable_values_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<Vec<i64>> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        if trimmed.starts_with("range(") && trimmed.ends_with(')') {
-            return Self::parse_python_like_range_values_from_args_py(&trimmed["range(".len()..trimmed.len() - 1], scope);
-        }
-        Self::parse_python_like_int_set_expr_with_scope_py(trimmed, scope)
-            .map(|values| values.into_iter().collect())
-    }
-
-    fn parse_python_like_comprehension_clauses_py(text: &str) -> Option<Vec<PyLikeComprehensionClause>> {
-        let mut clauses: Vec<PyLikeComprehensionClause> = vec![];
-        let mut remaining = text.trim();
-        if remaining.is_empty() {
-            return None;
-        }
-        while !remaining.is_empty() {
-            if let Some(after_for) = remaining.strip_prefix("for ") {
-                let (in_idx, _) = Self::find_top_level_keyword_py(after_for, &[" in "])?;
-                let variable = after_for[..in_idx].trim();
-                if !Self::is_python_identifier_py(variable) {
-                    return None;
-                }
-                let after_in = after_for[in_idx + 4..].trim_start();
-                if after_in.is_empty() {
-                    return None;
-                }
-                let (iterable_txt, next_remaining) = if let Some((next_idx, _)) = Self::find_top_level_keyword_py(after_in, &[" for ", " if "]) {
-                    (&after_in[..next_idx], after_in[next_idx + 1..].trim_start())
-                } else {
-                    (after_in, "")
-                };
-                let iterable_txt = iterable_txt.trim();
-                if iterable_txt.is_empty() {
-                    return None;
-                }
-                clauses.push(PyLikeComprehensionClause::For {
-                    variable: variable.to_string(),
-                    iterable: iterable_txt.to_string(),
-                });
-                remaining = next_remaining;
-            } else if let Some(after_if) = remaining.strip_prefix("if ") {
-                let (condition_txt, next_remaining) = if let Some((next_idx, _)) = Self::find_top_level_keyword_py(after_if, &[" for ", " if "]) {
-                    (&after_if[..next_idx], after_if[next_idx + 1..].trim_start())
-                } else {
-                    (after_if, "")
-                };
-                let condition_txt = condition_txt.trim();
-                if condition_txt.is_empty() {
-                    return None;
-                }
-                clauses.push(PyLikeComprehensionClause::If {
-                    condition: condition_txt.to_string(),
-                });
-                remaining = next_remaining;
-            } else {
-                return None;
-            }
-        }
-        Some(clauses)
-    }
-
-    fn eval_python_like_comprehension_clauses_py(
-        body_expr: &str,
-        clauses: &[PyLikeComprehensionClause],
-        clause_idx: usize,
-        scope: &mut BTreeMap<String, i64>,
-        out: &mut BTreeSet<i64>,
-    ) -> Option<()> {
-        if clause_idx >= clauses.len() {
-            out.insert(Self::eval_python_int_expr_with_scope_py(body_expr, scope)?);
-            return Some(());
-        }
-        match &clauses[clause_idx] {
-            PyLikeComprehensionClause::For { variable, iterable } => {
-                let values = Self::parse_python_like_iterable_values_py(iterable, scope)?;
-                let previous = scope.get(variable).copied();
-                for value in values {
-                    scope.insert(variable.clone(), value);
-                    Self::eval_python_like_comprehension_clauses_py(body_expr, clauses, clause_idx + 1, scope, out)?;
-                }
-                if let Some(old_value) = previous {
-                    scope.insert(variable.clone(), old_value);
-                } else {
-                    scope.remove(variable);
-                }
-            }
-            PyLikeComprehensionClause::If { condition } => {
-                if Self::eval_python_bool_expr_with_scope_py(condition, scope)? {
-                    Self::eval_python_like_comprehension_clauses_py(body_expr, clauses, clause_idx + 1, scope, out)?;
-                }
-            }
-        }
-        Some(())
-    }
-
-    fn parse_python_like_comprehension_py(inner: &str, scope: &BTreeMap<String, i64>) -> Option<BTreeSet<i64>> {
-        let (body_idx, _) = Self::find_top_level_keyword_py(inner, &[" for "])?;
-        let body_expr = inner[..body_idx].trim();
-        if body_expr.is_empty() {
-            return None;
-        }
-        let rest = inner[body_idx + 1..].trim_start();
-        let clauses = Self::parse_python_like_comprehension_clauses_py(rest)?;
-        if clauses.is_empty() {
-            return None;
-        }
         let mut out = BTreeSet::new();
-        let mut nested_scope = scope.clone();
-        Self::eval_python_like_comprehension_clauses_py(body_expr, &clauses, 0, &mut nested_scope, &mut out)?;
+        for value in Self::parse_python_like_range_values_py(start, stop, step)? {
+            out.insert(Self::eval_python_int_expr_py(expr.trim(), Some((variable, value)))?);
+        }
         Some(out)
     }
 
-    fn parse_python_like_int_set_expr_with_scope_py(text: &str, scope: &BTreeMap<String, i64>) -> Option<BTreeSet<i64>> {
+    pub(crate) fn parse_python_like_int_set_expr_py(text: &str) -> Option<BTreeSet<i64>> {
         let trimmed = text.trim();
         if trimmed.len() < 2 {
             return None;
@@ -804,9 +535,10 @@ fn html_exact_header_attrs_py(
         if inner.is_empty() {
             return Some(BTreeSet::new());
         }
-        if let Some(values) = Self::parse_python_like_comprehension_py(inner, scope) {
+        if let Some(values) = Self::parse_python_like_range_comprehension_py(inner) {
             return Some(values);
         }
+        let mut out = BTreeSet::new();
         let parts: Vec<String> = Self::split_top_level_commas_filter_py(inner)
             .into_iter()
             .map(|part| part.trim().to_string())
@@ -815,16 +547,10 @@ fn html_exact_header_attrs_py(
         if parts.is_empty() {
             return None;
         }
-        let mut out = BTreeSet::new();
         for part in parts {
-            out.insert(Self::eval_python_int_expr_with_scope_py(&part, scope)?);
+            out.insert(Self::eval_python_int_expr_py(&part, None)?);
         }
         Some(out)
-    }
-
-    pub(crate) fn parse_python_like_int_set_expr_py(text: &str) -> Option<BTreeSet<i64>> {
-        let scope = BTreeMap::new();
-        Self::parse_python_like_int_set_expr_with_scope_py(text, &scope)
     }
 
     fn is_zeilen_angabe_between_kommas_filter_py(txt: &str) -> bool {
@@ -1743,141 +1469,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         " ".to_string()
     }
 
-    fn parse_row_number_label_py(label: Option<&String>) -> Option<i64> {
-        label.and_then(|s| s.trim().parse::<i64>().ok())
-    }
-
-    fn is_effectively_empty_entry_py(entry: &str, strict_short: bool) -> bool {
-        let trimmed = entry.trim();
-        trimmed.is_empty() || (strict_short && trimmed.chars().count() < 2)
-    }
-
-    fn should_skip_wrapped_subline_py(
-        wrapped_cells: &[Vec<String>],
-        sub_idx: usize,
-        keineleereninhalte: bool,
-    ) -> bool {
-        let mut entries_here = 0usize;
-        let mut empty_entries = 0usize;
-
-        for wrapped in wrapped_cells {
-            if let Some(part) = wrapped.get(sub_idx) {
-                entries_here += 1;
-                if Self::is_effectively_empty_entry_py(part, keineleereninhalte) {
-                    empty_entries += 1;
-                }
-            }
-        }
-
-        if entries_here == 0 {
-            return true;
-        }
-        if empty_entries == entries_here {
-            return true;
-        }
-        false
-    }
-
-    fn output_width_source_py(&self, col_idx: usize) -> i64 {
-        if col_idx < self.breiten.len() {
-            self.breiten[col_idx]
-        } else {
-            self.textWidth
-        }
-    }
-
-    fn effective_output_column_width_py(
-        &self,
-        col_idx: usize,
-        max_cell_width: usize,
-        html_or_bbcode: bool,
-    ) -> usize {
-        let certaintextwidth = self.output_width_source_py(col_idx);
-        if certaintextwidth > max_cell_width as i64 || (certaintextwidth == 0 && !html_or_bbcode) {
-            max_cell_width
-        } else if certaintextwidth < 0 {
-            max_cell_width
-        } else {
-            certaintextwidth as usize
-        }
-    }
-
-    fn detected_shell_width_py(&self) -> usize {
-        if self.shellWidth > 0 {
-            self.shellWidth as usize
-        } else {
-            let detected = Self::detect_terminal_columns_py();
-            if detected > 0 {
-                detected as usize
-            } else if self.textWidth > 0 {
-                self.textWidth as usize
-            } else {
-                80usize
-            }
-        }
-    }
-
-    fn compute_output_chunks_py(
-        &self,
-        widths: &[usize],
-        num_prefix_width: usize,
-    ) -> Vec<(usize, usize)> {
-        let col_count = widths.len();
-        if col_count == 0 {
-            return vec![];
-        }
-        if self.oneTable {
-            return vec![(0, col_count)];
-        }
-
-        let chunk_budget = self.detected_shell_width_py().max(21usize);
-        let left_prefix = if self.nummeriere { num_prefix_width + 1 } else { 0usize };
-        let available = chunk_budget.saturating_sub(left_prefix).max(1usize);
-
-        let mut chunks: Vec<(usize, usize)> = vec![];
-        let mut start_col = 0usize;
-        while start_col < col_count {
-            let mut used = 0usize;
-            let mut end_col = start_col;
-
-            while end_col < col_count {
-                let add = widths[end_col].saturating_add(1);
-                if used + add < available {
-                    used += add;
-                    end_col += 1;
-                } else if end_col == start_col {
-                    end_col += 1;
-                    break;
-                } else {
-                    break;
-                }
-            }
-
-            if end_col == start_col {
-                end_col += 1;
-            }
-            chunks.push((start_col, end_col));
-            start_col = end_col;
-        }
-
-        chunks
-    }
-
-    fn emacs_separator_needed_py(row_number: Option<i64>, is_header: bool) -> bool {
-        if is_header {
-            return true;
-        }
-        let Some(n) = row_number else {
-            return false;
-        };
-        let factors = Self::prim_fak_py(n);
-        if factors.len() == 1 {
-            return false;
-        }
-        let unique: BTreeSet<i64> = factors.into_iter().collect();
-        unique.len() == 1
-    }
-
     fn render_structured_output_py(
         &mut self,
         finallyDisplayLines: &[String],
@@ -1887,245 +1478,186 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
     ) {
         let mut out_lines: Vec<String> = vec![];
         let mut chunked_lines: Vec<Vec<String>> = vec![];
-
-        if self.outType == "nichts" {
-            self.finallyDisplayLinesByChunks = vec![];
-            self.finallyDisplayLines = vec![];
-            self.numlen = numlen;
-            return;
-        }
-
-        let col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
-        if col_count == 0 {
-            self.finallyDisplayLinesByChunks = vec![];
-            self.finallyDisplayLines = vec![];
-            self.numlen = numlen;
-            return;
-        }
-
-        let html_or_bbcode = self.outType == "html" || self.outType == "bbcode";
-        let max_cell_widths = Self::max_cell_text_widths_py(newTable, col_count);
-        let widths: Vec<usize> = (0..col_count)
-            .map(|i| self.effective_output_column_width_py(i, max_cell_widths[i], html_or_bbcode))
-            .collect();
-        let num_prefix_width = if self.nummeriere {
-            finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
-        } else {
-            0usize
-        };
-        let chunks = self.compute_output_chunks_py(&widths, num_prefix_width);
-        let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
-        let words = Words::new();
-
-        for (chunk_start, chunk_end) in chunks.iter().cloned() {
-            let mut block_lines: Vec<String> = vec![];
-            let mut header_sep_done = false;
-
-            if self.outType == "html" {
-                let line = r#"<table border=0 id="bigtable">"#.to_string();
-                out_lines.push(line.clone());
-                block_lines.push(line);
-            } else if self.outType == "bbcode" {
-                let line = "[table]".to_string();
-                out_lines.push(line.clone());
-                block_lines.push(line);
-            }
-
-            for (row_idx, row) in newTable.iter().enumerate() {
-                let row_number = Self::parse_row_number_label_py(finallyDisplayLines.get(row_idx));
-                let is_header = row_number.is_none();
-
-                let mut wrapped_cells: Vec<Vec<String>> = vec![];
-                let mut max_sub = 1usize;
-                for abs_i in chunk_start..chunk_end {
-                    let cell = row.get(abs_i).map(|s| s.as_str()).unwrap_or("");
-                    let wrap_width = widths.get(abs_i).copied().unwrap_or(0usize);
-                    let wrapped = Self::wrap_text_py(cell, wrap_width);
-                    max_sub = max_sub.max(wrapped.len());
-                    wrapped_cells.push(wrapped);
-                }
-
-                for sub_idx in 0..max_sub {
-                    if Self::should_skip_wrapped_subline_py(&wrapped_cells, sub_idx, self.keineleereninhalte) {
-                        continue;
+        match self.outType.as_str() {
+            "nichts" => {}
+            "csv" => {
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
                     }
-
-                    let label_text = if sub_idx == 0 {
-                        finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
-                    } else {
-                        String::new()
-                    };
-                    let prefix_text = self.row_prefix_text_py(row_number, is_header);
-
-                    match self.outType.as_str() {
-                        "csv" => {
-                            let mut fields: Vec<String> = vec![];
-                            if self.nummeriere {
-                                fields.push(Self::csv_escape_cell_py(&prefix_text));
-                                fields.push(Self::csv_escape_cell_py(&label_text));
-                            }
-                            for local_i in 0..wrapped_cells.len() {
-                                let part = wrapped_cells[local_i]
-                                    .get(sub_idx)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                fields.push(Self::csv_escape_cell_py(&part));
-                            }
-                            let line = fields.join(";");
-                            out_lines.push(line.clone());
-                            block_lines.push(line);
-                        }
-                        "markdown" => {
-                            let mut cells: Vec<String> = vec![];
-                            if self.nummeriere {
-                                cells.push(Self::markdown_escape_cell_py(&prefix_text));
-                                cells.push(Self::markdown_escape_cell_py(&label_text));
-                            }
-                            for local_i in 0..wrapped_cells.len() {
-                                let part = wrapped_cells[local_i]
-                                    .get(sub_idx)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                cells.push(Self::markdown_escape_cell_py(&part));
-                            }
-                            let line = format!("|{}|", cells.join("|"));
-                            out_lines.push(line.clone());
-                            block_lines.push(line);
-                            if is_header && sub_idx == 0 && !header_sep_done {
-                                let sep = format!("|{}|", vec![":--:"; cells.len()].join("|"));
-                                out_lines.push(sep.clone());
-                                block_lines.push(sep);
-                                header_sep_done = true;
-                            }
-                        }
-                        "emacs" => {
-                            let mut cells: Vec<String> = vec![];
-                            if self.nummeriere {
-                                cells.push(prefix_text.clone());
-                                cells.push(label_text.clone());
-                            }
-                            for local_i in 0..wrapped_cells.len() {
-                                let part = wrapped_cells[local_i]
-                                    .get(sub_idx)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                cells.push(part);
-                            }
-                            let line = format!("|{}|", cells.join("|"));
-                            out_lines.push(line.clone());
-                            block_lines.push(line);
-                            if Self::emacs_separator_needed_py(row_number, is_header) {
-                                let sep = format!("|{}|", vec!["----"; cells.len()].join("+"));
-                                out_lines.push(sep.clone());
-                                block_lines.push(sep);
-                            }
-                        }
-                        "html" => {
-                            let mut cells: Vec<String> = vec![];
-                            if self.nummeriere {
-                                let prefix_html = Self::html_escape_cell_py(&prefix_text);
-                                let label_html = Self::html_escape_cell_py(&label_text);
-                                if is_header {
-                                    cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 0), prefix_html));
-                                    cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 1), label_html));
-                                } else {
-                                    let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
-                                        r#" style="background-color:#000000;color:#ffffff;""#
-                                    } else {
-                                        r#" style="background-color:#ffffff;color:#000000;""#
-                                    };
-                                    cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_html));
-                                    cells.push(format!(r#"<td>{}</td>"#, label_html));
-                                }
-                            }
-                            for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
-                                let part = wrapped_cells[local_i]
-                                    .get(sub_idx)
-                                    .cloned()
-                                    .unwrap_or_default();
-                                let escaped = Self::html_escape_cell_py(&part);
-                                let html_col_idx = if self.nummeriere { local_i + 2 } else { local_i };
-                                let original_col = displayed_columns.get(abs_i).cloned().flatten();
-                                if is_header {
-                                    let attrs = Self::html_exact_header_attrs_py(&words, original_col, html_col_idx);
-                                    cells.push(format!(r#"<td{}> {} </td>"#, attrs, escaped));
-                                } else {
-                                    cells.push(format!(r#"<td>{}</td>"#, escaped));
-                                }
-                            }
-                            let line = format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" "));
-                            out_lines.push(line.clone());
-                            block_lines.push(line);
-                        }
-                        "bbcode" => {
-                            let mut cells: Vec<String> = vec![];
-                            if self.nummeriere {
-                                cells.push(format!("[td]{}[/td]", prefix_text));
-                                cells.push(format!("[td]{}[/td]", label_text));
-                            }
-                            for local_i in 0..wrapped_cells.len() {
-                                let part = wrapped_cells[local_i]
-                                    .get(sub_idx)
-                                    .cloned()
-                                    .unwrap_or_default()
-                                    .replace('\n', "<br>");
-                                cells.push(format!("[td]{}[/td]", part));
-                            }
-                            let line = format!("[tr]{}[/tr]", cells.join(""));
-                            out_lines.push(line.clone());
-                            block_lines.push(line);
-                        }
-                        _ => {}
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut fields: Vec<String> = vec![];
+                    if self.nummeriere {
+                        fields.push(Self::csv_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                        let label = finallyDisplayLines.get(row_idx).cloned().unwrap_or_default();
+                        fields.push(Self::csv_escape_cell_py(&label));
                     }
+                    for cell in row {
+                        fields.push(Self::csv_escape_cell_py(cell));
+                    }
+                    let line = fields.join(";");
+                    out_lines.push(line.clone());
+                    chunked_lines.push(vec![line]);
                 }
             }
-
-            if self.outType == "html" {
-                let line = "</table>".to_string();
-                out_lines.push(line.clone());
-                block_lines.push(line);
-            } else if self.outType == "bbcode" {
-                let line = "[/table]".to_string();
-                out_lines.push(line.clone());
-                block_lines.push(line);
+            "markdown" => {
+                let mut header_sep_done = false;
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(Self::markdown_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                        cells.push(Self::markdown_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
+                    }
+                    for cell in row {
+                        cells.push(Self::markdown_escape_cell_py(cell));
+                    }
+                    let line = format!("|{}|", cells.join("|"));
+                    out_lines.push(line.clone());
+                    let mut block = vec![line];
+                    if is_header && !header_sep_done {
+                        let sep = format!("|{}|", vec![":--:"; cells.len()].join("|"));
+                        out_lines.push(sep.clone());
+                        block.push(sep);
+                        header_sep_done = true;
+                    }
+                    chunked_lines.push(block);
+                }
             }
-
-            if !block_lines.is_empty() {
-                chunked_lines.push(block_lines);
+            "emacs" => {
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(self.row_prefix_text_py(row_number, is_header));
+                        cells.push(finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
+                    }
+                    cells.extend(row.iter().cloned());
+                    let line = format!("|{}|", cells.join("|"));
+                    out_lines.push(line.clone());
+                    let mut block = vec![line];
+                    if is_header {
+                        let sep = format!("|{}|", vec!["----"; cells.len()].join("+"));
+                        out_lines.push(sep.clone());
+                        block.push(sep);
+                    }
+                    chunked_lines.push(block);
+                }
+            }
+            "html" => {
+                let words = Words::new();
+                let _col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
+                let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
+                out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
+                let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        let prefix_text = Self::html_escape_cell_py(&self.row_prefix_text_py(row_number, is_header));
+                        let label_text = Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
+                        if is_header {
+                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 0), prefix_text));
+                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 1), label_text));
+                        } else {
+                            let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
+                                r#" style="background-color:#000000;color:#ffffff;""#
+                            } else {
+                                r#" style="background-color:#ffffff;color:#000000;""#
+                            };
+                            cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_text));
+                            cells.push(format!(r#"<td>{}</td>"#, label_text));
+                        }
+                    }
+                    for (visible_idx, cell) in row.iter().enumerate() {
+                        let html_col_idx = if self.nummeriere { visible_idx + 2 } else { visible_idx };
+                        let original_col = displayed_columns.get(visible_idx).cloned().flatten();
+                        let escaped = Self::html_escape_cell_py(cell);
+                        if is_header {
+                            let attrs = Self::html_exact_header_attrs_py(&words, original_col, html_col_idx);
+                            cells.push(format!(r#"<td{}> {} </td>"#, attrs, escaped));
+                        } else {
+                            cells.push(format!(r#"<td>{}</td>"#, escaped));
+                        }
+                    }
+                    let line = format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" "));
+                    out_lines.push(line.clone());
+                    current_block.push(line);
+                }
+                out_lines.push("</table>".to_string());
+                current_block.push("</table>".to_string());
+                chunked_lines.push(current_block);
+            }
+            "bbcode" => {
+                out_lines.push("[table]".to_string());
+                let mut current_block = vec!["[table]".to_string()];
+                for (row_idx, row) in newTable.iter().enumerate() {
+                    if self.keineleereninhalte {
+                        let joined = row.join(" ");
+                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                        if stripped.is_empty() {
+                            continue;
+                        }
+                    }
+                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    let is_header = row_number.is_none();
+                    let mut cells: Vec<String> = vec![];
+                    if self.nummeriere {
+                        cells.push(format!("[td]{}[/td]", self.row_prefix_text_py(row_number, is_header)));
+                        cells.push(format!("[td]{}[/td]", finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
+                    }
+                    for cell in row {
+                        cells.push(format!("[td]{}[/td]", cell.replace('\n', "<br>")));
+                    }
+                    let line = format!("[tr]{}[/tr]", cells.join(""));
+                    out_lines.push(line.clone());
+                    current_block.push(line);
+                }
+                out_lines.push("[/table]".to_string());
+                current_block.push("[/table]".to_string());
+                chunked_lines.push(current_block);
+            }
+            _ => {
+                self.finallyDisplayLines = vec![];
+                self.finallyDisplayLinesByChunks = vec![];
+                self.numlen = numlen;
+                return;
             }
         }
-
         self.finallyDisplayLinesByChunks = chunked_lines;
         self.finallyDisplayLines = out_lines;
         self.numlen = numlen;
     }
 
-
-    fn cell_visual_width_py(cell: &str) -> usize {
-        if cell.is_empty() {
-            return 0;
-        }
-        cell.split('\n')
-            .map(|part| part.chars().count())
-            .max()
-            .unwrap_or(0)
-    }
-
-    fn max_cell_text_widths_py(newTable: &[Vec<String>], col_count: usize) -> Vec<usize> {
-        let mut max_widths: Vec<usize> = vec![0; col_count];
-
-        for row in newTable {
-            for col_idx in 0..col_count {
-                let cell = row.get(col_idx).map(|s| s.as_str()).unwrap_or("");
-                let width = Self::cell_visual_width_py(cell);
-                if width > max_widths[col_idx] {
-                    max_widths[col_idx] = width;
-                }
-            }
-        }
-
-        max_widths
-    }
 
     pub(crate) fn cliOut_py(
         &mut self,
@@ -2155,17 +1687,89 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             return newTable;
         }
 
-        let max_cell_widths = Self::max_cell_text_widths_py(&newTable, col_count);
-        let widths: Vec<usize> = (0..col_count)
-            .map(|i| self.effective_output_column_width_py(i, max_cell_widths[i], false))
-            .collect();
+        let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+        for row in &newTable {
+            for col_idx in 0..col_count {
+                let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                let cell_width = cell
+                    .split('\n')
+                    .map(|part| part.chars().count())
+                    .max()
+                    .unwrap_or(0);
+                if cell_width > max_cell_widths[col_idx] {
+                    max_cell_widths[col_idx] = cell_width;
+                }
+            }
+        }
+
+        let mut widths: Vec<usize> = vec![0; col_count];
+        for col_idx in 0..col_count {
+            let certain = if col_idx < self.breiten.len() {
+                self.breiten[col_idx]
+            } else {
+                self.textWidth
+            };
+            widths[col_idx] = if certain > max_cell_widths[col_idx] as i64 || certain == 0 {
+                max_cell_widths[col_idx]
+            } else if certain < 0 {
+                0
+            } else {
+                certain as usize
+            };
+        }
 
         let num_prefix_width = if self.nummeriere {
-            finallyDisplayLines.iter().map(|s| s.chars().count()).max().unwrap_or(0)
+            finallyDisplayLines
+                .iter()
+                .map(|s| s.chars().count())
+                .max()
+                .unwrap_or(0)
         } else {
             0usize
         };
-        let chunks = self.compute_output_chunks_py(&widths, num_prefix_width);
+
+        let detected_shell_width = if self.shellWidth > 0 {
+            self.shellWidth as usize
+        } else {
+            let detected = Self::detect_terminal_columns_py();
+            if detected > 0 {
+                detected as usize
+            } else {
+                0usize
+            }
+        };
+        let chunk_budget = if detected_shell_width > 0 {
+            detected_shell_width.saturating_sub(if self.nummeriere { num_prefix_width + 1 } else { 0 })
+        } else {
+            0usize
+        };
+
+        let chunks: Vec<(usize, usize)> = if self.oneTable || chunk_budget == 0 {
+            vec![(0, col_count)]
+        } else {
+            let mut chunks: Vec<(usize, usize)> = vec![];
+            let mut start_col = 0usize;
+            while start_col < col_count {
+                let mut used = 0usize;
+                let mut end_col = start_col;
+
+                while end_col < col_count {
+                    let add = widths[end_col].saturating_add(1);
+                    if end_col > start_col && used.saturating_add(add) >= chunk_budget {
+                        break;
+                    }
+                    used = used.saturating_add(add);
+                    end_col += 1;
+                }
+
+                if end_col == start_col {
+                    end_col += 1;
+                }
+                chunks.push((start_col, end_col));
+                start_col = end_col;
+            }
+            chunks
+        };
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
@@ -2173,24 +1777,43 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             let mut one_chunk_lines: Vec<String> = vec![];
 
             for (row_idx, row) in newTable.iter().enumerate() {
+                if self.keineleereninhalte {
+                    let joined = (chunk_start..chunk_end)
+                        .filter_map(|i| row.get(i))
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                    if stripped.is_empty() {
+                        continue;
+                    }
+                }
+
+                let row_number = finallyDisplayLines
+                    .get(row_idx)
+                    .and_then(|s| s.trim().parse::<i64>().ok());
+                let is_header = row_number.is_none();
+
                 let mut wrapped_cells: Vec<Vec<String>> = vec![];
                 let mut max_sub = 1usize;
-
-                for i in chunk_start..chunk_end {
-                    let cell = if i < row.len() { row[i].as_str() } else { "" };
-                    let wrapped = Self::wrap_text_py(cell, widths[i]);
-                    max_sub = max_sub.max(wrapped.len());
+                for col_idx in chunk_start..chunk_end {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let wrapped = if widths[col_idx] == 0 {
+                        let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+                        if parts.is_empty() {
+                            parts.push(String::new());
+                        }
+                        parts
+                    } else {
+                        Self::wrap_text_py(cell, widths[col_idx])
+                    };
+                    if wrapped.len() > max_sub {
+                        max_sub = wrapped.len();
+                    }
                     wrapped_cells.push(wrapped);
                 }
 
-                let row_number = Self::parse_row_number_label_py(finallyDisplayLines.get(row_idx));
-                let is_header = row_number.is_none();
-
                 for sub_idx in 0..max_sub {
-                    if Self::should_skip_wrapped_subline_py(&wrapped_cells, sub_idx, self.keineleereninhalte) {
-                        continue;
-                    }
-
                     let mut line = String::new();
 
                     if self.nummeriere {
@@ -2199,7 +1822,17 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         } else {
                             String::new()
                         };
-                        let prefix = self.row_prefix_text_py(row_number, is_header);
+                        let prefix = if is_header {
+                            " ".to_string()
+                        } else if let Some(n) = row_number {
+                            if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
+                                "█".to_string()
+                            } else {
+                                " ".to_string()
+                            }
+                        } else {
+                            " ".to_string()
+                        };
                         line.push_str(&prefix);
                         line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
                     }
@@ -2208,7 +1841,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
                         let part = maybe_part.clone().unwrap_or_default();
                         let is_rest = maybe_part.is_none();
-                        let rendered = format!("{:<width$}", part, width = widths[abs_i]);
+                        let rendered = if widths[abs_i] == 0 {
+                            part
+                        } else {
+                            format!("{:<width$}", part, width = widths[abs_i])
+                        };
                         line.push_str(&Self::styled_shell_text_py(
                             &rendered,
                             row_number,

@@ -54,10 +54,6 @@ impl Program {
             }
         }
 
-        if !out.is_empty() {
-            out
-        } else {
-            values
-        }
+        out
     }
 }
