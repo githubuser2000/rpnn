@@ -3,8 +3,9 @@ use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultHinter, DefaultValidator, Emacs, FileBackedHistory, MenuBuilder,
-    Prompt, PromptEditMode, PromptHistorySearch, Reedline, ReedlineMenu, Signal, Vi,
+    ColumnarMenu, DefaultHinter, DefaultValidator, Emacs, FileBackedHistory, KeyCode,
+    KeyModifiers, Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
+    Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
 };
 
 use super::commands::{
@@ -36,6 +37,8 @@ struct StartupArgs {
 struct RpPrompt {
     text: String,
 }
+
+const COMPLETION_MENU_NAME: &str = "completion_menu";
 
 impl Prompt for RpPrompt {
     fn render_prompt_left(&self) -> Cow<'_, str> {
@@ -640,6 +643,55 @@ fn run_interactive_loop(
     0
 }
 
+fn completion_menu_event(next_event: ReedlineEvent) -> ReedlineEvent {
+    ReedlineEvent::UntilFound(vec![
+        ReedlineEvent::Menu(COMPLETION_MENU_NAME.to_string()),
+        next_event,
+    ])
+}
+
+fn menu_aware_navigation(menu_event: ReedlineEvent, fallback_event: ReedlineEvent) -> ReedlineEvent {
+    ReedlineEvent::UntilFound(vec![menu_event, fallback_event])
+}
+
+fn add_completion_keybindings(keybindings: &mut Keybindings) {
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Tab,
+        completion_menu_event(ReedlineEvent::MenuNext),
+    );
+    keybindings.add_binding(
+        KeyModifiers::SHIFT,
+        KeyCode::BackTab,
+        completion_menu_event(ReedlineEvent::MenuPrevious),
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::BackTab,
+        completion_menu_event(ReedlineEvent::MenuPrevious),
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Up,
+        menu_aware_navigation(ReedlineEvent::MenuUp, ReedlineEvent::Up),
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Down,
+        menu_aware_navigation(ReedlineEvent::MenuDown, ReedlineEvent::Down),
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Left,
+        menu_aware_navigation(ReedlineEvent::MenuLeft, ReedlineEvent::Left),
+    );
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Right,
+        menu_aware_navigation(ReedlineEvent::MenuRight, ReedlineEvent::Right),
+    );
+}
+
 fn build_editor(
     history_path: &PathBuf,
     mode: EditModeKind,
@@ -658,7 +710,7 @@ fn build_editor(
     );
 
     let completer = build_default_completer_with_runtime(completion_runtime.clone());
-    let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
+    let completion_menu = Box::new(ColumnarMenu::default().with_name(COMPLETION_MENU_NAME));
 
     let mut editor = Reedline::create()
         .with_history(history)
@@ -669,14 +721,17 @@ fn build_editor(
 
     editor = match mode {
         EditModeKind::Emacs => {
-            let edit_mode = Box::new(Emacs::new(default_emacs_keybindings()));
+            let mut keybindings = default_emacs_keybindings();
+            add_completion_keybindings(&mut keybindings);
+            let edit_mode = Box::new(Emacs::new(keybindings));
             editor.with_edit_mode(edit_mode)
         }
         EditModeKind::Vi => {
-            let edit_mode = Box::new(Vi::new(
-                default_vi_insert_keybindings(),
-                default_vi_normal_keybindings(),
-            ));
+            let mut insert_keybindings = default_vi_insert_keybindings();
+            let mut normal_keybindings = default_vi_normal_keybindings();
+            add_completion_keybindings(&mut insert_keybindings);
+            add_completion_keybindings(&mut normal_keybindings);
+            let edit_mode = Box::new(Vi::new(insert_keybindings, normal_keybindings));
             editor.with_edit_mode(edit_mode)
         }
     };
