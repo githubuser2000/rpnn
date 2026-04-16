@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use reedline::{Completer as ReedlineCompleter, Span, Suggestion};
 
@@ -47,8 +47,25 @@ enum RetaMainSection {
     Ausgabe,
 }
 
-#[derive(Clone, Debug, Default)]
-struct PromptContextCompleter;
+#[derive(Clone, Debug)]
+pub struct CompletionRuntimeState {
+    pub prompt_mode: PromptModus,
+}
+
+impl Default for CompletionRuntimeState {
+    fn default() -> Self {
+        Self {
+            prompt_mode: PromptModus::Normal,
+        }
+    }
+}
+
+pub type CompletionRuntimeHandle = Arc<Mutex<CompletionRuntimeState>>;
+
+#[derive(Clone, Debug)]
+struct PromptContextCompleter {
+    runtime: CompletionRuntimeHandle,
+}
 
 #[derive(Clone, Debug)]
 struct CompletionCandidate {
@@ -72,62 +89,60 @@ pub fn prompt_metadata() -> &'static PromptMetadata {
 
 fn build_prompt_metadata() -> PromptMetadata {
     let words = shared_words();
-    let mut items = BTreeSet::new();
+    let mut items = Vec::new();
+    let mut seen = BTreeSet::new();
 
-    for item in RP_META_COMMANDS {
-        items.insert((*item).to_string());
-    }
-    for item in &prompt_words().befehle {
-        items.insert(item.clone());
+    for item in ordered_prompt_commands() {
+        push_unique_ordered(&mut items, &mut seen, item);
     }
     for item in reta_main_switches() {
-        items.insert(item.to_string());
+        push_unique_ordered(&mut items, &mut seen, item);
     }
     for item in zeilen_parameter_tokens() {
-        items.insert(item.to_string());
+        push_unique_ordered(&mut items, &mut seen, item);
     }
     for item in ausgabe_parameter_tokens() {
-        items.insert(item.to_string());
+        push_unique_ordered(&mut items, &mut seen, item);
     }
     for item in kombi_parameter_tokens() {
-        items.insert(item.to_string());
+        push_unique_ordered(&mut items, &mut seen, item);
     }
     for item in spalten_parameter_tokens() {
-        items.insert(item);
+        push_unique_ordered(&mut items, &mut seen, item);
     }
 
     for main_group in all_main_alias_groups(words) {
         for alias in &main_group.aliases {
-            items.insert(alias.clone());
+            push_unique_ordered(&mut items, &mut seen, alias.clone());
         }
         for parameter_group in parameter_alias_groups_for_main(words, &main_group.canonical) {
             for alias in &parameter_group.aliases {
-                items.insert(alias.clone());
+                push_unique_ordered(&mut items, &mut seen, alias.clone());
             }
         }
     }
 
     for value in zeilen_value_candidates("typ") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
     for value in zeilen_value_candidates("primzahlen") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
     for value in zeilen_value_candidates("zeit") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
     for value in ausgabe_value_candidates("art") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
     for value in kombi_value_candidates("galaxie") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
     for value in kombi_value_candidates("universum") {
-        items.insert(value);
+        push_unique_ordered(&mut items, &mut seen, value);
     }
 
     PromptMetadata {
-        vocabulary: items.into_iter().collect(),
+        vocabulary: items,
     }
 }
 
@@ -135,8 +150,27 @@ pub fn completion_vocabulary() -> Vec<String> {
     prompt_metadata().vocabulary.clone()
 }
 
+pub fn new_completion_runtime_handle() -> CompletionRuntimeHandle {
+    Arc::new(Mutex::new(CompletionRuntimeState::default()))
+}
+
+pub fn set_completion_prompt_mode(
+    runtime: &CompletionRuntimeHandle,
+    prompt_mode: PromptModus,
+) {
+    if let Ok(mut state) = runtime.lock() {
+        state.prompt_mode = prompt_mode;
+    }
+}
+
 pub fn build_default_completer() -> Box<dyn ReedlineCompleter> {
-    Box::new(PromptContextCompleter)
+    build_default_completer_with_runtime(new_completion_runtime_handle())
+}
+
+pub fn build_default_completer_with_runtime(
+    runtime: CompletionRuntimeHandle,
+) -> Box<dyn ReedlineCompleter> {
+    Box::new(PromptContextCompleter { runtime })
 }
 
 pub fn candidates_for_prefix(prefix: &str) -> Vec<String> {
@@ -160,7 +194,13 @@ pub fn candidates_for_input_in_mode(input: &str, prompt_mode: PromptModus) -> Ve
 impl ReedlineCompleter for PromptContextCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
         let before_cursor = safe_prefix(line, pos);
-        completion_candidates_for_line_in_mode(before_cursor, PromptModus::Normal)
+        let prompt_mode = self
+            .runtime
+            .lock()
+            .map(|state| state.prompt_mode)
+            .unwrap_or(PromptModus::Normal);
+
+        completion_candidates_for_line_in_mode(before_cursor, prompt_mode)
             .into_iter()
             .map(|candidate| Suggestion {
                 value: candidate.value,
@@ -357,17 +397,88 @@ fn section_from_main_token(token: &str) -> Option<RetaMainSection> {
     }
 }
 
+fn ordered_prompt_commands() -> Vec<String> {
+    let mut commands = prompt_words().befehle.clone();
+    commands.sort_by(|left, right| {
+        prompt_command_sort_key(left)
+            .cmp(&prompt_command_sort_key(right))
+            .then_with(|| normalize_completion_text(left).cmp(&normalize_completion_text(right)))
+    });
+
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for item in [
+        "help",
+        "hilfe",
+        "kurzbefehle",
+        "universum",
+        "thomas",
+        "befehle",
+        "groesse",
+        "reta",
+        "bewusstsein",
+        "geist",
+        "emotion",
+        "impulse",
+        "loggen",
+        "nichtloggen",
+        "q",
+        ":q",
+        "exit",
+        "quit",
+        "ende",
+    ] {
+        push_unique_ordered(&mut out, &mut seen, item);
+    }
+
+    for item in commands {
+        push_unique_ordered(&mut out, &mut seen, item);
+    }
+
+    for item in RP_META_COMMANDS {
+        push_unique_ordered(&mut out, &mut seen, *item);
+    }
+
+    out
+}
+
+fn prompt_command_sort_key(command: &str) -> (u8, String) {
+    let normalized = normalize_completion_text(command);
+    let bucket = if matches!(normalized.as_str(), "help" | "hilfe" | "kurzbefehle") {
+        0
+    } else if matches!(normalized.as_str(), "universum" | "thomas" | "befehle" | "groesse") {
+        1
+    } else if matches!(normalized.as_str(), "reta" | "bewusstsein" | "geist" | "emotion" | "impulse") {
+        2
+    } else if matches!(normalized.as_str(), "loggen" | "nichtloggen" | "exit" | "quit" | "ende" | "q" | ":q") {
+        3
+    } else if normalized.len() == 1 {
+        7
+    } else if normalized.starts_with("15_") || normalized == "15" {
+        8
+    } else if normalized.starts_with("16_") || normalized == "16" {
+        9
+    } else if normalized.starts_with('1') {
+        10
+    } else {
+        5
+    };
+
+    (bucket, normalized)
+}
+
 fn build_prompt_candidates(fragment: &str, replace_start: usize) -> Vec<CompletionCandidate> {
-    let mut candidates = Vec::new();
-    extend_unique_strings(
-        &mut candidates,
-        RP_META_COMMANDS.iter().map(|item| (*item).to_string()),
-    );
-    extend_unique_strings(&mut candidates, prompt_words().befehle.iter().cloned());
-    extend_unique_strings(
-        &mut candidates,
-        reta_main_switches().into_iter().map(str::to_string),
-    );
+    let mut candidates = ordered_prompt_commands();
+    let mut seen = candidates
+        .iter()
+        .map(|candidate| normalize_completion_text(candidate))
+        .collect::<BTreeSet<_>>();
+
+    for item in reta_main_switches() {
+        push_unique_ordered(&mut candidates, &mut seen, item);
+    }
+
     build_completion_candidates(candidates, fragment, replace_start, None, true)
 }
 
@@ -451,11 +562,11 @@ fn filter_candidate_values(candidates: &[String], fragment: &str, fallback_conta
     for candidate in candidates {
         let normalized_candidate = normalize_completion_text(candidate);
         if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment) {
-            if prefix_seen.insert(candidate.clone()) {
+            if prefix_seen.insert(normalized_candidate.clone()) {
                 prefix_matches.push(candidate.clone());
             }
         } else if fallback_contains && normalized_candidate.contains(&normalized_fragment) {
-            if contains_seen.insert(candidate.clone()) {
+            if contains_seen.insert(normalized_candidate) {
                 contains_matches.push(candidate.clone());
             }
         }
@@ -470,6 +581,18 @@ fn filter_candidate_values(candidates: &[String], fragment: &str, fallback_conta
 
 fn normalize_completion_text(text: &str) -> String {
     text.trim().replace('ß', "ss").to_lowercase()
+}
+
+fn push_unique_ordered(
+    target: &mut Vec<String>,
+    seen: &mut BTreeSet<String>,
+    value: impl Into<String>,
+) {
+    let value = value.into();
+    let key = normalize_completion_text(&value);
+    if seen.insert(key) {
+        target.push(value);
+    }
 }
 
 fn reta_main_switches() -> [&'static str; 6] {
@@ -643,18 +766,6 @@ fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<Stri
     out.into_iter().collect()
 }
 
-fn extend_unique_strings<I>(target: &mut Vec<String>, values: I)
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut seen = target.iter().cloned().collect::<BTreeSet<_>>();
-    for value in values {
-        if seen.insert(value.clone()) {
-            target.push(value);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{candidates_for_input, normalize_completion_text};
@@ -729,6 +840,29 @@ mod tests {
     fn shell_context_does_not_fall_back_to_reta_completion() {
         let values = candidates_for_input("shell -l");
         assert!(values.is_empty());
+    }
+
+    #[test]
+    fn delete_mode_disables_completion_candidates() {
+        let values = super::candidates_for_input_in_mode(
+            "reta -zeilen --zeit=h",
+            super::PromptModus::LoeschenSelect,
+        );
+        assert!(values.is_empty());
+    }
+
+    #[test]
+    fn help_stays_near_the_front_of_top_level_candidates() {
+        let values = candidates_for_input("");
+        let help_index = values
+            .iter()
+            .position(|value| normalize_completion_text(value) == "help")
+            .unwrap();
+        let fifteen_index = values
+            .iter()
+            .position(|value| normalize_completion_text(value).starts_with("15_"))
+            .unwrap();
+        assert!(help_index < fifteen_index);
     }
 
     #[test]

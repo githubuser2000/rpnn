@@ -11,7 +11,10 @@ use super::commands::{
     compile_command_with_state, execute_command, help_text, EditModeKind, PromptCommand,
     PromptOutput, SessionState,
 };
-use super::completion::build_default_completer;
+use super::completion::{
+    build_default_completer_with_runtime, new_completion_runtime_handle,
+    set_completion_prompt_mode, CompletionRuntimeHandle,
+};
 use super::history::{default_history_path, default_log_path};
 use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
@@ -66,16 +69,6 @@ fn prompt_text_for_state(state: &SessionState) -> String {
         | super::python_like::PromptModus::LoeschenSelect => "was löschen> ".to_string(),
         _ => "> ".to_string(),
     }
-}
-
-fn completions_enabled_for_prompt_mode(
-    prompt_mode: super::python_like::PromptModus,
-) -> bool {
-    !matches!(
-        prompt_mode,
-        super::python_like::PromptModus::LoeschenStart
-            | super::python_like::PromptModus::LoeschenSelect
-    )
 }
 
 fn parse_startup_args(argv: &[String], preset: &PromptFrontendPreset) -> StartupArgs {
@@ -470,11 +463,14 @@ fn run_interactive_loop(
     exact_mode_enabled: bool,
     state: &mut SessionState,
 ) -> i32 {
+    let completion_runtime = new_completion_runtime_handle();
+    set_completion_prompt_mode(&completion_runtime, state.prompt_mode);
+
     let mut editor = match build_editor(
         &history_path,
         state.current_mode(),
         state.logging_enabled,
-        completions_enabled_for_prompt_mode(state.prompt_mode),
+        &completion_runtime,
     ) {
         Ok(editor) => editor,
         Err(err) => {
@@ -484,6 +480,8 @@ fn run_interactive_loop(
     };
 
     loop {
+        set_completion_prompt_mode(&completion_runtime, state.prompt_mode);
+
         let prompt = RpPrompt {
             text: prompt_text_for_state(state),
         };
@@ -509,9 +507,6 @@ fn run_interactive_loop(
 
                 let previous_editor_mode = state.current_mode();
                 let previous_logging_enabled = state.logging_enabled;
-                let previous_completion_enabled =
-                    completions_enabled_for_prompt_mode(state.prompt_mode);
-
                 let compiled = match compile_command_with_state(&compile_input, state) {
                     Ok(command) => command,
                     Err(err) => {
@@ -581,16 +576,14 @@ fn run_interactive_loop(
                 }
 
                 let rebuild_editor = previous_editor_mode != state.current_mode()
-                    || previous_logging_enabled != state.logging_enabled
-                    || previous_completion_enabled
-                        != completions_enabled_for_prompt_mode(state.prompt_mode);
+                    || previous_logging_enabled != state.logging_enabled;
 
                 if rebuild_editor {
                     editor = match build_editor(
                         &history_path,
                         state.current_mode(),
                         state.logging_enabled,
-                        completions_enabled_for_prompt_mode(state.prompt_mode),
+                        &completion_runtime,
                     ) {
                         Ok(editor) => editor,
                         Err(err) => {
@@ -641,7 +634,7 @@ fn build_editor(
     history_path: &PathBuf,
     mode: EditModeKind,
     logging_enabled: bool,
-    enable_completion: bool,
+    completion_runtime: &CompletionRuntimeHandle,
 ) -> Result<Reedline, String> {
     let effective_history_path = if logging_enabled {
         history_path.clone()
@@ -654,18 +647,15 @@ fn build_editor(
             .map_err(|err| format!("History-Datei konnte nicht geöffnet werden: {err}"))?,
     );
 
+    let completer = build_default_completer_with_runtime(completion_runtime.clone());
+    let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
+
     let mut editor = Reedline::create()
         .with_history(history)
         .with_hinter(Box::new(DefaultHinter::default()))
-        .with_validator(Box::new(DefaultValidator));
-
-    if enable_completion {
-        let completer = build_default_completer();
-        let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
-        editor = editor
-            .with_completer(completer)
-            .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
-    }
+        .with_validator(Box::new(DefaultValidator))
+        .with_completer(completer)
+        .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
 
     editor = match mode {
         EditModeKind::Emacs => {
