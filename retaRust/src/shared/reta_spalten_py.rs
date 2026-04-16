@@ -370,7 +370,7 @@ impl Program {
             self.setShellRowsAmount();
             if self.breiteHasBeenOnceZero {
                 self.shellRowsAmount = 0;
-                self.textWidth = 0;
+                self.set_text_width_property_py(0);
                 self.breiteORbreiten = true;
                 return true;
             }
@@ -382,26 +382,27 @@ impl Program {
                 } else if self.shellRowsAmount > 7 && breite > self.shellRowsAmount - 7 {
                     breite = self.shellRowsAmount - 7;
                 }
-                if neg.is_empty() {
-                    self.breite = breite;
-                    let normalized = self.normalize_text_width_py(breite);
-                    if normalized > self.textWidth {
-                        self.textWidth = normalized;
-                    }
-                }
+                self.breite = breite;
+                let new_text_width = if breite > self.textWidth {
+                    breite
+                } else {
+                    self.textWidth
+                };
+                self.set_text_width_property_py(new_text_width);
                 self.breiteORbreiten = true;
             }
             return true;
         }
         if let Some(tail) = cmd.strip_prefix("breiten=") {
             if neg.is_empty() {
-                self.breiten = vec![];
+                let mut parsed_breiten: Vec<i64> = vec![];
                 for breite in tail.split(',') {
                     if breite.trim().chars().all(|c| c.is_ascii_digit()) {
-                        self.breiten.push(breite.trim().parse::<i64>().unwrap_or(0));
+                        parsed_breiten.push(breite.trim().parse::<i64>().unwrap_or(0));
                         self.breiteORbreiten = true;
                     }
                 }
+                self.breiten = self.normalize_breiten_list_py(parsed_breiten);
             }
             return true;
         }
@@ -409,14 +410,7 @@ impl Program {
     }
 
     fn normalize_text_width_py(&self, value: i64) -> i64 {
-        let shell_width = if self.shellRowsAmount > 0 {
-            self.shellRowsAmount
-        } else {
-            Self::detect_terminal_columns_py()
-        };
-        if shell_width <= 0 {
-            return value;
-        }
+        let shell_width = Self::detect_terminal_columns_py();
         if (shell_width > value + 7 || shell_width == 0)
             && (value != 0 || self.outType == "bbcode" || self.outType == "html" || self.oneTable)
         {
@@ -424,6 +418,26 @@ impl Program {
         } else {
             shell_width - 7
         }
+    }
+
+    pub(crate) fn set_text_width_property_py(&mut self, value: i64) {
+        self.textWidth = self.normalize_text_width_py(value);
+    }
+
+    fn normalize_breite_value_py(shell_width: i64, value: i64) -> i64 {
+        if shell_width > value + 7 || shell_width == 0 {
+            value
+        } else {
+            shell_width - 7
+        }
+    }
+
+    pub(crate) fn normalize_breiten_list_py(&self, values: Vec<i64>) -> Vec<i64> {
+        let shell_width = Self::detect_terminal_columns_py();
+        values
+            .into_iter()
+            .map(|value| Self::normalize_breite_value_py(shell_width, value))
+            .collect()
     }
 
     pub fn setShellRowsAmount(&mut self) {
@@ -459,7 +473,7 @@ impl Program {
         if let Some(n) = try_cmd("tput cols 2>/dev/null") {
             return n;
         }
-        0
+        80
     }
 
     pub fn setShellWidth(&mut self) {

@@ -456,13 +456,19 @@ impl Program {
             }
         }
 
+        let breite_ist_null = "--breite=0";
+        if argv.iter().any(|arg| arg == breite_ist_null) {
+            self.breiteBreitenSysArgvPara(&breite_ist_null[2..], "");
+        }
+
         if !self.oneTable {
             self.setShellRowsAmount();
-            self.textWidth = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
+            let normalized_text_width = if self.shellRowsAmount > self.textWidth + 7 || self.shellRowsAmount <= 0 {
                 self.textWidth
             } else {
                 self.shellRowsAmount - 7
             };
+            self.set_text_width_property_py(normalized_text_width);
         }
         self.ifZeilenSetted = self.obZeilenBereicheAngegeben;
         (paramLines, rowsAsNumbers, self.__willBeOverwritten_rowsOfcombi.clone(), spaltenreihenfolgeundnurdiese, puniverseprims_only, generRows)
@@ -957,7 +963,7 @@ impl Program {
         self.setShellWidth();
         if self.htmlOrBBcode && !self.breiteORbreiten {
             self.shellRowsAmount = 0;
-            self.textWidth = 0;
+            self.set_text_width_property_py(0);
         }
 
         self.setRowRangeFromArgv();
