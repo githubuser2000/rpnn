@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use super::commands::{PromptOutput, SessionState};
-use super::completion::candidates_for_input;
+use super::completion::candidates_for_input_in_mode;
 use super::python_like::PromptModus;
 
 #[derive(Clone, Debug)]
@@ -34,7 +34,7 @@ impl RpTuiState {
             current_input: session.last_input.clone(),
             preview: session.last_output.clone(),
             vi_mode: session.vi_mode,
-            completions: candidates_for_input(&session.last_input),
+            completions: candidates_for_input_in_mode(&session.last_input, session.prompt_mode),
             stored_commands: session.stored_commands.clone(),
             prompt_mode: session.prompt_mode,
         }
@@ -116,7 +116,7 @@ fn render(frame: &mut ratatui::Frame<'_>, state: &mut RpTuiState) {
 fn render_status(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState) {
     let status_text = vec![
         Line::from(format!(
-            "rp Vorschau  |  Editiermodus: {}  |  PromptModus: {:?}  |  History: {}  |  Gespeichert: {}  |  Letzte Ausgabe: {} (code {})",
+            "rp Vorschau  |  Editiermodus: {}  |  PromptModus: {:?}  |  History: {}  |  Platzhalter: {}  |  Letzte Ausgabe: {} (code {})",
             if state.vi_mode { "vi" } else { "emacs" },
             state.prompt_mode,
             state.history.len(),
@@ -161,7 +161,7 @@ fn render_history(frame: &mut ratatui::Frame<'_>, area: Rect, state: &mut RpTuiS
 fn render_preview(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState) {
     let selected_history = state.selected_history().unwrap_or("<kein Eintrag ausgewählt>");
     let stored = if state.stored_commands.is_empty() {
-        "<keine gespeicherten Befehle>".to_string()
+        "<kein gespeicherter Platzhalter>".to_string()
     } else {
         state.stored_commands.join("\n")
     };
@@ -172,7 +172,7 @@ fn render_preview(frame: &mut ratatui::Frame<'_>, area: Rect, state: &RpTuiState
     };
 
     let text = format!(
-        "Gewählte History:\n{}\n\nGespeicherte Befehle:\n{}\n\nLetzte Ausgabe:\n{}",
+        "Gewählte History:\n{}\n\nGespeicherter Platzhalter:\n{}\n\nLetzte Ausgabe:\n{}",
         selected_history, stored, body
     );
 

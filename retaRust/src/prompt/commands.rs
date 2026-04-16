@@ -2,8 +2,9 @@ use crate::{run_reta_from_args, RetaRunResult};
 
 use super::completion::candidates_for_prefix;
 use super::python_like::{
-    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
-    expand_python_prompt_macros, normalize_prompt_tokens, prompt_words, PromptModus,
+    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
+    custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl, expand_python_prompt_macros,
+    looks_like_numeric_or_fraction_range, normalize_prompt_tokens, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -26,8 +27,11 @@ pub enum PromptCommand {
     Exit,
     SaveBefore,
     SaveAfter,
+    StoreCurrentInput(String),
+    StoreInline(String),
     DeleteStoredStart,
-    ShowStored,
+    DeleteStoredSelection(String),
+    ShowStored(Option<String>),
     Clear,
     LaunchUi,
     PrintHelp,
@@ -51,9 +55,12 @@ pub struct SessionState {
     pub implicit_logging: bool,
     pub history_lines: Vec<String>,
     pub last_output: PromptOutput,
+    pub previous_input: String,
     pub last_input: String,
     pub prompt_mode: PromptModus,
+    pub stored_placeholder: String,
     pub stored_commands: Vec<String>,
+    pub stored_expanded_tokens: Vec<String>,
 }
 
 impl SessionState {
@@ -65,9 +72,12 @@ impl SessionState {
             implicit_logging,
             history_lines: Vec::new(),
             last_output: PromptOutput::default(),
+            previous_input: String::new(),
             last_input: String::new(),
             prompt_mode: PromptModus::Normal,
+            stored_placeholder: String::new(),
             stored_commands: Vec::new(),
+            stored_expanded_tokens: Vec::new(),
         }
     }
 
@@ -78,9 +88,13 @@ impl SessionState {
             EditModeKind::Emacs
         }
     }
+
+    pub fn has_stored_placeholder(&self) -> bool {
+        !self.stored_expanded_tokens.is_empty()
+    }
 }
 
-pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
+fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Ok(PromptCommand::Noop);
@@ -93,7 +107,7 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
         "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
         "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
         "l" | "BefehlSpeicherungLöschen" => return Ok(PromptCommand::DeleteStoredStart),
-        "o" | "BefehlSpeicherungAusgeben" => return Ok(PromptCommand::ShowStored),
+        "o" | "BefehlSpeicherungAusgeben" => return Ok(PromptCommand::ShowStored(None)),
         "leeren" | "clear" => return Ok(PromptCommand::Clear),
         ":ui" | ":preview" => return Ok(PromptCommand::LaunchUi),
         ":history" => return Ok(PromptCommand::PrintHistory),
@@ -161,6 +175,339 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
     ))
 }
 
+
+pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
+    compile_command_inner(input, prompt_mode)
+}
+
+pub fn compile_command_with_state(input: &str, state: &SessionState) -> Result<PromptCommand, String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Ok(PromptCommand::Noop);
+    }
+
+    if matches!(state.prompt_mode, PromptModus::Speichern) {
+        return Ok(PromptCommand::StoreCurrentInput(trimmed.to_string()));
+    }
+
+    if matches!(
+        state.prompt_mode,
+        PromptModus::LoeschenStart | PromptModus::LoeschenSelect
+    ) {
+        return Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string()));
+    }
+
+    let tokenized = split_shell_like(trimmed)?;
+    if tokenized.tokens.is_empty() {
+        return Ok(PromptCommand::Noop);
+    }
+
+    if let Some(command) = compile_inline_storage_command(&tokenized.tokens) {
+        return Ok(command);
+    }
+
+    if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens) || !state.has_stored_placeholder() {
+        return compile_command_inner(trimmed, state.prompt_mode);
+    }
+
+    let effective_input = compose_input_with_stored_placeholder(
+        &state.stored_expanded_tokens,
+        &tokenized.tokens,
+    );
+
+    compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
+}
+
+fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
+    if tokens.len() <= 1 {
+        return None;
+    }
+
+    if tokens.iter().any(|token| is_store_before_token(token) || is_store_after_token(token)) {
+        let payload = tokens
+            .iter()
+            .filter(|token| !is_store_before_token(token) && !is_store_after_token(token))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if !payload.trim().is_empty() {
+            return Some(PromptCommand::StoreInline(payload));
+        }
+    }
+
+    if tokens.iter().any(|token| is_show_stored_token(token)) {
+        let payload = tokens
+            .iter()
+            .filter(|token| !is_show_stored_token(token))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
+        return Some(PromptCommand::ShowStored(
+            (!payload.trim().is_empty()).then_some(payload),
+        ));
+    }
+
+    None
+}
+
+fn raw_input_bypasses_stored_merge(trimmed: &str, tokens: &[String]) -> bool {
+    if matches!(
+        trimmed,
+        "q"
+            | ":q"
+            | "exit"
+            | "quit"
+            | "ende"
+            | "help"
+            | "hilfe"
+            | "befehle"
+            | "kurzbefehle"
+            | "s"
+            | "BefehlSpeichernDavor"
+            | "S"
+            | "BefehlSpeichernDanach"
+            | "l"
+            | "BefehlSpeicherungLöschen"
+            | "o"
+            | "BefehlSpeicherungAusgeben"
+            | "leeren"
+            | "clear"
+            | ":ui"
+            | ":preview"
+            | ":history"
+            | ":mode vi"
+            | ":mode emacs"
+            | "loggen"
+            | "nichtloggen"
+    ) {
+        return true;
+    }
+
+    matches!(
+        tokens.first().map(String::as_str),
+        Some("shell" | "python" | "math" | ":mode")
+    )
+}
+
+fn is_store_before_token(token: &str) -> bool {
+    matches!(token, "s" | "BefehlSpeichernDavor")
+}
+
+fn is_store_after_token(token: &str) -> bool {
+    matches!(token, "S" | "BefehlSpeichernDanach")
+}
+
+fn is_show_stored_token(token: &str) -> bool {
+    matches!(token, "o" | "BefehlSpeicherungAusgeben")
+}
+
+fn compose_input_with_stored_placeholder(stored_tokens: &[String], input_tokens: &[String]) -> String {
+    if stored_tokens.is_empty() {
+        return input_tokens.join(" ");
+    }
+
+    if input_tokens.is_empty() {
+        return stored_tokens.join(" ");
+    }
+
+    let mut combined = Vec::with_capacity(stored_tokens.len() + input_tokens.len());
+    if matches!(input_tokens.first().map(String::as_str), Some("reta"))
+        && !matches!(stored_tokens.first().map(String::as_str), Some("reta"))
+    {
+        combined.extend(input_tokens.iter().cloned());
+        combined.extend(stored_tokens.iter().cloned());
+    } else {
+        combined.extend(stored_tokens.iter().cloned());
+        combined.extend(input_tokens.iter().cloned());
+    }
+
+    combined.join(" ")
+}
+
+fn split_storage_text(text: &str) -> Vec<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    match split_shell_like(trimmed) {
+        Ok(tokenized) if !tokenized.tokens.is_empty() => tokenized.tokens,
+        _ => custom_split_whitespace_parenthesized(trimmed),
+    }
+}
+
+fn prepare_stored_prefix_tokens_from_text(text: &str) -> Vec<String> {
+    let tokens = split_storage_text(text);
+    prepare_stored_prefix_tokens(&tokens)
+}
+
+fn prepare_stored_prefix_tokens(tokens: &[String]) -> Vec<String> {
+    if tokens.is_empty() {
+        return Vec::new();
+    }
+
+    let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::AusgabeSelektiv, tokens);
+    let mut effective_tokens = if expanded.is_empty() {
+        tokens.to_vec()
+    } else {
+        expanded
+    };
+
+    if !matches!(
+        effective_tokens.first().map(String::as_str),
+        Some("reta" | "shell" | "python" | "abstand")
+    ) {
+        effective_tokens = normalize_prompt_tokens(&effective_tokens);
+    }
+
+    effective_tokens
+}
+
+fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
+    let existing_tokens = split_storage_text(existing);
+    let incoming_tokens = split_storage_text(incoming);
+
+    if existing_tokens.is_empty() {
+        return incoming_tokens.join(" ");
+    }
+    if incoming_tokens.is_empty() {
+        return existing_tokens.join(" ");
+    }
+
+    let mut left_tokens = existing_tokens;
+    let mut right_tokens = incoming_tokens;
+    let left_has_reta = matches!(left_tokens.first().map(String::as_str), Some("reta"));
+    let right_has_reta = matches!(right_tokens.first().map(String::as_str), Some("reta"));
+
+    if left_has_reta {
+        left_tokens.remove(0);
+    }
+    if right_has_reta {
+        right_tokens.remove(0);
+    }
+
+    if left_has_reta || right_has_reta {
+        let mut merged = vec!["reta".to_string()];
+        merged.extend(left_tokens);
+        merged.extend(right_tokens);
+        return merged.join(" ");
+    }
+
+    let mut plain_tokens = Vec::new();
+    let mut long_prompt_commands = Vec::new();
+    for token in left_tokens.into_iter().chain(right_tokens) {
+        if prompt_words().befehle_set.contains(&token) && token.len() > 1 {
+            long_prompt_commands.push(token);
+        } else {
+            plain_tokens.push(token);
+        }
+    }
+
+    let mut merged = prepare_stored_prefix_tokens(&plain_tokens);
+    merged.extend(long_prompt_commands);
+    merged.join(" ")
+}
+
+fn refresh_stored_placeholder_cache(state: &mut SessionState) {
+    state.stored_placeholder = state.stored_placeholder.trim().to_string();
+    state.stored_commands = split_storage_text(&state.stored_placeholder);
+    state.stored_expanded_tokens = prepare_stored_prefix_tokens_from_text(&state.stored_placeholder);
+}
+
+fn store_text_in_placeholder(state: &mut SessionState, text: &str) {
+    let merged = merge_stored_placeholder(&state.stored_placeholder, text);
+    state.stored_placeholder = merged;
+    refresh_stored_placeholder_cache(state);
+}
+
+fn render_stored_placeholder_text(state: &SessionState) -> String {
+    if state.stored_commands.is_empty() {
+        return "Noch kein gespeicherter Platzhalter vorhanden.".to_string();
+    }
+
+    state
+        .stored_commands
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| format!("{:>4}: {}", index + 1, entry))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn delete_from_stored_placeholder(state: &mut SessionState, selection_text: &str) {
+    let mut tokens = split_storage_text(&state.stored_placeholder);
+    let trimmed = selection_text.trim();
+
+    if trimmed.is_empty() || tokens.is_empty() {
+        state.prompt_mode = PromptModus::Normal;
+        refresh_stored_placeholder_cache(state);
+        return;
+    }
+
+    let delete_by_index = should_delete_stored_by_index(trimmed, &tokens);
+    if delete_by_index {
+        if let Some(indexes) = parse_delete_selection_indexes(trimmed) {
+            let index_set = indexes.into_iter().collect::<std::collections::BTreeSet<_>>();
+            tokens = tokens
+                .into_iter()
+                .enumerate()
+                .filter_map(|(index, token)| (!index_set.contains(&(index + 1))).then_some(token))
+                .collect();
+        }
+    } else {
+        let delete_tokens = split_storage_text(trimmed);
+        tokens.retain(|token| !delete_tokens.iter().any(|delete| delete == token));
+    }
+
+    state.stored_placeholder = tokens.join(" ");
+    state.prompt_mode = PromptModus::Normal;
+    refresh_stored_placeholder_cache(state);
+}
+
+fn should_delete_stored_by_index(selection_text: &str, stored_tokens: &[String]) -> bool {
+    if selection_text.chars().all(|ch| ch.is_ascii_digit())
+        && stored_tokens.iter().any(|token| token == selection_text)
+    {
+        return false;
+    }
+
+    looks_like_numeric_or_fraction_range(selection_text)
+}
+
+fn parse_delete_selection_indexes(selection_text: &str) -> Option<Vec<usize>> {
+    let numbers = parse_row_numbers_from_tokens(&[selection_text.to_string()])?;
+    let mut out = Vec::new();
+    for number in numbers {
+        if number > 0 {
+            out.push(number as usize);
+        }
+    }
+    (!out.is_empty()).then_some(out)
+}
+
+fn run_nested_prompt_input(input: &str, state: &mut SessionState) -> Result<Option<PromptOutput>, String> {
+    let nested_command = compile_command_inner(input, PromptModus::AusgabeSelektiv)?;
+    match nested_command {
+        PromptCommand::Noop => Ok(None),
+        PromptCommand::Exit => Err("Gespeicherte Platzhalter dürfen keinen Exit-Befehl auslösen.".to_string()),
+        PromptCommand::SaveBefore
+        | PromptCommand::SaveAfter
+        | PromptCommand::StoreCurrentInput(_)
+        | PromptCommand::StoreInline(_)
+        | PromptCommand::DeleteStoredStart
+        | PromptCommand::DeleteStoredSelection(_)
+        | PromptCommand::ShowStored(_) => Err(
+            "Gespeicherte Platzhalter dürfen keine Speicher-Kommandos rekursiv auslösen."
+                .to_string(),
+        ),
+        PromptCommand::LaunchUi => Err(
+            "Gespeicherte Platzhalter dürfen die interaktive Vorschau nicht rekursiv starten."
+                .to_string(),
+        ),
+        other => execute_command(other, state),
+    }
+}
+
 pub fn execute_command(
     command: PromptCommand,
     state: &mut SessionState,
@@ -169,37 +516,101 @@ pub fn execute_command(
         PromptCommand::Noop => Ok(None),
         PromptCommand::Exit => Ok(None),
         PromptCommand::SaveBefore => {
-            state.prompt_mode = PromptModus::Speichern;
+            let previous_input = state.previous_input.trim().to_string();
+            if previous_input.is_empty() {
+                return Ok(Some(PromptOutput {
+                    title: "speichern".to_string(),
+                    text: "Kein vorheriger Eingabetext zum Speichern vorhanden.".to_string(),
+                    exit_code: 0,
+                }));
+            }
+
+            store_text_in_placeholder(state, &previous_input);
+            state.prompt_mode = PromptModus::Normal;
+
             Ok(Some(PromptOutput {
                 title: "speichern".to_string(),
-                text: "Speicher-Modus aktiviert. Nächster reta-Befehl wird vorne gespeichert.".to_string(),
-                exit_code: 0,
-            }))
-        }
-        PromptCommand::SaveAfter => {
-            state.prompt_mode = PromptModus::SpeicherungAusgaben;
-            Ok(Some(PromptOutput {
-                title: "speichern".to_string(),
-                text: "Speicher-Modus aktiviert. Nächster reta-Befehl wird hinten gespeichert.".to_string(),
-                exit_code: 0,
-            }))
-        }
-        PromptCommand::DeleteStoredStart => {
-            state.prompt_mode = PromptModus::LoeschenStart;
-            Ok(Some(PromptOutput {
-                title: "loeschen".to_string(),
                 text: format!(
-                    "Lösch-Modus aktiviert. Aktuell gespeicherte Befehle:\n{}",
-                    render_history_text(&state.stored_commands)
+                    "Gespeicherter Platzhalter:\n{}",
+                    render_stored_placeholder_text(state)
                 ),
                 exit_code: 0,
             }))
         }
-        PromptCommand::ShowStored => Ok(Some(PromptOutput {
-            title: "stored".to_string(),
-            text: render_history_text(&state.stored_commands),
-            exit_code: 0,
-        })),
+        PromptCommand::SaveAfter => {
+            state.prompt_mode = PromptModus::Speichern;
+            Ok(Some(PromptOutput {
+                title: "speichern".to_string(),
+                text: "Speicher-Modus aktiviert. Die nächste Eingabe wird nur im Platzhalter abgelegt.".to_string(),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::StoreCurrentInput(text) | PromptCommand::StoreInline(text) => {
+            store_text_in_placeholder(state, &text);
+            state.prompt_mode = PromptModus::Normal;
+            Ok(Some(PromptOutput {
+                title: "speichern".to_string(),
+                text: format!(
+                    "Gespeicherter Platzhalter:\n{}",
+                    render_stored_placeholder_text(state)
+                ),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::DeleteStoredStart => {
+            state.prompt_mode = PromptModus::LoeschenSelect;
+            Ok(Some(PromptOutput {
+                title: "loeschen".to_string(),
+                text: format!(
+                    "Lösch-Modus aktiviert. Welche Einträge sollen entfernt werden?\n{}",
+                    render_stored_placeholder_text(state)
+                ),
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::DeleteStoredSelection(selection_text) => {
+            delete_from_stored_placeholder(state, &selection_text);
+            let text = if state.stored_commands.is_empty() {
+                "Gespeicherter Platzhalter ist jetzt leer.".to_string()
+            } else {
+                format!(
+                    "Gespeicherter Platzhalter nach dem Löschen:\n{}",
+                    render_stored_placeholder_text(state)
+                )
+            };
+            Ok(Some(PromptOutput {
+                title: "loeschen".to_string(),
+                text,
+                exit_code: 0,
+            }))
+        }
+        PromptCommand::ShowStored(additional_text) => {
+            let effective_input = match additional_text {
+                Some(text) => {
+                    let additional_tokens = split_storage_text(&text);
+                    if state.has_stored_placeholder() {
+                        compose_input_with_stored_placeholder(
+                            &state.stored_expanded_tokens,
+                            &additional_tokens,
+                        )
+                    } else {
+                        additional_tokens.join(" ")
+                    }
+                }
+                None if state.has_stored_placeholder() => state.stored_expanded_tokens.join(" "),
+                None => String::new(),
+            };
+
+            if effective_input.trim().is_empty() {
+                return Ok(Some(PromptOutput {
+                    title: "stored".to_string(),
+                    text: "Noch kein gespeicherter Platzhalter vorhanden.".to_string(),
+                    exit_code: 0,
+                }));
+            }
+
+            run_nested_prompt_input(&effective_input, state)
+        }
         PromptCommand::Clear => {
             print!("\x1b[2J\x1b[H");
             Ok(Some(PromptOutput {
@@ -274,7 +685,6 @@ pub fn execute_command(
         PromptCommand::Math(command_text) => run_math_command(&command_text),
         PromptCommand::Immediate(output) => Ok(Some(output)),
         PromptCommand::Reta(argv) => {
-            let argv = apply_storage_mode(state, argv);
             let result: RetaRunResult = run_reta_from_args(argv);
             Ok(Some(PromptOutput {
                 title: "reta".to_string(),
@@ -286,7 +696,6 @@ pub fn execute_command(
             let mut combined = String::new();
             let mut exit_code = 0;
             for argv in argvs {
-                let argv = apply_storage_mode(state, argv);
                 let result: RetaRunResult = run_reta_from_args(argv);
                 if !combined.is_empty() && !combined.ends_with('\n') {
                     combined.push('\n');
@@ -632,42 +1041,8 @@ fn run_math_command(command_text: &str) -> Result<Option<PromptOutput>, String> 
     }))
 }
 
-pub fn apply_storage_mode(state: &mut SessionState, argv: Vec<String>) -> Vec<String> {
-    if argv.is_empty() {
-        return argv;
-    }
-
-    match state.prompt_mode {
-        PromptModus::Speichern => {
-            if argv.len() > 1 {
-                state.stored_commands.insert(0, argv[1..].join(" "));
-            }
-            state.prompt_mode = PromptModus::Normal;
-        }
-        PromptModus::SpeicherungAusgaben | PromptModus::SpeicherungAusgabenMitZusatz => {
-            if argv.len() > 1 {
-                state.stored_commands.push(argv[1..].join(" "));
-            }
-            state.prompt_mode = PromptModus::Normal;
-        }
-        PromptModus::LoeschenStart | PromptModus::LoeschenSelect => {
-            if argv.len() > 1 {
-                let joined = argv[1..].join(" ");
-                state.stored_commands.retain(|s| s != &joined);
-            }
-            state.prompt_mode = PromptModus::Normal;
-        }
-        PromptModus::AusgabeSelektiv | PromptModus::Normal => {}
-    }
-
-    let mut out = vec![argv[0].clone()];
-    for stored in &state.stored_commands {
-        if let Ok(parts) = split_shell_like(stored) {
-            out.extend(parts.tokens);
-        }
-    }
-    out.extend(argv.into_iter().skip(1));
-    out
+pub fn apply_storage_mode(_state: &mut SessionState, argv: Vec<String>) -> Vec<String> {
+    argv
 }
 
 pub fn help_text() -> String {
@@ -693,10 +1068,10 @@ pub fn help_text() -> String {
         "  -debug               reserviert Debug-Verhalten; bei rpl unterdrückt es das implizite -e",
         "",
         "Python-nahe Prompt-Befehle:",
-        "  s / BefehlSpeichernDavor      nächsten reta-Befehl vorne speichern",
-        "  S / BefehlSpeichernDanach     nächsten reta-Befehl hinten speichern",
-        "  l / BefehlSpeicherungLöschen  gespeicherten Befehl löschen",
-        "  o / BefehlSpeicherungAusgeben gespeicherte Befehle anzeigen",
+        "  s / BefehlSpeichernDavor      vorherige Eingabe sofort in den Platzhalter übernehmen",
+        "  S / BefehlSpeichernDanach     nächste Eingabe nur im Platzhalter speichern",
+        "  l / BefehlSpeicherungLöschen  Lösch-Auswahl für den Platzhalter starten",
+        "  o / BefehlSpeicherungAusgeben gespeicherten Platzhalter ausführen",
         "  loggen | nichtloggen          Logging umschalten",
         "",
         "Meta-Befehle:",

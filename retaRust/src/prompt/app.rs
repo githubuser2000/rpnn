@@ -1,14 +1,15 @@
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultHinter, DefaultPrompt, DefaultValidator, Emacs, FileBackedHistory,
-    MenuBuilder, Reedline, ReedlineMenu, Signal, Vi,
+    ColumnarMenu, DefaultHinter, DefaultValidator, Emacs, FileBackedHistory, MenuBuilder,
+    Prompt, PromptEditMode, PromptHistorySearch, Reedline, ReedlineMenu, Signal, Vi,
 };
 
 use super::commands::{
-    compile_command, execute_command, help_text, EditModeKind, PromptCommand, PromptOutput,
-    SessionState,
+    compile_command_with_state, execute_command, help_text, EditModeKind, PromptCommand,
+    PromptOutput, SessionState,
 };
 use super::completion::build_default_completer;
 use super::history::{default_history_path, default_log_path};
@@ -25,6 +26,56 @@ struct StartupArgs {
     exact_mode: bool,
     command_text: Option<String>,
     trailing_args: Vec<String>,
+}
+
+
+#[derive(Clone, Debug)]
+struct RpPrompt {
+    text: String,
+}
+
+impl Prompt for RpPrompt {
+    fn render_prompt_left(&self) -> Cow<'_, str> {
+        Cow::Owned(self.text.clone())
+    }
+
+    fn render_prompt_right(&self) -> Cow<'_, str> {
+        Cow::Borrowed("")
+    }
+
+    fn render_prompt_indicator(&self, _prompt_mode: PromptEditMode) -> Cow<'_, str> {
+        Cow::Borrowed("")
+    }
+
+    fn render_prompt_multiline_indicator(&self) -> Cow<'_, str> {
+        Cow::Borrowed("... ")
+    }
+
+    fn render_prompt_history_search_indicator(
+        &self,
+        _history_search: PromptHistorySearch,
+    ) -> Cow<'_, str> {
+        Cow::Borrowed("(history) ")
+    }
+}
+
+fn prompt_text_for_state(state: &SessionState) -> String {
+    match state.prompt_mode {
+        super::python_like::PromptModus::Speichern => "was speichern> ".to_string(),
+        super::python_like::PromptModus::LoeschenStart
+        | super::python_like::PromptModus::LoeschenSelect => "was löschen> ".to_string(),
+        _ => "> ".to_string(),
+    }
+}
+
+fn completions_enabled_for_prompt_mode(
+    prompt_mode: super::python_like::PromptModus,
+) -> bool {
+    !matches!(
+        prompt_mode,
+        super::python_like::PromptModus::LoeschenStart
+            | super::python_like::PromptModus::LoeschenSelect
+    )
 }
 
 fn parse_startup_args(argv: &[String], preset: &PromptFrontendPreset) -> StartupArgs {
@@ -178,6 +229,22 @@ fn should_append_exact_suffix(input: &str) -> bool {
         return false;
     }
 
+    if tokenized.tokens.iter().any(|token| {
+        matches!(
+            token.as_str(),
+            "s"
+                | "S"
+                | "l"
+                | "o"
+                | "BefehlSpeichernDavor"
+                | "BefehlSpeichernDanach"
+                | "BefehlSpeicherungLöschen"
+                | "BefehlSpeicherungAusgeben"
+        )
+    }) {
+        return false;
+    }
+
     !matches!(
         first,
         "help"
@@ -323,6 +390,7 @@ fn run_one_shot(
         return output.exit_code;
     }
 
+    state.previous_input = state.last_input.clone();
     state.last_input = input.clone();
     state.history_lines.push(input.clone());
 
@@ -330,7 +398,7 @@ fn run_one_shot(
         append_log_line(log_path, "input", &input);
     }
 
-    let compiled = match compile_command(&input, state.prompt_mode) {
+    let compiled = match compile_command_with_state(&input, state) {
         Ok(command) => {
             if emacs_output_mode {
                 apply_rpe_emacs_output_to_command(command, &input)
@@ -402,9 +470,12 @@ fn run_interactive_loop(
     exact_mode_enabled: bool,
     state: &mut SessionState,
 ) -> i32 {
-    let prompt = DefaultPrompt::default();
-
-    let mut editor = match build_editor(&history_path, state.current_mode(), state.logging_enabled) {
+    let mut editor = match build_editor(
+        &history_path,
+        state.current_mode(),
+        state.logging_enabled,
+        completions_enabled_for_prompt_mode(state.prompt_mode),
+    ) {
         Ok(editor) => editor,
         Err(err) => {
             eprintln!("rp konnte reedline nicht initialisieren: {err}");
@@ -413,9 +484,14 @@ fn run_interactive_loop(
     };
 
     loop {
+        let prompt = RpPrompt {
+            text: prompt_text_for_state(state),
+        };
+
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
+                state.previous_input = state.last_input.clone();
                 state.last_input = input.clone();
                 if !input.is_empty() {
                     state.history_lines.push(input.clone());
@@ -431,7 +507,12 @@ fn run_interactive_loop(
                     input.clone()
                 };
 
-                let compiled = match compile_command(&compile_input, state.prompt_mode) {
+                let previous_editor_mode = state.current_mode();
+                let previous_logging_enabled = state.logging_enabled;
+                let previous_completion_enabled =
+                    completions_enabled_for_prompt_mode(state.prompt_mode);
+
+                let compiled = match compile_command_with_state(&compile_input, state) {
                     Ok(command) => command,
                     Err(err) => {
                         if state.logging_enabled {
@@ -476,11 +557,6 @@ fn run_interactive_loop(
                     continue;
                 }
 
-                let rebuild_editor = matches!(
-                    &compiled,
-                    PromptCommand::SwitchMode(_) | PromptCommand::ToggleLogging(_)
-                );
-
                 match execute_command(compiled, state) {
                     Ok(Some(output)) => {
                         if state.logging_enabled {
@@ -504,8 +580,18 @@ fn run_interactive_loop(
                     }
                 }
 
+                let rebuild_editor = previous_editor_mode != state.current_mode()
+                    || previous_logging_enabled != state.logging_enabled
+                    || previous_completion_enabled
+                        != completions_enabled_for_prompt_mode(state.prompt_mode);
+
                 if rebuild_editor {
-                    editor = match build_editor(&history_path, state.current_mode(), state.logging_enabled) {
+                    editor = match build_editor(
+                        &history_path,
+                        state.current_mode(),
+                        state.logging_enabled,
+                        completions_enabled_for_prompt_mode(state.prompt_mode),
+                    ) {
                         Ok(editor) => editor,
                         Err(err) => {
                             eprintln!("rp konnte reedline nicht neu initialisieren: {err}");
@@ -555,6 +641,7 @@ fn build_editor(
     history_path: &PathBuf,
     mode: EditModeKind,
     logging_enabled: bool,
+    enable_completion: bool,
 ) -> Result<Reedline, String> {
     let effective_history_path = if logging_enabled {
         history_path.clone()
@@ -567,15 +654,18 @@ fn build_editor(
             .map_err(|err| format!("History-Datei konnte nicht geöffnet werden: {err}"))?,
     );
 
-    let completer = build_default_completer();
-    let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
-
     let mut editor = Reedline::create()
         .with_history(history)
         .with_hinter(Box::new(DefaultHinter::default()))
-        .with_validator(Box::new(DefaultValidator))
-        .with_completer(completer)
-        .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
+        .with_validator(Box::new(DefaultValidator));
+
+    if enable_completion {
+        let completer = build_default_completer();
+        let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
+        editor = editor
+            .with_completer(completer)
+            .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
+    }
 
     editor = match mode {
         EditModeKind::Emacs => {

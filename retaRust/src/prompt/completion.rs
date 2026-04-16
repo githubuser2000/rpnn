@@ -8,7 +8,7 @@ use crate::domain::python_source_of_truth::{
 };
 use crate::shared_words;
 
-use super::python_like::prompt_words;
+use super::python_like::{prompt_words, PromptModus};
 
 pub const RP_META_COMMANDS: &[&str] = &[
     "help",
@@ -150,10 +150,17 @@ pub fn candidates_for_input(input: &str) -> Vec<String> {
         .collect()
 }
 
+pub fn candidates_for_input_in_mode(input: &str, prompt_mode: PromptModus) -> Vec<String> {
+    completion_candidates_for_line_in_mode(input, prompt_mode)
+        .into_iter()
+        .map(|candidate| candidate.value)
+        .collect()
+}
+
 impl ReedlineCompleter for PromptContextCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
         let before_cursor = safe_prefix(line, pos);
-        completion_candidates_for_line(before_cursor)
+        completion_candidates_for_line_in_mode(before_cursor, PromptModus::Normal)
             .into_iter()
             .map(|candidate| Suggestion {
                 value: candidate.value,
@@ -170,6 +177,17 @@ impl ReedlineCompleter for PromptContextCompleter {
 }
 
 fn completion_candidates_for_line(before_cursor: &str) -> Vec<CompletionCandidate> {
+    completion_candidates_for_line_in_mode(before_cursor, PromptModus::Normal)
+}
+
+fn completion_candidates_for_line_in_mode(
+    before_cursor: &str,
+    prompt_mode: PromptModus,
+) -> Vec<CompletionCandidate> {
+    if matches!(prompt_mode, PromptModus::LoeschenStart | PromptModus::LoeschenSelect) {
+        return Vec::new();
+    }
+
     let tokens = split_tokens_with_positions(before_cursor);
     let ends_with_whitespace = before_cursor
         .chars()
