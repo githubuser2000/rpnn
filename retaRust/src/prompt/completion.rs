@@ -8,7 +8,9 @@ use crate::domain::python_source_of_truth::{
 };
 use crate::shared_words;
 
-use super::python_like::{prompt_words, PromptModus};
+use super::python_like::{
+    expand_kurz_kurz_befehl, looks_like_numeric_or_fraction_range, prompt_words, PromptModus,
+};
 
 pub const RP_META_COMMANDS: &[&str] = &[
     "help",
@@ -47,6 +49,25 @@ enum RetaMainSection {
     Ausgabe,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ComplSitua {
+    HauptPara,
+    ZeilenPara,
+    Value,
+    NeitherNor,
+    RetaAnfang,
+    Unbekannt,
+    SpaltenPara,
+    KomiPara,
+    KombiMetaPara,
+    AusgabePara,
+    SpaltenValPara,
+    ZeilenValPara,
+    KombiValPara,
+    AusgabeValPara,
+    BefehleNichtReta,
+}
+
 #[derive(Clone, Debug)]
 pub struct CompletionRuntimeState {
     pub prompt_mode: PromptModus,
@@ -79,6 +100,47 @@ struct CompletionCandidate {
 struct TokenSegment {
     text: String,
     start: usize,
+}
+
+#[derive(Clone, Debug)]
+struct PythonCompletionState {
+    options: Vec<String>,
+    if_reta_anfang: bool,
+    situation: ComplSitua,
+    spalten_para_wort: Option<String>,
+    kombi_para_wort: Option<String>,
+    ausgabe_para_wort: Option<String>,
+    zeilen_para_wort: Option<String>,
+    neben_para_wort: Option<String>,
+    last_commands: Vec<String>,
+}
+
+impl PythonCompletionState {
+    fn new() -> Self {
+        Self {
+            options: ordered_prompt_commands(),
+            if_reta_anfang: false,
+            situation: ComplSitua::RetaAnfang,
+            spalten_para_wort: None,
+            kombi_para_wort: None,
+            ausgabe_para_wort: None,
+            zeilen_para_wort: None,
+            neben_para_wort: None,
+            last_commands: Vec::new(),
+        }
+    }
+
+    fn push_last_command(&mut self, token: &str) {
+        if !self.last_commands.iter().any(|entry| entry == token) {
+            self.last_commands.push(token.to_string());
+        }
+    }
+
+    fn current_section(&self) -> Option<RetaMainSection> {
+        self.neben_para_wort
+            .as_deref()
+            .and_then(section_from_main_token)
+    }
 }
 
 static PROMPT_METADATA: OnceLock<PromptMetadata> = OnceLock::new();
@@ -141,9 +203,7 @@ fn build_prompt_metadata() -> PromptMetadata {
         push_unique_ordered(&mut items, &mut seen, value);
     }
 
-    PromptMetadata {
-        vocabulary: items,
-    }
+    PromptMetadata { vocabulary: items }
 }
 
 pub fn completion_vocabulary() -> Vec<String> {
@@ -154,10 +214,7 @@ pub fn new_completion_runtime_handle() -> CompletionRuntimeHandle {
     Arc::new(Mutex::new(CompletionRuntimeState::default()))
 }
 
-pub fn set_completion_prompt_mode(
-    runtime: &CompletionRuntimeHandle,
-    prompt_mode: PromptModus,
-) {
+pub fn set_completion_prompt_mode(runtime: &CompletionRuntimeHandle, prompt_mode: PromptModus) {
     if let Ok(mut state) = runtime.lock() {
         state.prompt_mode = prompt_mode;
     }
@@ -224,7 +281,10 @@ fn completion_candidates_for_line_in_mode(
     before_cursor: &str,
     prompt_mode: PromptModus,
 ) -> Vec<CompletionCandidate> {
-    if matches!(prompt_mode, PromptModus::LoeschenStart | PromptModus::LoeschenSelect) {
+    if matches!(
+        prompt_mode,
+        PromptModus::LoeschenStart | PromptModus::LoeschenSelect
+    ) {
         return Vec::new();
     }
 
@@ -252,18 +312,6 @@ fn completion_candidates_for_line_in_mode(
         .map(|segment| segment.text.clone())
         .collect::<Vec<_>>();
 
-    if let Some((parameter_token, value_fragment, replace_start)) =
-        parse_value_context(&current_token, current_start)
-    {
-        let current_section = detect_reta_section(&previous_text_tokens);
-        return build_value_candidates(
-            current_section,
-            &parameter_token,
-            &value_fragment,
-            replace_start,
-        );
-    }
-
     if mode_like_prompt_command(&previous_text_tokens) {
         return build_completion_candidates(
             vec!["vi".to_string(), "emacs".to_string()],
@@ -278,17 +326,148 @@ fn completion_candidates_for_line_in_mode(
         return Vec::new();
     }
 
-    let current_section = detect_reta_section(&previous_text_tokens);
-    let reta_mode = is_reta_mode(&previous_text_tokens, &current_token);
-
-    if reta_mode {
-        if current_section.is_some() && (current_token.is_empty() || current_token.starts_with("--")) {
-            return build_section_parameter_candidates(current_section, &current_token, current_start);
-        }
-        return build_main_switch_candidates(&current_token, current_start);
+    let mut state = PythonCompletionState::new();
+    for token in &previous_text_tokens {
+        consume_space_token(&mut state, token);
     }
 
-    build_prompt_candidates(&current_token, current_start)
+    if let Some((parameter_token, value_fragment, replace_start)) =
+        parse_value_context(&current_token, current_start)
+    {
+        return build_value_candidates_from_state(
+            &state,
+            &parameter_token,
+            &value_fragment,
+            replace_start,
+        );
+    }
+
+    let mut candidates = state.options.clone();
+    if previous_text_tokens.is_empty() && current_token.starts_with('-') {
+        candidates = merge_unique(candidates, main_switches_vec());
+    }
+
+    build_completion_candidates(candidates, &current_token, current_start, None, true)
+}
+
+fn consume_space_token(state: &mut PythonCompletionState, first_term: &str) {
+    state.push_last_command(first_term);
+
+    if state.situation == ComplSitua::RetaAnfang && first_term == "reta" {
+        state.if_reta_anfang = true;
+        state.options = main_switches_vec();
+        state.situation = ComplSitua::HauptPara;
+        return;
+    }
+
+    if matches!(
+        state.situation,
+        ComplSitua::RetaAnfang | ComplSitua::BefehleNichtReta
+    ) && !is_main_switch(first_term)
+    {
+        let has_prompt_command = state
+            .last_commands
+            .iter()
+            .any(|token| token != "reta" && is_prompt_non_reta_command(token));
+        let has_row_spec = state
+            .last_commands
+            .iter()
+            .any(|token| looks_like_numeric_or_fraction_range(token));
+        let expanded_like_python =
+            expand_kurz_kurz_befehl(PromptModus::Normal, &state.last_commands).0;
+
+        let mut options = prompt_non_reta_commands();
+        if (has_prompt_command && has_row_spec) || expanded_like_python || !state.if_reta_anfang {
+            options = merge_unique(options, main_switches_vec());
+        } else {
+            state.if_reta_anfang = false;
+        }
+        state.options = options;
+        state.situation = ComplSitua::BefehleNichtReta;
+        return;
+    }
+
+    if is_main_switch(first_term)
+        || state
+            .neben_para_wort
+            .as_deref()
+            .map(is_main_switch)
+            .unwrap_or(false)
+    {
+        let active_main = if is_main_switch(first_term) {
+            first_term
+        } else {
+            state.neben_para_wort.as_deref().unwrap_or("")
+        };
+
+        let (mut options, next_situation) = parameter_options_for_main(active_main);
+        if !state.if_reta_anfang {
+            options = merge_unique(options, prompt_non_reta_commands());
+        }
+        if !is_main_switch(first_term) {
+            options = merge_unique(options, main_switches_vec());
+        }
+        state.options = options;
+        state.situation = next_situation;
+        if is_main_switch(first_term) {
+            state.neben_para_wort = Some(first_term.to_string());
+        }
+    }
+}
+
+fn is_prompt_non_reta_command(token: &str) -> bool {
+    token != "reta"
+        && ordered_prompt_commands().into_iter().any(|candidate| {
+            normalize_completion_text(&candidate) == normalize_completion_text(token)
+        })
+}
+
+fn parameter_options_for_main(main_switch: &str) -> (Vec<String>, ComplSitua) {
+    match main_switch {
+        "-zeilen" => (
+            zeilen_parameter_tokens()
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+            ComplSitua::ZeilenPara,
+        ),
+        "-spalten" => (spalten_parameter_tokens(), ComplSitua::SpaltenPara),
+        "-kombination" => (
+            kombi_parameter_tokens()
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+            ComplSitua::KomiPara,
+        ),
+        "-ausgabe" => (
+            ausgabe_parameter_tokens()
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+            ComplSitua::AusgabePara,
+        ),
+        _ => (Vec::new(), ComplSitua::HauptPara),
+    }
+}
+
+fn build_value_candidates_from_state(
+    state: &PythonCompletionState,
+    parameter_token: &str,
+    fragment: &str,
+    replace_start: usize,
+) -> Vec<CompletionCandidate> {
+    let stripped = parameter_token.trim_start_matches('-');
+    let key = stripped.trim_end_matches('=');
+    let section = state.current_section();
+    let candidates = match section {
+        Some(RetaMainSection::Zeilen) => zeilen_value_candidates(key),
+        Some(RetaMainSection::Spalten) => spalten_value_candidates(key),
+        Some(RetaMainSection::Kombination) => kombi_value_candidates(key),
+        Some(RetaMainSection::Ausgabe) => ausgabe_value_candidates(key),
+        None => Vec::new(),
+    };
+
+    build_completion_candidates(candidates, fragment, replace_start, None, false)
 }
 
 fn safe_prefix(line: &str, pos: usize) -> &str {
@@ -303,14 +482,22 @@ fn split_tokens_with_positions(input: &str) -> Vec<TokenSegment> {
     let mut out = Vec::new();
     let mut current = String::new();
     let mut start: Option<usize> = None;
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
 
     for (idx, ch) in input.char_indices() {
-        if ch.is_whitespace() {
+        let is_top_level_whitespace = ch.is_whitespace() && round == 0 && square == 0 && curly == 0;
+        if is_top_level_whitespace {
             if let Some(token_start) = start.take() {
-                out.push(TokenSegment {
-                    text: std::mem::take(&mut current),
-                    start: token_start,
-                });
+                if !current.trim().is_empty() {
+                    out.push(TokenSegment {
+                        text: std::mem::take(&mut current),
+                        start: token_start,
+                    });
+                } else {
+                    current.clear();
+                }
             }
             continue;
         }
@@ -318,56 +505,64 @@ fn split_tokens_with_positions(input: &str) -> Vec<TokenSegment> {
         if start.is_none() {
             start = Some(idx);
         }
+
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+
         current.push(ch);
     }
 
     if let Some(token_start) = start {
-        out.push(TokenSegment {
-            text: current,
-            start: token_start,
-        });
+        if !current.trim().is_empty() {
+            out.push(TokenSegment {
+                text: current,
+                start: token_start,
+            });
+        }
     }
 
     out
 }
 
 fn parse_value_context(current_token: &str, token_start: usize) -> Option<(String, String, usize)> {
-    let (parameter_token, raw_values) = current_token.split_once('=')?;
-    let value_offset = raw_values.rfind(',').map(|idx| idx + 1).unwrap_or(0);
+    let eq_index = current_token.find('=')?;
+    let parameter_token = current_token[..eq_index].to_string();
+    let raw_values = &current_token[eq_index + 1..];
+    let value_offset = last_top_level_comma_index(raw_values)
+        .map(|idx| idx + 1)
+        .unwrap_or(0);
     let value_fragment = raw_values[value_offset..].to_string();
     let replace_start = token_start + parameter_token.len() + 1 + value_offset;
-    Some((parameter_token.to_string(), value_fragment, replace_start))
+    Some((parameter_token, value_fragment, replace_start))
 }
 
-fn is_reta_mode(previous_tokens: &[String], current_token: &str) -> bool {
-    if previous_tokens
-        .iter()
-        .any(|token| token == "reta" || token.starts_with('-'))
-    {
-        return true;
-    }
+fn last_top_level_comma_index(text: &str) -> Option<usize> {
+    let mut last = None;
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
 
-    current_token == "reta"
-        || (current_token.starts_with('-') && !current_token.starts_with("--"))
-}
-
-fn detect_reta_section(tokens: &[String]) -> Option<RetaMainSection> {
-    let mut section = None;
-
-    for token in tokens {
-        if token == "reta" {
-            continue;
-        }
-        if let Some(next_section) = section_from_main_token(token) {
-            section = Some(next_section);
-            continue;
-        }
-        if token.starts_with('-') && !token.starts_with("--") {
-            section = None;
+    for (idx, ch) in text.char_indices() {
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            ',' if round == 0 && square == 0 && curly == 0 => last = Some(idx),
+            _ => {}
         }
     }
 
-    section
+    last
 }
 
 fn mode_like_prompt_command(previous_tokens: &[String]) -> bool {
@@ -395,6 +590,13 @@ fn section_from_main_token(token: &str) -> Option<RetaMainSection> {
         "-ausgabe" => Some(RetaMainSection::Ausgabe),
         _ => None,
     }
+}
+
+fn is_main_switch(token: &str) -> bool {
+    matches!(
+        token,
+        "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" | "-h" | "-help"
+    )
 }
 
 fn ordered_prompt_commands() -> Vec<String> {
@@ -443,21 +645,43 @@ fn ordered_prompt_commands() -> Vec<String> {
     out
 }
 
+fn prompt_non_reta_commands() -> Vec<String> {
+    ordered_prompt_commands()
+        .into_iter()
+        .filter(|command| normalize_completion_text(command) != "reta")
+        .collect()
+}
+
 fn prompt_command_sort_key(command: &str) -> (u8, String) {
     let normalized = normalize_completion_text(command);
-    let bucket = if matches!(normalized.as_str(), "help" | "hilfe" | "kurzbefehle") {
+    let eig_prefixes = &prompt_words().eig_prefixes;
+    let looks_like_eig = normalized.starts_with(&normalize_completion_text(&eig_prefixes.0))
+        || normalized.starts_with(&normalize_completion_text(&eig_prefixes.1));
+
+    let bucket = if matches!(normalized.as_str(), "absicht" | "hilfe" | "kurzbefehle") {
         0
-    } else if matches!(normalized.as_str(), "universum" | "thomas" | "befehle" | "groesse") {
+    } else if matches!(
+        normalized.as_str(),
+        "universum" | "thomas" | "befehle" | "groesse"
+    ) {
         1
-    } else if matches!(normalized.as_str(), "reta" | "bewusstsein" | "geist" | "emotion" | "impulse") {
+    } else if matches!(
+        normalized.as_str(),
+        "reta" | "bewusstsein" | "geist" | "emotion" | "impulse"
+    ) {
         2
-    } else if matches!(normalized.as_str(), "loggen" | "nichtloggen" | "exit" | "quit" | "ende" | "q" | ":q") {
+    } else if matches!(
+        normalized.as_str(),
+        "loggen" | "nichtloggen" | "exit" | "quit" | "ende" | "q" | ":q"
+    ) {
         3
+    } else if looks_like_eig {
+        19
     } else if normalized.len() == 1 {
         7
-    } else if normalized.starts_with("15_") || normalized == "15" {
+    } else if normalized == "15" || normalized.starts_with("15_") {
         8
-    } else if normalized.starts_with("16_") || normalized == "16" {
+    } else if normalized == "16" || normalized.starts_with("16_") {
         9
     } else if normalized.starts_with('1') {
         10
@@ -466,72 +690,6 @@ fn prompt_command_sort_key(command: &str) -> (u8, String) {
     };
 
     (bucket, normalized)
-}
-
-fn build_prompt_candidates(fragment: &str, replace_start: usize) -> Vec<CompletionCandidate> {
-    let mut candidates = ordered_prompt_commands();
-    let mut seen = candidates
-        .iter()
-        .map(|candidate| normalize_completion_text(candidate))
-        .collect::<BTreeSet<_>>();
-
-    for item in reta_main_switches() {
-        push_unique_ordered(&mut candidates, &mut seen, item);
-    }
-
-    build_completion_candidates(candidates, fragment, replace_start, None, true)
-}
-
-fn build_main_switch_candidates(fragment: &str, replace_start: usize) -> Vec<CompletionCandidate> {
-    build_completion_candidates(
-        reta_main_switches().into_iter().map(str::to_string).collect(),
-        fragment,
-        replace_start,
-        Some("reta".to_string()),
-        true,
-    )
-}
-
-fn build_section_parameter_candidates(
-    section: Option<RetaMainSection>,
-    fragment: &str,
-    replace_start: usize,
-) -> Vec<CompletionCandidate> {
-    let candidates = match section {
-        Some(RetaMainSection::Zeilen) => zeilen_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        Some(RetaMainSection::Spalten) => spalten_parameter_tokens(),
-        Some(RetaMainSection::Kombination) => kombi_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        Some(RetaMainSection::Ausgabe) => ausgabe_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        None => reta_main_switches().into_iter().map(str::to_string).collect(),
-    };
-    build_completion_candidates(candidates, fragment, replace_start, None, false)
-}
-
-fn build_value_candidates(
-    section: Option<RetaMainSection>,
-    parameter_token: &str,
-    fragment: &str,
-    replace_start: usize,
-) -> Vec<CompletionCandidate> {
-    let stripped = parameter_token.trim_start_matches('-');
-    let key = stripped.trim_end_matches('=');
-    let candidates = match section {
-        Some(RetaMainSection::Zeilen) => zeilen_value_candidates(key),
-        Some(RetaMainSection::Spalten) => spalten_value_candidates(key),
-        Some(RetaMainSection::Kombination) => kombi_value_candidates(key),
-        Some(RetaMainSection::Ausgabe) => ausgabe_value_candidates(key),
-        None => Vec::new(),
-    };
-    build_completion_candidates(candidates, fragment, replace_start, None, false)
 }
 
 fn build_completion_candidates(
@@ -552,7 +710,11 @@ fn build_completion_candidates(
         .collect()
 }
 
-fn filter_candidate_values(candidates: &[String], fragment: &str, fallback_contains: bool) -> Vec<String> {
+fn filter_candidate_values(
+    candidates: &[String],
+    fragment: &str,
+    fallback_contains: bool,
+) -> Vec<String> {
     let normalized_fragment = normalize_completion_text(fragment);
     let mut prefix_matches = Vec::new();
     let mut contains_matches = Vec::new();
@@ -561,7 +723,8 @@ fn filter_candidate_values(candidates: &[String], fragment: &str, fallback_conta
 
     for candidate in candidates {
         let normalized_candidate = normalize_completion_text(candidate);
-        if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment) {
+        if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment)
+        {
             if prefix_seen.insert(normalized_candidate.clone()) {
                 prefix_matches.push(candidate.clone());
             }
@@ -595,8 +758,33 @@ fn push_unique_ordered(
     }
 }
 
+fn merge_unique(mut left: Vec<String>, right: Vec<String>) -> Vec<String> {
+    let mut seen = left
+        .iter()
+        .map(|value| normalize_completion_text(value))
+        .collect::<BTreeSet<_>>();
+    for value in right {
+        push_unique_ordered(&mut left, &mut seen, value);
+    }
+    left
+}
+
+fn main_switches_vec() -> Vec<String> {
+    reta_main_switches()
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
 fn reta_main_switches() -> [&'static str; 6] {
-    ["-zeilen", "-spalten", "-kombination", "-ausgabe", "-h", "-help"]
+    [
+        "-zeilen",
+        "-spalten",
+        "-kombination",
+        "-ausgabe",
+        "-h",
+        "-help",
+    ]
 }
 
 fn zeilen_parameter_tokens() -> [&'static str; 14] {
@@ -691,10 +879,12 @@ fn zeilen_value_candidates(key: &str) -> Vec<String> {
 
 fn ausgabe_value_candidates(key: &str) -> Vec<String> {
     match key {
-        "art" | "*" => ["bbcode", "html", "csv", "shell", "markdown", "emacs", "nichts"]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
+        "art" | "*" => [
+            "bbcode", "html", "csv", "shell", "markdown", "emacs", "nichts",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
         "breite" | "breiten" => (10..100).map(|n| n.to_string()).collect(),
         _ => Vec::new(),
     }
@@ -704,7 +894,8 @@ fn kombi_value_candidates(key: &str) -> Vec<String> {
     let words = shared_words();
     let mut set = BTreeSet::new();
 
-    let add_flattened = |target: &mut BTreeSet<String>, values: &indexmap::IndexMap<i64, Vec<String>>| {
+    let add_flattened = |target: &mut BTreeSet<String>,
+                         values: &indexmap::IndexMap<i64, Vec<String>>| {
         for entries in values.values() {
             for entry in entries {
                 target.insert(entry.clone());
@@ -768,7 +959,7 @@ fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<Stri
 
 #[cfg(test)]
 mod tests {
-    use super::{candidates_for_input, normalize_completion_text};
+    use super::{candidates_for_input, normalize_completion_text, PromptModus};
 
     fn contains_normalized(values: &[String], expected: &str) -> bool {
         let expected = normalize_completion_text(expected);
@@ -797,25 +988,32 @@ mod tests {
     }
 
     #[test]
-    fn prompt_prefix_keeps_zeilen_context_for_values() {
-        let values = candidates_for_input("a -zeilen --zeit=h");
-        assert!(contains_normalized(&values, "heute"));
-    }
-
-    #[test]
-    fn reta_spalten_context_suggests_main_alias_parameter() {
-        let values = candidates_for_input("reta -spalten --mens");
-        assert!(values
-            .iter()
-            .any(|value| normalize_completion_text(value).contains("menschliches=")));
-    }
-
-    #[test]
     fn prompt_prefix_keeps_spalten_context_after_reta_commands() {
         let values = candidates_for_input("a reta -spalten --mens");
         assert!(values
             .iter()
             .any(|value| normalize_completion_text(value).contains("menschliches=")));
+    }
+
+    #[test]
+    fn non_reta_context_after_row_spec_offers_main_switches() {
+        let values = candidates_for_input("a 1/2 ");
+        assert!(contains_normalized(&values, "-zeilen"));
+        assert!(contains_normalized(&values, "-spalten"));
+    }
+
+    #[test]
+    fn non_reta_section_context_keeps_prompt_commands_like_python() {
+        let values = candidates_for_input("a -zeilen ");
+        assert!(contains_normalized(&values, "--zeit="));
+        assert!(contains_normalized(&values, "help"));
+    }
+
+    #[test]
+    fn reta_section_context_stays_stricter_than_prompt_prefix() {
+        let values = candidates_for_input("reta -zeilen ");
+        assert!(contains_normalized(&values, "--zeit="));
+        assert!(!contains_normalized(&values, "help"));
     }
 
     #[test]
@@ -828,6 +1026,12 @@ mod tests {
     fn zeilen_time_completion_suggests_today_alias() {
         let values = candidates_for_input("reta -zeilen --zeit=h");
         assert!(contains_normalized(&values, "heute"));
+    }
+
+    #[test]
+    fn value_completion_ignores_commas_inside_brackets() {
+        let values = candidates_for_input("reta -zeilen --zeit=[heute,gestern],m");
+        assert!(contains_normalized(&values, "morgen"));
     }
 
     #[test]
@@ -846,7 +1050,7 @@ mod tests {
     fn delete_mode_disables_completion_candidates() {
         let values = super::candidates_for_input_in_mode(
             "reta -zeilen --zeit=h",
-            super::PromptModus::LoeschenSelect,
+            PromptModus::LoeschenSelect,
         );
         assert!(values.is_empty());
     }
@@ -868,12 +1072,15 @@ mod tests {
     #[test]
     fn numeric_value_candidates_keep_python_like_order() {
         let values = candidates_for_input("reta -zeilen --zaehlung=");
-        assert_eq!(values.iter().take(5).cloned().collect::<Vec<_>>(), vec![
-            "0".to_string(),
-            "1".to_string(),
-            "2".to_string(),
-            "3".to_string(),
-            "4".to_string(),
-        ]);
+        assert_eq!(
+            values.iter().take(5).cloned().collect::<Vec<_>>(),
+            vec![
+                "0".to_string(),
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "4".to_string(),
+            ]
+        );
     }
 }
