@@ -53,18 +53,10 @@ enum RetaMainSection {
 enum ComplSitua {
     HauptPara,
     ZeilenPara,
-    Value,
-    NeitherNor,
     RetaAnfang,
-    Unbekannt,
     SpaltenPara,
     KomiPara,
-    KombiMetaPara,
     AusgabePara,
-    SpaltenValPara,
-    ZeilenValPara,
-    KombiValPara,
-    AusgabeValPara,
     BefehleNichtReta,
 }
 
@@ -107,10 +99,6 @@ struct PythonCompletionState {
     options: Vec<String>,
     if_reta_anfang: bool,
     situation: ComplSitua,
-    spalten_para_wort: Option<String>,
-    kombi_para_wort: Option<String>,
-    ausgabe_para_wort: Option<String>,
-    zeilen_para_wort: Option<String>,
     neben_para_wort: Option<String>,
     last_commands: Vec<String>,
 }
@@ -121,10 +109,6 @@ impl PythonCompletionState {
             options: ordered_prompt_commands(),
             if_reta_anfang: false,
             situation: ComplSitua::RetaAnfang,
-            spalten_para_wort: None,
-            kombi_para_wort: None,
-            ausgabe_para_wort: None,
-            zeilen_para_wort: None,
             neben_para_wort: None,
             last_commands: Vec::new(),
         }
@@ -328,7 +312,7 @@ fn completion_candidates_for_line_in_mode(
 
     let mut state = PythonCompletionState::new();
     for token in &previous_text_tokens {
-        consume_space_token(&mut state, token);
+        consume_space_token(&mut state, token, prompt_mode);
     }
 
     if let Some((parameter_token, value_fragment, replace_start)) =
@@ -348,11 +332,14 @@ fn completion_candidates_for_line_in_mode(
     if previous_text_tokens.is_empty() && current_token.starts_with('-') {
         candidates = merge_unique(candidates, main_switches_vec());
     }
+    if let Some(section) = section_from_main_token(&current_token) {
+        candidates = merge_unique(parameter_tokens_for_section(section), main_switches_vec());
+    }
 
     build_completion_candidates(candidates, &current_token, current_start, None, true)
 }
 
-fn consume_space_token(state: &mut PythonCompletionState, first_term: &str) {
+fn consume_space_token(state: &mut PythonCompletionState, first_term: &str, prompt_mode: PromptModus) {
     state.push_last_command(first_term);
 
     if state.situation == ComplSitua::RetaAnfang && first_term == "reta" {
@@ -376,7 +363,7 @@ fn consume_space_token(state: &mut PythonCompletionState, first_term: &str) {
             .iter()
             .any(|token| looks_like_numeric_or_fraction_range(token));
         let expanded_like_python =
-            expand_kurz_kurz_befehl(PromptModus::Normal, &state.last_commands).0;
+            expand_kurz_kurz_befehl(prompt_mode, &state.last_commands).0;
 
         let mut options = prompt_non_reta_commands();
         if (has_prompt_command && has_row_spec) || expanded_like_python || !state.if_reta_anfang {
@@ -490,7 +477,7 @@ fn build_value_candidates_from_state(
     };
 
     if !candidates.is_empty() {
-        return build_completion_candidates(candidates, fragment, replace_start, None, true);
+        return build_completion_candidates(candidates, fragment, replace_start, None, false);
     }
 
     let Some(section) = section else {
@@ -1230,5 +1217,17 @@ mod tests {
     fn top_level_contains_python_prefix_commands_15_and_16() {
         let values = candidates_for_input("15");
         assert!(contains_normalized(&values, "15_"));
+    }
+
+    #[test]
+    fn parenthesized_tokens_keep_single_fragment_for_completion_state() {
+        let values = candidates_for_input("(a 1/2) -zeilen --ze");
+        assert!(contains_normalized(&values, "--zeit="));
+    }
+
+    #[test]
+    fn reta_gate_still_allows_switches_after_python_like_short_command() {
+        let values = candidates_for_input("a 1/2 -z");
+        assert!(contains_normalized(&values, "-zeilen"));
     }
 }
