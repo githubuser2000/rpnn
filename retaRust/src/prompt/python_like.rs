@@ -763,6 +763,241 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
     Some(argv)
 }
 
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PreparedPromptBigOutput {
+    pub tokens: Vec<String>,
+    pub row_specs: Vec<String>,
+    pub had_kurz_kurz: bool,
+}
+
+/// Python-Architekturanker fuer den gespeicherten `reta`-Platzhalter-Pfad.
+///
+/// Das bildet den fachlich wichtigsten Teil von
+/// `verdreheWoReTaBefehl()` + `promptVorbereitungGrosseAusgabe()` nach:
+/// Wenn ein gespeicherter Platzhalter bereits mit `reta` beginnt und die
+/// neue Eingabe nur aus Zeilenbereichen plus prompt-typischen Modifikatoren
+/// besteht, wird die alte `-zeilen`-Sektion ersetzt statt die neuen Tokens
+/// blind anzuhängen.
+pub fn prepare_prompt_big_output_for_stored_reta(
+    stored_prefix_tokens: &[String],
+    input_tokens: &[String],
+) -> Option<PreparedPromptBigOutput> {
+    if stored_prefix_tokens.first().map(String::as_str) != Some("reta") || input_tokens.is_empty() {
+        return None;
+    }
+
+    let (had_kurz_kurz, expanded_input) =
+        expand_kurz_kurz_befehl(PromptModus::AusgabeSelektiv, input_tokens);
+    let mut effective_input = if expanded_input.is_empty() {
+        input_tokens.to_vec()
+    } else {
+        expanded_input
+    };
+    effective_input = normalize_prompt_tokens(&effective_input);
+
+    let row_specs = effective_input
+        .iter()
+        .filter(|token| is_row_spec_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    if row_specs.is_empty() {
+        return None;
+    }
+
+    if effective_input
+        .iter()
+        .any(|token| !is_row_spec_token(token) && !is_selective_reta_modifier(token))
+    {
+        return None;
+    }
+
+    let use_range = effective_input.iter().any(|token| token == "range");
+    let use_teiler = effective_input.iter().any(|token| token == "teiler");
+    let use_vielfache = effective_input.iter().any(|token| token == "vielfache");
+    let use_invertieren = effective_input
+        .iter()
+        .any(|token| matches!(token.as_str(), "invertieren" | "--invertieren"));
+    let request_no_headers = effective_input
+        .iter()
+        .any(|token| matches!(token.as_str(), "--keineueberschriften" | "ee"));
+
+    let mut joined_rows = row_specs.join(",");
+    if use_teiler {
+        let divisors = divisors_from_row_specs(&row_specs)?;
+        joined_rows = divisors
+            .into_iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+    }
+
+    let row_argument = if use_vielfache {
+        format!("--vielfachevonzahlen={joined_rows}")
+    } else if use_range {
+        format!("--zaehlung={joined_rows}")
+    } else {
+        format!("--vorhervonausschnitt={joined_rows}")
+    };
+
+    let mut new_zeilen_section = vec!["-zeilen".to_string(), row_argument];
+    if use_invertieren {
+        new_zeilen_section.push("--invertieren".to_string());
+    }
+
+    let mut rebuilt =
+        replace_main_section_tokens(stored_prefix_tokens, "-zeilen", &new_zeilen_section);
+
+    if request_no_headers {
+        ensure_flag_in_main_section(&mut rebuilt, "-ausgabe", "--keineueberschriften");
+    }
+
+    Some(PreparedPromptBigOutput {
+        tokens: rebuilt,
+        row_specs,
+        had_kurz_kurz,
+    })
+}
+
+fn is_selective_reta_modifier(token: &str) -> bool {
+    matches!(
+        token,
+        "range"
+            | "teiler"
+            | "vielfache"
+            | "invertieren"
+            | "--invertieren"
+            | "-ausgabe"
+            | "--keineueberschriften"
+            | "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+    )
+}
+
+fn is_main_switch_token(token: &str) -> bool {
+    token.starts_with('-') && !token.starts_with("--")
+}
+
+fn replace_main_section_tokens(
+    tokens: &[String],
+    section: &str,
+    replacement: &[String],
+) -> Vec<String> {
+    let mut out = Vec::with_capacity(tokens.len() + replacement.len());
+    let mut index = 0usize;
+    let mut insert_at = if tokens.is_empty() { 0usize } else { 1usize };
+    let mut found = false;
+
+    while index < tokens.len() {
+        if tokens[index] == section {
+            if !found {
+                insert_at = out.len();
+                found = true;
+            }
+            index += 1;
+            while index < tokens.len() && !is_main_switch_token(&tokens[index]) {
+                index += 1;
+            }
+            continue;
+        }
+        out.push(tokens[index].clone());
+        index += 1;
+    }
+
+    let insert_at = insert_at.min(out.len());
+    let mut rebuilt = Vec::with_capacity(out.len() + replacement.len());
+    rebuilt.extend(out[..insert_at].iter().cloned());
+    rebuilt.extend(replacement.iter().cloned());
+    rebuilt.extend(out[insert_at..].iter().cloned());
+    rebuilt
+}
+
+fn ensure_flag_in_main_section(tokens: &mut Vec<String>, section: &str, flag: &str) {
+    if tokens.iter().any(|token| token == flag) {
+        return;
+    }
+
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if tokens[index] == section {
+            let mut insert_at = index + 1;
+            while insert_at < tokens.len() && !is_main_switch_token(&tokens[insert_at]) {
+                insert_at += 1;
+            }
+            tokens.insert(insert_at, flag.to_string());
+            return;
+        }
+        index += 1;
+    }
+
+    tokens.push(section.to_string());
+    tokens.push(flag.to_string());
+}
+
+fn divisors_from_row_specs(row_specs: &[String]) -> Option<Vec<i64>> {
+    let numbers = parse_row_spec_numbers(row_specs)?;
+    let mut divisors = BTreeSet::new();
+
+    for number in numbers {
+        let n = number.abs();
+        if n == 0 {
+            continue;
+        }
+        let mut divisor = 1i64;
+        while divisor * divisor <= n {
+            if n % divisor == 0 {
+                divisors.insert(divisor);
+                divisors.insert(n / divisor);
+            }
+            divisor += 1;
+        }
+    }
+
+    if divisors.len() > 1 {
+        divisors.remove(&1);
+    }
+
+    Some(divisors.into_iter().collect())
+}
+
+fn parse_row_spec_numbers(row_specs: &[String]) -> Option<Vec<i64>> {
+    let mut numbers = Vec::new();
+    for spec in row_specs {
+        for piece in custom_split_delim_parenthesized(spec, ',') {
+            let trimmed = piece.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.contains('/') {
+                return None;
+            }
+            if let Some((start, end)) = parse_integer_range_piece(trimmed) {
+                if start <= end {
+                    for value in start..=end {
+                        numbers.push(value);
+                    }
+                } else {
+                    for value in (end..=start).rev() {
+                        numbers.push(value);
+                    }
+                }
+            } else {
+                numbers.push(trimmed.parse::<i64>().ok()?);
+            }
+        }
+    }
+    Some(numbers)
+}
+
+fn parse_integer_range_piece(piece: &str) -> Option<(i64, i64)> {
+    let (left, right) = piece.split_once('-')?;
+    if left.is_empty() || right.is_empty() {
+        return None;
+    }
+    let start = left.trim().parse::<i64>().ok()?;
+    let end = right.trim().parse::<i64>().ok()?;
+    Some((start, end))
+}
+
 fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
     if text.is_empty() {
         return None;
@@ -786,4 +1021,80 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
     }
     let suffix = chars[split_at..].iter().collect::<String>();
     Some((prefix, suffix))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::prepare_prompt_big_output_for_stored_reta;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn stored_reta_placeholder_replaces_zeilen_section_python_like() {
+        let prepared = prepare_prompt_big_output_for_stored_reta(
+            &strings(&[
+                "reta",
+                "-zeilen",
+                "--zeit=heute",
+                "-spalten",
+                "--thomas",
+            ]),
+            &strings(&["12-15"]),
+        )
+        .expect("stored reta placeholder should be rewritten");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "-spalten",
+                "--thomas",
+            ])
+        );
+    }
+
+    #[test]
+    fn stored_reta_placeholder_supports_range_and_teiler_modifiers() {
+        let prepared = prepare_prompt_big_output_for_stored_reta(
+            &strings(&["reta", "-zeilen", "--zeit=heute", "-spalten", "--geist"]),
+            &strings(&["R", "w12"]),
+        )
+        .expect("range + teiler path should be rewritten");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--zaehlung=2,3,4,6,12",
+                "-spalten",
+                "--geist",
+            ])
+        );
+    }
+
+    #[test]
+    fn stored_reta_placeholder_supports_vielfache_modifier() {
+        let prepared = prepare_prompt_big_output_for_stored_reta(
+            &strings(&["reta", "-zeilen", "--zeit=heute", "-spalten", "--impulse"]),
+            &strings(&["v12-15"]),
+        )
+        .expect("vielfache path should be rewritten");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vielfachevonzahlen=12-15",
+                "-spalten",
+                "--impulse",
+            ])
+        );
+    }
 }

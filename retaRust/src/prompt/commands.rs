@@ -4,7 +4,8 @@ use super::completion::candidates_for_prefix;
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl, expand_python_prompt_macros,
-    looks_like_numeric_or_fraction_range, normalize_prompt_tokens, prompt_words, PromptModus,
+    looks_like_numeric_or_fraction_range, normalize_prompt_tokens, prepare_prompt_big_output_for_stored_reta,
+    prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -226,6 +227,12 @@ pub fn compile_command_with_state(
 
     if let Some(command) = compile_inline_storage_command(&tokenized.tokens) {
         return Ok(command);
+    }
+
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, &tokenized.tokens)
+    {
+        return Ok(PromptCommand::Reta(prepared.tokens));
     }
 
     if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens)
@@ -623,7 +630,12 @@ pub fn execute_command(
             let effective_input = match additional_text {
                 Some(text) => {
                     let additional_tokens = split_storage_text(&text);
-                    if state.has_stored_placeholder() {
+                    if let Some(prepared) = prepare_prompt_big_output_for_stored_reta(
+                        &state.stored_expanded_tokens,
+                        &additional_tokens,
+                    ) {
+                        prepared.tokens.join(" ")
+                    } else if state.has_stored_placeholder() {
                         compose_input_with_stored_placeholder(
                             &state.stored_expanded_tokens,
                             &additional_tokens,
@@ -1230,5 +1242,27 @@ mod tests {
         let state = SessionState::new("rp".to_string(), true, false);
         let command = compile_command_with_state("", &state).unwrap();
         assert!(matches!(command, PromptCommand::Noop));
+    }
+
+    #[test]
+    fn stored_reta_placeholder_row_input_rewrites_zeilen_section() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "reta -zeilen --zeit=heute -spalten --thomas".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let command = compile_command_with_state("12-15", &state).unwrap();
+        match command {
+            PromptCommand::Reta(argv) => assert_eq!(
+                argv,
+                vec![
+                    "reta".to_string(),
+                    "-zeilen".to_string(),
+                    "--vorhervonausschnitt=12-15".to_string(),
+                    "-spalten".to_string(),
+                    "--thomas".to_string(),
+                ]
+            ),
+            other => panic!("expected PromptCommand::Reta, got {other:?}"),
+        }
     }
 }
