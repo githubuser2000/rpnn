@@ -50,8 +50,10 @@ pub mod shared {
 
 pub mod domain {
     pub mod python_source_of_truth {
+        use std::collections::BTreeMap;
         use std::ffi::{CStr, CString};
         use std::os::raw::c_char;
+        use std::sync::{Mutex, OnceLock};
 
         use serde::{Deserialize, Serialize};
 
@@ -62,139 +64,121 @@ pub mod domain {
         }
 
         type FreeStringFn = unsafe extern "C" fn(*mut c_char);
-        type AllMainAliasGroupsJsonFn = unsafe extern "C" fn() -> *mut c_char;
-        type ParameterAliasGroupsForMainJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
-        type ResolveParameterMainAliasFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+
+        static ALL_MAIN_ALIAS_GROUPS_CACHE: OnceLock<Vec<PythonAliasGroup>> = OnceLock::new();
+        static PARAMETER_ALIAS_GROUPS_CACHE: OnceLock<Mutex<BTreeMap<String, Vec<PythonAliasGroup>>>> =
+            OnceLock::new();
+        static MAIN_ALIAS_RESOLUTION_CACHE: OnceLock<BTreeMap<String, String>> = OnceLock::new();
 
         pub fn all_main_alias_groups(
             _words: &crate::shared::words_py::Words,
         ) -> Vec<PythonAliasGroup> {
-            load_alias_groups_from_json(b"reta_all_main_alias_groups_json", None)
+            ALL_MAIN_ALIAS_GROUPS_CACHE
+                .get_or_init(|| load_alias_groups_from_json(b"reta_all_main_alias_groups_json", None))
+                .clone()
         }
 
         pub fn parameter_alias_groups_for_main(
             _words: &crate::shared::words_py::Words,
             canonical_main: &str,
         ) -> Vec<PythonAliasGroup> {
-            load_alias_groups_from_json(
+            let cache = PARAMETER_ALIAS_GROUPS_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+            let cache_key = normalize_alias_like_python(canonical_main);
+
+            if let Ok(guard) = cache.lock() {
+                if let Some(groups) = guard.get(&cache_key) {
+                    return groups.clone();
+                }
+            }
+
+            let groups = load_alias_groups_from_json(
                 b"reta_parameter_alias_groups_for_main_json",
                 Some(canonical_main),
-            )
+            );
+
+            if let Ok(mut guard) = cache.lock() {
+                guard.entry(cache_key).or_insert_with(|| groups.clone());
+            }
+
+            groups
         }
 
         pub fn resolve_parameter_main_alias(
             _words: &crate::shared::words_py::Words,
             main_alias: &str,
         ) -> Option<String> {
-            let library = match crate::reta_library() {
-                Ok(library) => library,
-                Err(message) => {
-                    eprintln!(
-                        "retaprompt_commands could not load libreta.so for main alias resolution: {message}"
-                    );
-                    return None;
-                }
-            };
-
-            unsafe {
-                let resolve: libloading::Symbol<'_, ResolveParameterMainAliasFn> =
-                    match library.get(b"reta_resolve_parameter_main_alias") {
-                        Ok(symbol) => symbol,
-                        Err(error) => {
-                            eprintln!(
-                                "retaprompt_commands missing symbol reta_resolve_parameter_main_alias: {error}"
-                            );
-                            return None;
-                        }
-                    };
-                let free: libloading::Symbol<'_, FreeStringFn> =
-                    match library.get(b"reta_free_string") {
-                        Ok(symbol) => symbol,
-                        Err(error) => {
-                            eprintln!(
-                                "retaprompt_commands missing symbol reta_free_string while resolving main alias: {error}"
-                            );
-                            return None;
-                        }
-                    };
-
-                let alias = to_c_string_lossy(main_alias);
-                let ptr = resolve(alias.as_ptr());
-                let value = take_owned_string(ptr, &free);
-                if value.is_empty() {
-                    None
-                } else {
-                    Some(value)
-                }
-            }
+            MAIN_ALIAS_RESOLUTION_CACHE
+                .get_or_init(build_main_alias_resolution_cache)
+                .get(&normalize_alias_like_python(main_alias))
+                .cloned()
         }
 
         fn load_alias_groups_from_json(
             symbol_name: &[u8],
             canonical_main: Option<&str>,
         ) -> Vec<PythonAliasGroup> {
-            let library = match crate::reta_library() {
-                Ok(library) => library,
+            let free = match crate::reta_free_string_fn() {
+                Ok(free) => free,
                 Err(message) => {
                     eprintln!(
-                        "retaprompt_commands could not load libreta.so for alias group metadata: {message}"
+                        "retaprompt_commands could not resolve libreta free-string ABI for alias groups: {message}"
                     );
                     return Vec::new();
                 }
             };
 
-            unsafe {
-                let free: libloading::Symbol<'_, FreeStringFn> = match library.get(b"reta_free_string") {
-                    Ok(symbol) => symbol,
-                    Err(error) => {
+            let json = if let Some(main) = canonical_main {
+                let get_json = match crate::reta_parameter_alias_groups_for_main_json_fn() {
+                    Ok(get_json) => get_json,
+                    Err(message) => {
+                        let display = String::from_utf8_lossy(symbol_name);
                         eprintln!(
-                            "retaprompt_commands missing symbol reta_free_string while loading alias groups: {error}"
+                            "retaprompt_commands could not resolve libreta symbol {display}: {message}"
                         );
                         return Vec::new();
                     }
                 };
-
-                let json = if let Some(main) = canonical_main {
-                    let get_json: libloading::Symbol<'_, ParameterAliasGroupsForMainJsonFn> =
-                        match library.get(symbol_name) {
-                            Ok(symbol) => symbol,
-                            Err(error) => {
-                                let display = String::from_utf8_lossy(symbol_name);
-                                eprintln!(
-                                    "retaprompt_commands missing symbol {display} while loading alias groups: {error}"
-                                );
-                                return Vec::new();
-                            }
-                        };
-                    let main = to_c_string_lossy(main);
-                    let ptr = get_json(main.as_ptr());
-                    take_owned_string(ptr, &free)
-                } else {
-                    let get_json: libloading::Symbol<'_, AllMainAliasGroupsJsonFn> =
-                        match library.get(symbol_name) {
-                            Ok(symbol) => symbol,
-                            Err(error) => {
-                                let display = String::from_utf8_lossy(symbol_name);
-                                eprintln!(
-                                    "retaprompt_commands missing symbol {display} while loading alias groups: {error}"
-                                );
-                                return Vec::new();
-                            }
-                        };
-                    let ptr = get_json();
-                    take_owned_string(ptr, &free)
-                };
-
-                match serde_json::from_str::<Vec<PythonAliasGroup>>(&json) {
-                    Ok(groups) => groups,
-                    Err(error) => {
+                let main = to_c_string_lossy(main);
+                let ptr = unsafe { get_json(main.as_ptr()) };
+                unsafe { take_owned_string(ptr, free) }
+            } else {
+                let get_json = match crate::reta_all_main_alias_groups_json_fn() {
+                    Ok(get_json) => get_json,
+                    Err(message) => {
+                        let display = String::from_utf8_lossy(symbol_name);
                         eprintln!(
-                            "retaprompt_commands could not deserialize alias group metadata: {error}"
+                            "retaprompt_commands could not resolve libreta symbol {display}: {message}"
                         );
-                        Vec::new()
+                        return Vec::new();
                     }
+                };
+                let ptr = unsafe { get_json() };
+                unsafe { take_owned_string(ptr, free) }
+            };
+
+            match serde_json::from_str::<Vec<PythonAliasGroup>>(&json) {
+                Ok(groups) => groups,
+                Err(error) => {
+                    eprintln!(
+                        "retaprompt_commands could not deserialize alias group metadata: {error}"
+                    );
+                    Vec::new()
                 }
             }
+        }
+
+        fn build_main_alias_resolution_cache() -> BTreeMap<String, String> {
+            let mut map = BTreeMap::new();
+            for group in all_main_alias_groups(&crate::shared::words_py::Words::empty()) {
+                for alias in &group.aliases {
+                    map.insert(normalize_alias_like_python(alias), group.canonical.clone());
+                }
+            }
+            map
+        }
+
+        fn normalize_alias_like_python(txt: &str) -> String {
+            txt.trim().replace('ß', "ss").to_lowercase()
         }
 
         fn to_c_string_lossy(text: &str) -> CString {
@@ -203,10 +187,7 @@ pub mod domain {
                 .expect("sanitized alias string must not contain interior null bytes")
         }
 
-        unsafe fn take_owned_string(
-            ptr: *mut c_char,
-            free: &libloading::Symbol<'_, FreeStringFn>,
-        ) -> String {
+        unsafe fn take_owned_string(ptr: *mut c_char, free: FreeStringFn) -> String {
             if ptr.is_null() {
                 return String::new();
             }
@@ -287,49 +268,49 @@ type RetaRunArgvFn = unsafe extern "C" fn(
 
 type RetaFreeStringFn = unsafe extern "C" fn(*mut c_char);
 type RetaSharedWordsJsonFn = unsafe extern "C" fn() -> *mut c_char;
+type RetaAllMainAliasGroupsJsonFn = unsafe extern "C" fn() -> *mut c_char;
+type RetaParameterAliasGroupsForMainJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+
+static RETA_RUN_ARGV_FN: OnceLock<Result<RetaRunArgvFn, String>> = OnceLock::new();
+static RETA_FREE_STRING_FN: OnceLock<Result<RetaFreeStringFn, String>> = OnceLock::new();
+static RETA_SHARED_WORDS_JSON_FN: OnceLock<Result<RetaSharedWordsJsonFn, String>> = OnceLock::new();
+static RETA_ALL_MAIN_ALIAS_GROUPS_JSON_FN: OnceLock<Result<RetaAllMainAliasGroupsJsonFn, String>> = OnceLock::new();
+static RETA_PARAMETER_ALIAS_GROUPS_FOR_MAIN_JSON_FN: OnceLock<
+    Result<RetaParameterAliasGroupsForMainJsonFn, String>,
+> = OnceLock::new();
 
 pub fn run_reta_from_args<A>(argv: A) -> RetaRunResult
 where
     A: AsRef<[String]>,
 {
     let args = argv.as_ref();
-    let library = match reta_library() {
-        Ok(library) => library,
+
+    let run = match reta_run_argv_fn() {
+        Ok(run) => run,
         Err(message) => {
             return RetaRunResult {
                 stdout: String::new(),
-                stderr: format!("reta library load failed: {message}\n"),
+                stderr: format!("reta ABI lookup failed: {message}\n"),
+                exit_code: 127,
+            };
+        }
+    };
+    let free = match reta_free_string_fn() {
+        Ok(free) => free,
+        Err(message) => {
+            return RetaRunResult {
+                stdout: String::new(),
+                stderr: format!("reta ABI lookup failed: {message}\n"),
                 exit_code: 127,
             };
         }
     };
 
-    unsafe {
-        let run: libloading::Symbol<'_, RetaRunArgvFn> = match library.get(b"reta_run_argv") {
-            Ok(symbol) => symbol,
-            Err(error) => {
-                return RetaRunResult {
-                    stdout: String::new(),
-                    stderr: format!("missing symbol reta_run_argv: {error}\n"),
-                    exit_code: 127,
-                };
-            }
-        };
-        let free: libloading::Symbol<'_, RetaFreeStringFn> = match library.get(b"reta_free_string") {
-            Ok(symbol) => symbol,
-            Err(error) => {
-                return RetaRunResult {
-                    stdout: String::new(),
-                    stderr: format!("missing symbol reta_free_string: {error}\n"),
-                    exit_code: 127,
-                };
-            }
-        };
+    let argv_cstrings = args.iter().map(|arg| to_c_string_lossy(arg)).collect::<Vec<_>>();
+    let argv_ptrs = argv_cstrings.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
 
-        let argv_cstrings = args.iter().map(|arg| to_c_string_lossy(arg)).collect::<Vec<_>>();
-        let argv_ptrs = argv_cstrings.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
-
-        let response = run(
+    let response = unsafe {
+        run(
             argv_ptrs.len(),
             argv_ptrs.as_ptr(),
             std::ptr::null(),
@@ -337,16 +318,16 @@ where
             io::stdout().is_terminal() as u8,
             io::stderr().is_terminal() as u8,
             io::stdin().is_terminal() as u8,
-        );
+        )
+    };
 
-        let stderr = take_owned_string(response.stderr_text, &free);
-        let stdout = take_owned_string(response.stdout_text, &free);
+    let stderr = unsafe { take_owned_string(response.stderr_text, free) };
+    let stdout = unsafe { take_owned_string(response.stdout_text, free) };
 
-        RetaRunResult {
-            stdout,
-            stderr,
-            exit_code: response.exit_code,
-        }
+    RetaRunResult {
+        stdout,
+        stderr,
+        exit_code: response.exit_code,
     }
 }
 
@@ -357,38 +338,28 @@ pub fn shared_words() -> &'static shared::words_py::Words {
 }
 
 fn load_shared_words_snapshot() -> shared::words_py::Words {
-    let library = match reta_library() {
-        Ok(library) => library,
+    let get_json = match reta_shared_words_json_fn() {
+        Ok(get_json) => get_json,
         Err(message) => {
-            eprintln!("retaprompt_commands could not load libreta.so for shared words: {message}");
+            eprintln!("retaprompt_commands could not resolve reta_shared_words_json: {message}");
+            return shared::words_py::Words::empty();
+        }
+    };
+    let free = match reta_free_string_fn() {
+        Ok(free) => free,
+        Err(message) => {
+            eprintln!("retaprompt_commands could not resolve reta_free_string while loading words: {message}");
             return shared::words_py::Words::empty();
         }
     };
 
-    unsafe {
-        let get_json: libloading::Symbol<'_, RetaSharedWordsJsonFn> = match library.get(b"reta_shared_words_json") {
-            Ok(symbol) => symbol,
-            Err(error) => {
-                eprintln!("retaprompt_commands missing symbol reta_shared_words_json: {error}");
-                return shared::words_py::Words::empty();
-            }
-        };
-        let free: libloading::Symbol<'_, RetaFreeStringFn> = match library.get(b"reta_free_string") {
-            Ok(symbol) => symbol,
-            Err(error) => {
-                eprintln!("retaprompt_commands missing symbol reta_free_string while loading words: {error}");
-                return shared::words_py::Words::empty();
-            }
-        };
-
-        let ptr = get_json();
-        let json = take_owned_string(ptr, &free);
-        match serde_json::from_str::<shared::words_py::Words>(&json) {
-            Ok(words) => words,
-            Err(error) => {
-                eprintln!("retaprompt_commands could not deserialize shared words snapshot: {error}");
-                shared::words_py::Words::empty()
-            }
+    let ptr = unsafe { get_json() };
+    let json = unsafe { take_owned_string(ptr, free) };
+    match serde_json::from_str::<shared::words_py::Words>(&json) {
+        Ok(words) => words,
+        Err(error) => {
+            eprintln!("retaprompt_commands could not deserialize shared words snapshot: {error}");
+            shared::words_py::Words::empty()
         }
     }
 }
@@ -426,8 +397,81 @@ fn load_reta_library() -> Result<Library, String> {
     ))
 }
 
+fn reta_run_argv_fn() -> Result<RetaRunArgvFn, String> {
+    RETA_RUN_ARGV_FN
+        .get_or_init(|| {
+            let library = reta_library()?;
+            unsafe {
+                library
+                    .get::<RetaRunArgvFn>(b"reta_run_argv")
+                    .map(|symbol| *symbol)
+                    .map_err(|error| format!("missing symbol reta_run_argv: {error}"))
+            }
+        })
+        .clone()
+}
+
+fn reta_free_string_fn() -> Result<RetaFreeStringFn, String> {
+    RETA_FREE_STRING_FN
+        .get_or_init(|| {
+            let library = reta_library()?;
+            unsafe {
+                library
+                    .get::<RetaFreeStringFn>(b"reta_free_string")
+                    .map(|symbol| *symbol)
+                    .map_err(|error| format!("missing symbol reta_free_string: {error}"))
+            }
+        })
+        .clone()
+}
+
+fn reta_shared_words_json_fn() -> Result<RetaSharedWordsJsonFn, String> {
+    RETA_SHARED_WORDS_JSON_FN
+        .get_or_init(|| {
+            let library = reta_library()?;
+            unsafe {
+                library
+                    .get::<RetaSharedWordsJsonFn>(b"reta_shared_words_json")
+                    .map(|symbol| *symbol)
+                    .map_err(|error| format!("missing symbol reta_shared_words_json: {error}"))
+            }
+        })
+        .clone()
+}
+
+fn reta_all_main_alias_groups_json_fn() -> Result<RetaAllMainAliasGroupsJsonFn, String> {
+    RETA_ALL_MAIN_ALIAS_GROUPS_JSON_FN
+        .get_or_init(|| {
+            let library = reta_library()?;
+            unsafe {
+                library
+                    .get::<RetaAllMainAliasGroupsJsonFn>(b"reta_all_main_alias_groups_json")
+                    .map(|symbol| *symbol)
+                    .map_err(|error| format!("missing symbol reta_all_main_alias_groups_json: {error}"))
+            }
+        })
+        .clone()
+}
+
+fn reta_parameter_alias_groups_for_main_json_fn() -> Result<RetaParameterAliasGroupsForMainJsonFn, String> {
+    RETA_PARAMETER_ALIAS_GROUPS_FOR_MAIN_JSON_FN
+        .get_or_init(|| {
+            let library = reta_library()?;
+            unsafe {
+                library
+                    .get::<RetaParameterAliasGroupsForMainJsonFn>(b"reta_parameter_alias_groups_for_main_json")
+                    .map(|symbol| *symbol)
+                    .map_err(|error| format!("missing symbol reta_parameter_alias_groups_for_main_json: {error}"))
+            }
+        })
+        .clone()
+}
+
 pub fn preload_reta_bridge() -> Result<(), String> {
     let _ = reta_library()?;
+    let _ = reta_run_argv_fn()?;
+    let _ = reta_free_string_fn()?;
+    let _ = reta_shared_words_json_fn()?;
     let _ = shared_words();
     Ok(())
 }
@@ -470,10 +514,7 @@ fn to_c_string_lossy(text: &str) -> CString {
     CString::new(sanitized).expect("sanitized string must not contain interior null bytes")
 }
 
-unsafe fn take_owned_string(
-    ptr: *mut c_char,
-    free: &libloading::Symbol<'_, RetaFreeStringFn>,
-) -> String {
+unsafe fn take_owned_string(ptr: *mut c_char, free: RetaFreeStringFn) -> String {
     if ptr.is_null() {
         return String::new();
     }
