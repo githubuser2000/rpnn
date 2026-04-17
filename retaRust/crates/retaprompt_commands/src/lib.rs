@@ -6,9 +6,7 @@ use std::os::raw::c_char;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use indexmap::IndexMap;
 use libloading::{library_filename, Library};
-use serde::{Deserialize, Serialize};
 
 pub mod shared {
     pub mod words_py {
@@ -88,7 +86,7 @@ pub mod domain {
             _words: &crate::shared::words_py::Words,
             main_alias: &str,
         ) -> Option<String> {
-            let library = match crate::load_reta_library() {
+            let library = match crate::reta_library() {
                 Ok(library) => library,
                 Err(message) => {
                     eprintln!(
@@ -135,7 +133,7 @@ pub mod domain {
             symbol_name: &[u8],
             canonical_main: Option<&str>,
         ) -> Vec<PythonAliasGroup> {
-            let library = match crate::load_reta_library() {
+            let library = match crate::reta_library() {
                 Ok(library) => library,
                 Err(message) => {
                     eprintln!(
@@ -295,7 +293,7 @@ where
     A: AsRef<[String]>,
 {
     let args = argv.as_ref();
-    let library = match load_reta_library() {
+    let library = match reta_library() {
         Ok(library) => library,
         Err(message) => {
             return RetaRunResult {
@@ -359,7 +357,7 @@ pub fn shared_words() -> &'static shared::words_py::Words {
 }
 
 fn load_shared_words_snapshot() -> shared::words_py::Words {
-    let library = match load_reta_library() {
+    let library = match reta_library() {
         Ok(library) => library,
         Err(message) => {
             eprintln!("retaprompt_commands could not load libreta.so for shared words: {message}");
@@ -402,6 +400,17 @@ fn detect_terminal_width() -> Option<usize> {
         .filter(|width| *width > 0)
 }
 
+static RETA_LIBRARY: OnceLock<Result<usize, String>> = OnceLock::new();
+
+fn reta_library() -> Result<&'static Library, String> {
+    match RETA_LIBRARY.get_or_init(|| {
+        load_reta_library().map(|library| Box::leak(Box::new(library)) as *mut Library as usize)
+    }) {
+        Ok(ptr) => Ok(unsafe { &*(*ptr as *const Library) }),
+        Err(message) => Err(message.clone()),
+    }
+}
+
 fn load_reta_library() -> Result<Library, String> {
     let mut errors = Vec::new();
     for candidate in library_candidates("reta", "RETA_LIB_PATH") {
@@ -415,6 +424,12 @@ fn load_reta_library() -> Result<Library, String> {
         "could not load libreta.so; tried {}",
         errors.join(" | ")
     ))
+}
+
+pub fn preload_reta_bridge() -> Result<(), String> {
+    let _ = reta_library()?;
+    let _ = shared_words();
+    Ok(())
 }
 
 fn library_candidates(base_name: &str, env_var: &str) -> Vec<PathBuf> {
@@ -641,6 +656,10 @@ pub fn run_kind_from_abi_value(kind: i32) -> i32 {
 }
 
 pub fn run_input_kind(argv: Vec<String>, kind: PromptCommandFrontendKind) -> i32 {
+    if let Err(message) = preload_reta_bridge() {
+        eprintln!("retaprompt_commands could not preload libreta.so for input frontend: {message}");
+    }
+
     match kind {
         PromptCommandFrontendKind::Rp
         | PromptCommandFrontendKind::Rpl
