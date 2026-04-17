@@ -1764,6 +1764,17 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         " ".to_string()
     }
 
+    fn limit_cell_height_py(&self, cell: &str) -> String {
+        if self.textHeight <= 0 {
+            return cell.to_string();
+        }
+        cell.split('\n')
+            .take(self.textHeight as usize)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+
     fn render_structured_output_py(
         &mut self,
         finallyDisplayLines: &[String],
@@ -1793,7 +1804,8 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         fields.push(Self::csv_escape_cell_py(&label));
                     }
                     for cell in row {
-                        fields.push(Self::csv_escape_cell_py(cell));
+                        let limited = self.limit_cell_height_py(cell);
+                        fields.push(Self::csv_escape_cell_py(&limited));
                     }
                     let line = fields.join(";");
                     out_lines.push(line.clone());
@@ -1818,7 +1830,8 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         cells.push(Self::markdown_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
                     }
                     for cell in row {
-                        cells.push(Self::markdown_escape_cell_py(cell));
+                        let limited = self.limit_cell_height_py(cell);
+                        cells.push(Self::markdown_escape_cell_py(&limited));
                     }
                     let line = format!("|{}|", cells.join("|"));
                     out_lines.push(line.clone());
@@ -1848,7 +1861,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         cells.push(self.row_prefix_text_py(row_number, is_header));
                         cells.push(finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
                     }
-                    cells.extend(row.iter().cloned());
+                    cells.extend(row.iter().map(|cell| self.limit_cell_height_py(cell)));
                     let line = format!("|{}|", cells.join("|"));
                     out_lines.push(line.clone());
                     let mut block = vec![line];
@@ -1896,7 +1909,8 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                     for (visible_idx, cell) in row.iter().enumerate() {
                         let html_col_idx = if self.nummeriere { visible_idx + 2 } else { visible_idx };
                         let original_col = displayed_columns.get(visible_idx).cloned().flatten();
-                        let escaped = Self::html_escape_cell_py(cell);
+                        let limited = self.limit_cell_height_py(cell);
+                        let escaped = Self::html_escape_cell_py(&limited);
                         let attrs = self.html_runtime_attrs_exact_py(
                             &words,
                             original_col,
@@ -1933,7 +1947,8 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         cells.push(format!("[td]{}[/td]", finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
                     }
                     for cell in row {
-                        cells.push(format!("[td]{}[/td]", cell.replace('\n', "<br>")));
+                        let limited = self.limit_cell_height_py(cell);
+                        cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
                     }
                     let line = format!("[tr]{}[/tr]", cells.join(""));
                     out_lines.push(line.clone());
@@ -2110,7 +2125,13 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                     wrapped_cells.push(wrapped);
                 }
 
-                for sub_idx in 0..max_sub {
+                let visible_sub_count = if self.textHeight > 0 {
+                    max_sub.min(self.textHeight as usize)
+                } else {
+                    max_sub
+                };
+
+                for sub_idx in 0..visible_sub_count {
                     let mut line = String::new();
 
                     if self.nummeriere {
@@ -2234,3 +2255,40 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
 
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::shared::reta_program_types::Program;
+
+    #[test]
+    fn text_height_limits_wrapped_shell_output_lines() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.nocolor = true;
+        program.nummeriere = false;
+        program.oneTable = true;
+        program.textWidth = 3;
+        program.textHeight = 2;
+
+        let table = vec![vec!["abcdefghi".to_string()]];
+        let _ = program.cliOut_py(vec!["1".to_string()], table.clone(), 1, vec![1]);
+
+        assert_eq!(program.finallyDisplayLines, vec!["abc".to_string(), "def".to_string()]);
+    }
+
+    #[test]
+    fn text_height_limits_structured_cells_too() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "csv".to_string();
+        program.nummeriere = false;
+        program.textHeight = 2;
+
+        let table = vec![vec!["a\nb\nc".to_string()]];
+        let _ = program.cliOut_py(vec!["1".to_string()], table, 1, vec![1]);
+
+        let joined = program.finallyDisplayLines.join("\n");
+        assert!(joined.contains("a\nb"));
+        assert!(!joined.contains("c"));
+    }
+}
+

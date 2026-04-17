@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 use indexmap::IndexMap;
 
+use crate::doc_tools::markdown_reader::read_doc_file;
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Generated2Selection, GeneratorPairSelection, Program, SpaltenTyp};
 use crate::shared::reta_runtime_cache::{shared_reta_static_data, GeneratorFamilyData};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
@@ -21,6 +22,7 @@ impl Program {
             "  --alles".to_string(),
             "  --zeit=gestern,heute,morgen".to_string(),
             "  --zaehlung=1,2,3".to_string(),
+            "  --hoehemaximal=2".to_string(),
             "  --typ=sonne,mond,planet,schwarzesonne,SonneMitMondanteil".to_string(),
             "  --primzahlen=aussenalle,innenalle,aussenerste,innenerste".to_string(),
             "  --vielfachevonzahlen=1,2,3".to_string(),
@@ -70,9 +72,18 @@ impl Program {
         ]
     }
 
+    fn help_lines_from_readme_py(&self) -> Option<Vec<String>> {
+        read_doc_file("readme-reta.md")
+            .ok()
+            .map(|text| text.replace("\r\n", "\n"))
+            .map(|text| text.lines().map(|line| line.to_string()).collect())
+    }
+
     pub fn helpPage(&mut self) -> bool {
         if self.argvWithoutProgram.iter().any(|a| a == "-h" || a == "-help" || a == "--help") {
-            self.finallyDisplayLines = self.help_lines_py();
+            self.finallyDisplayLines = self
+                .help_lines_from_readme_py()
+                .unwrap_or_else(|| self.help_lines_py());
             return true;
         }
         false
@@ -315,7 +326,7 @@ impl Program {
                     }
                 } else if let Some(tail) = sub.strip_prefix("hoehemaximal=") {
                     if tail.trim().chars().all(|c| c.is_ascii_digit()) {
-                        self.textWidth = tail.trim().parse::<i64>().unwrap_or(self.textWidth);
+                        self.textHeight = tail.trim().parse::<i64>().unwrap_or(self.textHeight);
                     }
                 } else if let Some(tail) = sub.strip_prefix("typ=") {
                     self.obZeilenBereicheAngegeben = true;
@@ -856,6 +867,7 @@ impl Program {
         self.breite = 0;
         self.breiten = vec![];
         self.textWidth = 21;
+        self.textHeight = 0;
         self.shellRowsAmount = 0;
         self.shellWidth = 0;
         self.spaltenreihenfolgeundnurdiese = vec![];
@@ -1030,3 +1042,67 @@ impl Program {
         self.__invertAlles = true;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+
+    fn empty_words() -> Words {
+        Words {
+            paraNdataMatrix: vec![],
+            kombiParaNdataMatrix: IndexMap::new(),
+            kombiParaNdataMatrix2: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn help_page_uses_same_readme_source_as_python() {
+        let mut program = Program::new(vec!["reta".to_string(), "-h".to_string()]);
+        assert!(program.helpPage());
+
+        let expected_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("doc")
+            .join("readme-reta.md");
+        let expected = fs::read_to_string(expected_path).expect("readme-reta.md must exist");
+        let expected_lines: Vec<String> = expected
+            .replace("\r\n", "\n")
+            .lines()
+            .map(|line| line.to_string())
+            .collect();
+
+        assert_eq!(program.finallyDisplayLines, expected_lines);
+        assert!(program.finallyDisplayLines.iter().any(|line| line.contains("## -zeilen")));
+    }
+
+    #[test]
+    fn zeilen_parser_accepts_all_python_parameters_and_sets_height() {
+        let words = empty_words();
+        let argv = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--alles".to_string(),
+            "--zeit=gestern,heute,morgen".to_string(),
+            "--zaehlung=1,2,3".to_string(),
+            "--hoehemaximal=2".to_string(),
+            "--typ=sonne,mond,planet,schwarzesonne,SonneMitMondanteil".to_string(),
+            "--primzahlen=aussenalle,innenalle,aussenerste,innenerste".to_string(),
+            "--vielfachevonzahlen=2,3".to_string(),
+            "--primzahlvielfache=2,3".to_string(),
+            "--vorhervonausschnitt=1-3,5".to_string(),
+            "--vorhervonausschnittteiler".to_string(),
+            "--nachtraeglichneuabzaehlung=2".to_string(),
+            "--nachtraeglichneuabzaehlungvielfache=2".to_string(),
+            "--potenzenvonzahlen=2,3".to_string(),
+            "--oberesmaximum=2000".to_string(),
+            "--invertieren".to_string(),
+        ];
+        let mut program = Program::new(argv.clone());
+        let _ = program.parametersToCommandsAndNumbers(&argv, "", &words);
+
+        assert!(program.cliErrors.is_empty(), "unexpected zeilen parser errors: {:?}", program.cliErrors);
+        assert_eq!(program.textHeight, 2);
+    }
+}
+

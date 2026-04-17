@@ -67,31 +67,35 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
     * --breiten=
         * 30,40,70
     
-    * --wichtigsteverstehen= 
+    * --wichtigste= 
         * wichtigste,zweitwichtigste,drittwichtigste,viertwichtigste
     * --menschliches= 
-        * menschtier,ansichten,richtungen,klasse,moral,fachgebiete,sinndeslebens,intelligenzprobleme,lebewesendenkweise,gegentranszendentalien,gleichheitfreiheit,emotionen,egoismus,wirkung,incel,irrationalezahlendurchwurzelbildung,dominierendesgeschlecht,liebe,glauben,angreifbarkeit,motive,positionen,bewusstsein,errungenschaften,evolutionärerwerbenundintelligenz,benoetigen,krankheit,alphabeta,anfuehrer,manipulation,berufe,lösungen,musik,ehrlich
+        * menschtier,kriminell,goetter,Sinne,Superkraefte,Formationen,ansichten,richtungen,Satan_Teufel,bestrafen,diplomatie,Bestrafung,weniger_am_Menschen,Erloesung,Gewalt,Zeitalter,Himmel_Hoelle_Kettenmolekuele,Spiele-Genre,Land_Laender-Dach-Organisation,raenge,klasse,moral,fachgebiete,sinndeslebens,intelligenzprobleme,lebewesendenkweise,gegentranszendentalien,gleichheitfreiheit,emotionen,egoismus,wirkung,incel,irrationalezahlendurchwurzelbildung,dominierendesgeschlecht,liebe,glauben,angreifbarkeit,sadist,verbundenheiten,motive,positionen,bewusstsein,errungenschaften,evolutionärerwerbenundintelligenz,benoetigen,krankheit,alphabeta,anfuehrer_und_boss,Biologischer_Baum_(15),manipulation,berufe,lösungen,musik,ehrlich,konservativ,Professioneller,managen,intelligent_Design,karriere,elite
+    * --herrschaft= 
+        * cluster,formen,orbit,struktur,sonne,Galaxie,abstrakt,Speziesherrschaftsformen,planet
+    * --metachemiemetametaphysik= 
+        * Meta_Meta_Physik_Einteilungen,kybernetik
+    * --universum= 
+        * winkel,logik,objekt,Evolution_vs_Design_intelligent,Spezies_Entwicklung,Teilchen_anderes_Universum,Zusammenhang_Gehirn_Kosmos_Universum,zahlen,Farben,künstlichesleben,softwarelizenz,strategie,verhaeltnisgleicherzahl,recht,kombinierenetc,hochzüchten,Teilchen-Meta-Physik,metaparadigmareligion,kugelnkreise,analytischeontologie,gegentranszendentalien,systemsachen,transzendentalien,transzendentalienreziproke,netzwerk,warumtranszendentaliezustrukturgroesseundcharakter,kategorie,weltall,programmierparadigmen,geist,warumtranszendentaliegleichkomplexitaet,modelofhierarchicalcomplexity,spezies,Biologischer_Baum_(15),morphismus
     * --planet= 
-        * wirklichkeit,metasysteme,intelligenz,gleichheit,komplexität,mechanismen
-    * --wichtigsteeinordnen= 
+        * logik,kreislauf,herrschaft,wirklichkeit,metasysteme,intelligenz,gleichheit,komplexität,mechanismen
+    * --religionen= 
+        * Superkraefte,religionsgründertyp,Satan_Teufel,hinduismus,sternpolygon,dertierkreiszeichen,vergleich,messias,gleichförmigespolygon,vertreterhoehererkonzepte
+    * --galaxie= 
+        * Superkraefte,Lebewesen_Galaxie_am_Besten,offenbarung,hochzüchten,kugelnkreise,chinesischeshoroskop,tierkreiszeichen,thomasevangelium,analytischeontologie,innenaussenstrukur,modallogik,ZergAliens_MenschenHumanoid_ProtosPraedatoren,weltall
+    * --wichtigste2= 
         * wichtigstes,zweitwichtigste
     * --operationen= 
         * halbierung,fünf,neun,drei,zwei,multiplikation,vier
-    * --religionen= 
-        * religionsgründertyp,hinduismus,sternpolygon,dertierkreiszeichen,vergleich,messias,gleichförmigespolygon,vertreterhoehererkonzepte
-    * --galaxie= 
-        * offenbarung,hochzüchten,kugelnkreise,chinesischeshoroskop,tierkreiszeichen,thomasevangelium,analytischeontologie,innenaussenstrukur,modallogik,weltall
     * --inkrementieren= 
         * addition,um1,um2,um3,warumtranszendentaliezustrukturgroesseundcharakter,warumtranszendentaliegleichkomplexitaet
-    * --universum= 
-        * künstlichesleben,strategie,verhaeltnisgleicherzahl,recht,kombinierenetc,hochzüchten,Teilchen-Meta-Physik,metaparadigmareligion,kugelnkreise,analytischeontologie,gegentranszendentalien,systemsachen,transzendentalien,transzendentalienreziproke,netzwerk,warumtranszendentaliezustrukturgroesseundcharakter,kategorie,weltall,programmierparadigmen,geist,warumtranszendentaliegleichkomplexitaet,modelofhierarchicalcomplexity
-    * --teilchen= 
-        * das_Universelle_(15),wirklichkeit,das_Glaktische_(14),das_Multiverselle_(16),die_Tugendsortierung_(13_mit_14),die_Galaxie_Unterbereiche_(13),das_Gute_die_Richtung_(7),Raum_und_Dimensionen_(8)
     * --multiversum= 
-        * multiversalien,teilchen
+        * farbe,Computer,kybernetik,Teilchen_anderes_Universum,Raumzeit_Anordnung_mathematisch_universell,multiversalien,teilchen,modelofhierarchicalcomplexity,Transzendentalien,geist,Struktur-Wissenschaften_(10),Muster-Wissenschaften_(20),Biologischer_Baum_(16_->_5),Religionen_Kraefte_Krieg_der_Sterne_Star_Wars,p,p5
     * --grundstrukturen= 
-        * netzwerk,mathematischesdesign,analytischeontologie,modelofhierarchicalcomplexity,Transzendentalien,bedingung,lebensbereiche,massnahmen,relativreziprokuniversell,universellerkomperativ,existenzialien,extremalien,erwartungen,leidenschaft,relativerzeitbetrag,zahlenvergleich,bestrebung,prinzipien,attraktionen,optimierung,themen,bedeutung,reziproke,achtung,zeit,absicht16,absicht17,absicht6,absicht7,bewusstheit,verhalten,energie,garben,nachvollziehen,empathie,absicht1/6,innerewerte,absicht10,geist,reflex,lust,paradigmen,wirklichkeit,rechnen,stimmung,klasse,ordnen,metasysteme,absicht1pro8,ziele,konkreta,gefuehle,abhaengigkeit,karte,fundament,positionen,vorstellungen,sollen,ansichten,verbundenheiten,absicht13,liebe,koalitionen,gegen_5,impulse,trieb,reflektion,zustaende
-    * --groessenordnung= 
+        * Teilchen_anderes_Universum,Bestrafung,Erloesung,Gewalt,netzwerk,kontroverse,mathematischesdesign,analytischeontologie,Größenordnung,modelofhierarchicalcomplexity,system,Transzendentalien,bedingung,lebensbereiche,massnahmen,relativreziprokuniversell,universellerkomperativ,existenzialien,extremalien,erwartungen,leidenschaft,relativerzeitbetrag,zahlenvergleich,bestrebung,prinzipien,attraktionen,optimierung,themen,bedeutung,reziproke,achtung,zeit,absicht16,absicht17,absicht6,absicht7,bewusstheit,verhalten,energie,garben,nachvollziehen,empathie,absicht1/6,innerewerte,absicht10,wohlbefinden,geist,reflex,lust,paradigmen,wirklichkeit,rechnen,stimmung,Anführer_Arten_(7),klasse,ordnen,metasysteme,absicht1pro8,ziele,konkreta,gefuehle,abhaengigkeit,karte,fundament,positionen,vorstellungen,sollen,ansichten,verbundenheiten,absicht13,liebe,koalitionen,gegen_5,impulse,trieb,tätigkeiten,reflektion,zustaende,Biologischer_Baum_(15)
+    * --teilchen= 
+        * das_Universelle_(15),wirklichkeit,das_Galaktische_(14),das_Multiverselle_(16),die_Tugendsortierung_(13_mit_14),die_Galaxie_Unterbereiche_(13),das_Gute_die_Richtung_(7),Raum_und_Dimensionen_(8)
+    * --strukturgroesse= 
         * licht,Größenordnung,organisationen,politischesysteme
     * --universummetakonkret= 
         * meta,konkret,theorie,praxis,management,veraendernd,mathematisch_diskret,hinausgehend,unternehmen,wert,regieren,richtung
@@ -105,20 +109,23 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
     * --bedeutung= 
         * primzahlkreuz,inreta,vorzeichen,primzahlen,anwendungdersonnenundmonde,zählungen,jura,vollkommenheit,gestirn,konjunktiv,mechanismen
     * --gebrochengalaxie= 
-        * 17,3,8,15,12,5,4,9,23,22,13,16,18,20,7,6,14,11,2,10,21,19
+        * 3
     * --gebrochenuniversum= 
-        * 17,3,8,15,12,5,4,9,23,22,13,16,18,20,7,6,14,11,2,10,21,19
+        * 3
     * --gebrochenemotion= 
-        * 17,3,8,15,12,5,4,9,23,22,13,16,18,20,7,6,14,11,2,10,21,19
+        * 3
     * --gebrochengroesse= 
-        * 17,3,8,15,12,5,4,9,23,22,13,16,18,20,7,6,14,11,2,10,21,19
-    * --symbole 
-    * --eigenschaften= 
+        * 3
+    * --symbole= 
+        * Religionen,Drei,Vier,Fuenf,Sechs,Sieben,Acht,Neun,Zehn,Zwoelf
+    * --konzept= 
         * weisheit,rechte,unterlegen,streit,einklinken,familiebrauchen,bescheiden,selbstsucht,wissenschaft,arschloch,liebe,selbstlos,eintönig,abgeneigt,ehrlich,tragweite,wertlos,familiaer,sanft,vereinenverbinden,aehnlich,gut,sinn,zeit,egalitaerautoritaer,meinungen,meinungsintelligenz,sittlichkeit,führung,durchleuchten,foerdern,überheblich,liebepolung,egoismus,geltung,gleich,ueberleben
     * --konzept2= 
         * wuerdig,regel,filterart,werte,position,reflektieren,vertrauenwollen,einrichten,toleranz
-    * --multiplikationen= 
+    * --primvielfache= 
         * rahmen,motivgleichfoermig,strukturgleichfoermig,motivstern,strukturstern,motivgebrstern,strukgebrstern,motivgebrgleichf,strukgebrgleichf,beschrieben
+    * --kontinuum= 
+        * q,ab,z,aa,I,g,j,K,e,l,au,ak,ae,ad,ac,at,w,y,F,f,o,h,n,m,t,p5,p,x,s,r,a,b,c,d
 
 
 ## -kombination

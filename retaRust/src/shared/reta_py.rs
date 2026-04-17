@@ -13,7 +13,7 @@ impl Program {
 
     pub fn snapshot(&self) -> String {
         format!(
-            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?} resultingTableRows={} allesParameters={} spaltenNumbers={} ifPrint={} rowRangeLen={} shellRowsAmount={} shellWidth={} finallyDisplayLines={} ifZeilenSetToInf={} tables={} numlen={} old2Rows={} newerTable={} finallyDisplayLinesByChunks={} rowsOfcombi={} oldRows={} newerRows={} oldTable={} generatedSpaltenParameter={} generatedSpaltenParameterExact={} generatedSpaltenParameterTags={} allEquColumns={} finallyDisplayTable={} bigParamaeter={:?} obZeilenBereicheAngegeben={} breiteHasBeenOnceZero={} breiteORbreiten={} spaltenreihenfolgeundnurdiese={:?} puniverseprims={} generRows={} rowsAsNumbersNot={} rowsOfcombiNot={} htmlOrBBcode={} spaltenArtenKeys={}",
+            "paraMainDict={} paraDict={} dataDict0={} dataDict3={} kombi1={} kombi2={} newTable={} argvWithoutProgram={:?} beginDone={} runDone={} hoechsteZeile={} tableGenerated={} relitableRows={} RowsLen={} cliErrors={} sideParas={:?} resultingTableRows={} allesParameters={} spaltenNumbers={} ifPrint={} rowRangeLen={} shellRowsAmount={} shellWidth={} finallyDisplayLines={} ifZeilenSetToInf={} tables={} numlen={} old2Rows={} newerTable={} finallyDisplayLinesByChunks={} rowsOfcombi={} oldRows={} newerRows={} oldTable={} generatedSpaltenParameter={} generatedSpaltenParameterExact={} generatedSpaltenParameterTags={} allEquColumns={} finallyDisplayTable={} bigParamaeter={:?} obZeilenBereicheAngegeben={} breiteHasBeenOnceZero={} breiteORbreiten={} spaltenreihenfolgeundnurdiese={:?} puniverseprims={} generRows={} rowsAsNumbersNot={} rowsOfcombiNot={} htmlOrBBcode={} textHeight={} spaltenArtenKeys={}",
             self.paraMainDict.len(),
             self.paraDict.len(),
             self.dataDicts[0].len(),
@@ -63,6 +63,7 @@ impl Program {
             self.rowsAsNumbersNot.len(),
             self.rowsOfcombiNot.len(),
             self.htmlOrBBcode,
+            self.textHeight,
             self.spaltenArtenKey_SpaltennummernValue.len()
         )
     }
