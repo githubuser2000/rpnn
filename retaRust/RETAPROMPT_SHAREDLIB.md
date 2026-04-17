@@ -1,70 +1,104 @@
-# retaPrompt shared library split
+# retaPrompt shared libraries: actual state vs. target state
 
-Zielzustand für retaPrompt:
+## Fachliche Zieltrennung
+
+Deine gewünschte Aufteilung ist fachlich klar:
 
 - `libreta.so`
-  - gesamte gemeinsame Implementierung und Python-nahe Kernlogik
+  - nur `reta`
+  - kein retaPrompt-Besitz
 - `libretaprompt_commands.so`
-  - gemeinsame Befehls-/Command-Schicht für `rpb`, `rp`, `rpl`, `rpe`
+  - nur retaPrompt-Command-Seite
+  - öffentliche ABI:
+    - `retaprompt_commands_run_kind_from_env`
+    - `retaprompt_commands_run_current_executable_from_env`
+    - `retaprompt_commands_run_rp_from_env`
+    - `retaprompt_commands_run_rpl_from_env`
+    - `retaprompt_commands_run_rpb_from_env`
+    - `retaprompt_commands_run_rpe_from_env`
 - `libretaprompt_input.so`
-  - eigene/interaktive CLI-Eingabeschicht für `rp`, `rpl`, `rpe`
-  - oberster Launcher-Dispatch für `rp`, `rpl`, `rpe`, `rpb`
+  - nur retaPrompt-Input-/Launcher-Seite für `rp`, `rpl`, `rpe`
+  - öffentliche ABI:
+    - `retaprompt_input_run_kind_from_env`
+    - `retaprompt_input_run_current_executable_from_env`
+    - `retaprompt_input_run_any_current_executable_from_env`
+    - `retaprompt_input_run_launcher_kind_from_env`
+    - `retaprompt_input_run_rp_from_env`
+    - `retaprompt_input_run_rpl_from_env`
+    - `retaprompt_input_run_rpe_from_env`
 
-## Abhängigkeitsrichtung
+## Was am alten Shim-Weg falsch war
 
-```text
-rp/rpl/rpe/rpb -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
-```
+Der frühere `tools/build_prompt_split_sharedlibs.sh` hat versucht, Doppelungen dadurch zu vermeiden,
+dass die sichtbaren retaPrompt-Libraries nur noch C-Forwarder wurden und die eigentliche retaPrompt-
+Laufzeit über `libreta.so` lief.
 
-- `retaprompt_input` hängt bewusst von `retaprompt_commands` ab.
-- `retaprompt_commands` hängt bewusst nur von `reta` ab.
-- `reta` bleibt die Kernbibliothek.
+Das verletzt genau die gewünschte Trennung:
 
-## Aktiver Cargo-Bauweg
+- prompt-spezifische ABI landet in `libreta.so`
+- retaPrompt-Libraries werden künstlich leergezogen
+- die öffentliche ABI der Command-Library wurde dabei sogar unvollständig
+  (die Header/API wollten mehr als der Shim-Pfad tatsächlich exportierte)
 
-Die drei dynamischen Libraries werden im aktiven Verpackungsweg bewusst als kleine Forwarder mit expliziter Link-Abhängigkeitskette gebaut, damit `libreta.so` nicht mehrfach dupliziert wird und die Dateibeziehungen im ELF-Metadatenraum sichtbar bleiben:
+Deshalb ist dieser Weg hier auf den einfachen Cargo- plus Launcher-Bau zurückgesetzt.
+
+## Einfacher Bauweg
+
+Der aktive einfache Bauweg bleibt:
 
 ```bash
-./tools/build_prompt_split_sharedlibs.sh
+./build.sh release
 ```
 
-Die vier Launcher sind dabei absichtlich extrem klein und enthalten nur den festen Einstiegspunkt je Frontend.
+bzw.
 
-## Vier dünne Launcher
-
-Es gibt vier extrem kleine Launcher-Binaries:
-
-- `rp` ruft fest `retaprompt_input_run_launcher_kind_from_env(1)` auf
-- `rpl` ruft fest `retaprompt_input_run_launcher_kind_from_env(2)` auf
-- `rpb` ruft fest `retaprompt_input_run_launcher_kind_from_env(3)` auf
-- `rpe` ruft fest `retaprompt_input_run_launcher_kind_from_env(4)` auf
-
-Damit wissen die Executables selbst bereits, welches Frontend sie starten sollen, und müssen nicht erst über Dateinamen geraten.
-
-Dann gilt:
-
-```text
-rp  -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
-rpl -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
-rpe -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
-rpb -> libretaprompt_input.so -> libretaprompt_commands.so -> libreta.so
+```bash
+./build.sh debug
 ```
 
-Die fachliche Unterscheidung bleibt dabei in den Libraries:
+Er macht genau zwei Dinge:
 
-- `rp`, `rpl`, `rpe` laufen im Input-Pfad
-- `rpb` läuft im Command-Pfad
+1. `cargo build --workspace`
+2. danach die vier kleinen C-Launcher linken
+   - `rp`, `rpl`, `rpe` gegen `libretaprompt_input.so`
+   - `rpb` gegen `libretaprompt_commands.so`
 
-## Warum vier feste Mini-Launcher?
+## Wichtige Ehrlichkeit zum aktuellen Rust-Linking
 
-So bleibt in den Executables fast nichts übrig:
+Dieser einfache Bauweg respektiert die Library-Grenzen auf API- und Launcher-Ebene.
+Er löst aber **noch nicht** die physische Entdoppelung des Rust-Codes zwischen den drei `.so`.
 
-- genau ein `main()`
-- genau ein fester Sprung in `retaprompt_input`
-- die komplette Fachlogik lebt weiter in den `.so`-Bibliotheken
+Grund:
 
-Zusätzlich ist die Abhängigkeit jetzt auch auf ELF-Ebene klar:
+- `retaprompt_commands` ist aktuell ein Rust-`cdylib` mit Rust-Abhängigkeit auf `reta`
+- `retaprompt_input` ist aktuell ein Rust-`cdylib` mit Rust-Abhängigkeit auf `reta`
+  und zusätzlich auf `retaprompt_commands`
+- bei normalem Cargo-`cdylib`-Linking werden diese Rust-Abhängigkeiten nicht als saubere
+  Laufzeitkette zwischen den drei öffentlichen `.so` realisiert, sondern in die jeweiligen
+  Shared Objects eingebunden
 
-- `rp/rpl/rpe/rpb` kennen `libretaprompt_input.so`
-- `libretaprompt_input.so` kennt `libretaprompt_commands.so`
-- `libretaprompt_commands.so` kennt `libreta.so`
+Das heißt:
+
+- die einfache Build-Kette bleibt einfach
+- die fachliche Zuordnung bleibt richtig
+- die vollständige Binär-Entdoppelung ist damit aber noch **nicht** erreicht
+
+## Was für echte Entdoppelung noch nötig ist
+
+Für echte Entdoppelung ohne falsches Verschieben nach `libreta.so` muss die Code-Besitzstruktur
+geändert werden, nicht bloß das Verpackungsskript.
+
+Dazu gehören insbesondere:
+
+1. retaPrompt-spezifischen Code aus dem Root-`reta` herauslösen
+2. `retaprompt_input -> retaprompt_commands` nicht mehr als normale Rust-`cdylib`-Abhängigkeit,
+   sondern über eine echte ABI-/Laufzeitgrenze lösen
+3. `retaprompt_commands -> reta` ebenfalls so anbinden, dass `reta` nicht in der Command-Library
+   noch einmal als Rust-Code landet
+
+Erst dann gilt wirklich:
+
+- `libreta.so` nur `reta`
+- `libretaprompt_commands.so` nur Command-Seite
+- `libretaprompt_input.so` nur Input-/Launcher-Seite
+- keine doppelte oder dreifache Eigenimplementierung in den drei `.so`

@@ -1,6 +1,5 @@
 pub mod domain;
 pub mod doc_tools;
-pub mod prompt;
 pub mod runtime;
 pub mod shared;
 

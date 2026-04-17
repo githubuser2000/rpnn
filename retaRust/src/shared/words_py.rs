@@ -1,8 +1,9 @@
 #![allow(non_snake_case)]
 
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum PyValue {
     Int(i64),
     Str(String),
@@ -11,14 +12,14 @@ pub enum PyValue {
     NoneValue,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoreParameterEntry {
     pub parameterMainNames: Vec<String>,
     pub parameterNames: Vec<String>,
     pub datas: Vec<Vec<PyValue>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Words {
     pub paraNdataMatrix: Vec<StoreParameterEntry>,
     pub kombiParaNdataMatrix: IndexMap<i64, Vec<String>>,

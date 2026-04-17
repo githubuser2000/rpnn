@@ -1,13 +1,43 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROFILE="${1:-release}"
+case "$PROFILE" in
+  debug)
+    CARGO_FLAGS=()
+    TARGET_DIR="target/debug"
+    ;;
+  release)
+    CARGO_FLAGS=(--release)
+    TARGET_DIR="target/release"
+    ;;
+  *)
+    echo "usage: $0 [debug|release]" >&2
+    exit 1
+    ;;
+esac
 
 cargo clean
-cargo build --workspace --release
+cargo build --workspace "${CARGO_FLAGS[@]}"
 
-for bin in rp rpl rpe rpb; do
-  cc tools/launchers/$bin.c -o target/release/$bin \
-    -Ltarget/release -lretaprompt_input \
-    -Wl,-rpath,'$ORIGIN'
-done
+mkdir -p "$TARGET_DIR"
 
-echo "Build complete"
+link_launcher() {
+  local source="$1"
+  local output="$2"
+  local library="$3"
+  cc "$source" \
+    -o "$output" \
+    -L"$TARGET_DIR" \
+    -l"$library" \
+    -Wl,-rpath,'$ORIGIN' \
+    -Wl,-rpath,'$ORIGIN/lib' \
+    -Wl,-rpath,'$ORIGIN/../lib'
+}
+
+link_launcher tools/launchers/rp.c  "$TARGET_DIR/rp"  retaprompt_input
+link_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl" retaprompt_input
+link_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe" retaprompt_input
+link_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb" retaprompt_commands
+
+echo "Build complete: $TARGET_DIR"

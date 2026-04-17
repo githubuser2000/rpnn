@@ -1,10 +1,8 @@
 [package]
 name = "retaprompt"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2024"
 autobins = false
-description = "Additive static library and binary frontend package for retaPrompt (rp/rpl/rpb/rpe)."
-license = "MIT OR Apache-2.0"
 publish = false
 
 [lib]
@@ -13,5 +11,4 @@ path = "src/lib.rs"
 crate-type = ["rlib"]
 
 [dependencies]
-reta = { path = "../.." }
-
+retaprompt_commands = { path = "../retaprompt_commands" }

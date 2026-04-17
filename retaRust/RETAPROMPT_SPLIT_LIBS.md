@@ -1,69 +1,33 @@
-# retaPrompt split library layout
+# retaPrompt split libraries
 
-This repository keeps `reta` as the unchanged shared core library.
-The retaPrompt side is split additively into two independent libraries.
-A thin frontend package may stay in the repository as preserved wrapper code,
-but it is not part of the active split itself.
+## Gewollte Rollen
 
-## Active layout
+- `libreta.so`
+  - nur `reta`
+- `libretaprompt_commands.so`
+  - retaPrompt-Command-Library
+  - für `rpb`, `rp`, `rpl`, `rpe`
+- `libretaprompt_input.so`
+  - retaPrompt-Input-/Launcher-Library
+  - für `rp`, `rpl`, `rpe`
+  - oberer Launcher-Dispatch für `rp`, `rpl`, `rpb`, `rpe`
 
-1. `reta`
-   - unchanged core library
-   - single shared lower layer
-   - contains the real reusable implementation that the split prompt libraries call
+## Direkte Launcher-Zuordnung
 
-2. `retaprompt_input`
-   - only own command input for `rp`, `rpl`, `rpe`
-   - depends only on `reta`
-   - no dependency on `retaprompt_commands`
-   - no copied code from `reta`
+- `rp`  -> `libretaprompt_input.so`
+- `rpl` -> `libretaprompt_input.so`
+- `rpe` -> `libretaprompt_input.so`
+- `rpb` -> `libretaprompt_commands.so`
 
-3. `retaprompt_commands`
-   - only command-topic handling for `rp`, `rpl`, `rpe`, `rpb`
-   - depends only on `reta`
-   - no dependency on `retaprompt_input`
-   - no copied code from `reta`
+## Was der einfache Build im aktuellen Stand wirklich leistet
 
-4. optional preserved wrapper package: `retaprompt_frontends`
-   - only thin binaries
-   - preserved so old code is not destroyed
-   - intentionally inactive in the workspace
-   - contains no duplicated `reta` implementation
+Der einfache Build (`build.sh`) hält die öffentliche ABI und die Launcher-Zuordnung ein.
+Er hält **nicht automatisch** die Binär-Entdoppelung zwischen den drei `.so` ein,
+weil die aktuellen Rust-`cdylib`-Abhängigkeiten dafür noch zu eng gekoppelt sind.
 
-## Binary-to-library mapping
+## Konsequenz
 
-- `rp` -> `retaprompt_input`
-- `rpl` -> `retaprompt_input`
-- `rpe` -> `retaprompt_input`
-- `rpb` -> `retaprompt_commands`
-
-## Separation rules
-
-- nothing from `reta` is copied into the two prompt libraries
-- `retaprompt_input` and `retaprompt_commands` do not depend on each other
-- nothing from any of the three libraries is contained inside either of the other two
-- `rpb` stays on the command-topic side
-- `rp`, `rpl`, `rpe` stay on the own-input side
-
-## Legacy code policy
-
-The older mixed `crates/retaprompt` package is kept in the repository so old
-code is not destroyed. It is intentionally inactive and not part of the active
-workspace member list.
-
-## Active workspace members
-
-- root package `reta`
-- `crates/retaprompt_input`
-- `crates/retaprompt_commands`
-
-The preserved packages `crates/retaprompt` and `crates/retaprompt_frontends` stay in the repository but are not active workspace members.
-
-
-## Aktive fachliche Trennung
-
-- `reta` bleibt der gemeinsame Kern und enthält die eigentliche Implementierung.
-- `retaprompt_input` bildet nur die interaktive eigene Befehlseingabe für `rp`, `rpl`, `rpe` ab.
-- `retaprompt_commands` bildet nur die Befehlsseite für `rp`, `rpl`, `rpe`, `rpb` ab.
-
-Die Trennung ist absichtlich additiv: es wird kein alter Code gelöscht. Die zwei Zusatzlibs sind nur schmale Fassaden über `reta` und enthalten weder Kopien aus `reta` noch gegenseitige Abhängigkeiten.
+Die fachliche Festlegung ist richtig.
+Die bisherige Shim-Lösung über `libreta.so` war dafür die falsche Umsetzung.
+Für echte Entdoppelung ist eine weitere Code-Aufteilung nötig; ein bloß komplizierteres
+Verpackungsskript reicht dafür nicht.

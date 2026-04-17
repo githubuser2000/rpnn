@@ -1,19 +1,16 @@
 [package]
 name = "reta"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2024"
 autobins = false
 default-run = "reta"
 
 [dependencies]
-indexmap = "2"
+indexmap = { version = "2", features = ["serde"] }
 hypher = { version = "0.1.7", default-features = false, features = ["german"] }
-termimad = "0.34.1"
-reedline = "0.47.0"
-ratatui = { version = "0.30.0", features = ["crossterm"] }
-crossterm = "0.29.0"
-nu-ansi-term = "0.50.3"
 libloading = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [lib]
 name = "reta"

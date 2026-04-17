@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Serialize};
+
 use crate::shared::words_py::{PyValue, Words};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PythonAliasGroup {
     pub canonical: String,
     pub aliases: Vec<String>,

@@ -1,6 +1,8 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+use serde_json;
+
 use crate::{build_cli_request, run_reta, RetaRuntime};
 
 #[repr(C)]
@@ -56,6 +58,61 @@ pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
 
     unsafe {
         let _ = CString::from_raw(ptr);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_shared_words_json() -> *mut c_char {
+    match serde_json::to_string(crate::shared_words()) {
+        Ok(json) => into_c_string(json),
+        Err(error) => into_c_string(format!(
+            r#"{{"error":"{}"}}"#,
+            error.to_string().replace('"', "'")
+        )),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
+    match serde_json::to_string(&crate::domain::python_source_of_truth::all_main_alias_groups(
+        crate::shared_words(),
+    )) {
+        Ok(json) => into_c_string(json),
+        Err(error) => into_c_string(format!(
+            r#"{{"error":"{}"}}"#,
+            error.to_string().replace('"', "'")
+        )),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_parameter_alias_groups_for_main_json(
+    canonical_main: *const c_char,
+) -> *mut c_char {
+    let main = read_required_string(canonical_main).unwrap_or_default();
+    match serde_json::to_string(&crate::domain::python_source_of_truth::parameter_alias_groups_for_main(
+        crate::shared_words(),
+        &main,
+    )) {
+        Ok(json) => into_c_string(json),
+        Err(error) => into_c_string(format!(
+            r#"{{"error":"{}"}}"#,
+            error.to_string().replace('"', "'")
+        )),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_resolve_parameter_main_alias(
+    main_alias: *const c_char,
+) -> *mut c_char {
+    let main = read_required_string(main_alias).unwrap_or_default();
+    match crate::domain::python_source_of_truth::resolve_parameter_main_alias(
+        crate::shared_words(),
+        &main,
+    ) {
+        Some(canonical) => into_c_string(canonical),
+        None => into_c_string(String::new()),
     }
 }
 
