@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::shared::lib4tables_enum_py::ST;
-use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, Program};
-use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS};
+use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program};
+use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -98,6 +98,178 @@ impl Program {
         if !collected.is_empty() {
             self.generatedSpaltenParameter_Tags.insert(spalte, collected);
         }
+    }
+
+    fn set_generated_spalten_parameter_exact_py(&mut self, spalte: i64, entries: Vec<Vec<PairStr>>) {
+        if !entries.is_empty() {
+            self.generatedSpaltenParameter_Exact.insert(spalte, entries);
+        }
+    }
+
+    fn pairstr_group_exact_py(main_name: impl Into<String>, parameter_name: impl Into<String>) -> Vec<PairStr> {
+        vec![PairStr(main_name.into(), parameter_name.into())]
+    }
+
+    fn generated1_parameter_groups_exact_py(
+        &self,
+        selection: &GeneratorPairSelection,
+        fallback_spalte: i64,
+    ) -> Vec<Vec<PairStr>> {
+        let main_name = selection.parameter_main_name.trim();
+        let parameter_name = selection.parameter_name.trim();
+        if !main_name.is_empty() && !parameter_name.is_empty() {
+            return vec![Self::pairstr_group_exact_py(main_name, parameter_name)];
+        }
+
+        let groups: Vec<Vec<PairStr>> = GENERATED1_SPECS
+            .iter()
+            .filter(|spec| {
+                (spec.col_a == selection.left && spec.col_b == selection.right)
+                    || (spec.col_a == selection.right && spec.col_b == selection.left)
+            })
+            .map(|spec| Self::pairstr_group_exact_py(spec.main_name, spec.parameter_name))
+            .collect();
+        if !groups.is_empty() {
+            return groups;
+        }
+
+        let fallback = self.generator_pair_selection_meta_name_exact_py(selection, fallback_spalte);
+        if fallback.trim().is_empty() {
+            return vec![];
+        }
+        let main = if main_name.is_empty() {
+            "Generiert"
+        } else {
+            main_name
+        };
+        let parameter = if parameter_name.is_empty() {
+            fallback.as_str()
+        } else {
+            parameter_name
+        };
+        vec![Self::pairstr_group_exact_py(main, parameter)]
+    }
+
+    fn generated2_raw_names_exact_py(&self, selection: &Generated2Selection) -> (String, String) {
+        let mut main_name = selection.parameter_main_name.trim().to_string();
+        let mut parameter_name = selection.parameter_name.trim().to_string();
+        if main_name.is_empty() || parameter_name.is_empty() {
+            if let Some(spec) = GENERATED2_SPECS.iter().find(|spec| spec.code == selection.code) {
+                if main_name.is_empty() {
+                    main_name = spec.main_name.to_string();
+                }
+                if parameter_name.is_empty() {
+                    parameter_name = spec.parameter_name.to_string();
+                }
+            }
+        }
+        (main_name, parameter_name)
+    }
+
+    fn metakonkret_parameter_groups_exact_py(&self, selection: &GeneratorPairSelection) -> Vec<Vec<PairStr>> {
+        let mut main_name = selection.parameter_main_name.trim().to_string();
+        let mut parameter_name = selection.parameter_name.trim().to_string();
+        if main_name.is_empty() || parameter_name.is_empty() {
+            if let Some(spec) = METAKONKRET_SPECS
+                .iter()
+                .find(|spec| spec.col_a == selection.left && spec.col_b == selection.right)
+            {
+                if main_name.is_empty() {
+                    main_name = spec.main_name.to_string();
+                }
+                if parameter_name.is_empty() {
+                    parameter_name = spec.parameter_name.to_string();
+                }
+            }
+        }
+        if main_name.is_empty() || parameter_name.is_empty() {
+            return vec![];
+        }
+        vec![Self::pairstr_group_exact_py(main_name, parameter_name)]
+    }
+
+    fn generated2_spalte_parameter_groups_exact_py(&self, code: &str) -> Vec<Vec<PairStr>> {
+        match code {
+            "PrimCSV" => vec![Self::pairstr_group_exact_py("Multiplikationen", "Nicht_generiert")],
+            "primzahlkreuzprocontra" => vec![
+                Self::pairstr_group_exact_py("Bedeutung", "Primzahlkreuz_pro_contra"),
+                Self::pairstr_group_exact_py("Pro_Contra", "Primzahlkreuz_pro_contra"),
+                Self::pairstr_group_exact_py(
+                    "Grundstrukturen",
+                    "nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)",
+                ),
+            ],
+            _ => vec![],
+        }
+    }
+
+    fn generated2_spalte_tags_exact_py(&self, code: &str) -> Vec<ST> {
+        match code {
+            "PrimCSV" => vec![ST::sternPolygon, ST::universum, ST::galaxie],
+            "primzahlkreuzprocontra" => vec![ST::sternPolygon, ST::universum],
+            _ => vec![],
+        }
+    }
+
+    fn generated2_coord_parameter_groups_exact_py(
+        &self,
+        coord: (usize, usize, bool),
+        koord2parameter: &BTreeMap<(usize, usize, bool), Vec<Generated2Selection>>,
+    ) -> Vec<Vec<PairStr>> {
+        let Some(selections) = koord2parameter.get(&coord) else {
+            return vec![];
+        };
+        let mut groups: Vec<Vec<PairStr>> = Vec::new();
+        let mut add_viertwichtigste = false;
+        for selection in selections {
+            let (_, parameter_name) = self.generated2_raw_names_exact_py(selection);
+            if !parameter_name.trim().is_empty() {
+                groups.push(Self::pairstr_group_exact_py("Multiplikationen", parameter_name));
+            }
+            if selection.code == "primMotivStern" {
+                add_viertwichtigste = true;
+            }
+        }
+        if add_viertwichtigste {
+            groups.push(Self::pairstr_group_exact_py(
+                "Wichtigstes_zum_verstehen",
+                "Viertwichtigste",
+            ));
+        }
+        groups
+    }
+
+    fn wrap_items_exact_py(&self, items: &[String], wrap_empty_lists: bool) -> String {
+        if self.outType == "html" {
+            if items.is_empty() && !wrap_empty_lists {
+                return String::new();
+            }
+            let mut out = String::from("<ul>");
+            for item in items {
+                out.push_str("<li>");
+                out.push_str(item);
+                out.push_str("</li>");
+            }
+            out.push_str("</ul>");
+            out
+        } else if self.outType == "bbcode" {
+            if items.is_empty() && !wrap_empty_lists {
+                return String::new();
+            }
+            let mut out = String::from("[list]");
+            for item in items {
+                out.push_str("[*]");
+                out.push_str(item);
+            }
+            out.push_str("[/list]");
+            out
+        } else {
+            items.join(" | ")
+        }
+    }
+
+    fn primzahlkreuz_heading_exact_py(&self) -> &'static str {
+        "Gegen / pro: Nach Rechenregeln auf Primzahlkreuz und Vielfachern von Primzahlen"
     }
 
     fn concat_table_generated_tags_exact_py(&self, concatTable: i64) -> Vec<ST> {
@@ -298,33 +470,31 @@ impl Program {
         ifInvers: usize,
         neue2KoordNeue2Vorwoerter: &Vec<((Option<i64>, Option<PyFrac>), usize, String, String)>,
         transzendentalienSpalten: (usize, usize),
+        gebr_table: &Vec<Vec<String>>,
     ) -> String {
-        let mut intoList: Vec<String> = vec![];
+        let mut items: Vec<String> = vec![];
         let mut thema = String::new();
-        for vier in neue2KoordNeue2Vorwoerter.iter().take(neue2KoordNeue2Vorwoerter.len().saturating_sub(1)) {
+        for vier in neue2KoordNeue2Vorwoerter
+            .iter()
+            .take(neue2KoordNeue2Vorwoerter.len().saturating_sub(1))
+        {
             if bothRows == 0 {
                 if let Some(row_idx) = vier.0.0 {
                     let text = self.zellenwert_py(row_idx as usize, vier.1);
                     if text.trim().len() > 3 {
-                        if self.outType == "html" {
-                            intoList.push("<li>".to_string());
-                        } else if self.outType == "bbcode" {
-                            intoList.push("[*]".to_string());
-                        }
-                        intoList.push(vier.2.clone());
-                        intoList.push(thema.clone());
-                        intoList.push(text);
-                        intoList.push(" (".to_string());
-                        if vier.1 != (if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 }) && row_idx != 1 {
-                            intoList.push("1/".to_string());
-                        }
-                        intoList.push(row_idx.to_string());
-                        intoList.push(")".to_string());
-                        if self.outType == "html" {
-                            intoList.push("</li>".to_string());
-                        } else if self.outType != "bbcode" {
-                            intoList.push(" | ".to_string());
-                        }
+                        let prefix = if vier.1
+                            != (if ifInvers == 0 {
+                                transzendentalienSpalten.0
+                            } else {
+                                transzendentalienSpalten.1
+                            })
+                            && row_idx != 1
+                        {
+                            "1/"
+                        } else {
+                            ""
+                        };
+                        items.push(format!("{}{}{} ({prefix}{row_idx})", vier.2, thema, text));
                     }
                 }
             } else if let Some(frac) = vier.0.1 {
@@ -332,70 +502,41 @@ impl Program {
                     let row_idx = frac.numerator;
                     let text = self.zellenwert_py(row_idx as usize, vier.1);
                     if text.trim().len() > 3 {
-                        if self.outType == "html" {
-                            intoList.push("<li>".to_string());
-                        } else if self.outType == "bbcode" {
-                            intoList.push("[*]".to_string());
-                        }
-                        intoList.push(vier.3.clone());
-                        intoList.push(thema.clone());
-                        intoList.push(text);
-                        intoList.push(" (".to_string());
-                        if vier.1 != (if ifInvers == 0 { transzendentalienSpalten.0 } else { transzendentalienSpalten.1 }) && row_idx != 1 {
-                            intoList.push("1/".to_string());
-                        }
-                        intoList.push(row_idx.to_string());
-                        intoList.push(")".to_string());
-                        if self.outType == "html" {
-                            intoList.push("</li>".to_string());
-                        } else if self.outType != "bbcode" {
-                            intoList.push(" | ".to_string());
-                        }
+                        let prefix = if vier.1
+                            != (if ifInvers == 0 {
+                                transzendentalienSpalten.0
+                            } else {
+                                transzendentalienSpalten.1
+                            })
+                            && row_idx != 1
+                        {
+                            "1/"
+                        } else {
+                            ""
+                        };
+                        items.push(format!("{}{}{} ({prefix}{row_idx})", vier.3, thema, text));
                     }
-                } else if let Some(gebrStrukWort) = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
-                    frac,
-                    transzendentalienSpalten,
-                    &vec![],
-                    false,
-                ) {
+                } else if let Some(gebrStrukWort) = self
+                    .spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                        frac,
+                        transzendentalienSpalten,
+                        gebr_table,
+                        false,
+                    )
+                {
                     if gebrStrukWort.trim().len() > 3 {
-                        if self.outType == "html" {
-                            intoList.push("<li>".to_string());
-                        } else if self.outType == "bbcode" {
-                            intoList.push("[*]".to_string());
-                        }
-                        intoList.push(vier.3.clone());
-                        intoList.push(thema.clone());
-                        intoList.push(gebrStrukWort);
-                        intoList.push("(".to_string());
-                        intoList.push(frac.numerator.to_string());
-                        if frac.denominator > 1 {
-                            intoList.push(format!("/{}", frac.denominator));
-                        }
-                        intoList.push(")".to_string());
-                        if self.outType == "html" {
-                            intoList.push("</li>".to_string());
-                        } else if self.outType != "bbcode" {
-                            intoList.push(" | ".to_string());
-                        }
+                        let frac_display = if frac.denominator > 1 {
+                            format!("{}/{}", frac.numerator, frac.denominator)
+                        } else {
+                            frac.numerator.to_string()
+                        };
+                        items.push(format!("{}{}{}({})", vier.3, thema, gebrStrukWort, frac_display));
                     }
                 }
             }
             thema = "thema: ".to_string();
         }
-        let mut out: Vec<String> = vec![];
-        if self.outType == "html" {
-            out.push("<ul>".to_string());
-            out.extend(intoList);
-            out.push("</ul>".to_string());
-        } else if self.outType == "bbcode" {
-            out.push("[list]".to_string());
-            out.extend(intoList);
-            out.push("[/list]".to_string());
-        } else {
-            out.extend(intoList);
-        }
-        out.join("")
+        self.wrap_items_exact_py(&items, false)
     }
 
 fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
@@ -493,6 +634,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn generated2_code_heading_py(&self, code: &str) -> String {
+        if code == "primzahlkreuzprocontra" {
+            return self.primzahlkreuz_heading_exact_py().to_string();
+        }
         for spec in GENERATED2_SPECS {
             if spec.code == code {
                 return format!("{} {}", spec.main_name, spec.parameter_name);
@@ -697,6 +841,10 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 self.paraDictGenerated4htmlTags.insert(key, spalte);
             }
         }
+        let groups = self.generated2_spalte_parameter_groups_exact_py(code);
+        self.set_generated_spalten_parameter_exact_py(spalte, groups);
+        let tags = self.generated2_spalte_tags_exact_py(code);
+        self.set_generated_spalten_tags_exact_py(spalte, &tags);
     }
 
     fn generated2_code_source_columns_py(&self, code: &str) -> (usize, usize) {
@@ -854,7 +1002,11 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
 
+        let groups = self.generated2_coord_parameter_groups_exact_py(coord, koord2parameter);
+        self.set_generated_spalten_parameter_exact_py(spalte, groups);
+
         if let Some(tags) = koord2tag.get(&coord) {
+            self.set_generated_spalten_tags_exact_py(spalte, tags);
             let tag_label = tags
                 .iter()
                 .map(|tag| tag.py_name())
@@ -1953,29 +2105,45 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         tableToAdd
     }
 
-    fn readConcatCsv_set_generated_metadata_exact_py(&mut self, concatTable: i64, heading: &str, u: usize) {
+    fn readConcatCsv_set_generated_metadata_exact_py(
+        &mut self,
+        concatTable: i64,
+        heading: &str,
+        u: usize,
+        spalte: i64,
+    ) {
         if concatTable == 1 {
+            let groups = vec![Self::pairstr_group_exact_py("Multiplikationen", "Nicht_generiert")];
+            self.set_generated_spalten_parameter_exact_py(spalte, groups);
             self.generatedSpaltenParameter.push("Multiplikationen Nicht generiert".to_string());
             return;
         }
-        let rangeToDataDict: std::collections::BTreeMap<i64, i64> = [(2, 6), (3, 6), (4, 5), (5, 5), (6, 9), (7, 9), (8, 10), (9, 10)].into_iter().collect();
+        let rangeToDataDict: std::collections::BTreeMap<i64, i64> =
+            [(2, 6), (3, 6), (4, 5), (5, 5), (6, 9), (7, 9), (8, 10), (9, 10)]
+                .into_iter()
+                .collect();
         if let Some(dict_idx) = rangeToDataDict.get(&concatTable) {
-            if let Some(dict) = self.dataDict.get(*dict_idx as usize) {
-                if let Some(eintrag) = dict.get(&(u as i64 + 2).to_string()) {
-                    let mut teile: Vec<String> = Vec::new();
-                    for gruppe in eintrag {
-                        for paar in gruppe {
-                            if !paar.0.is_empty() {
-                                teile.push(paar.0.clone());
-                            } else if !paar.1.is_empty() {
-                                teile.push(paar.1.clone());
-                            }
+            let key = (u as i64 + 2).to_string();
+            let eintrag = self
+                .dataDict
+                .get(*dict_idx as usize)
+                .and_then(|dict| dict.get(&key))
+                .cloned();
+            if let Some(eintrag) = eintrag {
+                self.set_generated_spalten_parameter_exact_py(spalte, eintrag.clone());
+                let mut teile: Vec<String> = Vec::new();
+                for gruppe in &eintrag {
+                    for paar in gruppe {
+                        if !paar.0.is_empty() {
+                            teile.push(paar.0.clone());
+                        } else if !paar.1.is_empty() {
+                            teile.push(paar.1.clone());
                         }
                     }
-                    if !teile.is_empty() {
-                        self.generatedSpaltenParameter.push(teile.join(" / "));
-                        return;
-                    }
+                }
+                if !teile.is_empty() {
+                    self.generatedSpaltenParameter.push(teile.join(" / "));
+                    return;
                 }
             }
         }
@@ -1990,15 +2158,15 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, tableToAdd);
         let show_concat1_non_generated = self.should_show_concat1_non_generated_column_py();
         if concatTable == 1 {
-            let mut tableToAdd2 = vec![vec!["Primzahlvielfache, - nicht generiert".to_string()]];
+            let mut tableToAdd2 = vec![vec!["Primzahlvielfache, nicht generiert".to_string()]];
             for zeile in tableToAdd.into_iter().skip(1) {
-                let mut teile: Vec<String> = vec![];
+                let mut items: Vec<String> = vec![];
                 for zelle in zeile {
                     if zelle.trim().len() > 3 {
-                        teile.push(zelle);
+                        items.push(zelle);
                     }
                 }
-                tableToAdd2.push(vec![teile.join(" | ")]);
+                tableToAdd2.push(vec![self.wrap_items_exact_py(&items, true)]);
             }
             tableToAdd = tableToAdd2;
         }
@@ -2026,7 +2194,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                         let concat_tags = self.concat_table_generated_tags_exact_py(concatTable);
                         self.set_generated_spalten_tags_exact_py(selectedSpalten, &concat_tags);
                         let heading = tableToAdd.get(0).and_then(|row| row.get(u)).cloned().unwrap_or_default();
-                        self.readConcatCsv_set_generated_metadata_exact_py(concatTable, &heading, u);
+                        self.readConcatCsv_set_generated_metadata_exact_py(concatTable, &heading, u, selectedSpalten);
                     }
                 }
             }
@@ -2090,12 +2258,13 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             let concept = (selection.left, selection.right);
             let concept0 = concept.0 as usize;
             let concept1 = concept.1 as usize;
-            let mut into: Vec<String> = vec![String::new(); reliTableCopy.len()];
+            let mut into_items: Vec<Vec<String>> = vec![vec![]; reliTableCopy.len()];
+            let mut cells: Vec<String> = vec![String::new(); reliTableCopy.len()];
             let mut einMalVorkommen: Vec<usize> = vec![];
 
             for (i, cols) in reliTableCopy.iter().enumerate() {
                 if i == 0 {
-                    into[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
+                    cells[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
                 } else if cols.get(concept0).map(|s| !s.trim().is_empty()).unwrap_or(false) {
                     if !einMalVorkommen.contains(&i) {
                         einMalVorkommen.push(i);
@@ -2153,34 +2322,56 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                     let Some(entry_by_dist) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) else {
                         continue;
                     };
-                    for (modalOperatoren, &vervielfachter) in entry_by_dist.modalS.iter().zip(entry_by_dist.vervielfachter.iter()) {
+                    for (modalOperatoren, &vervielfachter) in entry_by_dist
+                        .modalS
+                        .iter()
+                        .zip(entry_by_dist.vervielfachter.iter())
+                    {
                         let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default()
+                            reliTableCopy
+                                .get(vervielfachter)
+                                .and_then(|r| r.get(concept0))
+                                .cloned()
+                                .unwrap_or_default()
                         } else {
-                            reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept1)).cloned().unwrap_or_default()
+                            reliTableCopy
+                                .get(vervielfachter)
+                                .and_then(|r| r.get(concept1))
+                                .cloned()
+                                .unwrap_or_default()
                         };
                         if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
                             continue;
                         }
-                        let basis_content = if reliTableCopy.get(1).and_then(|r| r.get(97)).map(|s| s == &modalOperatoren[0]).unwrap_or(false) {
+                        let basis_content = if reliTableCopy
+                            .get(1)
+                            .and_then(|r| r.get(97))
+                            .map(|s| s == &modalOperatoren[0])
+                            .unwrap_or(false)
+                        {
                             intoItsContent.clone()
                         } else {
                             self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
                         };
-                        into[i].push_str(self.modal_text_by_distance_exact_py(distanceFromLine));
-                        into[i].push_str(&modalOperatoren[0]);
-                        into[i].push(' ');
-                        into[i].push_str(&basis_content);
-                        into[i].push(' ');
-                        into[i].push_str(&modalOperatoren[1]);
+                        let mut item = format!(
+                            "{}{} {} {}",
+                            self.modal_text_by_distance_exact_py(distanceFromLine),
+                            modalOperatoren[0],
+                            basis_content,
+                            modalOperatoren[1]
+                        );
                         if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
-                            into[i].push_str(", nicht: ");
-                            into[i].push_str(&modalOperatoren[2..].join(", "));
-                            into[i].push_str(" (das alles nicht): ");
-                            let c0 = reliTableCopy.get(vervielfachter).and_then(|r| r.get(concept0)).cloned().unwrap_or_default();
-                            into[i].push_str(&self.modal_replace_zuerst_zweites_py(c0));
+                            item.push_str(", nicht: ");
+                            item.push_str(&modalOperatoren[2..].join(", "));
+                            item.push_str(" (das alles nicht): ");
+                            let c0 = reliTableCopy
+                                .get(vervielfachter)
+                                .and_then(|r| r.get(concept0))
+                                .cloned()
+                                .unwrap_or_default();
+                            item.push_str(&self.modal_replace_zuerst_zweites_py(c0));
                         }
-                        into[i].push_str(" | ");
+                        into_items[i].push(item);
                     }
                 }
                 let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
@@ -2189,18 +2380,30 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 } else {
                     reliTableCopy.get(i).and_then(|r| r.get(4)).cloned().unwrap_or_default()
                 };
-                if !into[i].is_empty() {
-                    if into[i].ends_with(" | ") {
-                        let new_len = into[i].len().saturating_sub(3);
-                        into[i].truncate(new_len);
-                    }
-                    into[i].push_str(" | Alles nur bezogen auf die selbe Strukturgröße einer ");
-                    into[i].push_str(&fill_);
+                if !into_items[i].is_empty() {
+                    into_items[i].push(format!(
+                        "Alles nur bezogen auf die selbe Strukturgröße einer {}",
+                        fill_
+                    ));
                 }
             }
 
+            for i in 1..=self.generator_row_end_py() {
+                cells[i] = self.wrap_items_exact_py(&into_items[i], false);
+            }
+
             let meta_name = self.generator_pair_selection_meta_name_exact_py(&selection, concept.0);
-            let spalte = self.fuege_spalte_hinzu_py(into, &meta_name);
+            let spalte = self.fuege_spalte_hinzu_py(cells, &meta_name);
+            self.set_generated_spalten_parameter_exact_py(
+                spalte,
+                self.generated1_parameter_groups_exact_py(&selection, concept.0),
+            );
+            let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+            if conditionNvs1perN {
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::gleichfoermigesPolygon, ST::galaxie]);
+            } else {
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie]);
+            }
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -2283,15 +2486,15 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             if let Some(csv_name) = self.concat_csv_name_py(1) {
                 if let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csv_name) {
                     tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(1, tableToAdd);
-                    let mut into: Vec<String> = vec!["Primzahlvielfache, - nicht generiert".to_string()];
+                    let mut into: Vec<String> = vec!["Primzahlvielfache, nicht generiert".to_string()];
                     for zeile in tableToAdd.into_iter().skip(1).take(row_end) {
-                        let mut teile: Vec<String> = vec![];
+                        let mut items: Vec<String> = vec![];
                         for zelle in zeile {
                             if zelle.trim().len() > 3 {
-                                teile.push(zelle);
+                                items.push(zelle);
                             }
                         }
-                        into.push(teile.join(" | "));
+                        into.push(self.wrap_items_exact_py(&items, true));
                     }
                     while into.len() <= row_end {
                         into.push(String::new());
@@ -2671,7 +2874,7 @@ for couple_a in paare {
             col_reverse.push(self.concat1_reverse_cell_exact_py(num, pro2, contra2, &dreli));
         }
 
-        let heading = self.generated2_code_heading_py("primzahlkreuzprocontra");
+        let heading = self.primzahlkreuz_heading_exact_py().to_string();
         let spalte_main = self.fuege_spalte_hinzu_py(col_main, &heading);
         let spalte_reverse = self.fuege_spalte_hinzu_py(col_reverse, &heading);
         self.register_generated2_spalte_exact_py("primzahlkreuzprocontra", spalte_main);
@@ -2683,14 +2886,23 @@ for couple_a in paare {
     pub fn spalteMetaKontretTheorieAbstrakt_etc_1(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let geordneteSelections = self.metakonkret_selections_exact_py();
         for selection in geordneteSelections {
-            let paar = (selection.left, selection.right);
-            let metavariable = paar.0;
-            let lower1greater2both3 = if paar.1 == 0 { 1 } else if paar.1 == 1 { 2 } else { 3 };
-            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, metavariable, lower1greater2both3);
+            self.spalteMetaKontretTheorieAbstrakt_etc(rowsAsNumbers, selection);
         }
     }
 
-    pub fn spalteMetaKontretTheorieAbstrakt_etc(&mut self, rowsAsNumbers: &mut Vec<i64>, metavariable: i64, lower1greater2both3: i64) {
+    pub fn spalteMetaKontretTheorieAbstrakt_etc(
+        &mut self,
+        rowsAsNumbers: &mut Vec<i64>,
+        selection: GeneratorPairSelection,
+    ) {
+        let metavariable = selection.left;
+        let lower1greater2both3 = if selection.right == 0 {
+            1
+        } else if selection.right == 1 {
+            2
+        } else {
+            3
+        };
         let metaOrWhat = self.meta_or_what_exact_py(metavariable);
         let bothRowsListe: Vec<i64> = if lower1greater2both3 == 3 {
             vec![0, 1]
@@ -2702,16 +2914,20 @@ for couple_a in paare {
             vec![]
         };
         let struktAndInversSpalten = (5usize, 131usize);
+        let gebr_univ_table = self
+            .csv_fraction_table_name_py(4)
+            .and_then(|name| self.load_csv_rows_semicolon_exact_path(name).ok())
+            .unwrap_or_default();
         for (ifInvers, transzendentalienSpalten) in [
             struktAndInversSpalten,
             (struktAndInversSpalten.1, struktAndInversSpalten.0),
-        ].into_iter().enumerate() {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             for bothRows in bothRowsListe.iter().copied() {
-                let mut into: Vec<String> = vec![];
-                let heading_pair = metaOrWhat.0;
-                let heading = if bothRows == 0 { heading_pair.0 } else { heading_pair.1 };
-                let heading_suffix = if ifInvers == 0 { "für n" } else { "für 1/n statt n" };
-                into.push(format!("{}{}", heading, heading_suffix));
+                let heading = self.meta_heading_py(metavariable, bothRows, ifInvers);
+                let mut into: Vec<String> = vec![heading.clone()];
                 if self.generator_row_end_py() >= 1 {
                     into.push(String::new());
                 }
@@ -2729,12 +2945,28 @@ for couple_a in paare {
                         ifInvers,
                         &neue2KoordNeue2Vorwoerter,
                         transzendentalienSpalten,
+                        &gebr_univ_table,
                     );
                     into.push(cell);
                 }
-                let meta_name = if bothRows == 0 { self.meta_prefixes_py(metavariable).0 } else { self.meta_prefixes_py(metavariable).1 };
-                let spalte = self.fuege_spalte_hinzu_py(into, &format!("{} {}", meta_name, if ifInvers == 0 { "n" } else { "1/n" }));
-                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
+                let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+                let polygon_tag = if ifInvers == 0 {
+                    ST::sternPolygon
+                } else {
+                    ST::gleichfoermigesPolygon
+                };
+                if bothRows == 0 {
+                    self.set_generated_spalten_tags_exact_py(spalte, &[polygon_tag, ST::universum]);
+                } else {
+                    self.set_generated_spalten_tags_exact_py(
+                        spalte,
+                        &[polygon_tag, ST::universum, ST::gebrRat],
+                    );
+                }
+                self.set_generated_spalten_parameter_exact_py(
+                    spalte,
+                    self.metakonkret_parameter_groups_exact_py(&selection),
+                );
                 Self::push_unique_i64_py(rowsAsNumbers, spalte);
             }
         }
