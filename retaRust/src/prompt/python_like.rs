@@ -1,6 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
+use crate::domain::python_source_of_truth::{
+    all_main_alias_groups, parameter_alias_groups_for_main,
+};
+use crate::shared_words;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PromptModus {
     Normal,
@@ -30,13 +35,15 @@ fn build_prompt_words() -> PromptWords {
     let mut befehle: Vec<String> = Vec::new();
 
     for key in [
-        "15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16",
-        "4", "1", "30", "14", "20", "37", "31", "11", "36", "21", "26", "19", "90",
+        "15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16", "4", "1",
+        "30", "14", "20", "37", "31", "11", "36", "21", "26", "19", "90",
     ] {
         befehle.push(format!("15_{key}"));
     }
     befehle.push("15_".to_string());
-    for key in ["15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16", "4", "1"] {
+    for key in [
+        "15", "2", "5", "7", "8", "10", "12", "13", "17", "18", "6", "9", "3", "16", "4", "1",
+    ] {
         befehle.push(format!("16_15_{key}"));
     }
     for key in ["15", "10", "11"] {
@@ -45,20 +52,94 @@ fn build_prompt_words() -> PromptWords {
     befehle.push("16_".to_string());
 
     for cmd in [
-        "invertieren", "netzwerk", "komplex", "ee", "groesse", "emotion", "freiheit", "gleichheit",
-        "kurzbefehle", "leeren", "kugeln", "kreise", "mond", "reta", "absicht", "motiv", "thomas",
-        "universum", "impulse", "motive", "absichten", "primfaktorenvergleich", "vielfache", "einzeln",
-        "multis", "multis3", "modulo", "prim", "primfaktorzerlegung", "prim24",
-        "primfaktorzerlegungModulo24", "help", "hilfe", "abc", "abcd", "alles", "geist", "a", "R",
-        "range", "B", "bewusstsein", "E", "G", "u", "I", "T", "W", "wirklichkeit", "triebe",
-        "befehle", "t", "richtung", "r", "v", "h", "p", "primzahlkreuz", "ende", "exit", "quit",
-        "q", ":q", "shell", "s", "math", "loggen", "nichtloggen", "mulpri", "python", "w", "teiler",
-        "BefehlSpeichernDanach", "S", "BefehlSpeicherungLöschen", "l", "BefehlSpeicherungAusgeben", "o",
-        "e", "BefehlSpeichernDavor", "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar", "abstand",
+        "invertieren",
+        "netzwerk",
+        "komplex",
+        "ee",
+        "groesse",
+        "emotion",
+        "freiheit",
+        "gleichheit",
+        "kurzbefehle",
+        "leeren",
+        "kugeln",
+        "kreise",
+        "mond",
+        "reta",
+        "absicht",
+        "motiv",
+        "thomas",
+        "universum",
+        "impulse",
+        "motive",
+        "absichten",
+        "primfaktorenvergleich",
+        "vielfache",
+        "einzeln",
+        "multis",
+        "multis3",
+        "modulo",
+        "prim",
+        "primfaktorzerlegung",
+        "prim24",
+        "primfaktorzerlegungModulo24",
+        "help",
+        "hilfe",
+        "abc",
+        "abcd",
+        "alles",
+        "geist",
+        "a",
+        "R",
+        "range",
+        "B",
+        "bewusstsein",
+        "E",
+        "G",
+        "u",
+        "I",
+        "T",
+        "W",
+        "wirklichkeit",
+        "triebe",
+        "befehle",
+        "t",
+        "richtung",
+        "r",
+        "v",
+        "h",
+        "p",
+        "primzahlkreuz",
+        "ende",
+        "exit",
+        "quit",
+        "q",
+        ":q",
+        "shell",
+        "s",
+        "math",
+        "loggen",
+        "nichtloggen",
+        "mulpri",
+        "python",
+        "w",
+        "teiler",
+        "BefehlSpeichernDanach",
+        "S",
+        "BefehlSpeicherungLöschen",
+        "l",
+        "BefehlSpeicherungAusgeben",
+        "o",
+        "e",
+        "BefehlSpeichernDavor",
+        "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+        "abstand",
         "abstandPrim",
     ] {
         befehle.push(cmd.to_string());
     }
+
+    befehle.extend(concept_prefixed_prompt_tokens());
 
     let befehle_set = befehle.iter().cloned().collect::<BTreeSet<_>>();
     let one_char_commands = [
@@ -75,6 +156,677 @@ fn build_prompt_words() -> PromptWords {
         eig_prefixes: ("EIGN".to_string(), "EIGR".to_string()),
         one_char_commands,
     }
+}
+
+fn normalize_match_text(text: &str) -> String {
+    text.trim().replace('ß', "ss").to_lowercase()
+}
+
+fn push_unique_preserving_normalized(
+    target: &mut Vec<String>,
+    seen: &mut BTreeSet<String>,
+    value: String,
+) {
+    let normalized = normalize_match_text(&value);
+    if seen.insert(normalized) {
+        target.push(value);
+    }
+}
+
+fn concept_parameter_aliases(canonical_main: &str) -> Vec<String> {
+    let words = shared_words();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for group in parameter_alias_groups_for_main(words, canonical_main) {
+        for alias in group.aliases {
+            let trimmed = alias.trim();
+            if !trimmed.is_empty() {
+                push_unique_preserving_normalized(&mut out, &mut seen, trimmed.to_string());
+            }
+        }
+    }
+    out
+}
+
+fn concept_prefixed_prompt_tokens() -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for (prefix, canonical_main) in [("EIGN", "konzept"), ("EIGR", "konzept2")] {
+        for alias in concept_parameter_aliases(canonical_main) {
+            push_unique_preserving_normalized(&mut out, &mut seen, format!("{prefix}{alias}"));
+        }
+    }
+
+    out
+}
+
+fn numeric_value_candidates_for_regex() -> Vec<String> {
+    (0..=128).map(|value| value.to_string()).collect()
+}
+
+fn reta_main_switch_tokens_for_regex() -> &'static [&'static str] {
+    &["-zeilen", "-spalten", "-kombination", "-ausgabe"]
+}
+
+fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+    let mut inventory = BTreeMap::new();
+    let numeric_values = numeric_value_candidates_for_regex();
+
+    for key in [
+        "zaehlung",
+        "vorhervonausschnitt",
+        "primzahlvielfache",
+        "nachtraeglichneuabzaehlung",
+        "nachtraeglichneuabzaehlungvielfache",
+        "potenzenvonzahlen",
+        "vielfachevonzahlen",
+        "oberesmaximum",
+    ] {
+        inventory.insert(key.to_string(), numeric_values.clone());
+    }
+
+    inventory.insert(
+        "zeit".to_string(),
+        ["gestern", "heute", "morgen"]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+    );
+    inventory.insert(
+        "typ".to_string(),
+        [
+            "mond",
+            "sonne",
+            "planet",
+            "schwarzesonne",
+            "SonneMitMondanteil",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+    );
+    inventory.insert(
+        "primzahlen".to_string(),
+        ["aussenerste", "innenerste", "innenalle", "aussenalle"]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+    );
+
+    for flag in ["vorhervonausschnittteiler", "alles", "invertieren"] {
+        inventory.insert(flag.to_string(), Vec::new());
+    }
+
+    inventory
+}
+
+fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+    let mut inventory = BTreeMap::new();
+    inventory.insert(
+        "art".to_string(),
+        [
+            "bbcode", "html", "csv", "shell", "markdown", "emacs", "nichts",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+    );
+    inventory.insert(
+        "breite".to_string(),
+        (0..=128).map(|value| value.to_string()).collect(),
+    );
+    inventory.insert(
+        "breiten".to_string(),
+        (0..=128).map(|value| value.to_string()).collect(),
+    );
+
+    for flag in [
+        "nocolor",
+        "justtext",
+        "onetable",
+        "spaltenreihenfolgeundnurdiese",
+        "endlessscreen",
+        "endless",
+        "dontwrap",
+        "keineleereninhalte",
+        "keinenummerierung",
+        "keineueberschriften",
+    ] {
+        inventory.entry(flag.to_string()).or_default();
+    }
+
+    inventory
+}
+
+fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+    let words = shared_words();
+    let mut inventory = BTreeMap::new();
+    let mut galaxie = Vec::new();
+    let mut galaxie_seen = BTreeSet::new();
+    for values in words.kombiParaNdataMatrix.values() {
+        for value in values {
+            push_unique_preserving_normalized(&mut galaxie, &mut galaxie_seen, value.clone());
+        }
+    }
+    inventory.insert("galaxie".to_string(), galaxie);
+
+    let mut universum = Vec::new();
+    let mut universum_seen = BTreeSet::new();
+    for values in words.kombiParaNdataMatrix2.values() {
+        for value in values {
+            push_unique_preserving_normalized(&mut universum, &mut universum_seen, value.clone());
+        }
+    }
+    inventory.insert("universum".to_string(), universum);
+    inventory
+}
+
+fn spalten_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+    let words = shared_words();
+    let mut inventory = BTreeMap::new();
+
+    for main_group in all_main_alias_groups(words) {
+        let mut parameter_aliases = Vec::new();
+        let mut seen = BTreeSet::new();
+        for parameter_group in parameter_alias_groups_for_main(words, &main_group.canonical) {
+            for alias in parameter_group.aliases {
+                let trimmed = alias.trim();
+                if !trimmed.is_empty() {
+                    push_unique_preserving_normalized(
+                        &mut parameter_aliases,
+                        &mut seen,
+                        trimmed.to_string(),
+                    );
+                }
+            }
+        }
+
+        for alias in main_group.aliases {
+            let trimmed = alias.trim();
+            if !trimmed.is_empty() {
+                inventory.insert(trimmed.to_string(), parameter_aliases.clone());
+            }
+        }
+    }
+
+    inventory
+}
+
+fn reta_section_parameter_inventory_for_regex(section: &str) -> BTreeMap<String, Vec<String>> {
+    match section {
+        "-zeilen" => zeilen_parameter_inventory_for_regex(),
+        "-ausgabe" => ausgabe_parameter_inventory_for_regex(),
+        "-kombination" => kombination_parameter_inventory_for_regex(),
+        "-spalten" => spalten_parameter_inventory_for_regex(),
+        _ => BTreeMap::new(),
+    }
+}
+
+fn reta_global_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+    let mut inventory = BTreeMap::new();
+    for section in reta_main_switch_tokens_for_regex() {
+        for (parameter, values) in reta_section_parameter_inventory_for_regex(section) {
+            inventory.entry(parameter).or_insert(values);
+        }
+    }
+    inventory
+}
+
+fn concept_values_from_fragment(prefix: &str, fragment: &str) -> Vec<String> {
+    let canonical_main = if prefix == prompt_words().eig_prefixes.0 {
+        "konzept"
+    } else {
+        "konzept2"
+    };
+    let aliases = concept_parameter_aliases(canonical_main);
+    let matcher = parse_special_fragment_matcher(fragment);
+    if matcher.is_none() {
+        return (!fragment.trim().is_empty())
+            .then_some(vec![fragment.trim().to_string()])
+            .unwrap_or_default();
+    }
+
+    let matcher = matcher.unwrap();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for alias in aliases {
+        if special_fragment_matches_candidate(&alias, &matcher) {
+            push_unique_preserving_normalized(&mut out, &mut seen, alias);
+        }
+    }
+    out
+}
+
+fn collect_concept_prefixed_values(tokens: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut eig_n = Vec::new();
+    let mut eig_r = Vec::new();
+    let mut eig_n_seen = BTreeSet::new();
+    let mut eig_r_seen = BTreeSet::new();
+
+    for token in tokens {
+        if let Some(fragment) = token.strip_prefix(&prompt_words().eig_prefixes.0) {
+            for value in concept_values_from_fragment(&prompt_words().eig_prefixes.0, fragment) {
+                push_unique_preserving_normalized(&mut eig_n, &mut eig_n_seen, value);
+            }
+        }
+        if let Some(fragment) = token.strip_prefix(&prompt_words().eig_prefixes.1) {
+            for value in concept_values_from_fragment(&prompt_words().eig_prefixes.1, fragment) {
+                push_unique_preserving_normalized(&mut eig_r, &mut eig_r_seen, value);
+            }
+        }
+    }
+
+    (eig_n, eig_r)
+}
+
+#[derive(Clone, Debug)]
+enum SpecialFragmentMatcher {
+    Any {
+        negative_only: bool,
+    },
+    Glob {
+        negative_only: bool,
+        pattern: String,
+    },
+    RegexLike {
+        negative_only: bool,
+        pattern: String,
+    },
+}
+
+fn parse_python_raw_regex_fragment(text: &str) -> Option<&str> {
+    if let Some(rest) = text.strip_prefix("r\"") {
+        return Some(rest.strip_suffix('"').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("r'") {
+        return Some(rest.strip_suffix('\'').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("R\"") {
+        return Some(rest.strip_suffix('"').unwrap_or(rest));
+    }
+    if let Some(rest) = text.strip_prefix("R'") {
+        return Some(rest.strip_suffix('\'').unwrap_or(rest));
+    }
+    None
+}
+
+fn token_has_python_regex_or_glob(text: &str) -> bool {
+    text.contains('*')
+        || parse_python_raw_regex_fragment(text).is_some()
+        || text.contains("r\"")
+        || text.contains("r'")
+        || text.contains("R\"")
+        || text.contains("R'")
+}
+
+fn parse_special_fragment_matcher(text: &str) -> Option<SpecialFragmentMatcher> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let (negative_only, core) = if let Some(rest) = trimmed.strip_prefix('-') {
+        (true, rest)
+    } else {
+        (false, trimmed)
+    };
+
+    if core == "*" {
+        return Some(SpecialFragmentMatcher::Any { negative_only });
+    }
+
+    if let Some(pattern) = parse_python_raw_regex_fragment(core) {
+        return Some(SpecialFragmentMatcher::RegexLike {
+            negative_only,
+            pattern: pattern.to_string(),
+        });
+    }
+
+    if core.contains('*') {
+        return Some(SpecialFragmentMatcher::Glob {
+            negative_only,
+            pattern: core.to_string(),
+        });
+    }
+
+    None
+}
+
+fn strip_optional_negative_prefix<'a>(candidate: &'a str, negative_only: bool) -> Option<&'a str> {
+    if !negative_only {
+        return Some(candidate);
+    }
+    candidate.strip_prefix('-')
+}
+
+fn special_fragment_matches_candidate(candidate: &str, matcher: &SpecialFragmentMatcher) -> bool {
+    let (negative_only, body) = match matcher {
+        SpecialFragmentMatcher::Any { negative_only }
+        | SpecialFragmentMatcher::Glob { negative_only, .. }
+        | SpecialFragmentMatcher::RegexLike { negative_only, .. } => (*negative_only, candidate),
+    };
+
+    let Some(candidate_body) = strip_optional_negative_prefix(body, negative_only) else {
+        return false;
+    };
+
+    match matcher {
+        SpecialFragmentMatcher::Any { .. } => true,
+        SpecialFragmentMatcher::Glob { pattern, .. } => glob_like_match(
+            &normalize_match_text(pattern),
+            &normalize_match_text(candidate_body),
+        ),
+        SpecialFragmentMatcher::RegexLike { pattern, .. } => regex_like_search(
+            &normalize_match_text(pattern),
+            &normalize_match_text(candidate_body),
+        ),
+    }
+}
+
+fn glob_like_match(pattern: &str, text: &str) -> bool {
+    if pattern.is_empty() {
+        return text.is_empty();
+    }
+
+    let pattern_chars = pattern.chars().collect::<Vec<_>>();
+    let text_chars = text.chars().collect::<Vec<_>>();
+    let mut memo = BTreeMap::new();
+    glob_like_match_chars(&pattern_chars, &text_chars, 0, 0, &mut memo)
+}
+
+fn glob_like_match_chars(
+    pattern: &[char],
+    text: &[char],
+    pattern_index: usize,
+    text_index: usize,
+    memo: &mut BTreeMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
+        return *cached;
+    }
+
+    let result = if pattern_index == pattern.len() {
+        text_index == text.len()
+    } else if pattern[pattern_index] == '*' {
+        glob_like_match_chars(pattern, text, pattern_index + 1, text_index, memo)
+            || (text_index < text.len()
+                && glob_like_match_chars(pattern, text, pattern_index, text_index + 1, memo))
+    } else {
+        text_index < text.len()
+            && pattern[pattern_index] == text[text_index]
+            && glob_like_match_chars(pattern, text, pattern_index + 1, text_index + 1, memo)
+    };
+
+    memo.insert((pattern_index, text_index), result);
+    result
+}
+
+fn strip_regex_like_anchors(pattern: &str) -> (bool, bool, &str) {
+    let start_anchor = pattern.starts_with('^');
+    let without_start = pattern.strip_prefix('^').unwrap_or(pattern);
+    let end_anchor = without_start.ends_with('$');
+    let core = without_start.strip_suffix('$').unwrap_or(without_start);
+    (start_anchor, end_anchor, core)
+}
+
+fn contains_regex_like_metacharacters(pattern: &str) -> bool {
+    pattern
+        .chars()
+        .any(|ch| matches!(ch, '.' | '*' | '^' | '$'))
+}
+
+fn regex_like_search(pattern: &str, text: &str) -> bool {
+    if pattern.is_empty() {
+        return true;
+    }
+
+    let (start_anchor, end_anchor, core) = strip_regex_like_anchors(pattern);
+    if core.is_empty() {
+        return true;
+    }
+
+    if !contains_regex_like_metacharacters(core) {
+        return text.contains(core);
+    }
+
+    let core_chars = core.chars().collect::<Vec<_>>();
+    let text_chars = text.chars().collect::<Vec<_>>();
+    let starts = if start_anchor {
+        vec![0usize]
+    } else {
+        (0..=text_chars.len()).collect::<Vec<_>>()
+    };
+
+    for start in starts {
+        let end_range = if end_anchor {
+            text_chars.len()..=text_chars.len()
+        } else {
+            start..=text_chars.len()
+        };
+
+        for end in end_range {
+            let mut memo = BTreeMap::new();
+            if regex_like_full_match_chars(&core_chars, &text_chars[start..end], 0, 0, &mut memo) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn regex_like_full_match_chars(
+    pattern: &[char],
+    text: &[char],
+    pattern_index: usize,
+    text_index: usize,
+    memo: &mut BTreeMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
+        return *cached;
+    }
+
+    let result = if pattern_index == pattern.len() {
+        text_index == text.len()
+    } else {
+        let first_match = text_index < text.len()
+            && (pattern[pattern_index] == '.' || pattern[pattern_index] == text[text_index]);
+
+        if pattern_index + 1 < pattern.len() && pattern[pattern_index + 1] == '*' {
+            regex_like_full_match_chars(pattern, text, pattern_index + 2, text_index, memo)
+                || (first_match
+                    && regex_like_full_match_chars(
+                        pattern,
+                        text,
+                        pattern_index,
+                        text_index + 1,
+                        memo,
+                    ))
+        } else {
+            first_match
+                && regex_like_full_match_chars(
+                    pattern,
+                    text,
+                    pattern_index + 1,
+                    text_index + 1,
+                    memo,
+                )
+        }
+    };
+
+    memo.insert((pattern_index, text_index), result);
+    result
+}
+
+fn expand_prompt_regex_like_token(token: &str) -> Vec<String> {
+    let Some(matcher) = parse_special_fragment_matcher(token) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for candidate in prompt_words()
+        .befehle
+        .iter()
+        .filter(|candidate| candidate.len() > 1)
+    {
+        if special_fragment_matches_candidate(candidate, &matcher) {
+            push_unique_preserving_normalized(&mut out, &mut seen, candidate.clone());
+        }
+    }
+    out
+}
+
+fn expand_reta_simple_regex_like_token(token: &str, current_section: Option<&str>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    let parameter_fragment = token.strip_prefix("--").unwrap_or(token);
+    if let Some(matcher) = parse_special_fragment_matcher(parameter_fragment) {
+        let inventory = current_section
+            .map(reta_section_parameter_inventory_for_regex)
+            .unwrap_or_else(reta_global_parameter_inventory_for_regex);
+        for (parameter, values) in inventory {
+            if values.is_empty() && special_fragment_matches_candidate(&parameter, &matcher) {
+                push_unique_preserving_normalized(&mut out, &mut seen, format!("--{parameter}"));
+            }
+        }
+    }
+
+    let main_fragment = token.strip_prefix('-').unwrap_or(token);
+    if let Some(matcher) = parse_special_fragment_matcher(main_fragment) {
+        for switch in reta_main_switch_tokens_for_regex() {
+            if special_fragment_matches_candidate(switch, &matcher)
+                || special_fragment_matches_candidate(switch.trim_start_matches('-'), &matcher)
+            {
+                push_unique_preserving_normalized(&mut out, &mut seen, (*switch).to_string());
+            }
+        }
+    }
+
+    out
+}
+
+fn expand_rhs_regex_pieces(pieces: &[&str], allowed_values: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for piece in pieces {
+        let trimmed = piece.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(matcher) = parse_special_fragment_matcher(trimmed) {
+            for value in allowed_values {
+                if special_fragment_matches_candidate(value, &matcher)
+                    || special_fragment_matches_candidate(&format!("={value}"), &matcher)
+                {
+                    push_unique_preserving_normalized(&mut out, &mut seen, value.clone());
+                }
+            }
+        } else {
+            push_unique_preserving_normalized(&mut out, &mut seen, trimmed.to_string());
+        }
+    }
+
+    out
+}
+
+fn expand_reta_equals_regex_like_token(
+    left: &str,
+    right: &str,
+    current_section: Option<&str>,
+) -> Vec<String> {
+    let left_core = left.trim().strip_prefix("--").unwrap_or(left.trim());
+    let inventory = current_section
+        .map(reta_section_parameter_inventory_for_regex)
+        .unwrap_or_else(reta_global_parameter_inventory_for_regex);
+
+    let parameter_names = if let Some(matcher) = parse_special_fragment_matcher(left_core) {
+        inventory
+            .keys()
+            .filter(|parameter| {
+                special_fragment_matches_candidate(parameter, &matcher)
+                    || special_fragment_matches_candidate(&format!("--{parameter}"), &matcher)
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    } else if inventory.contains_key(left_core) {
+        vec![left_core.to_string()]
+    } else {
+        Vec::new()
+    };
+
+    if parameter_names.is_empty() {
+        return Vec::new();
+    }
+
+    let right_pieces = right.split(',').collect::<Vec<_>>();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for parameter in parameter_names {
+        let allowed_values = inventory.get(&parameter).cloned().unwrap_or_default();
+        let values = expand_rhs_regex_pieces(&right_pieces, &allowed_values);
+        if values.is_empty() {
+            if allowed_values.is_empty() {
+                push_unique_preserving_normalized(&mut out, &mut seen, format!("--{parameter}"));
+            }
+            continue;
+        }
+        push_unique_preserving_normalized(
+            &mut out,
+            &mut seen,
+            format!("--{parameter}={}", values.join(",")),
+        );
+    }
+
+    out
+}
+
+pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
+    if !tokens
+        .iter()
+        .any(|token| token_has_python_regex_or_glob(token))
+    {
+        return tokens.to_vec();
+    }
+
+    let input_is_reta = matches!(tokens.first().map(String::as_str), Some("reta"));
+    let mut current_section: Option<&str> = None;
+    let mut out = Vec::new();
+
+    for token in tokens {
+        if token == "reta" {
+            out.push(token.clone());
+            continue;
+        }
+        if input_is_reta && is_main_switch_token(token) {
+            current_section = Some(token.as_str());
+            out.push(token.clone());
+            continue;
+        }
+
+        let expanded = if let Some((left, right)) = token.split_once('=') {
+            if input_is_reta || left.starts_with("--") {
+                expand_reta_equals_regex_like_token(left, right, current_section)
+            } else {
+                Vec::new()
+            }
+        } else if input_is_reta {
+            expand_reta_simple_regex_like_token(token, current_section)
+        } else {
+            expand_prompt_regex_like_token(token)
+        };
+
+        if expanded.is_empty() {
+            out.push(token.clone());
+        } else {
+            out.extend(expanded);
+        }
+    }
+
+    out
 }
 
 pub fn replace_prompt_alias(token: &str) -> String {
@@ -103,7 +855,10 @@ pub fn replace_prompt_alias(token: &str) -> String {
 }
 
 pub fn normalize_prompt_tokens(tokens: &[String]) -> Vec<String> {
-    tokens.iter().map(|token| replace_prompt_alias(token)).collect()
+    tokens
+        .iter()
+        .map(|token| replace_prompt_alias(token))
+        .collect()
 }
 
 pub fn expand_python_prompt_macros(tokens: &[String]) -> Vec<String> {
@@ -117,6 +872,11 @@ pub fn expand_python_prompt_macros(tokens: &[String]) -> Vec<String> {
         }
     }
     out
+}
+
+pub fn finalize_prompt_tokens_for_execution(tokens: &[String]) -> Vec<String> {
+    let normalized = expand_python_prompt_macros(tokens);
+    expand_python_regex_like_tokens(&normalized)
 }
 
 pub fn is_15or16_command(text: &str) -> bool {
@@ -308,7 +1068,8 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
         let mut text_dazu: Vec<String> = Vec::new();
 
         let first_token_is_reta = tokens.first().map(|s| s == "reta").unwrap_or(false);
-        let known_direct = is_15or16_command(&s) || words.befehle_set.contains(&s) || first_token_is_reta;
+        let known_direct =
+            is_15or16_command(&s) || words.befehle_set.contains(&s) || first_token_is_reta;
 
         if !known_direct {
             let parsed = parse_prefix_and_numeric_suffix(&s);
@@ -321,7 +1082,10 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
                         .collect::<Vec<_>>();
                     let set_text_len_is_1 = tokens
                         .iter()
-                        .filter(|t| *t != "e" && *t != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
+                        .filter(|t| {
+                            *t != "e"
+                                && *t != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+                        })
                         .count()
                         == 1;
 
@@ -335,11 +1099,23 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
                         text_dazu.push(numeric.clone());
                     } else if set_text_len_is_1 && prompt_mode != PromptModus::AusgabeSelektiv {
                         if_kurz_kurz = true;
-                        text_dazu.extend([
-                            "mulpri", "a", "t", "w", "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
-                        ].into_iter().map(|s| s.to_string()));
+                        text_dazu.extend(
+                            [
+                                "mulpri",
+                                "a",
+                                "t",
+                                "w",
+                                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+                            ]
+                            .into_iter()
+                            .map(|s| s.to_string()),
+                        );
                         if tokens.iter().any(|t| t.contains('/')) {
-                            text_dazu.extend(["u", "B", "G", "E", "groesse"].into_iter().map(|s| s.to_string()));
+                            text_dazu.extend(
+                                ["u", "B", "G", "E", "groesse"]
+                                    .into_iter()
+                                    .map(|s| s.to_string()),
+                            );
                         }
                     }
                 }
@@ -365,7 +1141,10 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
         }
     }
 
-    if matches!(tokens.first().map(|s| s.as_str()), Some("reta" | "shell" | "python")) {
+    if matches!(
+        tokens.first().map(|s| s.as_str()),
+        Some("reta" | "shell" | "python")
+    ) {
         (if_kurz_kurz, tokens.to_vec())
     } else {
         (if_kurz_kurz, stext3)
@@ -385,21 +1164,111 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
     SPECS
         .get_or_init(|| {
             vec![
-                PromptSemanticSpec { names: &["thomas"], integer_para: "--galaxie=thomas", fraction_para: None, integer_cols: "2", fraction_cols: "2" },
-                PromptSemanticSpec { names: &["emotion"], integer_para: "--grundstrukturen=emotion", fraction_para: Some("--gebrochenemotion"), integer_cols: "2,3", fraction_cols: "4,5" },
-                PromptSemanticSpec { names: &["wirklichkeit"], integer_para: "--grundstrukturen=wirklichkeit", fraction_para: None, integer_cols: "1,2", fraction_cols: "5" },
-                PromptSemanticSpec { names: &["triebe"], integer_para: "--grundstrukturen=triebe", fraction_para: None, integer_cols: "1", fraction_cols: "2" },
-                PromptSemanticSpec { names: &["impulse"], integer_para: "--grundstrukturen=impulse", fraction_para: None, integer_cols: "1,4", fraction_cols: "3" },
-                PromptSemanticSpec { names: &["bewusstsein"], integer_para: "--grundstrukturen=bewusstsein", fraction_para: None, integer_cols: "6", fraction_cols: "7" },
-                PromptSemanticSpec { names: &["geist"], integer_para: "--grundstrukturen=geist", fraction_para: None, integer_cols: "3", fraction_cols: "4" },
-                PromptSemanticSpec { names: &["freiheit", "gleichheit"], integer_para: "--planet=freiheit", fraction_para: None, integer_cols: "1-4,8", fraction_cols: "5-7" },
-                PromptSemanticSpec { names: &["groesse"], integer_para: "--strukturgroesse=organisation", fraction_para: Some("--gebrochengroesse"), integer_cols: "1-3", fraction_cols: "99" },
-                PromptSemanticSpec { names: &["kugeln", "kreise"], integer_para: "--universum=kugeln", fraction_para: None, integer_cols: "1-2", fraction_cols: "99" },
-                PromptSemanticSpec { names: &["netzwerk"], integer_para: "--universum=netzwerk", fraction_para: None, integer_cols: "1-3", fraction_cols: "99" },
-                PromptSemanticSpec { names: &["komplex"], integer_para: "--universum=komplex", fraction_para: None, integer_cols: "1", fraction_cols: "3" },
-                PromptSemanticSpec { names: &["absicht", "absichten", "motiv", "motive"], integer_para: "--menschliches=motivation", fraction_para: None, integer_cols: "1", fraction_cols: "3" },
-                PromptSemanticSpec { names: &["universum"], integer_para: "--universum=transzendentalien", fraction_para: Some("--universum=transzendentaliereziproke"), integer_cols: "1,4", fraction_cols: "1,2" },
-                PromptSemanticSpec { names: &["richtung"], integer_para: "--primzahlwirkung=galaxieabsicht", fraction_para: None, integer_cols: "1", fraction_cols: "1" },
+                PromptSemanticSpec {
+                    names: &["thomas"],
+                    integer_para: "--galaxie=thomas",
+                    fraction_para: None,
+                    integer_cols: "2",
+                    fraction_cols: "2",
+                },
+                PromptSemanticSpec {
+                    names: &["emotion"],
+                    integer_para: "--grundstrukturen=emotion",
+                    fraction_para: None,
+                    integer_cols: "2,3",
+                    fraction_cols: "4,5",
+                },
+                PromptSemanticSpec {
+                    names: &["wirklichkeit"],
+                    integer_para: "--grundstrukturen=wirklichkeit",
+                    fraction_para: None,
+                    integer_cols: "1,2",
+                    fraction_cols: "5",
+                },
+                PromptSemanticSpec {
+                    names: &["triebe"],
+                    integer_para: "--grundstrukturen=triebe",
+                    fraction_para: None,
+                    integer_cols: "1",
+                    fraction_cols: "2",
+                },
+                PromptSemanticSpec {
+                    names: &["impulse"],
+                    integer_para: "--grundstrukturen=impulse",
+                    fraction_para: None,
+                    integer_cols: "1,4",
+                    fraction_cols: "3",
+                },
+                PromptSemanticSpec {
+                    names: &["bewusstsein"],
+                    integer_para: "--grundstrukturen=bewusstsein",
+                    fraction_para: None,
+                    integer_cols: "6",
+                    fraction_cols: "7",
+                },
+                PromptSemanticSpec {
+                    names: &["geist"],
+                    integer_para: "--grundstrukturen=geist",
+                    fraction_para: None,
+                    integer_cols: "3",
+                    fraction_cols: "4",
+                },
+                PromptSemanticSpec {
+                    names: &["freiheit", "gleichheit"],
+                    integer_para: "--planet=freiheit",
+                    fraction_para: None,
+                    integer_cols: "1-4,8",
+                    fraction_cols: "5-7",
+                },
+                PromptSemanticSpec {
+                    names: &["groesse"],
+                    integer_para: "--strukturgroesse=organisation",
+                    fraction_para: None,
+                    integer_cols: "1-3",
+                    fraction_cols: "99",
+                },
+                PromptSemanticSpec {
+                    names: &["kugeln", "kreise"],
+                    integer_para: "--universum=kugeln",
+                    fraction_para: None,
+                    integer_cols: "1-2",
+                    fraction_cols: "99",
+                },
+                PromptSemanticSpec {
+                    names: &["netzwerk"],
+                    integer_para: "--universum=netzwerk",
+                    fraction_para: None,
+                    integer_cols: "1-3",
+                    fraction_cols: "99",
+                },
+                PromptSemanticSpec {
+                    names: &["komplex"],
+                    integer_para: "--universum=komplex",
+                    fraction_para: None,
+                    integer_cols: "1",
+                    fraction_cols: "3",
+                },
+                PromptSemanticSpec {
+                    names: &["absicht", "absichten", "motiv", "motive"],
+                    integer_para: "--menschliches=motivation",
+                    fraction_para: None,
+                    integer_cols: "1",
+                    fraction_cols: "3",
+                },
+                PromptSemanticSpec {
+                    names: &["universum"],
+                    integer_para: "--universum=transzendentalien",
+                    fraction_para: Some("--universum=transzendentaliereziproke"),
+                    integer_cols: "1,4",
+                    fraction_cols: "1,2",
+                },
+                PromptSemanticSpec {
+                    names: &["richtung"],
+                    integer_para: "--primzahlwirkung=galaxieabsicht",
+                    fraction_para: None,
+                    integer_cols: "1",
+                    fraction_cols: "1",
+                },
             ]
         })
         .as_slice()
@@ -461,73 +1330,337 @@ fn contains_blocking_abc(tokens: &[String]) -> bool {
     tokens.iter().any(|t| t == "abc" || t == "abcd")
 }
 
-pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>> {
-    let normalized = expand_python_prompt_macros(tokens);
-    if normalized.is_empty() || normalized[0] == "reta" || normalized[0].starts_with('-') {
-        return Vec::new();
-    }
-    if normalized.iter().any(|t| matches!(t.as_str(), "help" | "hilfe" | "befehle" | "kurzbefehle" | "shell" | "python" | "math" | "loggen" | "nichtloggen")) {
-        return Vec::new();
-    }
+#[derive(Clone, Debug, Default)]
+struct PythonRowBuckets {
+    primary_row_specs: Vec<String>,
+    reciprocal_row_specs: Vec<String>,
+    raw_fraction_specs: Vec<String>,
+}
 
-    let row_specs = normalized
-        .iter()
-        .filter(|token| is_row_spec_token(token))
-        .cloned()
-        .collect::<Vec<_>>();
-    if row_specs.is_empty() {
-        return Vec::new();
+fn push_unique_string(target: &mut Vec<String>, value: String) {
+    if !target.contains(&value) {
+        target.push(value);
     }
+}
 
-    let suppress_empty = normalized.iter().any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
-    let no_headers = normalized.iter().any(|t| t == "ee" || t == "--keineueberschriften");
-    let use_range = normalized.iter().any(|t| t == "range");
-    let invert = normalized.iter().any(|t| t == "invertieren");
-    let teiler = normalized.iter().any(|t| t == "teiler");
-    let vielfache = normalized.iter().any(|t| t == "vielfache");
-    let has_fraction = row_specs.iter().any(|t| t.contains('/'));
-    let joined_rows = row_specs.join(",");
-    let mut calls: Vec<Vec<String>> = Vec::new();
-    let mut seen_labels = BTreeSet::new();
+fn parse_simple_fraction_piece(piece: &str) -> Option<(i64, i64)> {
+    let trimmed = piece.trim();
+    let trimmed = trimmed.strip_prefix('v').unwrap_or(trimmed);
+    let (left, right) = trimmed.split_once('/')?;
+    let numerator = left.trim().parse::<i64>().ok()?;
+    let denominator = right.trim().parse::<i64>().ok()?;
+    if denominator == 0 {
+        return None;
+    }
+    Some((numerator, denominator))
+}
 
-    for token in &normalized {
-        for spec in semantic_specs() {
-            if spec.names.contains(&token.as_str()) {
-                let label = spec.names[0].to_string();
-                if seen_labels.insert(label) {
-                    calls.push(build_single_semantic_call(
-                        spec,
-                        &joined_rows,
-                        has_fraction,
-                        use_range,
-                        invert,
-                        teiler,
-                        vielfache,
-                        suppress_empty,
-                        no_headers,
-                    ));
+fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
+    let mut buckets = PythonRowBuckets::default();
+
+    for spec in row_specs {
+        let trimmed = spec.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if !trimmed.contains('/') {
+            push_unique_string(&mut buckets.primary_row_specs, trimmed.to_string());
+            continue;
+        }
+
+        push_unique_string(&mut buckets.raw_fraction_specs, trimmed.to_string());
+
+        for piece in custom_split_delim_parenthesized(trimmed, ',') {
+            if let Some((numerator, denominator)) = parse_simple_fraction_piece(&piece) {
+                if numerator == 0 {
+                    continue;
                 }
-                break;
+                let numerator_abs = numerator.abs();
+                let denominator_abs = denominator.abs();
+                if numerator_abs == 0 || denominator_abs == 0 {
+                    continue;
+                }
+                if numerator_abs % denominator_abs == 0 {
+                    push_unique_string(
+                        &mut buckets.primary_row_specs,
+                        (numerator_abs / denominator_abs).to_string(),
+                    );
+                }
+                if denominator_abs % numerator_abs == 0 {
+                    push_unique_string(
+                        &mut buckets.reciprocal_row_specs,
+                        (denominator_abs / numerator_abs).to_string(),
+                    );
+                }
             }
         }
     }
 
-    if !contains_blocking_abc(&normalized) {
-        append_15_16_calls(&mut calls, &normalized, &joined_rows, use_range, invert, teiler, suppress_empty, no_headers);
+    buckets
+}
+
+fn prompt_python_default_oberesmaximum_seed() -> i64 {
+    // Python retaPrompt liest hier letztlich `tables.hoechsteZeile[1024]` aus dem
+    // laufenden Programm oder faellt auf das globale `retaProgram` zurueck.
+    // Auf dem split prompt crate existiert diese Program-Template-Schicht nicht,
+    // daher verwenden wir hier den gleichen Python-Defaultwert direkt.
+    1024
+}
+
+fn another_oberesmaximum_from_row_specs(row_specs: &[String]) -> Option<String> {
+    let numbers = parse_row_spec_numbers(row_specs)?;
+    if numbers.is_empty() {
+        return None;
+    }
+    let max_row = numbers.into_iter().map(i64::abs).max()?;
+    let hoechste_zeile = prompt_python_default_oberesmaximum_seed();
+    Some(format!(
+        "--oberesmaximum={}",
+        std::cmp::max(max_row, hoechste_zeile) + 1
+    ))
+}
+
+#[derive(Clone, Debug, Default)]
+struct BuiltRowSection {
+    tokens: Vec<String>,
+}
+
+fn build_python_row_section(
+    row_specs: &[String],
+    use_range: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    invert: bool,
+) -> Option<BuiltRowSection> {
+    if row_specs.is_empty() {
+        return None;
     }
 
-    calls
+    let base_specs = if use_teiler {
+        divisors_from_row_specs(row_specs)?
+            .into_iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        row_specs.to_vec()
+    };
+
+    if base_specs.is_empty() {
+        return None;
+    }
+
+    let mut tokens = Vec::new();
+
+    if use_vielfache {
+        if !use_teiler {
+            tokens.push(format!("--vielfachevonzahlen={}", base_specs.join(",")));
+        }
+        let prefix = if use_range {
+            "--zaehlung="
+        } else {
+            "--vorhervonausschnitt="
+        };
+        let mut suffix_parts = row_specs
+            .iter()
+            .filter_map(|spec| {
+                let trimmed = spec.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(format!("v{trimmed}"))
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut value_parts = base_specs.clone();
+        if use_teiler {
+            value_parts.extend(row_specs.iter().cloned());
+        }
+        value_parts.append(&mut suffix_parts);
+        tokens.push(format!("{prefix}{}", value_parts.join(",")));
+    } else {
+        let prefix = if use_range {
+            "--zaehlung="
+        } else {
+            "--vorhervonausschnitt="
+        };
+        tokens.push(format!("{prefix}{}", base_specs.join(",")));
+        if let Some(oberesmaximum) = another_oberesmaximum_from_row_specs(&base_specs) {
+            tokens.push(oberesmaximum);
+        }
+    }
+
+    if invert {
+        tokens.push("--invertieren".to_string());
+    }
+
+    Some(BuiltRowSection { tokens })
+}
+
+fn build_trailing_primary_zeilen_tokens(
+    primary_row_specs: &[String],
+    use_range: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+) -> Vec<String> {
+    build_python_row_section(
+        primary_row_specs,
+        use_range,
+        use_teiler,
+        use_vielfache,
+        false,
+    )
+    .map(|section| {
+        let mut tokens = vec!["-zeilen".to_string()];
+        tokens.extend(section.tokens);
+        tokens
+    })
+    .unwrap_or_default()
+}
+
+fn is_known_reta_parameter_token(token: &str) -> bool {
+    if !token.starts_with("--") {
+        return false;
+    }
+    let base = token
+        .split_once('=')
+        .map(|(head, _)| head)
+        .unwrap_or(token)
+        .trim_start_matches("--");
+    reta_global_parameter_inventory_for_regex().contains_key(base)
+}
+
+fn is_spalten_parameter_token(token: &str) -> bool {
+    if !token.starts_with("--") {
+        return false;
+    }
+    let base = token
+        .split_once('=')
+        .map(|(head, _)| head)
+        .unwrap_or(token)
+        .trim_start_matches("--");
+    spalten_parameter_inventory_for_regex().contains_key(base)
+}
+
+fn is_ausgabe_parameter_token(token: &str) -> bool {
+    if !token.starts_with("--") {
+        return false;
+    }
+    let base = token
+        .split_once('=')
+        .map(|(head, _)| head)
+        .unwrap_or(token)
+        .trim_start_matches("--");
+    ausgabe_parameter_inventory_for_regex().contains_key(base)
+}
+
+fn extract_passthrough_reta_parameters(tokens: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for token in tokens {
+        if is_known_reta_parameter_token(token) {
+            push_unique_string(&mut out, token.clone());
+        }
+    }
+    out
+}
+
+fn build_general_semantic_call(
+    row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    para: &str,
+    cols: Option<&str>,
+    extra_params: &[String],
+    trailing_tokens: &[String],
+) -> Vec<String> {
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+    if let Some(section) =
+        build_python_row_section(row_specs, use_range, use_teiler, use_vielfache, invert)
+    {
+        argv.extend(section.tokens);
+    }
+    argv.push("-spalten".to_string());
+    argv.push(para.to_string());
+    argv.push("--breite=0".to_string());
+    argv.push("-ausgabe".to_string());
+    if let Some(cols) = cols {
+        argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+    }
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    for token in extra_params {
+        if !argv.contains(token) {
+            argv.push(token.clone());
+        }
+    }
+    for token in trailing_tokens {
+        argv.push(token.clone());
+    }
+    argv
+}
+
+fn build_single_semantic_call(
+    spec: &PromptSemanticSpec,
+    row_specs: &[String],
+    reciprocal_kind: bool,
+    use_range: bool,
+    invert: bool,
+    teiler: bool,
+    vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+    trailing_tokens: &[String],
+) -> Option<Vec<String>> {
+    if row_specs.is_empty() {
+        return None;
+    }
+
+    let para = if reciprocal_kind {
+        spec.fraction_para.unwrap_or(spec.integer_para)
+    } else {
+        spec.integer_para
+    };
+    let cols = if reciprocal_kind {
+        spec.fraction_cols
+    } else {
+        spec.integer_cols
+    };
+
+    Some(build_general_semantic_call(
+        row_specs,
+        use_range,
+        invert,
+        teiler,
+        vielfache,
+        suppress_empty,
+        no_headers,
+        para,
+        Some(cols),
+        extra_params,
+        trailing_tokens,
+    ))
 }
 
 fn append_15_16_calls(
     calls: &mut Vec<Vec<String>>,
     normalized: &[String],
-    joined_rows: &str,
+    row_specs: &[String],
     use_range: bool,
     invert: bool,
     teiler: bool,
+    use_vielfache: bool,
     suppress_empty: bool,
     no_headers: bool,
+    extra_params: &[String],
 ) {
     let mut values16: Vec<String> = Vec::new();
     let mut values15: Vec<String> = Vec::new();
@@ -561,109 +1694,182 @@ fn append_15_16_calls(
 
     if !values16.is_empty() {
         calls.push(build_general_semantic_call(
-            joined_rows,
+            row_specs,
             use_range,
             invert,
             teiler,
-            false,
+            use_vielfache,
             suppress_empty,
             no_headers,
             &format!("--multiversum={}", values16.join(",")),
             None,
+            extra_params,
+            &[],
         ));
     }
     if !values15.is_empty() {
         calls.push(build_general_semantic_call(
-            joined_rows,
+            row_specs,
             use_range,
             invert,
             teiler,
-            false,
+            use_vielfache,
             suppress_empty,
             no_headers,
             &format!("--grundstrukturen={}", values15.join(",")),
             None,
+            extra_params,
+            &[],
         ));
     }
 }
 
-fn build_single_semantic_call(
-    spec: &PromptSemanticSpec,
-    joined_rows: &str,
-    has_fraction: bool,
-    use_range: bool,
-    invert: bool,
-    teiler: bool,
-    vielfache: bool,
-    suppress_empty: bool,
-    no_headers: bool,
-) -> Vec<String> {
-    let para = if has_fraction {
-        spec.fraction_para.unwrap_or(spec.integer_para)
-    } else {
-        spec.integer_para
-    };
-    let cols = if has_fraction {
-        spec.fraction_cols
-    } else {
-        spec.integer_cols
-    };
-    build_general_semantic_call(
-        joined_rows,
-        use_range,
-        invert,
-        teiler,
-        vielfache,
-        suppress_empty,
-        no_headers,
-        para,
-        Some(cols),
-    )
-}
+pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>> {
+    let normalized = finalize_prompt_tokens_for_execution(tokens);
+    if normalized.is_empty() || normalized[0] == "reta" || normalized[0].starts_with('-') {
+        return Vec::new();
+    }
+    if normalized.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "help"
+                | "hilfe"
+                | "befehle"
+                | "kurzbefehle"
+                | "shell"
+                | "python"
+                | "math"
+                | "loggen"
+                | "nichtloggen"
+        )
+    }) {
+        return Vec::new();
+    }
 
-fn build_general_semantic_call(
-    joined_rows: &str,
-    use_range: bool,
-    invert: bool,
-    teiler: bool,
-    vielfache: bool,
-    suppress_empty: bool,
-    no_headers: bool,
-    para: &str,
-    cols: Option<&str>,
-) -> Vec<String> {
-    let row_parameter = if vielfache {
-        format!("--vielfachevonzahlen={joined_rows}")
-    } else if use_range {
-        format!("--zaehlung={joined_rows}")
-    } else {
-        format!("--vorhervonausschnitt={joined_rows}")
-    };
-    let mut argv = vec![
-        "reta".to_string(),
-        "-zeilen".to_string(),
-        row_parameter,
-    ];
-    if teiler {
-        argv.push("--vorhervonausschnittteiler".to_string());
+    let row_specs = normalized
+        .iter()
+        .filter(|token| is_row_spec_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    if row_specs.is_empty() {
+        return Vec::new();
     }
-    if invert {
-        argv.push("--invertieren".to_string());
+
+    let suppress_empty = normalized
+        .iter()
+        .any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
+    let no_headers = normalized
+        .iter()
+        .any(|t| t == "ee" || t == "--keineueberschriften");
+    let use_range = normalized.iter().any(|t| t == "range");
+    let invert = normalized.iter().any(|t| t == "invertieren");
+    let teiler = normalized.iter().any(|t| t == "teiler");
+    let vielfache = normalized.iter().any(|t| t == "vielfache");
+    let row_buckets = build_python_row_buckets(&row_specs);
+    let extra_params = extract_passthrough_reta_parameters(&normalized);
+    let mut calls: Vec<Vec<String>> = Vec::new();
+    let mut seen_labels = BTreeSet::new();
+
+    for token in &normalized {
+        for spec in semantic_specs() {
+            if spec.names.contains(&token.as_str()) {
+                let label = spec.names[0].to_string();
+                if seen_labels.insert(label) {
+                    if let Some(call) = build_single_semantic_call(
+                        spec,
+                        &row_buckets.primary_row_specs,
+                        false,
+                        use_range,
+                        invert,
+                        teiler,
+                        vielfache,
+                        suppress_empty,
+                        no_headers,
+                        &extra_params,
+                        &[],
+                    ) {
+                        calls.push(call);
+                    }
+                    if let Some(call) = build_single_semantic_call(
+                        spec,
+                        &row_buckets.reciprocal_row_specs,
+                        true,
+                        use_range,
+                        invert,
+                        teiler,
+                        vielfache,
+                        suppress_empty,
+                        no_headers,
+                        &extra_params,
+                        &[],
+                    ) {
+                        calls.push(call);
+                    }
+                }
+                break;
+            }
+        }
     }
-    argv.push("-spalten".to_string());
-    argv.push(para.to_string());
-    argv.push("--breite=0".to_string());
-    argv.push("-ausgabe".to_string());
-    if let Some(cols) = cols {
-        argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+
+    let (eig_n_values, eig_r_values) = collect_concept_prefixed_values(&normalized);
+    if !eig_n_values.is_empty() && !row_buckets.primary_row_specs.is_empty() {
+        calls.push(build_general_semantic_call(
+            &row_buckets.primary_row_specs,
+            use_range,
+            invert,
+            teiler,
+            vielfache,
+            suppress_empty,
+            no_headers,
+            &format!("--konzept={}", eig_n_values.join(",")),
+            None,
+            &extra_params,
+            &[],
+        ));
     }
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
+    if !eig_r_values.is_empty() && !row_buckets.reciprocal_row_specs.is_empty() {
+        let trailing = build_trailing_primary_zeilen_tokens(
+            &row_buckets.primary_row_specs,
+            use_range,
+            teiler,
+            vielfache,
+        );
+        calls.push(build_general_semantic_call(
+            &row_buckets.reciprocal_row_specs,
+            use_range,
+            invert,
+            teiler,
+            vielfache,
+            suppress_empty,
+            no_headers,
+            &format!("--konzept2={}", eig_r_values.join(",")),
+            None,
+            &extra_params,
+            &trailing,
+        ));
     }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
+
+    if !contains_blocking_abc(&normalized) {
+        let rows_for_15_16 = if !row_buckets.primary_row_specs.is_empty() {
+            row_buckets.primary_row_specs.as_slice()
+        } else {
+            row_specs.as_slice()
+        };
+        append_15_16_calls(
+            &mut calls,
+            &normalized,
+            rows_for_15_16,
+            use_range,
+            invert,
+            teiler,
+            vielfache,
+            suppress_empty,
+            no_headers,
+            &extra_params,
+        );
     }
-    argv
+
+    calls
 }
 
 pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<String>> {
@@ -672,18 +1878,32 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         return semantic_calls.into_iter().next();
     }
 
-    let normalized = expand_python_prompt_macros(tokens);
+    let normalized = finalize_prompt_tokens_for_execution(tokens);
     if normalized.is_empty() {
         return None;
     }
     if normalized[0] == "reta" || normalized[0].starts_with('-') {
         return None;
     }
+    if normalized.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "help"
+                | "hilfe"
+                | "befehle"
+                | "kurzbefehle"
+                | "shell"
+                | "python"
+                | "math"
+                | "loggen"
+                | "nichtloggen"
+        )
+    }) {
+        return None;
+    }
 
     let mut row_specs: Vec<String> = Vec::new();
     let mut output_commands: Vec<String> = Vec::new();
-    let mut output_special_flags: Vec<String> = Vec::new();
-    let mut line_flags: Vec<String> = Vec::new();
     let mut output_flags: Vec<String> = Vec::new();
 
     for token in &normalized {
@@ -692,33 +1912,43 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
             continue;
         }
         match token.as_str() {
-            "vielfache" | "einzeln" => {}
-            "teiler" => line_flags.push("--vorhervonausschnittteiler".to_string()),
-            "invertieren" => line_flags.push("--invertieren".to_string()),
-            "range" => output_special_flags.push("range".to_string()),
-            "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" => {}
-            "ee" => output_flags.push("--keineueberschriften".to_string()),
+            "vielfache"
+            | "einzeln"
+            | "teiler"
+            | "invertieren"
+            | "range"
+            | "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" => {}
+            "ee" => push_unique_string(&mut output_flags, "--keineueberschriften".to_string()),
             "absicht" | "motiv" | "motive" | "absichten" | "universum" | "thomas" | "geist"
             | "bewusstsein" | "emotion" | "impulse" | "wirklichkeit" | "groesse" | "komplex"
-            | "kugeln" | "kreise" | "freiheit" | "gleichheit" | "richtung" | "mond"
-            | "alles" | "primzahlkreuz" => output_commands.push(token.clone()),
-            other if is_15or16_command(other) || other.starts_with(&prompt_words().eig_prefixes.0) || other.starts_with(&prompt_words().eig_prefixes.1) => {
-                output_commands.push(other.to_string());
+            | "kugeln" | "kreise" | "freiheit" | "gleichheit" | "richtung" | "mond" | "alles"
+            | "primzahlkreuz" => push_unique_string(&mut output_commands, token.clone()),
+            other
+                if is_15or16_command(other)
+                    || other.starts_with(&prompt_words().eig_prefixes.0)
+                    || other.starts_with(&prompt_words().eig_prefixes.1) =>
+            {
+                push_unique_string(&mut output_commands, other.to_string());
             }
             _ => {}
         }
     }
 
-    if row_specs.is_empty() || normalized.iter().any(|t| matches!(t.as_str(), "help" | "hilfe" | "befehle" | "kurzbefehle" | "shell" | "python" | "math" | "loggen" | "nichtloggen")) {
+    if row_specs.is_empty() {
         return None;
     }
 
-    if output_commands.is_empty() {
-        output_commands.extend([
-            "absicht".to_string(),
-            "thomas".to_string(),
-        ]);
-        if normalized.iter().any(|t| t.contains('/')) {
+    let passthrough_params = extract_passthrough_reta_parameters(&normalized);
+    let has_explicit_spalten_parameter = passthrough_params
+        .iter()
+        .any(|token| is_spalten_parameter_token(token));
+    let has_explicit_ausgabe_parameter = passthrough_params
+        .iter()
+        .any(|token| is_ausgabe_parameter_token(token));
+
+    if output_commands.is_empty() && !has_explicit_spalten_parameter {
+        output_commands.extend(["absicht".to_string(), "thomas".to_string()]);
+        if row_specs.iter().any(|t| t.contains('/')) {
             output_commands.extend([
                 "universum".to_string(),
                 "bewusstsein".to_string(),
@@ -727,42 +1957,64 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
                 "groesse".to_string(),
             ]);
         }
-        line_flags.push("--vorhervonausschnittteiler".to_string());
     }
 
-    let joined_rows = row_specs.join(",");
-    let line_parameter = if normalized.iter().any(|t| t == "vielfache") {
-        format!("--vielfachevonzahlen={joined_rows}")
-    } else if output_special_flags.iter().any(|flag| flag == "range") {
-        format!("--zaehlung={joined_rows}")
+    let use_range = normalized.iter().any(|t| t == "range");
+    let invert = normalized.iter().any(|t| t == "invertieren");
+    let teiler = normalized.iter().any(|t| t == "teiler");
+    let vielfache = normalized.iter().any(|t| t == "vielfache");
+    let row_buckets = build_python_row_buckets(&row_specs);
+    let generic_rows = if !row_buckets.primary_row_specs.is_empty() {
+        row_buckets.primary_row_specs.clone()
     } else {
-        format!("--vorhervonausschnitt={joined_rows}")
+        row_specs.clone()
     };
+    let row_section =
+        build_python_row_section(&generic_rows, use_range, teiler, vielfache, invert)?;
 
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string(), line_parameter];
-    for flag in line_flags {
-        if !argv.contains(&flag) {
-            argv.push(flag);
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+    argv.extend(row_section.tokens);
+
+    if !output_commands.is_empty() || has_explicit_spalten_parameter {
+        argv.push("-spalten".to_string());
+        for command in output_commands {
+            let token = format!("--{command}");
+            if !argv.contains(&token) {
+                argv.push(token);
+            }
+        }
+        for token in &passthrough_params {
+            if is_spalten_parameter_token(token) && !argv.contains(token) {
+                argv.push(token.clone());
+            }
         }
     }
 
-    argv.push("-spalten".to_string());
-    for command in output_commands {
-        argv.push(format!("--{command}"));
-    }
-
-    if !output_flags.is_empty() {
+    if !output_flags.is_empty() || has_explicit_ausgabe_parameter {
         argv.push("-ausgabe".to_string());
         for flag in output_flags {
             if !argv.contains(&flag) {
                 argv.push(flag);
             }
         }
+        for token in &passthrough_params {
+            if is_ausgabe_parameter_token(token) && !argv.contains(token) {
+                argv.push(token.clone());
+            }
+        }
+    }
+
+    for token in passthrough_params {
+        if !argv.contains(&token)
+            && !is_spalten_parameter_token(&token)
+            && !is_ausgabe_parameter_token(&token)
+        {
+            argv.push(token);
+        }
     }
 
     Some(argv)
 }
-
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PreparedPromptBigOutput {
@@ -794,7 +2046,7 @@ pub fn prepare_prompt_big_output_for_stored_reta(
     } else {
         expanded_input
     };
-    effective_input = normalize_prompt_tokens(&effective_input);
+    effective_input = finalize_prompt_tokens_for_execution(&effective_input);
 
     let row_specs = effective_input
         .iter()
@@ -967,10 +2219,11 @@ fn parse_row_spec_numbers(row_specs: &[String]) -> Option<Vec<i64>> {
             if trimmed.is_empty() {
                 continue;
             }
-            if trimmed.contains('/') {
+            let normalized = trimmed.strip_prefix('v').unwrap_or(trimmed);
+            if normalized.contains('/') {
                 return None;
             }
-            if let Some((start, end)) = parse_integer_range_piece(trimmed) {
+            if let Some((start, end)) = parse_integer_range_piece(normalized) {
                 if start <= end {
                     for value in start..=end {
                         numbers.push(value);
@@ -981,7 +2234,7 @@ fn parse_row_spec_numbers(row_specs: &[String]) -> Option<Vec<i64>> {
                     }
                 }
             } else {
-                numbers.push(trimmed.parse::<i64>().ok()?);
+                numbers.push(normalized.parse::<i64>().ok()?);
             }
         }
     }
@@ -1023,10 +2276,12 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
     Some((prefix, suffix))
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::prepare_prompt_big_output_for_stored_reta;
+    use super::{
+        build_reta_calls_from_prompt_tokens, expand_python_regex_like_tokens,
+        prepare_prompt_big_output_for_stored_reta,
+    };
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
@@ -1035,13 +2290,7 @@ mod tests {
     #[test]
     fn stored_reta_placeholder_replaces_zeilen_section_python_like() {
         let prepared = prepare_prompt_big_output_for_stored_reta(
-            &strings(&[
-                "reta",
-                "-zeilen",
-                "--zeit=heute",
-                "-spalten",
-                "--thomas",
-            ]),
+            &strings(&["reta", "-zeilen", "--zeit=heute", "-spalten", "--thomas"]),
             &strings(&["12-15"]),
         )
         .expect("stored reta placeholder should be rewritten");
@@ -1096,5 +2345,65 @@ mod tests {
                 "--impulse",
             ])
         );
+    }
+
+    #[test]
+    fn prompt_execution_regex_expands_prompt_command_like_python() {
+        let expanded = expand_python_regex_like_tokens(&strings(&["r\"emo.*\""]));
+        assert_eq!(expanded, strings(&["emotion"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_expands_reta_value_like_python() {
+        let expanded =
+            expand_python_regex_like_tokens(&strings(&["reta", "-zeilen", "--zeit=r\"heu.*\""]));
+        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
+    }
+
+    #[test]
+    fn build_reta_calls_supports_concept_prefixed_prompt_commands() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["12", "EIGNweisheit"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].iter().any(|token| token == "--konzept=weisheit"));
+    }
+
+    #[test]
+    fn build_reta_calls_supports_reciprocal_concept_prefixed_prompt_commands() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["1/2", "EIGRgleichheit"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--konzept2=gleichheit"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2"));
+    }
+
+    #[test]
+    fn build_reta_calls_transform_teiler_without_legacy_flag() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "12", "teiler"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,3,4,6,12"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token.starts_with("--oberesmaximum=")));
+        assert!(!calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnittteiler"));
+    }
+
+    #[test]
+    fn semantic_call_keeps_passthrough_reta_parameters() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "emotion",
+            "12",
+            "--nocolor",
+            "--breite=80",
+        ]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].iter().any(|token| token == "--nocolor"));
+        assert!(calls[0].iter().any(|token| token == "--breite=80"));
     }
 }

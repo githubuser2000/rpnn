@@ -3,9 +3,9 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::completion::candidates_for_prefix;
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl, expand_python_prompt_macros,
-    looks_like_numeric_or_fraction_range, normalize_prompt_tokens, prepare_prompt_big_output_for_stored_reta,
-    prompt_words, PromptModus,
+    custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
+    finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
+    prepare_prompt_big_output_for_stored_reta, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -130,8 +130,12 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     } else {
         expanded
     };
-    effective_tokens = normalize_prompt_tokens(&effective_tokens);
-    effective_tokens = expand_python_prompt_macros(&effective_tokens);
+    if !matches!(
+        effective_tokens.first().map(String::as_str),
+        Some("shell" | "python" | "abstand")
+    ) {
+        effective_tokens = finalize_prompt_tokens_for_execution(&effective_tokens);
+    }
 
     if effective_tokens[0] == "shell" {
         let shell_text = trimmed
@@ -389,9 +393,9 @@ fn prepare_stored_prefix_tokens(tokens: &[String]) -> Vec<String> {
 
     if !matches!(
         effective_tokens.first().map(String::as_str),
-        Some("reta" | "shell" | "python" | "abstand")
+        Some("shell" | "python" | "abstand")
     ) {
-        effective_tokens = normalize_prompt_tokens(&effective_tokens);
+        effective_tokens = finalize_prompt_tokens_for_execution(&effective_tokens);
     }
 
     effective_tokens
@@ -422,8 +426,13 @@ fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
 
     if left_has_reta || right_has_reta {
         let mut merged = vec!["reta".to_string()];
-        merged.extend(left_tokens);
-        merged.extend(right_tokens);
+        if right_has_reta && !left_has_reta {
+            merged.extend(right_tokens);
+            merged.extend(left_tokens);
+        } else {
+            merged.extend(left_tokens);
+            merged.extend(right_tokens);
+        }
         return merged.join(" ");
     }
 
@@ -1224,7 +1233,8 @@ pub fn render_history_text(history: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_command_with_state, refresh_stored_placeholder_cache, PromptCommand, SessionState,
+        compile_command_with_state, merge_stored_placeholder, refresh_stored_placeholder_cache,
+        PromptCommand, SessionState,
     };
 
     #[test]
@@ -1242,6 +1252,12 @@ mod tests {
         let state = SessionState::new("rp".to_string(), true, false);
         let command = compile_command_with_state("", &state).unwrap();
         assert!(matches!(command, PromptCommand::Noop));
+    }
+
+    #[test]
+    fn merge_stored_placeholder_prefers_incoming_reta_order_like_python() {
+        let merged = merge_stored_placeholder("emotion 12", "reta -spalten --geist");
+        assert_eq!(merged, "reta -spalten --geist emotion 12");
     }
 
     #[test]
