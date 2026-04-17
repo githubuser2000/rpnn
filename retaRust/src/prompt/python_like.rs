@@ -1154,9 +1154,12 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
 struct PromptSemanticSpec {
     names: &'static [&'static str],
     integer_para: &'static str,
-    fraction_para: Option<&'static str>,
+    reciprocal_whole_para: Option<&'static str>,
     integer_cols: &'static str,
-    fraction_cols: &'static str,
+    reciprocal_whole_cols: &'static str,
+    non_whole_fraction_para: Option<&'static str>,
+    include_reverse_non_whole: bool,
+    dynamic_universe_columns: bool,
 }
 
 fn semantic_specs() -> &'static [PromptSemanticSpec] {
@@ -1167,111 +1170,194 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                 PromptSemanticSpec {
                     names: &["thomas"],
                     integer_para: "--galaxie=thomas",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "2",
-                    fraction_cols: "2",
+                    reciprocal_whole_cols: "2",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["emotion"],
                     integer_para: "--grundstrukturen=emotion",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "2,3",
-                    fraction_cols: "4,5",
+                    reciprocal_whole_cols: "4,5",
+                    non_whole_fraction_para: Some("--gebrochenemotion="),
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["wirklichkeit"],
                     integer_para: "--grundstrukturen=wirklichkeit",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1,2",
-                    fraction_cols: "5",
+                    reciprocal_whole_cols: "5",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["triebe"],
                     integer_para: "--grundstrukturen=triebe",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1",
-                    fraction_cols: "2",
+                    reciprocal_whole_cols: "2",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["impulse"],
                     integer_para: "--grundstrukturen=impulse",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1,4",
-                    fraction_cols: "3",
+                    reciprocal_whole_cols: "3",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["bewusstsein"],
                     integer_para: "--grundstrukturen=bewusstsein",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "6",
-                    fraction_cols: "7",
+                    reciprocal_whole_cols: "7",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["geist"],
                     integer_para: "--grundstrukturen=geist",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "3",
-                    fraction_cols: "4",
+                    reciprocal_whole_cols: "4",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["freiheit", "gleichheit"],
                     integer_para: "--planet=freiheit",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1-4,8",
-                    fraction_cols: "5-7",
+                    reciprocal_whole_cols: "5-7",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["groesse"],
                     integer_para: "--strukturgroesse=organisation",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1-3",
-                    fraction_cols: "99",
+                    reciprocal_whole_cols: "99",
+                    non_whole_fraction_para: Some("--gebrochengroesse="),
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["kugeln", "kreise"],
                     integer_para: "--universum=kugeln",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1-2",
-                    fraction_cols: "99",
+                    reciprocal_whole_cols: "99",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["netzwerk"],
                     integer_para: "--universum=netzwerk",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1-3",
-                    fraction_cols: "99",
+                    reciprocal_whole_cols: "99",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["komplex"],
                     integer_para: "--universum=komplex",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1",
-                    fraction_cols: "3",
+                    reciprocal_whole_cols: "3",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["absicht", "absichten", "motiv", "motive"],
                     integer_para: "--menschliches=motivation",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1",
-                    fraction_cols: "3",
+                    reciprocal_whole_cols: "3",
+                    non_whole_fraction_para: Some("--gebrochengalaxie="),
+                    include_reverse_non_whole: true,
+                    dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
                     names: &["universum"],
                     integer_para: "--universum=transzendentalien",
-                    fraction_para: Some("--universum=transzendentaliereziproke"),
-                    integer_cols: "1,4",
-                    fraction_cols: "1,2",
+                    reciprocal_whole_para: Some("--universum=transzendentaliereziproke"),
+                    integer_cols: "1",
+                    reciprocal_whole_cols: "1",
+                    non_whole_fraction_para: Some("--gebrochenuniversum="),
+                    include_reverse_non_whole: true,
+                    dynamic_universe_columns: true,
                 },
                 PromptSemanticSpec {
                     names: &["richtung"],
                     integer_para: "--primzahlwirkung=galaxieabsicht",
-                    fraction_para: None,
+                    reciprocal_whole_para: None,
                     integer_cols: "1",
-                    fraction_cols: "1",
+                    reciprocal_whole_cols: "1",
+                    non_whole_fraction_para: None,
+                    include_reverse_non_whole: false,
+                    dynamic_universe_columns: false,
                 },
             ]
         })
         .as_slice()
+}
+
+fn prompt_command_count(tokens: &[String]) -> usize {
+    tokens
+        .iter()
+        .filter(|token| prompt_words().befehle_set.contains(*token))
+        .count()
+}
+
+fn semantic_columns_for_spec(
+    spec: &PromptSemanticSpec,
+    normalized: &[String],
+    reciprocal_kind: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+) -> String {
+    if spec.dynamic_universe_columns {
+        let show_extra_columns = prompt_command_count(normalized) <= 2 && !suppress_empty && !no_headers;
+        let mut columns = String::from("1");
+        if show_extra_columns {
+            columns.push_str(if reciprocal_kind { ",2" } else { ",4" });
+        }
+        return columns;
+    }
+
+    if reciprocal_kind {
+        spec.reciprocal_whole_cols.to_string()
+    } else {
+        spec.integer_cols.to_string()
+    }
+}
+
+fn semantic_non_whole_fraction_reverse_columns(_spec: &PromptSemanticSpec) -> &'static str {
+    "1"
+}
+
+fn semantic_non_whole_fraction_normal_columns(_spec: &PromptSemanticSpec) -> &'static str {
+    "2"
 }
 
 fn semantic_wahl15() -> &'static BTreeMap<&'static str, &'static str> {
@@ -1335,6 +1421,8 @@ struct PythonRowBuckets {
     primary_row_specs: Vec<String>,
     reciprocal_row_specs: Vec<String>,
     raw_fraction_specs: Vec<String>,
+    non_whole_fraction_denominator_groups: BTreeMap<i64, Vec<String>>,
+    non_whole_fraction_numerator_groups: BTreeMap<i64, Vec<String>>,
 }
 
 fn push_unique_string(target: &mut Vec<String>, value: String) {
@@ -1355,8 +1443,191 @@ fn parse_simple_fraction_piece(piece: &str) -> Option<(i64, i64)> {
     Some((numerator, denominator))
 }
 
+fn strip_matching_row_wrappers(mut text: &str) -> &str {
+    loop {
+        let trimmed = text.trim();
+        let stripped = if trimmed.starts_with('(') && trimmed.ends_with(')') {
+            Some(&trimmed[1..trimmed.len() - 1])
+        } else if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            Some(&trimmed[1..trimmed.len() - 1])
+        } else if trimmed.starts_with('{') && trimmed.ends_with('}') {
+            Some(&trimmed[1..trimmed.len() - 1])
+        } else {
+            None
+        };
+        match stripped {
+            Some(inner) => text = inner,
+            None => return trimmed,
+        }
+    }
+}
+
+fn strip_row_piece_prefixes(piece: &str) -> (bool, &str) {
+    let mut subtract = false;
+    let mut rest = piece.trim();
+
+    loop {
+        let mut changed = false;
+        if let Some(next) = rest.strip_prefix('v') {
+            rest = next.trim_start();
+            changed = true;
+        }
+        if let Some(next) = rest.strip_prefix('-') {
+            subtract = !subtract;
+            rest = next.trim_start();
+            changed = true;
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    (subtract, strip_matching_row_wrappers(rest))
+}
+
+fn split_fraction_operator(text: &str, operator: char) -> Option<(&str, &str)> {
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+
+    for (index, ch) in text.char_indices() {
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ if ch == operator
+                && index > 0
+                && round == 0
+                && square == 0
+                && curly == 0 =>
+            {
+                let left = text[..index].trim();
+                let right = text[index + ch.len_utf8()..].trim();
+                if !left.is_empty() && !right.is_empty() {
+                    return Some((left, right));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn inclusive_i64_range(start: i64, end: i64) -> Vec<i64> {
+    if start <= end {
+        (start..=end).collect()
+    } else {
+        (end..=start).rev().collect()
+    }
+}
+
+fn expand_fraction_range_piece(piece: &str) -> Option<Vec<(i64, i64)>> {
+    let (left, right) = split_fraction_operator(piece, '-')?;
+    let (left_numerator, left_denominator) = parse_simple_fraction_piece(left)?;
+    let (right_numerator, right_denominator) = parse_simple_fraction_piece(right)?;
+
+    let numerators = inclusive_i64_range(left_numerator, right_numerator);
+    let denominators = inclusive_i64_range(left_denominator, right_denominator);
+    let mut out = Vec::new();
+
+    for denominator in denominators {
+        if denominator == 0 {
+            continue;
+        }
+        for numerator in &numerators {
+            if *numerator == 0 {
+                continue;
+            }
+            out.push((*numerator, denominator));
+        }
+    }
+
+    (!out.is_empty()).then_some(out)
+}
+
+fn expand_fraction_distance_piece(piece: &str) -> Option<Vec<(i64, i64)>> {
+    let (left, right) = split_fraction_operator(piece, '+')?;
+    let (base_numerator, base_denominator) = parse_simple_fraction_piece(left)?;
+    let (delta_numerator, delta_denominator) = parse_simple_fraction_piece(right)?;
+
+    let numerator_candidates = [
+        base_numerator - delta_numerator,
+        base_numerator + delta_numerator,
+    ];
+    let denominator_candidates = [
+        base_denominator - delta_denominator,
+        base_denominator + delta_denominator,
+    ];
+
+    let mut out = Vec::new();
+    for denominator in denominator_candidates {
+        if denominator == 0 {
+            continue;
+        }
+        for numerator in numerator_candidates {
+            if numerator == 0 {
+                continue;
+            }
+            out.push((numerator, denominator));
+        }
+    }
+
+    (!out.is_empty()).then_some(out)
+}
+
+fn expand_fraction_piece_values(piece: &str) -> Option<Vec<(i64, i64)>> {
+    let inner = strip_matching_row_wrappers(piece.trim());
+    expand_fraction_range_piece(inner)
+        .or_else(|| expand_fraction_distance_piece(inner))
+        .or_else(|| parse_simple_fraction_piece(inner).map(|fraction| vec![fraction]))
+}
+
+fn expand_integer_piece_values(piece: &str) -> Option<Vec<i64>> {
+    let inner = strip_matching_row_wrappers(piece.trim());
+    if let Some((start, end)) = parse_integer_range_piece(inner) {
+        return Some(inclusive_i64_range(start, end));
+    }
+    inner.parse::<i64>().ok().map(|value| vec![value])
+}
+
+fn insert_fraction_group_value(
+    map: &mut BTreeMap<i64, BTreeSet<i64>>,
+    key: i64,
+    value: i64,
+) {
+    if key <= 0 || value <= 0 {
+        return;
+    }
+    map.entry(key).or_default().insert(value);
+}
+
+fn finalize_fraction_group_map(map: BTreeMap<i64, BTreeSet<i64>>) -> BTreeMap<i64, Vec<String>> {
+    map.into_iter()
+        .map(|(key, values)| {
+            (
+                key,
+                values
+                    .into_iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect()
+}
+
 fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
     let mut buckets = PythonRowBuckets::default();
+
+    let mut primary_numbers = BTreeSet::new();
+    let mut reciprocal_numbers = BTreeSet::new();
+    let mut negative_primary_numbers = BTreeSet::new();
+    let mut negative_reciprocal_numbers = BTreeSet::new();
+    let mut non_whole_fraction_pairs = BTreeSet::new();
+    let mut negative_non_whole_fraction_pairs = BTreeSet::new();
 
     for spec in row_specs {
         let trimmed = spec.trim();
@@ -1364,38 +1635,99 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
             continue;
         }
 
-        if !trimmed.contains('/') {
-            push_unique_string(&mut buckets.primary_row_specs, trimmed.to_string());
-            continue;
-        }
-
-        push_unique_string(&mut buckets.raw_fraction_specs, trimmed.to_string());
-
         for piece in custom_split_delim_parenthesized(trimmed, ',') {
-            if let Some((numerator, denominator)) = parse_simple_fraction_piece(&piece) {
-                if numerator == 0 {
-                    continue;
+            let piece_trimmed = piece.trim();
+            if piece_trimmed.is_empty() {
+                continue;
+            }
+
+            let (subtract, core) = strip_row_piece_prefixes(piece_trimmed);
+
+            if core.contains('/') {
+                push_unique_string(&mut buckets.raw_fraction_specs, piece_trimmed.to_string());
+                if let Some(fractions) = expand_fraction_piece_values(core) {
+                    for (numerator, denominator) in fractions {
+                        let numerator_abs = numerator.abs();
+                        let denominator_abs = denominator.abs();
+                        if numerator_abs == 0 || denominator_abs == 0 {
+                            continue;
+                        }
+                        if numerator_abs % denominator_abs == 0 {
+                            let value = numerator_abs / denominator_abs;
+                            if subtract {
+                                negative_primary_numbers.insert(value);
+                            } else {
+                                primary_numbers.insert(value);
+                            }
+                        }
+                        if denominator_abs % numerator_abs == 0 {
+                            let value = denominator_abs / numerator_abs;
+                            if subtract {
+                                negative_reciprocal_numbers.insert(value);
+                            } else {
+                                reciprocal_numbers.insert(value);
+                            }
+                        }
+                        if numerator_abs % denominator_abs != 0
+                            && denominator_abs % numerator_abs != 0
+                        {
+                            let pair = (numerator_abs, denominator_abs);
+                            if subtract {
+                                negative_non_whole_fraction_pairs.insert(pair);
+                            } else {
+                                non_whole_fraction_pairs.insert(pair);
+                            }
+                        }
+                    }
                 }
-                let numerator_abs = numerator.abs();
-                let denominator_abs = denominator.abs();
-                if numerator_abs == 0 || denominator_abs == 0 {
-                    continue;
-                }
-                if numerator_abs % denominator_abs == 0 {
-                    push_unique_string(
-                        &mut buckets.primary_row_specs,
-                        (numerator_abs / denominator_abs).to_string(),
-                    );
-                }
-                if denominator_abs % numerator_abs == 0 {
-                    push_unique_string(
-                        &mut buckets.reciprocal_row_specs,
-                        (denominator_abs / numerator_abs).to_string(),
-                    );
+                continue;
+            }
+
+            if let Some(values) = expand_integer_piece_values(core) {
+                for value in values {
+                    let value_abs = value.abs();
+                    if value_abs == 0 {
+                        continue;
+                    }
+                    if subtract {
+                        negative_primary_numbers.insert(value_abs);
+                    } else {
+                        primary_numbers.insert(value_abs);
+                    }
                 }
             }
         }
     }
+
+    for value in negative_primary_numbers {
+        primary_numbers.remove(&value);
+    }
+    for value in negative_reciprocal_numbers {
+        reciprocal_numbers.remove(&value);
+    }
+    for pair in negative_non_whole_fraction_pairs {
+        non_whole_fraction_pairs.remove(&pair);
+    }
+
+    buckets.primary_row_specs = primary_numbers
+        .into_iter()
+        .map(|value| value.to_string())
+        .collect();
+    buckets.reciprocal_row_specs = reciprocal_numbers
+        .into_iter()
+        .map(|value| value.to_string())
+        .collect();
+
+    let mut denominator_groups: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+    let mut numerator_groups: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+    for (numerator, denominator) in non_whole_fraction_pairs {
+        insert_fraction_group_value(&mut denominator_groups, denominator, numerator);
+        insert_fraction_group_value(&mut numerator_groups, numerator, denominator);
+    }
+
+    buckets.non_whole_fraction_denominator_groups =
+        finalize_fraction_group_map(denominator_groups);
+    buckets.non_whole_fraction_numerator_groups = finalize_fraction_group_map(numerator_groups);
 
     buckets
 }
@@ -1607,8 +1939,129 @@ fn build_general_semantic_call(
     argv
 }
 
+fn build_fractional_prompt_row_section(
+    row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+) -> Option<BuiltRowSection> {
+    if row_specs.is_empty() {
+        return None;
+    }
+
+    let joined_rows = row_specs
+        .iter()
+        .map(|spec| spec.trim())
+        .filter(|spec| !spec.is_empty())
+        .collect::<Vec<_>>()
+        .join(",");
+    if joined_rows.is_empty() {
+        return None;
+    }
+
+    let prefix = if use_range {
+        "--zaehlung="
+    } else {
+        "--vorhervonausschnitt="
+    };
+
+    let mut tokens = vec![format!("{prefix}{joined_rows}")];
+    if invert {
+        tokens.push("--invertieren".to_string());
+    }
+    Some(BuiltRowSection { tokens })
+}
+
+fn build_non_whole_fraction_semantic_call(
+    row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    para: &str,
+    cols: &str,
+    extra_params: &[String],
+) -> Option<Vec<String>> {
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+    let section = build_fractional_prompt_row_section(row_specs, use_range, invert)?;
+    argv.extend(section.tokens);
+    argv.push("-spalten".to_string());
+    argv.push(para.to_string());
+    argv.push("--breite=0".to_string());
+    argv.push("-ausgabe".to_string());
+    argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    for token in extra_params {
+        if !argv.contains(token) {
+            argv.push(token.clone());
+        }
+    }
+    Some(argv)
+}
+
+fn build_non_whole_fraction_semantic_calls(
+    spec: &PromptSemanticSpec,
+    row_buckets: &PythonRowBuckets,
+    use_range: bool,
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+) -> Vec<Vec<String>> {
+    let Some(main_parameter_prefix) = spec.non_whole_fraction_para else {
+        return Vec::new();
+    };
+
+    let mut calls = Vec::new();
+
+    for (denominator, numerators) in &row_buckets.non_whole_fraction_denominator_groups {
+        let row_spec = numerators.join(",");
+        if let Some(call) = build_non_whole_fraction_semantic_call(
+            &[row_spec],
+            use_range,
+            invert,
+            suppress_empty,
+            no_headers,
+            &format!("{main_parameter_prefix}{denominator}"),
+            semantic_non_whole_fraction_normal_columns(spec),
+            extra_params,
+        ) {
+            if !calls.contains(&call) {
+                calls.push(call);
+            }
+        }
+    }
+
+    if spec.include_reverse_non_whole {
+        for (numerator, denominators) in &row_buckets.non_whole_fraction_numerator_groups {
+            let row_spec = denominators.join(",");
+            if let Some(call) = build_non_whole_fraction_semantic_call(
+                &[row_spec],
+                use_range,
+                invert,
+                suppress_empty,
+                no_headers,
+                &format!("{main_parameter_prefix}{numerator}"),
+                semantic_non_whole_fraction_reverse_columns(spec),
+                extra_params,
+            ) {
+                if !calls.contains(&call) {
+                    calls.push(call);
+                }
+            }
+        }
+    }
+
+    calls
+}
+
 fn build_single_semantic_call(
     spec: &PromptSemanticSpec,
+    normalized: &[String],
     row_specs: &[String],
     reciprocal_kind: bool,
     use_range: bool,
@@ -1625,15 +2078,11 @@ fn build_single_semantic_call(
     }
 
     let para = if reciprocal_kind {
-        spec.fraction_para.unwrap_or(spec.integer_para)
+        spec.reciprocal_whole_para.unwrap_or(spec.integer_para)
     } else {
         spec.integer_para
     };
-    let cols = if reciprocal_kind {
-        spec.fraction_cols
-    } else {
-        spec.integer_cols
-    };
+    let cols = semantic_columns_for_spec(spec, normalized, reciprocal_kind, suppress_empty, no_headers);
 
     Some(build_general_semantic_call(
         row_specs,
@@ -1644,7 +2093,7 @@ fn build_single_semantic_call(
         suppress_empty,
         no_headers,
         para,
-        Some(cols),
+        Some(cols.as_str()),
         extra_params,
         trailing_tokens,
     ))
@@ -1777,6 +2226,7 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                 if seen_labels.insert(label) {
                     if let Some(call) = build_single_semantic_call(
                         spec,
+                        &normalized,
                         &row_buckets.primary_row_specs,
                         false,
                         use_range,
@@ -1792,6 +2242,7 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                     }
                     if let Some(call) = build_single_semantic_call(
                         spec,
+                        &normalized,
                         &row_buckets.reciprocal_row_specs,
                         true,
                         use_range,
@@ -1805,6 +2256,15 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                     ) {
                         calls.push(call);
                     }
+                    calls.extend(build_non_whole_fraction_semantic_calls(
+                        spec,
+                        &row_buckets,
+                        use_range,
+                        invert,
+                        suppress_empty,
+                        no_headers,
+                        &extra_params,
+                    ));
                 }
                 break;
             }
@@ -2405,5 +2865,66 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert!(calls[0].iter().any(|token| token == "--nocolor"));
         assert!(calls[0].iter().any(|token| token == "--breite=80"));
+    }
+
+    #[test]
+    fn fractional_emotion_builds_gebrochenemotion_call() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/3"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--gebrochenemotion=3"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=2"));
+    }
+
+    #[test]
+    fn universum_fraction_emits_normal_and_reverse_fraction_calls() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "2/3"]));
+        assert_eq!(calls.len(), 2);
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenuniversum=3")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenuniversum=2")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=2")));
+    }
+
+    #[test]
+    fn fraction_rectangle_expands_into_integer_reciprocal_and_non_whole_calls() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "1/2-3/3"]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--grundstrukturen=emotion")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenemotion=2")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenemotion=3")));
+    }
+
+    #[test]
+    fn fraction_distance_expands_like_python_prompt_examples() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["absicht", "4/5+2/2"]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochengalaxie=3")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochengalaxie=7")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochengalaxie=2")));
     }
 }
