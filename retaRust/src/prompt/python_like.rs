@@ -1841,40 +1841,65 @@ fn build_trailing_primary_zeilen_tokens(
     .unwrap_or_default()
 }
 
-fn is_known_reta_parameter_token(token: &str) -> bool {
+fn parameter_token_base(token: &str) -> Option<&str> {
     if !token.starts_with("--") {
-        return false;
+        return None;
     }
-    let base = token
-        .split_once('=')
-        .map(|(head, _)| head)
-        .unwrap_or(token)
-        .trim_start_matches("--");
-    reta_global_parameter_inventory_for_regex().contains_key(base)
+    Some(
+        token
+            .split_once('=')
+            .map(|(head, _)| head)
+            .unwrap_or(token)
+            .trim_start_matches("--"),
+    )
+}
+
+fn is_known_reta_parameter_token(token: &str) -> bool {
+    parameter_token_base(token)
+        .map(|base| reta_global_parameter_inventory_for_regex().contains_key(base))
+        .unwrap_or(false)
 }
 
 fn is_spalten_parameter_token(token: &str) -> bool {
-    if !token.starts_with("--") {
-        return false;
-    }
-    let base = token
-        .split_once('=')
-        .map(|(head, _)| head)
-        .unwrap_or(token)
-        .trim_start_matches("--");
-    spalten_parameter_inventory_for_regex().contains_key(base)
+    parameter_token_base(token)
+        .map(|base| spalten_parameter_inventory_for_regex().contains_key(base))
+        .unwrap_or(false)
 }
 
 fn is_ausgabe_parameter_token(token: &str) -> bool {
-    if !token.starts_with("--") {
-        return false;
-    }
-    let base = token
-        .split_once('=')
-        .map(|(head, _)| head)
-        .unwrap_or(token)
-        .trim_start_matches("--");
-    ausgabe_parameter_inventory_for_regex().contains_key(base)
+    parameter_token_base(token)
+        .map(|base| ausgabe_parameter_inventory_for_regex().contains_key(base))
+        .unwrap_or(false)
+}
+
+fn is_kombination_parameter_token(token: &str) -> bool {
+    parameter_token_base(token)
+        .map(|base| kombination_parameter_inventory_for_regex().contains_key(base))
+        .unwrap_or(false)
+}
+
+fn is_zeilen_parameter_token(token: &str) -> bool {
+    is_known_reta_parameter_token(token)
+        && !is_spalten_parameter_token(token)
+        && !is_ausgabe_parameter_token(token)
+        && !is_kombination_parameter_token(token)
+}
+
+fn is_conflicting_generated_zeilen_parameter_token(token: &str) -> bool {
+    matches!(
+        parameter_token_base(token),
+        Some(
+            "zaehlung"
+                | "vorhervonausschnitt"
+                | "vorhervonausschnittteiler"
+                | "primzahlvielfache"
+                | "nachtraeglichneuabzaehlung"
+                | "nachtraeglichneuabzaehlungvielfache"
+                | "vielfachevonzahlen"
+                | "oberesmaximum"
+                | "invertieren"
+        )
+    )
 }
 
 fn extract_passthrough_reta_parameters(tokens: &[String]) -> Vec<String> {
@@ -1885,6 +1910,41 @@ fn extract_passthrough_reta_parameters(tokens: &[String]) -> Vec<String> {
         }
     }
     out
+}
+
+fn append_passthrough_params_to_reta_argv(argv: &mut Vec<String>, extra_params: &[String]) {
+    let mut zeilen = Vec::new();
+    let mut spalten = Vec::new();
+    let mut kombination = Vec::new();
+    let mut ausgabe = Vec::new();
+    let mut other = Vec::new();
+
+    for token in extra_params {
+        if is_zeilen_parameter_token(token) {
+            if is_conflicting_generated_zeilen_parameter_token(token) {
+                continue;
+            }
+            push_unique_string(&mut zeilen, token.clone());
+        } else if is_spalten_parameter_token(token) {
+            push_unique_string(&mut spalten, token.clone());
+        } else if is_kombination_parameter_token(token) {
+            push_unique_string(&mut kombination, token.clone());
+        } else if is_ausgabe_parameter_token(token) {
+            push_unique_string(&mut ausgabe, token.clone());
+        } else {
+            push_unique_string(&mut other, token.clone());
+        }
+    }
+
+    merge_tokens_into_main_section(argv, "-zeilen", &zeilen);
+    merge_tokens_into_main_section(argv, "-spalten", &spalten);
+    merge_tokens_into_main_section(argv, "-kombination", &kombination);
+    merge_tokens_into_main_section(argv, "-ausgabe", &ausgabe);
+    for token in other {
+        if !argv.contains(&token) {
+            argv.push(token);
+        }
+    }
 }
 
 fn build_general_semantic_call(
@@ -1908,8 +1968,8 @@ fn build_general_semantic_call(
     }
     argv.push("-spalten".to_string());
     argv.push(para.to_string());
-    argv.push("--breite=0".to_string());
     argv.push("-ausgabe".to_string());
+    argv.push("--breite=0".to_string());
     if let Some(cols) = cols {
         argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
     }
@@ -1919,11 +1979,7 @@ fn build_general_semantic_call(
     if no_headers {
         argv.push("--keineueberschriften".to_string());
     }
-    for token in extra_params {
-        if !argv.contains(token) {
-            argv.push(token.clone());
-        }
-    }
+    append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     for token in trailing_tokens {
         argv.push(token.clone());
     }
@@ -1977,8 +2033,8 @@ fn build_non_whole_fraction_semantic_call(
     argv.extend(section.tokens);
     argv.push("-spalten".to_string());
     argv.push(para.to_string());
-    argv.push("--breite=0".to_string());
     argv.push("-ausgabe".to_string());
+    argv.push("--breite=0".to_string());
     argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
     if suppress_empty {
         argv.push("--keineleereninhalte".to_string());
@@ -1986,11 +2042,7 @@ fn build_non_whole_fraction_semantic_call(
     if no_headers {
         argv.push("--keineueberschriften".to_string());
     }
-    for token in extra_params {
-        if !argv.contains(token) {
-            argv.push(token.clone());
-        }
-    }
+    append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     Some(argv)
 }
 
@@ -2461,14 +2513,7 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         }
     }
 
-    for token in passthrough_params {
-        if !argv.contains(&token)
-            && !is_spalten_parameter_token(&token)
-            && !is_ausgabe_parameter_token(&token)
-        {
-            argv.push(token);
-        }
-    }
+    append_passthrough_params_to_reta_argv(&mut argv, &passthrough_params);
 
     Some(argv)
 }
@@ -2489,6 +2534,10 @@ struct SelectivePromptRowInput {
     use_invertieren: bool,
     request_no_headers: bool,
     suppress_empty: bool,
+    zeilen_passthrough: Vec<String>,
+    spalten_passthrough: Vec<String>,
+    kombination_passthrough: Vec<String>,
+    ausgabe_passthrough: Vec<String>,
 }
 
 fn parse_selective_prompt_row_input(tokens: &[String]) -> Option<SelectivePromptRowInput> {
@@ -2508,24 +2557,46 @@ fn parse_selective_prompt_row_input(tokens: &[String]) -> Option<SelectivePrompt
         return None;
     }
 
-    Some(SelectivePromptRowInput {
+    let mut selective = SelectivePromptRowInput {
         row_specs,
-        use_range: tokens.iter().any(|token| token == "range"),
-        use_teiler: tokens.iter().any(|token| token == "teiler"),
-        use_vielfache: tokens.iter().any(|token| token == "vielfache"),
-        use_invertieren: tokens
-            .iter()
-            .any(|token| matches!(token.as_str(), "invertieren" | "--invertieren")),
-        request_no_headers: tokens
-            .iter()
-            .any(|token| matches!(token.as_str(), "--keineueberschriften" | "ee")),
-        suppress_empty: tokens.iter().any(|token| {
-            matches!(
-                token.as_str(),
-                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" | "--keineleereninhalte"
-            )
-        }),
-    })
+        ..SelectivePromptRowInput::default()
+    };
+
+    for token in tokens {
+        if is_row_spec_token(token) {
+            continue;
+        }
+
+        match token.as_str() {
+            "range" => selective.use_range = true,
+            "teiler" => selective.use_teiler = true,
+            "vielfache" => selective.use_vielfache = true,
+            "invertieren" | "--invertieren" => selective.use_invertieren = true,
+            "ee" | "--keineueberschriften" => selective.request_no_headers = true,
+            "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" | "--keineleereninhalte" => {
+                selective.suppress_empty = true
+            }
+            "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" => {}
+            _ if is_zeilen_parameter_token(token) => {
+                if is_conflicting_generated_zeilen_parameter_token(token) {
+                    return None;
+                }
+                push_unique_string(&mut selective.zeilen_passthrough, token.clone());
+            }
+            _ if is_spalten_parameter_token(token) => {
+                push_unique_string(&mut selective.spalten_passthrough, token.clone());
+            }
+            _ if is_kombination_parameter_token(token) => {
+                push_unique_string(&mut selective.kombination_passthrough, token.clone());
+            }
+            _ if is_ausgabe_parameter_token(token) => {
+                push_unique_string(&mut selective.ausgabe_passthrough, token.clone());
+            }
+            _ => return None,
+        }
+    }
+
+    Some(selective)
 }
 
 fn selective_prompt_row_input_from_raw(
@@ -2565,8 +2636,20 @@ fn apply_selective_prompt_row_input_to_reta_tokens(
 
     let mut new_zeilen_section = vec!["-zeilen".to_string()];
     new_zeilen_section.extend(row_section.tokens);
+    for token in &selective.zeilen_passthrough {
+        if !new_zeilen_section.contains(token) {
+            new_zeilen_section.push(token.clone());
+        }
+    }
 
     let mut rebuilt = replace_main_section_tokens(reta_tokens, "-zeilen", &new_zeilen_section);
+    merge_tokens_into_main_section(&mut rebuilt, "-spalten", &selective.spalten_passthrough);
+    merge_tokens_into_main_section(
+        &mut rebuilt,
+        "-kombination",
+        &selective.kombination_passthrough,
+    );
+    merge_tokens_into_main_section(&mut rebuilt, "-ausgabe", &selective.ausgabe_passthrough);
 
     if selective.request_no_headers {
         ensure_flag_in_main_section(&mut rebuilt, "-ausgabe", "--keineueberschriften");
@@ -2651,11 +2734,14 @@ fn is_selective_reta_modifier(token: &str) -> bool {
             | "invertieren"
             | "--invertieren"
             | "ee"
+            | "-zeilen"
+            | "-spalten"
+            | "-kombination"
             | "-ausgabe"
             | "--keineueberschriften"
             | "--keineleereninhalte"
             | "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
-    )
+    ) || is_known_reta_parameter_token(token)
 }
 
 fn is_main_switch_token(token: &str) -> bool {
@@ -2696,8 +2782,46 @@ fn replace_main_section_tokens(
     rebuilt
 }
 
-fn ensure_flag_in_main_section(tokens: &mut Vec<String>, section: &str, flag: &str) {
-    if tokens.iter().any(|token| token == flag) {
+fn main_section_order_index(section: &str) -> Option<usize> {
+    match section {
+        "-zeilen" => Some(0),
+        "-spalten" => Some(1),
+        "-kombination" => Some(2),
+        "-ausgabe" => Some(3),
+        _ => None,
+    }
+}
+
+fn insertion_index_for_missing_main_section(tokens: &[String], section: &str) -> usize {
+    let Some(target_order) = main_section_order_index(section) else {
+        return tokens.len();
+    };
+
+    for (index, token) in tokens.iter().enumerate() {
+        if let Some(order) = main_section_order_index(token) {
+            if order > target_order {
+                return index;
+            }
+        }
+    }
+
+    tokens.len()
+}
+
+fn merge_tokens_into_main_section(tokens: &mut Vec<String>, section: &str, additions: &[String]) {
+    if additions.is_empty() {
+        return;
+    }
+
+    let mut pending = Vec::new();
+    for token in additions {
+        if !tokens.iter().any(|existing| existing == token)
+            && !pending.iter().any(|existing| existing == token)
+        {
+            pending.push(token.clone());
+        }
+    }
+    if pending.is_empty() {
         return;
     }
 
@@ -2708,14 +2832,25 @@ fn ensure_flag_in_main_section(tokens: &mut Vec<String>, section: &str, flag: &s
             while insert_at < tokens.len() && !is_main_switch_token(&tokens[insert_at]) {
                 insert_at += 1;
             }
-            tokens.insert(insert_at, flag.to_string());
+            tokens.splice(insert_at..insert_at, pending);
             return;
         }
         index += 1;
     }
 
-    tokens.push(section.to_string());
-    tokens.push(flag.to_string());
+    let insert_at = insertion_index_for_missing_main_section(tokens, section);
+    let mut inserted = Vec::with_capacity(1 + pending.len());
+    inserted.push(section.to_string());
+    inserted.extend(pending);
+    tokens.splice(insert_at..insert_at, inserted);
+}
+
+fn ensure_flag_in_main_section(tokens: &mut Vec<String>, section: &str, flag: &str) {
+    if tokens.iter().any(|token| token == flag) {
+        return;
+    }
+
+    merge_tokens_into_main_section(tokens, section, &[flag.to_string()]);
 }
 
 fn divisors_from_row_specs(row_specs: &[String]) -> Option<Vec<i64>> {
@@ -2907,6 +3042,74 @@ mod tests {
     }
 
     #[test]
+    fn stored_reta_placeholder_merges_passthrough_sections_into_rewritten_command() {
+        let prepared = prepare_prompt_big_output_for_stored_reta(
+            &strings(&["reta", "-zeilen", "--zeit=heute", "-spalten", "--thomas"]),
+            &strings(&[
+                "12-15",
+                "--zeit=morgen",
+                "--geist",
+                "--galaxie=Lebewesen",
+                "--nocolor",
+            ]),
+        )
+        .expect("stored reta placeholder should absorb extra reta parameters");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
+                "--zeit=morgen",
+                "-spalten",
+                "--thomas",
+                "--geist",
+                "-kombination",
+                "--galaxie=Lebewesen",
+                "-ausgabe",
+                "--nocolor",
+            ])
+        );
+    }
+
+    #[test]
+    fn stored_row_placeholder_merges_passthrough_sections_into_raw_reta_command() {
+        let prepared = prepare_prompt_big_output_for_stored_rows(
+            &strings(&[
+                "12-15",
+                "ee",
+                "--zeit=morgen",
+                "--geist",
+                "--galaxie=Lebewesen",
+                "--nocolor",
+            ]),
+            &strings(&["reta", "-spalten", "--licht"]),
+        )
+        .expect("stored row placeholder should inject extra reta parameters too");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
+                "--zeit=morgen",
+                "-spalten",
+                "--licht",
+                "--geist",
+                "-kombination",
+                "--galaxie=Lebewesen",
+                "-ausgabe",
+                "--nocolor",
+                "--keineueberschriften",
+            ])
+        );
+    }
+
+    #[test]
     fn prompt_execution_regex_expands_prompt_command_like_python() {
         let expanded = expand_python_regex_like_tokens(&strings(&["r\"emo.*\""]));
         assert_eq!(expanded, strings(&["emotion"]));
@@ -2964,6 +3167,39 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert!(calls[0].iter().any(|token| token == "--nocolor"));
         assert!(calls[0].iter().any(|token| token == "--breite=80"));
+    }
+
+    #[test]
+    fn semantic_call_sections_passthrough_params_python_like() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "emotion",
+            "12",
+            "--zeit=morgen",
+            "--geist",
+            "--galaxie=Lebewesen",
+            "--nocolor",
+        ]));
+        assert_eq!(calls.len(), 1);
+        let call = &calls[0];
+        assert!(call.iter().any(|token| token == "--zeit=morgen"));
+        assert!(call.iter().any(|token| token == "--geist"));
+        assert!(call.iter().any(|token| token == "--galaxie=Lebewesen"));
+        assert!(call.iter().any(|token| token == "--nocolor"));
+        assert_eq!(
+            call.iter().position(|token| token == "--zeit=morgen"),
+            Some(4)
+        );
+        assert_eq!(call.iter().position(|token| token == "--geist"), Some(7));
+        assert_eq!(
+            call.iter().position(|token| token == "-kombination"),
+            Some(8)
+        );
+        assert_eq!(
+            call.iter().position(|token| token == "--galaxie=Lebewesen"),
+            Some(9)
+        );
+        assert_eq!(call.iter().position(|token| token == "-ausgabe"), Some(10));
+        assert_eq!(call.iter().position(|token| token == "--nocolor"), Some(13));
     }
 
     #[test]
