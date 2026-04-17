@@ -1337,7 +1337,8 @@ fn semantic_columns_for_spec(
     no_headers: bool,
 ) -> String {
     if spec.dynamic_universe_columns {
-        let show_extra_columns = prompt_command_count(normalized) <= 2 && !suppress_empty && !no_headers;
+        let show_extra_columns =
+            prompt_command_count(normalized) <= 2 && !suppress_empty && !no_headers;
         let mut columns = String::from("1");
         if show_extra_columns {
             columns.push_str(if reciprocal_kind { ",2" } else { ",4" });
@@ -1498,12 +1499,7 @@ fn split_fraction_operator(text: &str, operator: char) -> Option<(&str, &str)> {
             ']' => square -= 1,
             '{' => curly += 1,
             '}' => curly -= 1,
-            _ if ch == operator
-                && index > 0
-                && round == 0
-                && square == 0
-                && curly == 0 =>
-            {
+            _ if ch == operator && index > 0 && round == 0 && square == 0 && curly == 0 => {
                 let left = text[..index].trim();
                 let right = text[index + ch.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -1594,11 +1590,7 @@ fn expand_integer_piece_values(piece: &str) -> Option<Vec<i64>> {
     inner.parse::<i64>().ok().map(|value| vec![value])
 }
 
-fn insert_fraction_group_value(
-    map: &mut BTreeMap<i64, BTreeSet<i64>>,
-    key: i64,
-    value: i64,
-) {
+fn insert_fraction_group_value(map: &mut BTreeMap<i64, BTreeSet<i64>>, key: i64, value: i64) {
     if key <= 0 || value <= 0 {
         return;
     }
@@ -1725,8 +1717,7 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
         insert_fraction_group_value(&mut numerator_groups, numerator, denominator);
     }
 
-    buckets.non_whole_fraction_denominator_groups =
-        finalize_fraction_group_map(denominator_groups);
+    buckets.non_whole_fraction_denominator_groups = finalize_fraction_group_map(denominator_groups);
     buckets.non_whole_fraction_numerator_groups = finalize_fraction_group_map(numerator_groups);
 
     buckets
@@ -2082,7 +2073,13 @@ fn build_single_semantic_call(
     } else {
         spec.integer_para
     };
-    let cols = semantic_columns_for_spec(spec, normalized, reciprocal_kind, suppress_empty, no_headers);
+    let cols = semantic_columns_for_spec(
+        spec,
+        normalized,
+        reciprocal_kind,
+        suppress_empty,
+        no_headers,
+    );
 
     Some(build_general_semantic_call(
         row_specs,
@@ -2483,19 +2480,58 @@ pub struct PreparedPromptBigOutput {
     pub had_kurz_kurz: bool,
 }
 
-/// Python-Architekturanker fuer den gespeicherten `reta`-Platzhalter-Pfad.
-///
-/// Das bildet den fachlich wichtigsten Teil von
-/// `verdreheWoReTaBefehl()` + `promptVorbereitungGrosseAusgabe()` nach:
-/// Wenn ein gespeicherter Platzhalter bereits mit `reta` beginnt und die
-/// neue Eingabe nur aus Zeilenbereichen plus prompt-typischen Modifikatoren
-/// besteht, wird die alte `-zeilen`-Sektion ersetzt statt die neuen Tokens
-/// blind anzuhängen.
-pub fn prepare_prompt_big_output_for_stored_reta(
-    stored_prefix_tokens: &[String],
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct SelectivePromptRowInput {
+    row_specs: Vec<String>,
+    use_range: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    use_invertieren: bool,
+    request_no_headers: bool,
+    suppress_empty: bool,
+}
+
+fn parse_selective_prompt_row_input(tokens: &[String]) -> Option<SelectivePromptRowInput> {
+    let row_specs = tokens
+        .iter()
+        .filter(|token| is_row_spec_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    if row_specs.is_empty() {
+        return None;
+    }
+
+    if tokens
+        .iter()
+        .any(|token| !is_row_spec_token(token) && !is_selective_reta_modifier(token))
+    {
+        return None;
+    }
+
+    Some(SelectivePromptRowInput {
+        row_specs,
+        use_range: tokens.iter().any(|token| token == "range"),
+        use_teiler: tokens.iter().any(|token| token == "teiler"),
+        use_vielfache: tokens.iter().any(|token| token == "vielfache"),
+        use_invertieren: tokens
+            .iter()
+            .any(|token| matches!(token.as_str(), "invertieren" | "--invertieren")),
+        request_no_headers: tokens
+            .iter()
+            .any(|token| matches!(token.as_str(), "--keineueberschriften" | "ee")),
+        suppress_empty: tokens.iter().any(|token| {
+            matches!(
+                token.as_str(),
+                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" | "--keineleereninhalte"
+            )
+        }),
+    })
+}
+
+fn selective_prompt_row_input_from_raw(
     input_tokens: &[String],
-) -> Option<PreparedPromptBigOutput> {
-    if stored_prefix_tokens.first().map(String::as_str) != Some("reta") || input_tokens.is_empty() {
+) -> Option<(SelectivePromptRowInput, bool)> {
+    if input_tokens.is_empty() {
         return None;
     }
 
@@ -2508,66 +2544,101 @@ pub fn prepare_prompt_big_output_for_stored_reta(
     };
     effective_input = finalize_prompt_tokens_for_execution(&effective_input);
 
-    let row_specs = effective_input
-        .iter()
-        .filter(|token| is_row_spec_token(token))
-        .cloned()
-        .collect::<Vec<_>>();
-    if row_specs.is_empty() {
+    parse_selective_prompt_row_input(&effective_input).map(|selective| (selective, had_kurz_kurz))
+}
+
+fn apply_selective_prompt_row_input_to_reta_tokens(
+    reta_tokens: &[String],
+    selective: &SelectivePromptRowInput,
+) -> Option<Vec<String>> {
+    if reta_tokens.first().map(String::as_str) != Some("reta") {
         return None;
     }
 
-    if effective_input
-        .iter()
-        .any(|token| !is_row_spec_token(token) && !is_selective_reta_modifier(token))
-    {
-        return None;
-    }
+    let row_section = build_python_row_section(
+        &selective.row_specs,
+        selective.use_range,
+        selective.use_teiler,
+        selective.use_vielfache,
+        selective.use_invertieren,
+    )?;
 
-    let use_range = effective_input.iter().any(|token| token == "range");
-    let use_teiler = effective_input.iter().any(|token| token == "teiler");
-    let use_vielfache = effective_input.iter().any(|token| token == "vielfache");
-    let use_invertieren = effective_input
-        .iter()
-        .any(|token| matches!(token.as_str(), "invertieren" | "--invertieren"));
-    let request_no_headers = effective_input
-        .iter()
-        .any(|token| matches!(token.as_str(), "--keineueberschriften" | "ee"));
+    let mut new_zeilen_section = vec!["-zeilen".to_string()];
+    new_zeilen_section.extend(row_section.tokens);
 
-    let mut joined_rows = row_specs.join(",");
-    if use_teiler {
-        let divisors = divisors_from_row_specs(&row_specs)?;
-        joined_rows = divisors
-            .into_iter()
-            .map(|value| value.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-    }
+    let mut rebuilt = replace_main_section_tokens(reta_tokens, "-zeilen", &new_zeilen_section);
 
-    let row_argument = if use_vielfache {
-        format!("--vielfachevonzahlen={joined_rows}")
-    } else if use_range {
-        format!("--zaehlung={joined_rows}")
-    } else {
-        format!("--vorhervonausschnitt={joined_rows}")
-    };
-
-    let mut new_zeilen_section = vec!["-zeilen".to_string(), row_argument];
-    if use_invertieren {
-        new_zeilen_section.push("--invertieren".to_string());
-    }
-
-    let mut rebuilt =
-        replace_main_section_tokens(stored_prefix_tokens, "-zeilen", &new_zeilen_section);
-
-    if request_no_headers {
+    if selective.request_no_headers {
         ensure_flag_in_main_section(&mut rebuilt, "-ausgabe", "--keineueberschriften");
     }
+    if selective.suppress_empty {
+        ensure_flag_in_main_section(&mut rebuilt, "-ausgabe", "--keineleereninhalte");
+    }
+
+    Some(rebuilt)
+}
+
+fn normalize_reta_like_tokens(tokens: &[String]) -> Option<Vec<String>> {
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if tokens.first().map(String::as_str) == Some("reta") {
+        return Some(tokens.to_vec());
+    }
+    if is_main_switch_token(&tokens[0]) {
+        let mut argv = vec!["reta".to_string()];
+        argv.extend(tokens.iter().cloned());
+        return Some(argv);
+    }
+
+    None
+}
+
+/// Python-Architekturanker fuer den gespeicherten `reta`-Platzhalter-Pfad.
+///
+/// Das bildet den fachlich wichtigsten Teil von
+/// `verdreheWoReTaBefehl()` + `promptVorbereitungGrosseAusgabe()` nach:
+/// Wenn ein gespeicherter Platzhalter bereits mit `reta` beginnt und die
+/// neue Eingabe nur aus Zeilenbereichen plus prompt-typischen Modifikatoren
+/// besteht, wird die alte `-zeilen`-Sektion ersetzt statt die neuen Tokens
+/// blind anzuhängen.
+pub fn prepare_prompt_big_output_for_stored_reta(
+    stored_prefix_tokens: &[String],
+    input_tokens: &[String],
+) -> Option<PreparedPromptBigOutput> {
+    if stored_prefix_tokens.first().map(String::as_str) != Some("reta") {
+        return None;
+    }
+
+    let (selective, had_kurz_kurz) = selective_prompt_row_input_from_raw(input_tokens)?;
+    let rebuilt =
+        apply_selective_prompt_row_input_to_reta_tokens(stored_prefix_tokens, &selective)?;
 
     Some(PreparedPromptBigOutput {
         tokens: rebuilt,
-        row_specs,
+        row_specs: selective.row_specs,
         had_kurz_kurz,
+    })
+}
+
+/// Gegenpfad zur Python-Architektur aus `verdreheWoReTaBefehl()`:
+/// Wenn der gespeicherte Platzhalter nur aus Zeilen-/Modifier-Tokens besteht
+/// und die aktuelle Eingabe ein roher `reta`-Befehl ist, wird die gespeicherte
+/// Zeilen-Sektion in den neuen `reta`-Aufruf eingebaut statt hinten
+/// drangehängt.
+pub fn prepare_prompt_big_output_for_stored_rows(
+    stored_prefix_tokens: &[String],
+    input_tokens: &[String],
+) -> Option<PreparedPromptBigOutput> {
+    let selective = parse_selective_prompt_row_input(stored_prefix_tokens)?;
+    let reta_tokens = normalize_reta_like_tokens(input_tokens)?;
+    let rebuilt = apply_selective_prompt_row_input_to_reta_tokens(&reta_tokens, &selective)?;
+
+    Some(PreparedPromptBigOutput {
+        tokens: rebuilt,
+        row_specs: selective.row_specs,
+        had_kurz_kurz: false,
     })
 }
 
@@ -2579,8 +2650,10 @@ fn is_selective_reta_modifier(token: &str) -> bool {
             | "vielfache"
             | "invertieren"
             | "--invertieren"
+            | "ee"
             | "-ausgabe"
             | "--keineueberschriften"
+            | "--keineleereninhalte"
             | "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
     )
 }
@@ -2740,7 +2813,7 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 mod tests {
     use super::{
         build_reta_calls_from_prompt_tokens, expand_python_regex_like_tokens,
-        prepare_prompt_big_output_for_stored_reta,
+        prepare_prompt_big_output_for_stored_reta, prepare_prompt_big_output_for_stored_rows,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -2761,6 +2834,7 @@ mod tests {
                 "reta",
                 "-zeilen",
                 "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
                 "-spalten",
                 "--thomas",
             ])
@@ -2781,6 +2855,7 @@ mod tests {
                 "reta",
                 "-zeilen",
                 "--zaehlung=2,3,4,6,12",
+                "--oberesmaximum=1025",
                 "-spalten",
                 "--geist",
             ])
@@ -2801,8 +2876,32 @@ mod tests {
                 "reta",
                 "-zeilen",
                 "--vielfachevonzahlen=12-15",
+                "--vorhervonausschnitt=12-15,v12-15",
                 "-spalten",
                 "--impulse",
+            ])
+        );
+    }
+
+    #[test]
+    fn stored_row_placeholder_injects_rows_into_raw_reta_command() {
+        let prepared = prepare_prompt_big_output_for_stored_rows(
+            &strings(&["12-15", "ee"]),
+            &strings(&["reta", "-spalten", "--thomas"]),
+        )
+        .expect("stored row placeholder should be injected into reta command");
+
+        assert_eq!(
+            prepared.tokens,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
+                "-spalten",
+                "--thomas",
+                "-ausgabe",
+                "--keineueberschriften",
             ])
         );
     }
@@ -2871,9 +2970,7 @@ mod tests {
     fn fractional_emotion_builds_gebrochenemotion_call() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/3"]));
         assert_eq!(calls.len(), 1);
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--gebrochenemotion=3"));
+        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=3"));
         assert!(calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=2"));
@@ -2886,12 +2983,12 @@ mod tests {
     fn universum_fraction_emits_normal_and_reverse_fraction_calls() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "2/3"]));
         assert_eq!(calls.len(), 2);
-        assert!(calls.iter().any(|call| call
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochenuniversum=3")));
-        assert!(calls.iter().any(|call| call
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=3")));
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochenuniversum=2")));
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=2")));
         assert!(calls.iter().any(|call| call
             .iter()
             .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")));
@@ -2906,25 +3003,25 @@ mod tests {
         assert!(calls.iter().any(|call| call
             .iter()
             .any(|token| token == "--grundstrukturen=emotion")));
-        assert!(calls.iter().any(|call| call
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochenemotion=2")));
-        assert!(calls.iter().any(|call| call
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochenemotion=3")));
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=3")));
     }
 
     #[test]
     fn fraction_distance_expands_like_python_prompt_examples() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["absicht", "4/5+2/2"]));
-        assert!(calls.iter().any(|call| call
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochengalaxie=3")));
-        assert!(calls.iter().any(|call| call
+            .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=3")));
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochengalaxie=7")));
-        assert!(calls.iter().any(|call| call
+            .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=7")));
+        assert!(calls
             .iter()
-            .any(|token| token == "--gebrochengalaxie=2")));
+            .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=2")));
     }
 }

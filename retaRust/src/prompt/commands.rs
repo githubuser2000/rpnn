@@ -5,7 +5,8 @@ use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
     finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
-    prepare_prompt_big_output_for_stored_reta, prompt_words, PromptModus,
+    prepare_prompt_big_output_for_stored_reta, prepare_prompt_big_output_for_stored_rows,
+    prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -238,6 +239,11 @@ pub fn compile_command_with_state(
     {
         return Ok(PromptCommand::Reta(prepared.tokens));
     }
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, &tokenized.tokens)
+    {
+        return Ok(PromptCommand::Reta(prepared.tokens));
+    }
 
     if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens)
         || !state.has_stored_placeholder()
@@ -410,6 +416,30 @@ fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
     }
     if incoming_tokens.is_empty() {
         return existing_tokens.join(" ");
+    }
+
+    let existing_prepared = prepare_stored_prefix_tokens(&existing_tokens);
+    let incoming_prepared = prepare_stored_prefix_tokens(&incoming_tokens);
+
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_reta(&existing_prepared, &incoming_tokens)
+    {
+        return prepared.tokens.join(" ");
+    }
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_reta(&incoming_prepared, &existing_tokens)
+    {
+        return prepared.tokens.join(" ");
+    }
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_rows(&existing_prepared, &incoming_tokens)
+    {
+        return prepared.tokens.join(" ");
+    }
+    if let Some(prepared) =
+        prepare_prompt_big_output_for_stored_rows(&incoming_prepared, &existing_tokens)
+    {
+        return prepared.tokens.join(" ");
     }
 
     let mut left_tokens = existing_tokens;
@@ -640,6 +670,11 @@ pub fn execute_command(
                 Some(text) => {
                     let additional_tokens = split_storage_text(&text);
                     if let Some(prepared) = prepare_prompt_big_output_for_stored_reta(
+                        &state.stored_expanded_tokens,
+                        &additional_tokens,
+                    ) {
+                        prepared.tokens.join(" ")
+                    } else if let Some(prepared) = prepare_prompt_big_output_for_stored_rows(
                         &state.stored_expanded_tokens,
                         &additional_tokens,
                     ) {
@@ -1274,11 +1309,46 @@ mod tests {
                     "reta".to_string(),
                     "-zeilen".to_string(),
                     "--vorhervonausschnitt=12-15".to_string(),
+                    "--oberesmaximum=1025".to_string(),
                     "-spalten".to_string(),
                     "--thomas".to_string(),
                 ]
             ),
             other => panic!("expected PromptCommand::Reta, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn stored_row_placeholder_injects_rows_into_incoming_reta_command() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "4,7-10 ee".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let command = compile_command_with_state("reta -spalten --licht", &state).unwrap();
+        match command {
+            PromptCommand::Reta(argv) => assert_eq!(
+                argv,
+                vec![
+                    "reta".to_string(),
+                    "-zeilen".to_string(),
+                    "--vorhervonausschnitt=4,7-10".to_string(),
+                    "--oberesmaximum=1025".to_string(),
+                    "-spalten".to_string(),
+                    "--licht".to_string(),
+                    "-ausgabe".to_string(),
+                    "--keineueberschriften".to_string(),
+                ]
+            ),
+            other => panic!("expected PromptCommand::Reta, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn merge_stored_row_placeholder_with_reta_normalizes_to_real_reta_command() {
+        let merged = merge_stored_placeholder("4,7-10", "-spalten --licht");
+        assert_eq!(
+            merged,
+            "reta -zeilen --vorhervonausschnitt=4,7-10 --oberesmaximum=1025 -spalten --licht"
+        );
     }
 }
