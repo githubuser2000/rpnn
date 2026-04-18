@@ -3,10 +3,9 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::completion::candidates_for_prefix;
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    custom_split_delim_parenthesized, custom_split_whitespace_parenthesized,
-    expand_kurz_kurz_befehl,
+    custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
     finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
-    prepare_prompt_big_output_for_stored_reta, python_row_spec_to_numbers,
+    prepare_prompt_big_output_for_stored_reta,
     prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
 };
@@ -951,14 +950,41 @@ pub fn execute_command(
 fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
     let mut out: Vec<i64> = Vec::new();
     for token in tokens {
-        if let Some(mut numbers) = python_row_spec_to_numbers(token) {
-            out.append(&mut numbers);
-        } else if token.contains('/') {
+        if token.contains('/') {
             continue;
         }
+        for part in token.split(',').filter(|p| !p.trim().is_empty()) {
+            let part = part.trim();
+            if let Some((a, b)) = part.split_once('-') {
+                if !a.is_empty()
+                    && !b.is_empty()
+                    && a.chars().all(|c| c.is_ascii_digit())
+                    && b.chars().all(|c| c.is_ascii_digit())
+                {
+                    let start: i64 = a.parse().ok()?;
+                    let end: i64 = b.parse().ok()?;
+                    if start <= end {
+                        for n in start..=end {
+                            out.push(n);
+                        }
+                    } else {
+                        for n in (end..=start).rev() {
+                            out.push(n);
+                        }
+                    }
+                    continue;
+                }
+            }
+            if part.chars().all(|c| c.is_ascii_digit()) {
+                out.push(part.parse().ok()?);
+            }
+        }
     }
-
-    (!out.is_empty()).then_some(out)
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
 }
 
 fn prime_factors(n: i64, modulo24: bool) -> Vec<i64> {
@@ -1076,12 +1102,38 @@ fn abstand_usage_text() -> String {
 }
 
 fn parse_integer_row_numbers_from_spec(spec: &str) -> Option<Vec<i64>> {
+    let mut out = Vec::new();
     let trimmed = spec.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed.contains('/') {
         return None;
     }
 
-    python_row_spec_to_numbers(trimmed)
+    for part in trimmed.split(',').filter(|part| !part.trim().is_empty()) {
+        let part = part.trim();
+        if let Some((a, b)) = part.split_once('-') {
+            if !a.is_empty()
+                && !b.is_empty()
+                && a.chars().all(|c| c.is_ascii_digit())
+                && b.chars().all(|c| c.is_ascii_digit())
+            {
+                let start: i64 = a.parse().ok()?;
+                let end: i64 = b.parse().ok()?;
+                if start <= end {
+                    out.extend(start..=end);
+                } else {
+                    out.extend((end..=start).rev());
+                }
+                continue;
+            }
+        }
+        if part.chars().all(|c| c.is_ascii_digit()) {
+            out.push(part.parse().ok()?);
+        } else {
+            return None;
+        }
+    }
+
+    (!out.is_empty()).then_some(out)
 }
 
 fn parse_integer_row_set_from_spec(spec: &str) -> Option<std::collections::BTreeSet<i64>> {
@@ -1356,46 +1408,24 @@ fn run_math_command(command_text: &str) -> Result<Option<PromptOutput>, String> 
     if command_text.is_empty() {
         return Err("Nach 'math' fehlt der eigentliche Ausdruck".to_string());
     }
-
-    let expressions = custom_split_delim_parenthesized(command_text, ',')
-        .into_iter()
-        .filter(|part| !part.trim().is_empty())
-        .collect::<Vec<_>>();
-    let expressions = if expressions.is_empty() {
-        vec![command_text.to_string()]
-    } else {
-        expressions
-    };
-
+    let python_code = format!("print({command_text})");
+    let output = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(&python_code)
+        .output()
+        .map_err(|err| format!("Math-Befehl konnte nicht ausgeführt werden: {err}"))?;
     let mut text = String::new();
-    let mut exit_code = 0;
-    for expression in expressions {
-        let python_code = format!("print({})", expression.trim());
-        let output = std::process::Command::new("python3")
-            .arg("-c")
-            .arg(&python_code)
-            .output()
-            .map_err(|err| format!("Math-Befehl konnte nicht ausgeführt werden: {err}"))?;
-
+    text.push_str(&String::from_utf8_lossy(&output.stdout));
+    if !output.stderr.is_empty() {
         if !text.is_empty() && !text.ends_with('\n') {
             text.push('\n');
         }
-        text.push_str(&String::from_utf8_lossy(&output.stdout));
-        if !output.stderr.is_empty() {
-            if !text.is_empty() && !text.ends_with('\n') {
-                text.push('\n');
-            }
-            text.push_str(&String::from_utf8_lossy(&output.stderr));
-        }
-        if !output.status.success() && exit_code == 0 {
-            exit_code = output.status.code().unwrap_or(1);
-        }
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
     }
-
     Ok(Some(PromptOutput {
         title: "math".to_string(),
         text,
-        exit_code,
+        exit_code: output.status.code().unwrap_or(1),
     }))
 }
 
