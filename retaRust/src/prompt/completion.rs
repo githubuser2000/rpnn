@@ -9,7 +9,8 @@ use crate::domain::python_source_of_truth::{
 use crate::shared_words;
 
 use super::python_like::{
-    expand_kurz_kurz_befehl, looks_like_numeric_or_fraction_range, prompt_words, PromptModus,
+    expand_kurz_kurz_befehl, looks_like_numeric_or_fraction_range, prompt_words,
+    regex_like_search as python_regex_like_search, PromptModus,
 };
 
 pub const RP_META_COMMANDS: &[&str] = &[
@@ -470,12 +471,41 @@ fn completion_bypasses_stored_context(trimmed: &str, tokens: &[String]) -> bool 
         return true;
     }
 
-    matches!(
+    if matches!(
         tokens.first().map(String::as_str),
         Some("shell" | "python" | "math" | ":mode")
-    )
+    ) {
+        return true;
+    }
+
+    prompt_command_prefix_like_python_bypasses_context(tokens)
 }
 
+fn prompt_command_prefix_like_python_bypasses_context(tokens: &[String]) -> bool {
+    let Some(first_token) = tokens.first().map(String::as_str) else {
+        return false;
+    };
+
+    if first_token.is_empty()
+        || first_token.starts_with('-')
+        || looks_like_numeric_or_fraction_range(first_token)
+    {
+        return false;
+    }
+
+    let fragment = normalize_completion_text(first_token);
+    if fragment.is_empty() {
+        return false;
+    }
+
+    ordered_prompt_commands().into_iter().any(|candidate| {
+        let candidate = normalize_completion_text(&candidate);
+        candidate.starts_with(&fragment)
+            || fuzzy_completion_score(&candidate, &fragment)
+                .map(|score| score.start == 0 || fragment.chars().count() > 1)
+                .unwrap_or(false)
+    })
+}
 fn delete_mode_completion_candidates(
     current_token: &str,
     current_start: usize,
@@ -632,18 +662,19 @@ fn build_value_candidates_from_state(
     replace_start: usize,
 ) -> Vec<CompletionCandidate> {
     let stripped = parameter_token.trim_start_matches('-');
-    let key = stripped.trim_end_matches('=');
+    let raw_key = stripped.trim_end_matches('=');
+    let key = normalize_completion_text(raw_key);
     let section = state.current_section();
     let mut candidates = match section {
-        Some(RetaMainSection::Zeilen) => zeilen_value_candidates(key),
-        Some(RetaMainSection::Spalten) => spalten_value_candidates(key),
-        Some(RetaMainSection::Kombination) => kombi_value_candidates(key),
-        Some(RetaMainSection::Ausgabe) => ausgabe_value_candidates(key),
+        Some(RetaMainSection::Zeilen) => zeilen_value_candidates(&key),
+        Some(RetaMainSection::Spalten) => spalten_value_candidates(&key),
+        Some(RetaMainSection::Kombination) => kombi_value_candidates(&key),
+        Some(RetaMainSection::Ausgabe) => ausgabe_value_candidates(&key),
         None => Vec::new(),
     };
 
     if candidates.is_empty() && !key.is_empty() {
-        candidates = close_parameter_key_candidates(section, key);
+        candidates = close_parameter_key_candidates(section, &key);
     }
 
     build_completion_candidates(candidates, fragment, replace_start, None, true)
@@ -1405,100 +1436,7 @@ fn glob_like_match_chars(
 }
 
 fn regex_like_search(pattern: &str, text: &str) -> bool {
-    if pattern.is_empty() {
-        return true;
-    }
-
-    let (start_anchor, end_anchor, core) = strip_regex_like_anchors(pattern);
-    if core.is_empty() {
-        return true;
-    }
-
-    if !contains_regex_like_metacharacters(core) {
-        return text.contains(core);
-    }
-
-    let core_chars = core.chars().collect::<Vec<_>>();
-    let text_chars = text.chars().collect::<Vec<_>>();
-    let starts = if start_anchor {
-        vec![0usize]
-    } else {
-        (0..=text_chars.len()).collect::<Vec<_>>()
-    };
-
-    for start in starts {
-        let end_range = if end_anchor {
-            text_chars.len()..=text_chars.len()
-        } else {
-            start..=text_chars.len()
-        };
-
-        for end in end_range {
-            let mut memo = std::collections::BTreeMap::new();
-            if regex_like_full_match_chars(&core_chars, &text_chars[start..end], 0, 0, &mut memo) {
-                return true;
-            }
-        }
-    }
-
-    false
-}
-
-fn strip_regex_like_anchors(pattern: &str) -> (bool, bool, &str) {
-    let start_anchor = pattern.starts_with('^');
-    let without_start = pattern.strip_prefix('^').unwrap_or(pattern);
-    let end_anchor = without_start.ends_with('$');
-    let core = without_start.strip_suffix('$').unwrap_or(without_start);
-    (start_anchor, end_anchor, core)
-}
-
-fn contains_regex_like_metacharacters(pattern: &str) -> bool {
-    pattern
-        .chars()
-        .any(|ch| matches!(ch, '.' | '*' | '^' | '$'))
-}
-
-fn regex_like_full_match_chars(
-    pattern: &[char],
-    text: &[char],
-    pattern_index: usize,
-    text_index: usize,
-    memo: &mut std::collections::BTreeMap<(usize, usize), bool>,
-) -> bool {
-    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
-        return *cached;
-    }
-
-    let result = if pattern_index == pattern.len() {
-        text_index == text.len()
-    } else {
-        let first_match = text_index < text.len()
-            && (pattern[pattern_index] == '.' || pattern[pattern_index] == text[text_index]);
-
-        if pattern_index + 1 < pattern.len() && pattern[pattern_index + 1] == '*' {
-            regex_like_full_match_chars(pattern, text, pattern_index + 2, text_index, memo)
-                || (first_match
-                    && regex_like_full_match_chars(
-                        pattern,
-                        text,
-                        pattern_index,
-                        text_index + 1,
-                        memo,
-                    ))
-        } else {
-            first_match
-                && regex_like_full_match_chars(
-                    pattern,
-                    text,
-                    pattern_index + 1,
-                    text_index + 1,
-                    memo,
-                )
-        }
-    };
-
-    memo.insert((pattern_index, text_index), result);
-    result
+    python_regex_like_search(pattern, text)
 }
 
 fn normalize_completion_text(text: &str) -> String {
@@ -2018,6 +1956,42 @@ mod tests {
 
 
     #[test]
+    fn prompt_top_level_includes_full_python_wahl15_wahl16_commands() {
+        let values = candidates_for_input("15_1pro3");
+        assert!(contains_normalized(&values, "15_1pro30"));
+        assert!(contains_normalized(&values, "15_1pro3"));
+
+        let values = candidates_for_input("16_1");
+        assert!(contains_normalized(&values, "16_1"));
+        assert!(contains_normalized(&values, "16_10"));
+        assert!(contains_normalized(&values, "16_15"));
+        assert!(contains_normalized(&values, "16_16"));
+    }
+
+    #[test]
+    fn raw_regex_fragment_matches_prompt_commands_with_python_groups() {
+        let values = candidates_for_input(r#"r"^(prim|multis)[0-9]+$""#);
+        assert!(contains_normalized(&values, "prim24"));
+        assert!(contains_normalized(&values, "multis3"));
+        assert!(!contains_normalized(&values, "prim"));
+    }
+
+    #[test]
+    fn raw_regex_fragment_after_equals_supports_python_alternation() {
+        let values = candidates_for_input(r#"reta -zeilen --zeit=r"^(heute|morgen)$""#);
+        assert!(contains_normalized(&values, "heute"));
+        assert!(contains_normalized(&values, "morgen"));
+        assert!(!contains_normalized(&values, "gestern"));
+    }
+
+    #[test]
+    fn raw_regex_fragment_after_equals_supports_python_char_classes_and_plus() {
+        let values = candidates_for_input(r#"reta -ausgabe --art=r"^h[a-z]+$""#);
+        assert!(contains_normalized(&values, "html"));
+        assert!(!contains_normalized(&values, "csv"));
+    }
+
+    #[test]
     fn reta_main_switches_include_python_nichts() {
         let values = candidates_for_input("reta -n");
         assert!(contains_normalized(&values, "-nichts"));
@@ -2027,6 +2001,61 @@ mod tests {
     fn mistyped_value_parameter_suggests_close_python_dictionary_keys() {
         let values = candidates_for_input("reta -zeilen --ty=");
         assert!(contains_normalized(&values, "typ"));
+    }
+
+    #[test]
+    fn stored_reta_context_does_not_hide_partial_prompt_commands() {
+        let values = candidates_for_input_in_mode_with_context(
+            "hel",
+            PromptModus::Normal,
+            &["reta".to_string(), "-zeilen".to_string()],
+            &[],
+        );
+        assert!(contains_normalized(&values, "help"));
+        assert!(!contains_normalized(&values, "--zeit="));
+    }
+
+    #[test]
+    fn stored_reta_context_does_not_hide_fuzzy_prompt_commands() {
+        let values = candidates_for_input_in_mode_with_context(
+            "unv",
+            PromptModus::Normal,
+            &["reta".to_string(), "-zeilen".to_string()],
+            &[],
+        );
+        assert!(contains_normalized(&values, "universum"));
+    }
+
+    #[test]
+    fn value_parameter_lookup_is_case_insensitive_like_python_completion() {
+        let values = candidates_for_input("reta -zeilen --Typ=s");
+        assert!(contains_normalized(&values, "sonne"));
+    }
+
+    #[test]
+    fn semantic_15_completion_uses_full_python_wahl15_inventory() {
+        let values = candidates_for_input("15_13_");
+        assert!(contains_normalized(&values, "15_13_6"));
+        assert!(contains_normalized(&values, "15_13_17"));
+        assert!(contains_normalized(&values, "15_13_13"));
+        assert!(contains_normalized(&values, "15_13_1pro8"));
+    }
+
+    #[test]
+    fn semantic_16_completion_uses_python_wahl16_inventory_without_old_stub() {
+        let values = candidates_for_input("16_");
+        assert!(contains_normalized(&values, "16_1"));
+        assert!(contains_normalized(&values, "16_2"));
+        assert!(contains_normalized(&values, "16_20"));
+        assert!(!contains_normalized(&values, "16_11"));
+    }
+
+    #[test]
+    fn nested_16_15_completion_uses_full_python_wahl15_inventory() {
+        let values = candidates_for_input("16_15_1pro");
+        assert!(contains_normalized(&values, "16_15_1pro12"));
+        assert!(contains_normalized(&values, "16_15_1pro13"));
+        assert!(contains_normalized(&values, "16_15_1pro19"));
     }
 
 }
