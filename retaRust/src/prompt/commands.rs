@@ -1096,15 +1096,163 @@ fn modulo_remainders_display(n: i64) -> String {
     format!("{}: {}", n, parts)
 }
 
+fn abstand_usage_text() -> String {
+    "der Befehl 'abstand' verlangt mindestens 2 Zahlenangaben, wie 'abstand 7 17-25'"
+        .to_string()
+}
+
+fn parse_integer_row_numbers_from_spec(spec: &str) -> Option<Vec<i64>> {
+    let mut out = Vec::new();
+    let trimmed = spec.trim();
+    if trimmed.is_empty() || trimmed.contains('/') {
+        return None;
+    }
+
+    for part in trimmed.split(',').filter(|part| !part.trim().is_empty()) {
+        let part = part.trim();
+        if let Some((a, b)) = part.split_once('-') {
+            if !a.is_empty()
+                && !b.is_empty()
+                && a.chars().all(|c| c.is_ascii_digit())
+                && b.chars().all(|c| c.is_ascii_digit())
+            {
+                let start: i64 = a.parse().ok()?;
+                let end: i64 = b.parse().ok()?;
+                if start <= end {
+                    out.extend(start..=end);
+                } else {
+                    out.extend((end..=start).rev());
+                }
+                continue;
+            }
+        }
+        if part.chars().all(|c| c.is_ascii_digit()) {
+            out.push(part.parse().ok()?);
+        } else {
+            return None;
+        }
+    }
+
+    (!out.is_empty()).then_some(out)
+}
+
+fn parse_integer_row_set_from_spec(spec: &str) -> Option<std::collections::BTreeSet<i64>> {
+    parse_integer_row_numbers_from_spec(spec).map(|numbers| numbers.into_iter().collect())
+}
+
+fn format_python_dict_items(entries: Vec<(i64, String)>) -> String {
+    entries
+        .into_iter()
+        .map(|(key, value)| format!("{key}: {value}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn render_abstand_like_python(
+    tokens: &[String],
+    render_distance: bool,
+    render_prime_distance: bool,
+) -> Vec<String> {
+    let mut groups: Vec<(String, std::collections::BTreeSet<i64>)> = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+
+    for token in tokens {
+        let Some(group) = parse_integer_row_set_from_spec(token) else {
+            continue;
+        };
+        let key = group.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(",");
+        if seen.insert(key) {
+            groups.push((token.clone(), group));
+        }
+    }
+
+    if groups.len() <= 1 {
+        return Vec::new();
+    }
+
+    let all_are_single_numbers = groups
+        .iter()
+        .all(|(source, _)| source.chars().all(|ch| ch.is_ascii_digit()));
+    let largest_index = groups
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, (_, group))| group.len())
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+
+    let mut distance_rows: std::collections::BTreeMap<i64, String> =
+        std::collections::BTreeMap::new();
+    let mut prime_rows: std::collections::BTreeMap<i64, String> =
+        std::collections::BTreeMap::new();
+
+    for (_, target_group) in &groups {
+        for (source_index, (_, source_group)) in groups.iter().enumerate() {
+            if source_index == largest_index || source_group == target_group {
+                continue;
+            }
+
+            for source_value in source_group {
+                if render_distance {
+                    let entries = target_group
+                        .iter()
+                        .map(|target_value| {
+                            (
+                                *target_value,
+                                (*source_value - *target_value).abs().to_string(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    if entries.len() > 1 || all_are_single_numbers {
+                        distance_rows.insert(*source_value, format_python_dict_items(entries));
+                    }
+                }
+
+                if render_prime_distance {
+                    let entries = target_group
+                        .iter()
+                        .map(|target_value| {
+                            let diff = (*source_value - *target_value).abs();
+                            (
+                                *target_value,
+                                prime_repeat_display(prime_factors(diff, false)),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    if entries.len() > 1 || all_are_single_numbers {
+                        prime_rows.insert(*source_value, format_python_dict_items(entries));
+                    }
+                }
+            }
+        }
+    }
+
+    let mut lines = Vec::new();
+    lines.extend(
+        distance_rows
+            .into_iter()
+            .map(|(key, value)| format!("{key}->: {value}")),
+    );
+    lines.extend(
+        prime_rows
+            .into_iter()
+            .map(|(key, value)| format!("{key}->: {value}")),
+    );
+    lines
+}
+
 fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
     if tokens.iter().any(|t| t == "abc" || t == "abcd") {
         return None;
     }
-    let numbers = parse_row_numbers_from_tokens(tokens)?;
     let token_set = tokens
         .iter()
         .map(|s| s.as_str())
         .collect::<std::collections::BTreeSet<_>>();
+    let wants_abstand = token_set.contains("abstand") || token_set.contains("abstandPrim");
+    let numbers = parse_row_numbers_from_tokens(tokens).unwrap_or_default();
+    if numbers.is_empty() && !wants_abstand {
+        return None;
+    }
     let mut lines: Vec<String> = Vec::new();
     let mut matched = false;
 
@@ -1178,27 +1326,20 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
             lines.push(modulo_remainders_display(*n));
         }
     }
-    if token_set.contains("abstand") || token_set.contains("abstandPrim") {
-        matched = true;
-        if numbers.len() > 1 {
-            let anchor = *numbers.iter().max().unwrap();
-            for n in &numbers {
-                if *n == anchor {
-                    continue;
-                }
-                if token_set.contains("abstand") {
-                    lines.push(format!("{}->: {}: {}", n, anchor, (anchor - *n).abs()));
-                }
-                if token_set.contains("abstandPrim") {
-                    let diff = (anchor - *n).abs();
-                    lines.push(format!(
-                        "{}->: {}: {}",
-                        n,
-                        anchor,
-                        prime_repeat_display(prime_factors(diff, false))
-                    ));
-                }
+    if wants_abstand {
+        let rendered = render_abstand_like_python(
+            tokens,
+            token_set.contains("abstand"),
+            token_set.contains("abstandPrim"),
+        );
+        if rendered.is_empty() {
+            if token_set.contains("abstand") {
+                matched = true;
+                lines.push(abstand_usage_text());
             }
+        } else {
+            matched = true;
+            lines.extend(rendered);
         }
     }
 
@@ -1550,6 +1691,30 @@ mod tests {
         ));
         assert_eq!(state.prompt_mode, super::PromptModus::Normal);
         assert_eq!(state.pending_show_stored_suffix, None);
+    }
+
+    #[test]
+    fn abstand_uses_python_group_distance_output() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("abstand 7 17-19", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.text, "7->: 17: 10, 18: 11, 19: 12");
+            }
+            other => panic!("expected immediate abstand output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn abstand_without_enough_ranges_prints_python_usage() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("abstand", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.contains("verlangt mindestens 2 Zahlenangaben"));
+            }
+            other => panic!("expected immediate abstand usage output, got {other:?}"),
+        }
     }
 
 }

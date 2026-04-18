@@ -2446,6 +2446,46 @@ fn build_single_semantic_call(
     ))
 }
 
+fn build_reciprocal_concept_call(
+    reciprocal_row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    para: &str,
+    extra_params: &[String],
+    trailing_tokens: &[String],
+) -> Vec<String> {
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+
+    if reciprocal_row_specs.is_empty() {
+        argv.push("--vorhervonausschnitt=0".to_string());
+        if invert {
+            argv.push("--invertieren".to_string());
+        }
+    } else if let Some(section) =
+        build_fractional_prompt_row_section(reciprocal_row_specs, use_range, invert)
+    {
+        argv.extend(section.tokens);
+    }
+
+    argv.push("-spalten".to_string());
+    argv.push(para.to_string());
+    argv.push("-ausgabe".to_string());
+    argv.push("--breite=0".to_string());
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    append_passthrough_params_to_reta_argv(&mut argv, extra_params);
+    for token in trailing_tokens {
+        argv.push(token.clone());
+    }
+    argv
+}
+
 fn append_15_16_calls(
     calls: &mut Vec<Vec<String>>,
     normalized: &[String],
@@ -2645,23 +2685,20 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
             &[],
         ));
     }
-    if !eig_r_values.is_empty() && !row_buckets.reciprocal_row_specs.is_empty() {
+    if !eig_r_values.is_empty() {
         let trailing = build_trailing_primary_zeilen_tokens(
             &row_buckets.primary_row_specs,
             use_range,
             teiler,
             vielfache,
         );
-        calls.push(build_general_semantic_call(
+        calls.push(build_reciprocal_concept_call(
             &row_buckets.reciprocal_row_specs,
             use_range,
             invert,
-            teiler,
-            vielfache,
             suppress_empty,
             no_headers,
             &format!("--konzept2={}", eig_r_values.join(",")),
-            None,
             &extra_params,
             &trailing,
         ));
@@ -3818,5 +3855,20 @@ mod tests {
         assert!(calls[0]
             .iter()
             .any(|token| token == "--oberesmaximum=1029"));
+    }
+
+    #[test]
+    fn reciprocal_concept_runs_for_integer_rows_like_python() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["12", "EIGRweisheit"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--konzept2=weisheit"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=0"));
+        assert!(calls[0]
+            .windows(2)
+            .any(|window| window[0] == "-zeilen" && window[1] == "--vorhervonausschnitt=12"));
     }
 }

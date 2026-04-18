@@ -65,12 +65,38 @@ impl Prompt for RpPrompt {
     }
 }
 
+fn prompt_placeholder_text(state: &SessionState) -> Option<String> {
+    if !state.has_stored_placeholder() {
+        return None;
+    }
+
+    let text = state.stored_placeholder.trim();
+    if text.is_empty() {
+        return None;
+    }
+
+    const MAX_PROMPT_PLACEHOLDER_CHARS: usize = 72;
+    let mut shortened = text.chars().take(MAX_PROMPT_PLACEHOLDER_CHARS).collect::<String>();
+    if text.chars().count() > MAX_PROMPT_PLACEHOLDER_CHARS {
+        shortened.push('…');
+    }
+    Some(shortened)
+}
+
 fn prompt_text_for_state(state: &SessionState) -> String {
     match state.prompt_mode {
         super::python_like::PromptModus::Speichern => "was speichern> ".to_string(),
         super::python_like::PromptModus::LoeschenStart
         | super::python_like::PromptModus::LoeschenSelect => "was löschen> ".to_string(),
-        _ => "> ".to_string(),
+        super::python_like::PromptModus::Normal | super::python_like::PromptModus::AusgabeSelektiv => {
+            if let Some(placeholder) = prompt_placeholder_text(state) {
+                format!("{placeholder} > ")
+            } else {
+                "> ".to_string()
+            }
+        }
+        super::python_like::PromptModus::SpeicherungAusgaben
+        | super::python_like::PromptModus::SpeicherungAusgabenMitZusatz => "o> ".to_string(),
     }
 }
 
