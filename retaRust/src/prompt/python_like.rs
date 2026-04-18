@@ -2792,6 +2792,327 @@ fn expand_fraction_piece_values(piece: &str) -> Option<Vec<(i64, i64)>> {
         .or_else(|| parse_simple_fraction_piece(inner).map(|fraction| vec![fraction]))
 }
 
+#[derive(Clone, Debug)]
+struct PythonBruchSpaltPart {
+    number_before_text: Vec<String>,
+    text: Vec<String>,
+    number_after_text: Vec<String>,
+    only_numbers: bool,
+}
+
+impl PythonBruchSpaltPart {
+    fn only(numbers: Vec<String>) -> Self {
+        Self {
+            number_before_text: numbers,
+            text: Vec::new(),
+            number_after_text: Vec::new(),
+            only_numbers: true,
+        }
+    }
+
+    fn mixed(
+        number_before_text: Vec<String>,
+        text: Vec<String>,
+        number_after_text: Vec<String>,
+    ) -> Self {
+        Self {
+            number_before_text,
+            text,
+            number_after_text,
+            only_numbers: false,
+        }
+    }
+
+    fn before_fraction_text(&self) -> Vec<String> {
+        if self.only_numbers {
+            Vec::new()
+        } else {
+            self.text.clone()
+        }
+    }
+
+    fn after_fraction_text(&self) -> Vec<String> {
+        if self.only_numbers {
+            Vec::new()
+        } else {
+            self.text.clone()
+        }
+    }
+
+    fn numerator_side_values(&self) -> Vec<String> {
+        if self.only_numbers {
+            self.number_before_text.clone()
+        } else {
+            self.number_after_text.clone()
+        }
+    }
+
+    fn denominator_side_values(&self) -> Vec<String> {
+        self.number_before_text.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PythonBruchRanges {
+    numerators: Vec<i64>,
+    denominator_spec: String,
+}
+
+fn ordered_values_from_segment_map(map: &BTreeMap<usize, String>) -> Vec<String> {
+    map.values().cloned().collect()
+}
+
+fn python_bruch_spalt(text: &str) -> Option<Vec<Vec<String>>> {
+    let parts = text.split('/').collect::<Vec<_>>();
+    if parts.len() < 2 {
+        return None;
+    }
+
+    let mut parsed_parts: Vec<PythonBruchSpaltPart> = Vec::new();
+    let mut out: Vec<Vec<String>> = Vec::new();
+
+    for (index, part) in parts.iter().enumerate() {
+        let mut numbers: BTreeMap<usize, String> = BTreeMap::new();
+        let mut non_numbers: BTreeMap<usize, String> = BTreeMap::new();
+        let mut was_number = false;
+        let mut go_next = 0usize;
+
+        for ch in part.chars() {
+            if ch.is_ascii_digit() {
+                if !was_number {
+                    go_next = go_next.saturating_add(1);
+                }
+                numbers.entry(go_next).or_default().push(ch);
+                was_number = true;
+            } else {
+                if was_number {
+                    go_next = go_next.saturating_add(1);
+                }
+                non_numbers.entry(go_next).or_default().push(ch);
+                was_number = false;
+            }
+        }
+
+        if numbers.is_empty() {
+            return None;
+        }
+
+        let all_comparison = non_numbers
+            .keys()
+            .zip(numbers.keys())
+            .map(|(non_number_key, number_key)| number_key > non_number_key)
+            .collect::<Vec<_>>();
+        let is_first = index == 0;
+        let is_last = index + 1 == parts.len();
+        let valid = if is_first && all_comparison.iter().all(|value| *value) {
+            true
+        } else if is_last && !all_comparison.iter().any(|value| *value) {
+            true
+        } else if !is_first && !is_last && !non_numbers.is_empty() {
+            let min_number = *numbers.keys().next()?;
+            let max_number = *numbers.keys().last()?;
+            non_numbers
+                .keys()
+                .all(|key| *key > min_number && *key < max_number)
+        } else {
+            false
+        };
+        if !valid {
+            return None;
+        }
+
+        let parsed = if non_numbers.is_empty() {
+            if is_first || is_last {
+                PythonBruchSpaltPart::only(ordered_values_from_segment_map(&numbers))
+            } else {
+                return None;
+            }
+        } else {
+            let min_non_number = *non_numbers.keys().next()?;
+            let max_non_number = *non_numbers.keys().last()?;
+            let number_before_text = numbers
+                .iter()
+                .filter(|(key, _)| **key < min_non_number)
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>();
+            let number_after_text = numbers
+                .iter()
+                .filter(|(key, _)| **key > max_non_number)
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>();
+            if is_last && !number_after_text.is_empty() {
+                return None;
+            }
+            PythonBruchSpaltPart::mixed(
+                number_before_text,
+                ordered_values_from_segment_map(&non_numbers),
+                number_after_text,
+            )
+        };
+
+        parsed_parts.push(parsed);
+
+        if index == 1 {
+            let previous = &parsed_parts[0];
+            let current = &parsed_parts[1];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
+            if is_last {
+                out.push(current.after_fraction_text());
+            }
+        } else if is_last && index > 1 {
+            let previous = &parsed_parts[index - 1];
+            let current = &parsed_parts[index];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
+            out.push(current.after_fraction_text());
+        } else if index > 1 {
+            let previous = &parsed_parts[index - 1];
+            let current = &parsed_parts[index];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
+        }
+    }
+
+    Some(out)
+}
+
+fn is_python_bruch_fraction_tuple(values: &[String]) -> bool {
+    values.len() == 2 && values.iter().all(|value| parse_unsigned_row_i64(value).is_some())
+}
+
+fn parse_python_bruch_fraction_tuple(values: &[String]) -> Option<(i64, i64)> {
+    if !is_python_bruch_fraction_tuple(values) {
+        return None;
+    }
+    Some((
+        parse_unsigned_row_i64(&values[0])?,
+        parse_unsigned_row_i64(&values[1])?,
+    ))
+}
+
+fn create_ranges_for_python_bruch_list(bruch_list: &[Vec<String>]) -> Option<PythonBruchRanges> {
+    let special_simple_fraction = bruch_list.len() == 3
+        && bruch_list[0].is_empty()
+        && is_python_bruch_fraction_tuple(&bruch_list[1])
+        && bruch_list[2].is_empty();
+    if special_simple_fraction {
+        let (numerator, denominator) = parse_python_bruch_fraction_tuple(&bruch_list[1])?;
+        return Some(PythonBruchRanges {
+            numerators: vec![numerator],
+            denominator_spec: denominator.to_string(),
+        });
+    }
+
+    let mut first_fraction_numerators: Vec<i64> = Vec::new();
+    let mut first_fraction_denominators: Vec<i64> = Vec::new();
+    let mut numerator_range: Vec<i64> = Vec::new();
+    let mut numerator_range_origin: Vec<i64> = Vec::new();
+    let mut flag = 0i32;
+    let mut denominator_pieces: Vec<String> = Vec::new();
+
+    for (index, values) in bruch_list.iter().enumerate() {
+        if flag == -1 {
+            return None;
+        }
+        if flag > 3 {
+            return None;
+        } else if flag == 3 {
+            let left_denominator = *first_fraction_denominators.get(first_fraction_denominators.len().saturating_sub(2))?;
+            let right_denominator = *first_fraction_denominators.last()?;
+            denominator_pieces.push(left_denominator.to_string());
+            denominator_pieces.push("-".to_string());
+            denominator_pieces.push(right_denominator.to_string());
+
+            let start = *first_fraction_numerators.get(first_fraction_numerators.len().saturating_sub(2))?;
+            let end = *first_fraction_numerators.last()?;
+            numerator_range = if start <= end {
+                (start..=end).collect()
+            } else {
+                Vec::new()
+            };
+            numerator_range_origin = numerator_range.clone();
+            flag = -1;
+        }
+
+        if let Some((numerator, denominator)) = parse_python_bruch_fraction_tuple(values) {
+            let next_is_minus = bruch_list
+                .get(index + 1)
+                .map(|next| next.len() == 1 && next[0] == "-")
+                .unwrap_or(false);
+            let previous_is_minus = index > 0
+                && bruch_list
+                    .get(index - 1)
+                    .map(|previous| previous.len() == 1 && previous[0] == "-")
+                    .unwrap_or(false);
+            if (next_is_minus && flag == 0) || (previous_is_minus && flag == 2) {
+                first_fraction_numerators.push(numerator);
+                first_fraction_denominators.push(denominator);
+                flag += 1;
+            } else {
+                denominator_pieces.push(denominator.to_string());
+                let previous_is_plus = index > 0
+                    && bruch_list
+                        .get(index - 1)
+                        .map(|previous| previous.len() == 1 && previous[0] == "+")
+                        .unwrap_or(false);
+                if !numerator_range.is_empty() && previous_is_plus {
+                    let mut next_range = Vec::new();
+                    for origin in &numerator_range_origin {
+                        next_range.push(origin.saturating_add(numerator));
+                        next_range.push(origin.saturating_sub(numerator));
+                    }
+                    numerator_range = next_range;
+                } else if numerator_range.is_empty() {
+                    numerator_range = vec![numerator];
+                    numerator_range_origin = numerator_range.clone();
+                }
+            }
+        } else if values.len() == 1 && values[0] == "-" && flag > 0 {
+            flag += 1;
+        } else {
+            flag = 0;
+            denominator_pieces.extend(values.iter().cloned());
+        }
+    }
+
+    Some(PythonBruchRanges {
+        numerators: numerator_range,
+        denominator_spec: denominator_pieces.join(""),
+    })
+}
+
+fn parse_python_bruch_spalt_group_piece(piece: &str) -> Option<PythonFractionGroup> {
+    let inner = strip_matching_row_wrappers(piece.trim());
+    let bruch_list = python_bruch_spalt(inner)?;
+    let ranges = create_ranges_for_python_bruch_list(&bruch_list)?;
+    if ranges.denominator_spec.trim().is_empty() {
+        return Some(PythonFractionGroup {
+            numerator_values: Vec::new(),
+            denominator_values: Vec::new(),
+        });
+    }
+
+    let numerator_values = ranges
+        .numerators
+        .into_iter()
+        .filter(|value| *value > 0)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let denominator_values = fraction_denominator_values_from_python_spec(&ranges.denominator_spec);
+    Some(PythonFractionGroup {
+        numerator_values,
+        denominator_values,
+    })
+}
+
 
 #[derive(Clone, Debug)]
 struct PythonFractionGroup {
@@ -2845,6 +3166,10 @@ fn parse_python_fraction_group_piece(piece: &str) -> Option<PythonFractionGroup>
     let inner = strip_matching_row_wrappers(piece.trim());
     if inner.is_empty() || !inner.contains('/') {
         return None;
+    }
+
+    if let Some(group) = parse_python_bruch_spalt_group_piece(inner) {
+        return Some(group);
     }
 
     if let Some((left, right)) = split_fraction_operator(inner, '-') {
@@ -5227,6 +5552,32 @@ mod tests {
         assert!(!calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=3")));
+    }
+
+    #[test]
+    fn fraction_mixed_range_and_distance_uses_python_bruch_spalt_pipeline() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "1/2-3/4+5/6"]));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=6")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=7")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=8")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=8,9,10")));
+        assert!(!calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
+    }
+
+    #[test]
+    fn descending_fraction_range_keeps_python_empty_range_semantics() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "3/4-1/2"]));
+        assert!(calls.is_empty());
     }
 
     #[test]
