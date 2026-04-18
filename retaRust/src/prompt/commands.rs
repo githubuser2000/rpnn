@@ -5,8 +5,9 @@ use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
     finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
-    prepare_prompt_big_output_for_stored_reta, prepare_prompt_big_output_for_stored_rows,
-    prompt_words, PromptModus,
+    prepare_prompt_big_output_for_stored_reta,
+    prepare_prompt_big_output_for_stored_reta_prompt_overlay,
+    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
 };
 use super::tokenize::split_shell_like;
 
@@ -249,6 +250,12 @@ pub fn compile_command_with_state(
     {
         return Ok(PromptCommand::Reta(prepared.tokens));
     }
+    if let Some(calls) = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+        &state.stored_expanded_tokens,
+        &tokenized.tokens,
+    ) {
+        return Ok(prompt_command_from_reta_calls(calls));
+    }
 
     if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens)
         || !state.has_stored_placeholder()
@@ -437,6 +444,14 @@ fn apply_nested_frontend_overrides(
                 .collect(),
         ),
         other => other,
+    }
+}
+
+fn prompt_command_from_reta_calls(calls: Vec<Vec<String>>) -> PromptCommand {
+    if calls.len() == 1 {
+        PromptCommand::Reta(calls.into_iter().next().unwrap())
+    } else {
+        PromptCommand::RetaBatch(calls)
     }
 }
 
@@ -773,6 +788,21 @@ pub fn execute_command(
             Ok(None)
         }
         PromptCommand::ShowStored(additional_text) => {
+            if let Some(text) = &additional_text {
+                let additional_tokens = split_storage_text(text);
+                if let Some(calls) = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+                    &state.stored_expanded_tokens,
+                    &additional_tokens,
+                ) {
+                    let nested_command = apply_nested_frontend_overrides(
+                        prompt_command_from_reta_calls(calls),
+                        text,
+                        state,
+                    );
+                    return execute_command(nested_command, state);
+                }
+            }
+
             let effective_input = match additional_text {
                 Some(text) => {
                     let additional_tokens = split_storage_text(&text);
@@ -1457,6 +1487,41 @@ mod tests {
             merged,
             "reta -zeilen --vorhervonausschnitt=4,7-10 --oberesmaximum=1025 -spalten --licht"
         );
+    }
+
+    #[test]
+    fn stored_reta_placeholder_prompt_overlay_compiles_to_real_reta_call() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "reta -ausgabe --nocolor".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let command = compile_command_with_state("emotion 12", &state).unwrap();
+        match command {
+            PromptCommand::Reta(argv) => {
+                assert!(argv.iter().any(|token| token == "--grundstrukturen=emotion"));
+                assert!(argv.iter().any(|token| token == "--nocolor"));
+                assert!(argv.iter().any(|token| token == "--vorhervonausschnitt=12"));
+            }
+            other => panic!("expected PromptCommand::Reta, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn stored_reta_placeholder_prompt_overlay_keeps_batches() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "reta -ausgabe --nocolor".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let command = compile_command_with_state("universum 2/3", &state).unwrap();
+        match command {
+            PromptCommand::RetaBatch(argvs) => {
+                assert_eq!(argvs.len(), 2);
+                assert!(argvs
+                    .iter()
+                    .all(|argv| argv.iter().any(|token| token == "--nocolor")));
+            }
+            other => panic!("expected PromptCommand::RetaBatch, got {other:?}"),
+        }
     }
 
     #[test]

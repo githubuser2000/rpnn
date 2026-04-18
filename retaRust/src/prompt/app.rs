@@ -596,7 +596,13 @@ fn run_interactive_loop(
                 let previous_editor_mode = state.current_mode();
                 let previous_logging_enabled = state.logging_enabled;
                 let compiled = match compile_command_with_state(&compile_input, state) {
-                    Ok(command) => command,
+                    Ok(command) => {
+                        if state.program_name == "rpe" {
+                            apply_rpe_emacs_output_to_command(command, &compile_input)
+                        } else {
+                            command
+                        }
+                    }
                     Err(err) => {
                         if state.logging_enabled {
                             append_log_line(&log_path, "compile-error", &err);

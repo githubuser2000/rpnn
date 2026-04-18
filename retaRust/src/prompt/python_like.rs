@@ -3175,6 +3175,128 @@ fn ensure_flag_in_main_section(tokens: &mut Vec<String>, section: &str, flag: &s
     merge_tokens_into_main_section(tokens, section, &[flag.to_string()]);
 }
 
+fn has_main_section(tokens: &[String], section: &str) -> bool {
+    tokens.iter().any(|token| token == section)
+}
+
+fn extract_main_section_payload(tokens: &[String], section: &str) -> Vec<String> {
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if tokens[index] == section {
+            let mut payload = Vec::new();
+            index += 1;
+            while index < tokens.len() && !is_main_switch_token(&tokens[index]) {
+                payload.push(tokens[index].clone());
+                index += 1;
+            }
+            return payload;
+        }
+        index += 1;
+    }
+    Vec::new()
+}
+
+fn extract_non_section_tokens(tokens: &[String]) -> Vec<String> {
+    if tokens.len() <= 1 {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+    let mut index = 1usize;
+    while index < tokens.len() {
+        if is_main_switch_token(&tokens[index]) {
+            index += 1;
+            while index < tokens.len() && !is_main_switch_token(&tokens[index]) {
+                index += 1;
+            }
+            continue;
+        }
+
+        out.push(tokens[index].clone());
+        index += 1;
+    }
+
+    out
+}
+
+fn merge_base_reta_tokens_into_overlay(
+    base_tokens: &[String],
+    overlay_tokens: &[String],
+) -> Option<Vec<String>> {
+    let base = normalize_reta_like_tokens(base_tokens)?;
+    let overlay = normalize_reta_like_tokens(overlay_tokens)?;
+    let mut merged = overlay;
+
+    if !has_main_section(&merged, "-zeilen") {
+        let payload = extract_main_section_payload(&base, "-zeilen");
+        merge_tokens_into_main_section(&mut merged, "-zeilen", &payload);
+    }
+
+    for section in ["-spalten", "-kombination", "-ausgabe"] {
+        let payload = extract_main_section_payload(&base, section);
+        merge_tokens_into_main_section(&mut merged, section, &payload);
+    }
+
+    for token in extract_non_section_tokens(&base) {
+        if token != "reta" && !merged.iter().any(|existing| existing == &token) {
+            merged.push(token);
+        }
+    }
+
+    Some(merged)
+}
+
+fn build_prompt_overlay_reta_calls(input_tokens: &[String]) -> Vec<Vec<String>> {
+    if input_tokens.is_empty() || normalize_reta_like_tokens(input_tokens).is_some() {
+        return Vec::new();
+    }
+
+    let calls = build_reta_calls_from_prompt_tokens(input_tokens);
+    if !calls.is_empty() {
+        return calls;
+    }
+
+    build_reta_argv_from_prompt_tokens(input_tokens)
+        .into_iter()
+        .collect()
+}
+
+/// Python-nahe Weiterfuehrung des gespeicherten `reta`-Platzhalter-Pfads:
+/// ein gespeicherter roher `reta`-Befehl bleibt die Basisschicht, waehrend eine
+/// neue Prompt-Eingabe zuerst selbst in einen oder mehrere `reta`-Aufrufe
+/// ueberfuehrt und danach in die gespeicherte Basis eingemischt wird.
+///
+/// Dadurch uebernimmt die aktuelle Prompt-Eingabe ihre eigene `-zeilen`- und
+/// Semantik-Struktur, waehrend gespeicherte Ausgabeflags oder Zusatzsektionen
+/// erhalten bleiben. Das schliesst die bis dahin noch fehlende Luecke zwischen
+/// reinem Selective-Row-Rewrite und blindem Token-Anhaengen.
+pub fn prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+    stored_prefix_tokens: &[String],
+    input_tokens: &[String],
+) -> Option<Vec<Vec<String>>> {
+    if stored_prefix_tokens.first().map(String::as_str) != Some("reta") {
+        return None;
+    }
+
+    let overlay_calls = build_prompt_overlay_reta_calls(input_tokens);
+    if overlay_calls.is_empty() {
+        return None;
+    }
+
+    let mut merged_calls = Vec::new();
+    for overlay in overlay_calls {
+        let Some(merged) = merge_base_reta_tokens_into_overlay(stored_prefix_tokens, &overlay)
+        else {
+            continue;
+        };
+        if !merged_calls.contains(&merged) {
+            merged_calls.push(merged);
+        }
+    }
+
+    (!merged_calls.is_empty()).then_some(merged_calls)
+}
+
 fn divisors_from_row_specs(row_specs: &[String]) -> Option<Vec<i64>> {
     let numbers = parse_row_spec_numbers(row_specs)?;
     let mut divisors = BTreeSet::new();
@@ -3270,7 +3392,9 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 mod tests {
     use super::{
         build_reta_calls_from_prompt_tokens, expand_python_regex_like_tokens,
-        prepare_prompt_big_output_for_stored_reta, prepare_prompt_big_output_for_stored_rows,
+        prepare_prompt_big_output_for_stored_reta,
+        prepare_prompt_big_output_for_stored_reta_prompt_overlay,
+        prepare_prompt_big_output_for_stored_rows,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -3616,6 +3740,52 @@ mod tests {
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=2")));
+    }
+
+    #[test]
+    fn stored_reta_placeholder_merges_generated_prompt_call_sections() {
+        let calls = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+            &strings(&["reta", "-ausgabe", "--nocolor"]),
+            &strings(&["emotion", "12"]),
+        )
+        .expect("stored reta base should absorb prompt-generated semantic call");
+
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0],
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12",
+                "--oberesmaximum=1025",
+                "-spalten",
+                "--grundstrukturen=emotion",
+                "-ausgabe",
+                "--breite=0",
+                "--spaltenreihenfolgeundnurdiese=2,3",
+                "--nocolor",
+            ])
+        );
+    }
+
+    #[test]
+    fn stored_reta_placeholder_merges_generated_prompt_batches() {
+        let calls = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+            &strings(&["reta", "-ausgabe", "--nocolor"]),
+            &strings(&["universum", "2/3"]),
+        )
+        .expect("stored reta base should absorb batched prompt-generated calls too");
+
+        assert_eq!(calls.len(), 2);
+        assert!(calls
+            .iter()
+            .all(|call| call.iter().any(|token| token == "--nocolor")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=3")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=2")));
     }
 
     #[test]
