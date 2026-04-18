@@ -215,29 +215,65 @@ fn concept_prefixed_prompt_tokens() -> Vec<String> {
     out
 }
 
-fn numeric_value_candidates_for_regex() -> Vec<String> {
-    (0..=128).map(|value| value.to_string()).collect()
+fn reta_main_switch_tokens_for_regex() -> &'static [&'static str] {
+    // Python regExReplace iteriert ueber i18n.hauptForNeben.values(), nicht nur
+    // ueber die vier datenfuehrenden Abschnitte. Deshalb gehoeren -h, -help,
+    // -debug und -nichts in die Regex-Expansion, auch wenn nur die ersten vier
+    // Abschnitte Nebenparameter-Inventare haben.
+    &[
+        "-zeilen",
+        "-spalten",
+        "-kombination",
+        "-ausgabe",
+        "-h",
+        "-help",
+        "-debug",
+        "-nichts",
+    ]
 }
 
-fn reta_main_switch_tokens_for_regex() -> &'static [&'static str] {
+fn reta_section_switch_tokens_for_regex() -> &'static [&'static str] {
     &["-zeilen", "-spalten", "-kombination", "-ausgabe"]
 }
 
 fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     let mut inventory = BTreeMap::new();
-    let numeric_values = numeric_value_candidates_for_regex();
 
+    // Python regExReplace baut fuer -zeilen zuerst
+    // {zeilenPara: {''} for zeilenPara in i18n.haupt2neben['zeilen']}
+    // und ueberschreibt nur zeit/typ/primzahlen mit echten Wertemengen.
+    // Numeric-Parameter wie zaehlung oder oberesmaximum haben dort keine
+    // Zahlenliste; ein Regex auf deren RHS ergibt Python-artig den Flag-Token.
     for key in [
-        "zaehlung",
-        "vorhervonausschnitt",
-        "primzahlvielfache",
+        "alles",
+        "gestern",
+        "heute",
+        "hoehemaximal",
+        "mond",
+        "morgen",
         "nachtraeglichneuabzaehlung",
         "nachtraeglichneuabzaehlungvielfache",
-        "potenzenvonzahlen",
-        "vielfachevonzahlen",
         "oberesmaximum",
+        "planet",
+        "potenzenvonzahlen",
+        "primzahlvielfache",
+        "schwarzesonne",
+        "sonne",
+        "typ",
+        "vielfachevonzahlen",
+        "vorhervonausschnitt",
+        "vorhervonausschnittteiler",
+        "zaehlung",
+        "zeit",
+        "primzahlen",
+        "aussenerste",
+        "innenerste",
+        "aussenalle",
+        "innenalle",
+        "invertieren",
+        "SonneMitMondanteil",
     ] {
-        inventory.insert(key.to_string(), numeric_values.clone());
+        inventory.insert(key.to_string(), Vec::new());
     }
 
     inventory.insert(
@@ -268,15 +304,33 @@ fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
             .collect(),
     );
 
-    for flag in ["vorhervonausschnittteiler", "alles", "invertieren"] {
-        inventory.insert(flag.to_string(), Vec::new());
-    }
-
     inventory
 }
 
 fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     let mut inventory = BTreeMap::new();
+
+    // Python regExReplace gibt nur --art echte Werte aus i18n.ausgabeArt.
+    // breite/breiten sind in der Completion numerisch, in der Regex-Expansion
+    // aber wie Python {''}-Parameter ohne generierte Zahlenliste.
+    for key in [
+        "nocolor",
+        "justtext",
+        "art",
+        "onetable",
+        "spaltenreihenfolgeundnurdiese",
+        "endlessscreen",
+        "endless",
+        "dontwrap",
+        "breite",
+        "breiten",
+        "keineleereninhalte",
+        "keinenummerierung",
+        "keineueberschriften",
+    ] {
+        inventory.insert(key.to_string(), Vec::new());
+    }
+
     inventory.insert(
         "art".to_string(),
         [
@@ -286,29 +340,6 @@ fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
         .map(str::to_string)
         .collect(),
     );
-    inventory.insert(
-        "breite".to_string(),
-        (0..=128).map(|value| value.to_string()).collect(),
-    );
-    inventory.insert(
-        "breiten".to_string(),
-        (0..=128).map(|value| value.to_string()).collect(),
-    );
-
-    for flag in [
-        "nocolor",
-        "justtext",
-        "onetable",
-        "spaltenreihenfolgeundnurdiese",
-        "endlessscreen",
-        "endless",
-        "dontwrap",
-        "keineleereninhalte",
-        "keinenummerierung",
-        "keineueberschriften",
-    ] {
-        inventory.entry(flag.to_string()).or_default();
-    }
 
     inventory
 }
@@ -379,7 +410,7 @@ fn reta_section_parameter_inventory_for_regex(section: &str) -> BTreeMap<String,
 
 fn reta_global_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     let mut inventory = BTreeMap::new();
-    for section in reta_main_switch_tokens_for_regex() {
+    for section in reta_section_switch_tokens_for_regex() {
         for (parameter, values) in reta_section_parameter_inventory_for_regex(section) {
             inventory.entry(parameter).or_insert(values);
         }
@@ -1132,13 +1163,25 @@ fn expand_reta_equals_regex_like_token(
     }
 
     let right_pieces = right.split(',').collect::<Vec<_>>();
+    let rhs_contains_regex_or_glob = right_pieces
+        .iter()
+        .any(|piece| parse_special_fragment_matcher(piece.trim()).is_some());
+    let all_selected_parameters_are_value_less = parameter_names.iter().all(|parameter| {
+        inventory
+            .get(parameter)
+            .map(|values| values.is_empty())
+            .unwrap_or(true)
+    });
+
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     for parameter in parameter_names {
         let allowed_values = inventory.get(&parameter).cloned().unwrap_or_default();
         let values = expand_rhs_regex_pieces(&right_pieces, &allowed_values);
         if values.is_empty() {
-            if allowed_values.is_empty() {
+            if allowed_values.is_empty()
+                && (!rhs_contains_regex_or_glob || all_selected_parameters_are_value_less)
+            {
                 push_unique_preserving_normalized(&mut out, &mut seen, format!("--{parameter}"));
             }
             continue;
@@ -5556,6 +5599,28 @@ mod tests {
                 && !token.contains("pro_contra")
                 && !token.contains("strukturgroesse")
         })));
+    }
+
+    #[test]
+    fn prompt_execution_regex_expands_all_python_main_parameters() {
+        let expanded = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "r\"^(h|help|debug|nichts)$\"",
+        ]));
+        assert_eq!(
+            expanded,
+            strings(&["reta", "-h", "-help", "-debug", "-nichts"])
+        );
+    }
+
+    #[test]
+    fn prompt_execution_regex_keeps_python_empty_value_parameters_as_flags() {
+        let expanded = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "-zeilen",
+            "--zaehlung=r\"^1$\"",
+        ]));
+        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zaehlung"]));
     }
 
     #[test]

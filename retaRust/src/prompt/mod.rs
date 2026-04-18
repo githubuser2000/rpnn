@@ -5,11 +5,11 @@ pub mod history;
 pub mod preset;
 pub mod frontend_profile;
 pub mod python_like;
-pub mod semantic_choices;
 pub mod tokenize;
 pub mod tui;
 pub mod frontends;
 pub mod retapromptlib;
+pub mod semantic_choices;
 
 pub use app::{
     run_prompt_command_frontend_with_profile,
