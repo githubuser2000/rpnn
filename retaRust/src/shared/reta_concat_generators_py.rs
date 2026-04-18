@@ -540,10 +540,11 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn generator_row_end_py(&self) -> usize {
-        // Python-näher: Generatoren rechnen über die bereits aufgebaute Gesamttabelle
-        // und die spätere Ausgabe filtert erst danach. Kein Kappen auf aktuell sichtbare
-        // Zeilenwünsche, solange die Tabelle die Zeilen bereits trägt.
-        self.relitable.len().saturating_sub(1)
+        let max_table_row = self.relitable.len().saturating_sub(1);
+        if self.lastLineNumber <= 0 {
+            return 0;
+        }
+        std::cmp::min(self.lastLineNumber as usize, max_table_row)
     }
 
     fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
@@ -3062,28 +3063,29 @@ for couple_a in paare {
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
-    pub fn apply_concat_generators_py(&mut self) {
-        let concat1_selection = self.CsvTheirsSpalten.get(&1).cloned().unwrap_or_default();
-        let gebr_gal_n = self.CsvTheirsSpalten.get(&2).cloned().unwrap_or_default();
-        let gebr_gal_1n = self.CsvTheirsSpalten.get(&3).cloned().unwrap_or_default();
-        let gebr_uni_n = self.CsvTheirsSpalten.get(&4).cloned().unwrap_or_default();
-        let gebr_uni_1n = self.CsvTheirsSpalten.get(&5).cloned().unwrap_or_default();
-        let gebr_emo_n = self.CsvTheirsSpalten.get(&6).cloned().unwrap_or_default();
-        let gebr_emo_1n = self.CsvTheirsSpalten.get(&7).cloned().unwrap_or_default();
-        let gebr_groe_n = self.CsvTheirsSpalten.get(&8).cloned().unwrap_or_default();
-        let gebr_groe_1n = self.CsvTheirsSpalten.get(&9).cloned().unwrap_or_default();
+    pub fn apply_concat_csv_generators_py(&mut self) {
+        let selections: [(i64, Vec<i64>); 9] = [
+            (1, self.CsvTheirsSpalten.get(&1).cloned().unwrap_or_default()),
+            (2, self.CsvTheirsSpalten.get(&2).cloned().unwrap_or_default()),
+            (3, self.CsvTheirsSpalten.get(&3).cloned().unwrap_or_default()),
+            (4, self.CsvTheirsSpalten.get(&4).cloned().unwrap_or_default()),
+            (5, self.CsvTheirsSpalten.get(&5).cloned().unwrap_or_default()),
+            (6, self.CsvTheirsSpalten.get(&6).cloned().unwrap_or_default()),
+            (7, self.CsvTheirsSpalten.get(&7).cloned().unwrap_or_default()),
+            (8, self.CsvTheirsSpalten.get(&8).cloned().unwrap_or_default()),
+            (9, self.CsvTheirsSpalten.get(&9).cloned().unwrap_or_default()),
+        ];
 
         let mut rowsAsNumbers = std::mem::take(&mut self.rowsAsNumbers);
+        for (concat_table, selection) in selections {
+            let generated_columns = self.readConcatCsv(&mut rowsAsNumbers, selection, concat_table);
+            self.CsvTheirsSpalten.insert(concat_table, generated_columns);
+        }
+        self.rowsAsNumbers = rowsAsNumbers;
+    }
 
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, concat1_selection, 1);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_gal_n, 2);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_gal_1n, 3);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_uni_n, 4);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_uni_1n, 5);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_emo_n, 6);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_emo_1n, 7);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_groe_n, 8);
-        let _ = self.readConcatCsv(&mut rowsAsNumbers, gebr_groe_1n, 9);
+    pub fn apply_post_csv_concat_generators_py(&mut self) {
+        let mut rowsAsNumbers = std::mem::take(&mut self.rowsAsNumbers);
 
         self.concatVervielfacheZeile(&mut rowsAsNumbers);
         self.concatModallogik(&mut rowsAsNumbers);
@@ -3100,5 +3102,10 @@ for couple_a in paare {
 
         self.remove_concat1_trigger_columns_py(&mut rowsAsNumbers);
         self.rowsAsNumbers = rowsAsNumbers;
+    }
+
+    pub fn apply_concat_generators_py(&mut self) {
+        self.apply_concat_csv_generators_py();
+        self.apply_post_csv_concat_generators_py();
     }
 }

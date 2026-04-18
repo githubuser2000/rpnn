@@ -975,6 +975,7 @@ impl Program {
         self.CsvTheirsSpalten.insert(9, Self::ordered_set_to_vec_i64(self.spaltenArtenKey_SpaltennummernValue.get(&self.spaltenTypeNaming.gebrGroe1).cloned().unwrap_or_default()));
 
         self.SpaltenVanillaAmount = self.rowsAsNumbers.len() as i64;
+        self.apply_concat_csv_generators_py();
         self.rowsAsNumbersNot = rowsAsNumbersNot0;
         self.rowsOfcombiNot = rowsOfcombiNot0;
         self.spaltenreihenfolgeundnurdiese = spaltenreihenfolgeundnurdiese0;

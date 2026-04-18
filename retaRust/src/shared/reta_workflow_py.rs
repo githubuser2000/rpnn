@@ -29,7 +29,7 @@ impl Program {
         zeilenliste.sort_unstable();
         self.lastLineNumber = zeilenliste.last().copied().unwrap_or(0);
 
-        self.apply_concat_generators_py();
+        self.apply_post_csv_concat_generators_py();
 
         if self.helpPage() {
             self.__resultingTable = vec![];
