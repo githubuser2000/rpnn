@@ -2676,15 +2676,16 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     gal_or_uni_n_or_invers[null_bis_drei].1
 };
 
+let n_and_inverse_spalten = (gal_or_uni_tuple[0], gal_or_uni_tuple[1]);
 let von = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
     multi.0,
-    gal_or_uni_tuple.into(),
+    n_and_inverse_spalten,
     csv_von,
     !(null_bis_drei >= 2),
 );
 let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
     multi.1,
-    gal_or_uni_tuple.into(),
+    n_and_inverse_spalten,
     csv_bis,
     !(null_bis_drei == 1 || null_bis_drei == 3),
 );
