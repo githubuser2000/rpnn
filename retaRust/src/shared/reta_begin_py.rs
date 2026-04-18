@@ -534,27 +534,165 @@ impl Program {
         self.spaltenTypeNaming = SpaltenTyp::default();
     }
 
-    pub fn validate_cli_like_python_for_known_case(&mut self) {
-
-        let has_zeilen = self.argvWithoutProgram.iter().any(|a| a == "-zeilen");
-        let has_spalten = self.argvWithoutProgram.iter().any(|a| a == "-spalten");
-        let has_vorher = self.argvWithoutProgram.iter().any(|a| a == "--vorhervonausschnitt=1-10");
-        let has_alles = self.argvWithoutProgram.iter().any(|a| a == "--alles");
-
-        if has_zeilen && has_spalten && has_vorher && has_alles {
-            let p1 = "--vorhervonausschnitt=1-10";
-            let p2 = "--alles";
-            let msg = |p: &str| format!(
-                "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: \"{}\" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
-                p
-            );
-            self.cliErrors.push(msg(p1));
-            self.cliErrors.push(msg(p2));
-            self.cliErrors.push(msg(p1));
-            self.cliErrors.push(msg(p2));
+    fn main_parameter_name_py(token: &str) -> Option<&'static str> {
+        match token {
+            "-debug" => Some("debug"),
+            "-zeilen" => Some("zeilen"),
+            "-spalten" => Some("spalten"),
+            "-kombination" => Some("kombination"),
+            "-ausgabe" => Some("ausgabe"),
+            "-h" => Some("h"),
+            "-help" | "--help" => Some("help"),
+            _ => None,
         }
     }
 
+    fn cli_context_error_py(arg: &str) -> String {
+        format!(
+            "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: \"{}\" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
+            arg
+        )
+    }
+
+    fn has_numeric_payload_py(raw: &str) -> bool {
+        raw.chars().any(|c| c.is_ascii_digit())
+    }
+
+    fn is_valid_zeilen_side_parameter_py(arg: &str) -> bool {
+        let sub = arg.strip_prefix("--").unwrap_or(arg);
+        if matches!(sub, "alles" | "vorhervonausschnittteiler" | "invertieren") {
+            return true;
+        }
+        if let Some(tail) = sub.strip_prefix("hoehemaximal=") {
+            return tail.trim().chars().all(|c| c.is_ascii_digit());
+        }
+        let prefixes = [
+            "zeit=",
+            "zaehlung=",
+            "typ=",
+            "primzahlen=",
+            "vielfachevonzahlen=",
+            "primzahlvielfache=",
+            "potenzenvonzahlen=",
+            "oberesmaximum=",
+            "vorhervonausschnitt=",
+            "nachtraeglichneuabzaehlung=",
+            "nachtraeglichneuabzaehlungvielfache=",
+        ];
+        prefixes.iter().any(|prefix| {
+            sub.strip_prefix(prefix)
+                .map(|tail| !tail.trim().is_empty())
+                .unwrap_or(false)
+        })
+    }
+
+    fn is_valid_ausgabe_side_parameter_py(arg: &str) -> bool {
+        let sub = arg.strip_prefix("--").unwrap_or(arg);
+        if matches!(
+            sub,
+            "keineueberschriften"
+                | "keinenummerierung"
+                | "keineleereninhalte"
+                | "nocolor"
+                | "justtext"
+                | "endlessscreen"
+                | "endless"
+                | "dontwrap"
+                | "onetable"
+        ) {
+            return true;
+        }
+        if let Some(tail) = sub.strip_prefix("art=") {
+            return matches!(tail, "shell" | "nichts" | "csv" | "bbcode" | "html" | "emacs" | "markdown");
+        }
+        if let Some(tail) = sub.strip_prefix("spaltenreihenfolgeundnurdiese=") {
+            return Self::has_numeric_payload_py(tail);
+        }
+        sub.starts_with("breite=") || sub.starts_with("breiten=")
+    }
+
+    fn is_valid_kombination_side_parameter_py(arg: &str) -> bool {
+        let sub = arg.strip_prefix("--").unwrap_or(arg);
+        sub.strip_prefix("galaxie=")
+            .or_else(|| sub.strip_prefix("universum="))
+            .map(|tail| !tail.trim().is_empty())
+            .unwrap_or(false)
+    }
+
+    fn is_valid_spalten_side_parameter_py(&self, arg: &str) -> bool {
+        let sub = arg.strip_prefix("--").unwrap_or(arg);
+        if matches!(sub, "alles" | "keinenummerierung") || sub.starts_with("breite=") || sub.starts_with("breiten=") {
+            return true;
+        }
+        let sub = sub.strip_suffix('-').unwrap_or(sub);
+        if let Some((main, values)) = sub.split_once('=') {
+            if main.trim().is_empty() {
+                return false;
+            }
+            let known_main = self
+                .paraDict
+                .keys()
+                .any(|(stored_main, _)| Self::parameter_main_name_matches_py(stored_main, main));
+            if !known_main {
+                return false;
+            }
+            let values = Self::split_parameter_values_py(values);
+            if values.is_empty() {
+                return false;
+            }
+            return values.iter().all(|value| {
+                let value = value.strip_prefix('-').unwrap_or(value.as_str());
+                self.paraDict.keys().any(|(stored_main, stored_value)| {
+                    Self::parameter_main_name_matches_py(stored_main, main) && stored_value == value
+                }) || Self::has_numeric_payload_py(value)
+            });
+        }
+        self.paraDict
+            .keys()
+            .any(|(stored_main, _)| Self::parameter_main_name_matches_py(stored_main, sub))
+    }
+
+    pub fn validate_cli_context_like_python(&mut self) {
+        let mut current_main: Option<&'static str> = None;
+        let mut emitted: Vec<String> = Vec::new();
+        for arg in self.argvWithoutProgram.clone() {
+            if let Some(main) = Self::main_parameter_name_py(&arg) {
+                current_main = Some(main);
+                continue;
+            }
+            if !arg.starts_with("--") {
+                continue;
+            }
+            let valid = match current_main {
+                Some("zeilen") => Self::is_valid_zeilen_side_parameter_py(&arg),
+                Some("spalten") => self.is_valid_spalten_side_parameter_py(&arg),
+                Some("kombination") => Self::is_valid_kombination_side_parameter_py(&arg),
+                Some("ausgabe") => Self::is_valid_ausgabe_side_parameter_py(&arg),
+                _ => false,
+            };
+            if !valid {
+                let msg = Self::cli_context_error_py(&arg);
+                if !emitted.contains(&msg) && !self.cliErrors.contains(&msg) {
+                    emitted.push(msg.clone());
+                    self.cliErrors.push(msg);
+                }
+            }
+        }
+    }
+
+    fn side_parameter_seen_under_main_py(&self, expected_main: &str, expected_side: &str) -> bool {
+        let mut current_main: Option<&'static str> = None;
+        for arg in &self.argvWithoutProgram {
+            if let Some(main) = Self::main_parameter_name_py(arg) {
+                current_main = Some(main);
+                continue;
+            }
+            if arg == expected_side && current_main.map(|main| main == expected_main).unwrap_or(false) {
+                return true;
+            }
+        }
+        false
+    }
 
 
     fn is_main_parameter_token_py(token: &str) -> bool {
@@ -940,7 +1078,7 @@ impl Program {
         self.metakonkretPairs = metakonkretPairs_exact;
         self.metakonkretSelections = metakonkretSelections_exact;
 
-        let has_alles_spalten = self.argvWithoutProgram.iter().any(|a| a == "--alles");
+        let has_alles_spalten = self.side_parameter_seen_under_main_py("spalten", "--alles");
         if has_alles_spalten {
             let mut merged_direct = self.rowsAsNumbers.clone();
             for n in self.AllSimpleCommandSpalten.iter().copied() {
@@ -992,7 +1130,7 @@ impl Program {
         self.setRowRangeFromArgv();
         self.setIfZeilenSetToInf();
         self.helpPage();
-        self.validate_cli_like_python_for_known_case();
+        self.validate_cli_context_like_python();
         self.allImportantBeginThingsDone = true;
 
         (self.RowsLen, paramLines, paramLinesNot, self.relitable.clone(), self.rowsAsNumbers.clone())

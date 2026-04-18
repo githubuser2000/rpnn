@@ -251,18 +251,64 @@ impl Program {
         .collect()
 }
 
-fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
-    if is_header {
-        r#" style="background-color:#ff2222;color:#002222;""#.to_string()
-    } else {
-        let row_number = row_number.unwrap_or(0);
-        if row_number % 3 == 1 {
-            r#" style="background-color:#555500;color:#aaaaff;""#.to_string()
-        } else if row_number % 3 == 2 {
-            r#" style="background-color:#66ff66;color:#000000;""#.to_string()
-        } else {
-            r#" style="background-color:#009900;color:#ffffff;""#.to_string()
+fn output_row_number_type_py(num: i64) -> i64 {
+    if num == 0 {
+        return 0;
+    }
+    if num.abs() == 1 {
+        return 2;
+    }
+    let factors = Self::prim_repeat2_py(&Self::prim_fak_py(num.abs()));
+    if factors.len() == 1 && factors[0].1 == 1 {
+        return 1;
+    }
+    if factors.len() == 1 {
+        return 3;
+    }
+    if factors.is_empty() {
+        return 0;
+    }
+    let mut intersection: Option<BTreeSet<i64>> = None;
+    for (_, amount) in factors {
+        let divisors: BTreeSet<i64> = (2..=amount).filter(|divisor| amount % divisor == 0).collect();
+        if divisors.is_empty() {
+            return 2;
         }
+        intersection = Some(match intersection {
+            Some(previous) => previous.intersection(&divisors).copied().collect(),
+            None => divisors,
+        });
+    }
+    match intersection {
+        Some(values) if !values.is_empty() => 3,
+        _ => 2,
+    }
+}
+
+fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
+    let num = if is_header { 0 } else { row_number.unwrap_or(0) };
+    let style = match Self::output_row_number_type_py(num) {
+        1 if num % 2 == 0 => "background-color:#66ff66;color:#000000;",
+        1 => "background-color:#009900;color:#ffffff;",
+        2 if num % 2 == 0 => "background-color:#ffff66;color:#000099;",
+        2 => "background-color:#555500;color:#aaaaff;",
+        3 if num % 2 == 0 => "background-color:#9999ff;color:#202000;",
+        3 => "background-color:#000099;color:#ffff66;",
+        _ => "background-color:#ff2222;color:#002222;",
+    };
+    format!(r#" style="{}""#, style)
+}
+
+fn bbcode_row_begin_py(row_number: Option<i64>, is_header: bool) -> String {
+    let num = if is_header { 0 } else { row_number.unwrap_or(0) };
+    match Self::output_row_number_type_py(num) {
+        1 if num % 2 == 0 => r#"[tr="background-color:#66ff66;color:#000000;"]"#.to_string(),
+        1 => r#"[tr="background-color:#009900;color:#ffffff;"]"#.to_string(),
+        2 if num % 2 == 0 => r#"[tr="background-color:#ffff66;color:#000099;"]"#.to_string(),
+        2 => r#"[tr="background-color:#555500;color:#aaaaff;"]"#.to_string(),
+        3 if num % 2 == 0 => r#"[tr="background-color:#9999ff;color:#202000;"]"#.to_string(),
+        3 => r#"[tr="background-color:#000099;color:#ffff66;"]"#.to_string(),
+        _ => r#"[tr="background-color:#ff2222;color:#002222;"]"#.to_string(),
     }
 }
 
@@ -1774,6 +1820,20 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             .join("\n")
     }
 
+    fn should_skip_structured_row_py(&self, row: &[String], row_number: Option<i64>) -> bool {
+        if self.keineUeberschriften && row_number.is_none() {
+            return true;
+        }
+        if self.keineleereninhalte {
+            let joined = row.join(" ");
+            let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+            if stripped.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
 
     fn render_structured_output_py(
         &mut self,
@@ -1788,14 +1848,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             "nichts" => {}
             "csv" => {
                 for (row_idx, row) in newTable.iter().enumerate() {
-                    if self.keineleereninhalte {
-                        let joined = row.join(" ");
-                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                        if stripped.is_empty() {
-                            continue;
-                        }
-                    }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    if self.should_skip_structured_row_py(row, row_number) {
+                        continue;
+                    }
                     let is_header = row_number.is_none();
                     let mut fields: Vec<String> = vec![];
                     if self.nummeriere {
@@ -1815,14 +1871,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             "markdown" => {
                 let mut header_sep_done = false;
                 for (row_idx, row) in newTable.iter().enumerate() {
-                    if self.keineleereninhalte {
-                        let joined = row.join(" ");
-                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                        if stripped.is_empty() {
-                            continue;
-                        }
-                    }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    if self.should_skip_structured_row_py(row, row_number) {
+                        continue;
+                    }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
                     if self.nummeriere {
@@ -1847,14 +1899,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             }
             "emacs" => {
                 for (row_idx, row) in newTable.iter().enumerate() {
-                    if self.keineleereninhalte {
-                        let joined = row.join(" ");
-                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                        if stripped.is_empty() {
-                            continue;
-                        }
-                    }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    if self.should_skip_structured_row_py(row, row_number) {
+                        continue;
+                    }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
                     if self.nummeriere {
@@ -1880,14 +1928,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
                 let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
                 for (row_idx, row) in newTable.iter().enumerate() {
-                    if self.keineleereninhalte {
-                        let joined = row.join(" ");
-                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                        if stripped.is_empty() {
-                            continue;
-                        }
-                    }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    if self.should_skip_structured_row_py(row, row_number) {
+                        continue;
+                    }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
                     if self.nummeriere {
@@ -1932,14 +1976,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 out_lines.push("[table]".to_string());
                 let mut current_block = vec!["[table]".to_string()];
                 for (row_idx, row) in newTable.iter().enumerate() {
-                    if self.keineleereninhalte {
-                        let joined = row.join(" ");
-                        let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                        if stripped.is_empty() {
-                            continue;
-                        }
-                    }
                     let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
+                    if self.should_skip_structured_row_py(row, row_number) {
+                        continue;
+                    }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
                     if self.nummeriere {
@@ -1950,7 +1990,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         let limited = self.limit_cell_height_py(cell);
                         cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
                     }
-                    let line = format!("[tr]{}[/tr]", cells.join(""));
+                    let line = format!("{}{}[/tr]", Self::bbcode_row_begin_py(row_number, is_header), cells.join(""));
                     out_lines.push(line.clone());
                     current_block.push(line);
                 }
