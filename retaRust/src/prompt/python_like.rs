@@ -6,6 +6,11 @@ use crate::domain::python_source_of_truth::{
 };
 use crate::shared_words;
 
+use super::semantic_choices::{
+    semantic_wahl15_ordered_keys, semantic_wahl16_ordered_keys, semantic_wahl15_value,
+    semantic_wahl16_value,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PromptModus {
     Normal,
@@ -50,6 +55,9 @@ fn build_prompt_words() -> PromptWords {
             befehle.push(format!("16_15_{key}"));
         }
     }
+    // Python `is15or16command` accepts the naked `16_15` branch even though
+    // the generated `befehle` inventory mostly contains `16_15_<wahl15-key>`.
+    befehle.push("16_15".to_string());
     for key in semantic_wahl16_ordered_keys() {
         if !key.is_empty() {
             befehle.push(format!("16_{key}"));
@@ -1252,14 +1260,17 @@ pub fn finalize_prompt_tokens_for_execution(tokens: &[String]) -> Vec<String> {
 
 pub fn is_15or16_command(text: &str) -> bool {
     if let Some(rest) = text.strip_prefix("15_") {
-        return rest.is_empty() || prompt_words().befehle_set.contains(text);
+        return rest.is_empty() || semantic_wahl15_value(rest).is_some();
     }
     if let Some(rest) = text.strip_prefix("16_") {
-        if rest.is_empty() || prompt_words().befehle_set.contains(text) {
+        if rest.is_empty() || semantic_wahl16_value(rest).is_some() {
+            return true;
+        }
+        if rest == "15" {
             return true;
         }
         if let Some(rest15) = text.strip_prefix("16_15_") {
-            return rest15.is_empty() || prompt_words().befehle_set.contains(text);
+            return semantic_wahl15_value(rest15).is_some();
         }
     }
     false
@@ -1765,173 +1776,6 @@ fn semantic_non_whole_fraction_reverse_columns(_spec: &PromptSemanticSpec) -> &'
 
 fn semantic_non_whole_fraction_normal_columns(_spec: &PromptSemanticSpec) -> &'static str {
     "2"
-}
-
-fn semantic_wahl15_ordered_keys() -> &'static [&'static str] {
-    &[
-        "15",
-        "2",
-        "5",
-        "7",
-        "8",
-        "10",
-        "1pro30",
-        "12",
-        "13",
-        "17",
-        "18",
-        "6",
-        "9",
-        "3",
-        "13_6",
-        "13_7",
-        "13_10",
-        "13_17",
-        "10_4",
-        "16",
-        "4",
-        "13_1pro8",
-        "13_1pro6",
-        "1pro15",
-        "1",
-        "30",
-        "14",
-        "14_6",
-        "20",
-        "37",
-        "31",
-        "11",
-        "5_10",
-        "17_6",
-        "17_6_10mit4",
-        "36",
-        "13_16",
-        "18_7",
-        "18_10",
-        "18_17",
-        "1pro8",
-        "1pro5",
-        "1pro3",
-        "10_4_18_6",
-        "18_6",
-        "21",
-        "26",
-        "19",
-        "18_15",
-        "18_15_n-vs-1pron",
-        "1pro13",
-        "1pro19",
-        "90",
-        "13_13",
-        "1pro12",
-        "39",
-        "1pro6",
-        "28",
-        "24",
-        "32",
-        "gegen5",
-        "9_6",
-        "51",
-        "13_4",
-        "7mit6",
-        "",
-    ]
-}
-
-fn semantic_wahl16_ordered_keys() -> &'static [&'static str] {
-    &["1", "2", "3", "5", "6", "15", "10", "16", "20", ""]
-}
-
-fn semantic_wahl15() -> &'static BTreeMap<&'static str, &'static str> {
-    static MAP: OnceLock<BTreeMap<&'static str, &'static str>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        BTreeMap::from([
-            ("15", "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,Biologischer_Baum_(15),Teilchen_anderes_Universum,pro_contra"),
-            ("2", "Konkreta_und_Focus_(2)"),
-            ("5", "Impulse_(5)"),
-            ("7", "Gefühle_(7),Anführer_Arten_(7),Erlösung"),
-            ("8", "Modus_und_Sein_(8),Bestrafung,Gewalt"),
-            ("10", "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)"),
-            ("1pro30", "analytische_Ontologie"),
-            ("12", "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12"),
-            ("13", "Paradigmen_sind_Absichten_(13)"),
-            ("17", "Gedanken_sind_Positionen_(17)"),
-            ("18", "Verbundenheiten_(18)"),
-            ("6", "Triebe_und_Bedürfnisse_(6),System"),
-            ("9", "Lust_(9)"),
-            ("3", "Reflexe_(3),Existenzialien_(3)"),
-            ("13_6", "Absicht_6_ist_Vorteilsmaximierung"),
-            ("13_7", "Absicht_7_ist_Selbstlosigkeit"),
-            ("13_10", "Absicht_10_ist_Wirklichkeit_erkennen"),
-            ("13_17", "Absicht_17_ist_zu_meinen"),
-            ("10_4", "Zeit_(4)_als_Wirklichkeit"),
-            ("16", "Funktionen_Vorstellungen_(16)"),
-            ("4", "Achtung_(4)"),
-            ("13_1pro8", "Absicht_1/8"),
-            ("13_1pro6", "Absicht_1/6_ist_Reinigung_und_Klarheit"),
-            ("1pro15", "Reflektion_und_Kategorien_(1/15)"),
-            ("1", "Bewusstheit_statt_Bewusstsein_(1)"),
-            ("30", "Energie_und_universelle_Eigenschaften_(30)"),
-            ("14", "Stimmungen_Kombinationen_(14)"),
-            ("14_6", "Rechnen"),
-            ("20", "Klassen_(20)"),
-            ("37", "Empathie_(37)"),
-            ("31", "Garben_und_Verhalten_nachfühlen(31)"),
-            ("11", "Verhalten_(11)"),
-            ("5_10", "Bedeutung_(10)"),
-            ("17_6", "Themen_(6)"),
-            ("17_6_10mit4", "Optimierung_(10)"),
-            ("36", "Attraktionen_(36)"),
-            ("13_16", "Absicht_16_ist_zu_genügen"),
-            ("18_7", "Liebe_(7)"),
-            ("18_10", "Koalitionen_(10)"),
-            ("18_17", "Ansichten_Standpunkte_(18_17)"),
-            ("1pro8", "Prinzipien(1/8)"),
-            ("1pro5", "Bestrebungen(1/5)"),
-            ("1pro3", "Bedingung_und_Auslöser_(1/3)"),
-            ("10_4_18_6", "relativer_Zeit-Betrag_(15_10_4_18_6)"),
-            ("18_6", "Zahlenvergleich_(15_18_6)"),
-            ("21", "Leidenschaften_(21)"),
-            ("26", "Erwartungshaltungen_(26)"),
-            ("19", "Extremalien_(19),Ziele_(19)"),
-            ("18_15", "universeller_Komperativ_(18→15)"),
-            ("18_15_n-vs-1pron", "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)"),
-            ("1pro13", "Sollen_Frage_Vorgehensweise_(1/13)"),
-            ("1pro19", "Fundament_(1/19)"),
-            ("90", "abhängige_Verbundenheit_(90)"),
-            ("13_13", "Absicht_13_ist_Helfen"),
-            ("1pro12", "Karte_Filter_und_Unterscheidung_(1/12)"),
-            ("39", "Maßnahmen_(39)"),
-            ("1pro6", "innere_Werte_1/6_der_Reinigung_und_Klarheit"),
-            ("28", "Lebensbereiche_Problemklassen_(28)"),
-            ("24", "Netzwerk"),
-            ("32", "mathematisches_Design_(32)"),
-            ("gegen5", "gegen_5"),
-            ("9_6", "strukturgroesse"),
-            ("51", "Kontroverse_(51)"),
-            ("13_4", "Taetigkeiten"),
-            ("7mit6", "Wohlbefinden_(7mit6)"),
-            ("", "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,Biologischer_Baum_(15),Teilchen_anderes_Universum,pro_contra"),
-        ])
-    })
-}
-
-fn semantic_wahl16() -> &'static BTreeMap<&'static str, &'static str> {
-    static MAP: OnceLock<BTreeMap<&'static str, &'static str>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        BTreeMap::from([
-            ("1", "Meta-Physik-Teilchen_(1)"),
-            ("2", "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Model_of_Hierarchical_Complexity"),
-            ("3", "Teilchen_anderes_Universum"),
-            ("5", "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Model_of_Hierarchical_Complexity,Biologischer_Baum_(16_->_5),P5"),
-            ("6", "Geist_(15)"),
-            ("15", "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Model_of_Hierarchical_Complexity"),
-            ("10", "Struktur-Wissenschaften_(10)"),
-            ("16", "Multiversalien_(16),P"),
-            ("20", "Muster-Wissenschaften_(20)"),
-            ("", "Multiversalien_(16),P"),
-        ])
-    })
 }
 
 fn contains_blocking_abc(tokens: &[String]) -> bool {
@@ -4533,26 +4377,26 @@ fn append_15_16_calls(
     for token in normalized {
         if let Some(suffix) = token.strip_prefix("16_") {
             if !token.starts_with("16_15") {
-                if let Some(value) = semantic_wahl16().get(suffix) {
-                    values16.push((*value).to_string());
+                if let Some(value) = semantic_wahl16_value(suffix) {
+                    values16.push(value.to_string());
                 }
             }
         }
         if token == "16_15" {
-            if let Some(value) = semantic_wahl15().get("15") {
-                values15.push((*value).to_string());
+            if let Some(value) = semantic_wahl15_value("15") {
+                values15.push(value.to_string());
             }
             continue;
         }
         if let Some(suffix) = token.strip_prefix("16_15_") {
-            if let Some(value) = semantic_wahl15().get(suffix) {
-                values15.push((*value).to_string());
+            if let Some(value) = semantic_wahl15_value(suffix) {
+                values15.push(value.to_string());
             }
             continue;
         }
         if let Some(suffix) = token.strip_prefix("15_") {
-            if let Some(value) = semantic_wahl15().get(suffix) {
-                values15.push((*value).to_string());
+            if let Some(value) = semantic_wahl15_value(suffix) {
+                values15.push(value.to_string());
             }
         }
     }
@@ -5473,7 +5317,8 @@ mod tests {
         build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows, python_row_spec_to_numbers, PromptModus,
+        prepare_prompt_big_output_for_stored_rows, is_15or16_command,
+        python_row_spec_to_numbers, PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -5694,6 +5539,23 @@ mod tests {
     fn prompt_execution_regex_at_reta_root_does_not_expand_section_flags() {
         let expanded = expand_python_regex_like_tokens(&strings(&["reta", "r\"^end.*\""]));
         assert_eq!(expanded, strings(&["reta"]));
+    }
+
+    #[test]
+    fn semantic_15_16_execution_uses_generated_python_choice_source() {
+        assert!(is_15or16_command("16_15"));
+        assert!(is_15or16_command("16_15_"));
+
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "15_15", "15_9_6", "16_15", "12",
+        ]));
+        assert!(calls.iter().any(|call| call.iter().any(|token| {
+            token.starts_with("--grundstrukturen=")
+                && token.contains("nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)")
+                && token.contains("Größenordnung")
+                && !token.contains("pro_contra")
+                && !token.contains("strukturgroesse")
+        })));
     }
 
     #[test]

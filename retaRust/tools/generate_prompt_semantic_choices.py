@@ -2,7 +2,7 @@
 """Generate Rust prompt semantic-choice constants from Python `i18n.words`.
 
 The generated file is the Rust source of truth for retaPrompt commands
-`15_...`, `16_...` and `16_15_...`.  It intentionally mirrors the Python
+`15_...`, `16_...` and `16_15_...`. It intentionally mirrors the Python
 runtime mutation in `retaPrompt.py`:
 
     wahl15[""] = wahl15["15"]
@@ -20,7 +20,14 @@ from typing import Iterable, Sequence
 
 
 def rust_str(value: str) -> str:
-    return '"' + value.replace('\\', '\\\\').replace('"', '\\"').replace('\r', '\\r').replace('\n', '\\n') + '"'
+    return (
+        '"'
+        + value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+        + '"'
+    )
 
 
 def render_entries(name: str, items: Sequence[tuple[str, str]]) -> str:
@@ -29,6 +36,14 @@ def render_entries(name: str, items: Sequence[tuple[str, str]]) -> str:
         lines.append(
             f"    SemanticChoiceEntry {{ key: {rust_str(key)}, value: {rust_str(value)} }},"
         )
+    lines.append("];\n")
+    return "\n".join(lines)
+
+
+def render_keys(name: str, items: Sequence[tuple[str, str]]) -> str:
+    lines = [f"pub const {name}: &[&str] = &["]
+    for key, _ in items:
+        lines.append(f"    {rust_str(key)},")
     lines.append("];\n")
     return "\n".join(lines)
 
@@ -57,12 +72,22 @@ pub struct SemanticChoiceEntry {
     source += render_entries("WAHL16_I18N_ENTRIES", wahl16)
     source += render_entries("RETAPROMPT_WAHL15_ENTRIES", retaprompt_wahl15)
     source += render_entries("RETAPROMPT_WAHL16_ENTRIES", retaprompt_wahl16)
+    source += render_keys("RETAPROMPT_WAHL15_KEYS", retaprompt_wahl15)
+    source += render_keys("RETAPROMPT_WAHL16_KEYS", retaprompt_wahl16)
     source += '''pub fn retaprompt_wahl15_entries() -> &'static [SemanticChoiceEntry] {
     RETAPROMPT_WAHL15_ENTRIES
 }
 
 pub fn retaprompt_wahl16_entries() -> &'static [SemanticChoiceEntry] {
     RETAPROMPT_WAHL16_ENTRIES
+}
+
+pub fn semantic_wahl15_ordered_keys() -> &'static [&'static str] {
+    RETAPROMPT_WAHL15_KEYS
+}
+
+pub fn semantic_wahl16_ordered_keys() -> &'static [&'static str] {
+    RETAPROMPT_WAHL16_KEYS
 }
 
 pub fn semantic_wahl15_value(key: &str) -> Option<&'static str> {
@@ -112,6 +137,8 @@ mod tests {
         assert_eq!(WAHL16_I18N_ENTRIES.len(), 9);
         assert_eq!(RETAPROMPT_WAHL15_ENTRIES.len(), 66);
         assert_eq!(RETAPROMPT_WAHL16_ENTRIES.len(), 10);
+        assert_eq!(RETAPROMPT_WAHL15_KEYS.len(), RETAPROMPT_WAHL15_ENTRIES.len());
+        assert_eq!(RETAPROMPT_WAHL16_KEYS.len(), RETAPROMPT_WAHL16_ENTRIES.len());
     }
 }
 '''

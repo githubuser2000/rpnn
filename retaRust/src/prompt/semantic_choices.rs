@@ -169,12 +169,100 @@ pub const RETAPROMPT_WAHL16_ENTRIES: &[SemanticChoiceEntry] = &[
     SemanticChoiceEntry { key: "20", value: "Muster-Wissenschaften_(20)" },
     SemanticChoiceEntry { key: "", value: "Multiversalien_(16),P" },
 ];
+pub const RETAPROMPT_WAHL15_KEYS: &[&str] = &[
+    "15",
+    "2",
+    "5",
+    "7",
+    "8",
+    "10",
+    "1pro30",
+    "12",
+    "13",
+    "17",
+    "18",
+    "6",
+    "9",
+    "3",
+    "13_6",
+    "13_7",
+    "13_10",
+    "13_17",
+    "10_4",
+    "16",
+    "4",
+    "13_1pro8",
+    "13_1pro6",
+    "1pro15",
+    "1",
+    "30",
+    "14",
+    "14_6",
+    "20",
+    "37",
+    "31",
+    "11",
+    "5_10",
+    "17_6",
+    "17_6_10mit4",
+    "36",
+    "13_16",
+    "18_7",
+    "18_10",
+    "18_17",
+    "1pro8",
+    "1pro5",
+    "1pro3",
+    "10_4_18_6",
+    "18_6",
+    "21",
+    "26",
+    "19",
+    "18_15",
+    "18_15_n-vs-1pron",
+    "1pro13",
+    "1pro19",
+    "90",
+    "13_13",
+    "1pro12",
+    "39",
+    "1pro6",
+    "28",
+    "24",
+    "32",
+    "gegen5",
+    "9_6",
+    "51",
+    "13_4",
+    "7mit6",
+    "",
+];
+pub const RETAPROMPT_WAHL16_KEYS: &[&str] = &[
+    "1",
+    "2",
+    "3",
+    "5",
+    "6",
+    "15",
+    "10",
+    "16",
+    "20",
+    "",
+];
 pub fn retaprompt_wahl15_entries() -> &'static [SemanticChoiceEntry] {
     RETAPROMPT_WAHL15_ENTRIES
 }
 
 pub fn retaprompt_wahl16_entries() -> &'static [SemanticChoiceEntry] {
     RETAPROMPT_WAHL16_ENTRIES
+}
+
+pub fn semantic_wahl15_ordered_keys() -> &'static [&'static str] {
+    RETAPROMPT_WAHL15_KEYS
+}
+
+pub fn semantic_wahl16_ordered_keys() -> &'static [&'static str] {
+    RETAPROMPT_WAHL16_KEYS
 }
 
 pub fn semantic_wahl15_value(key: &str) -> Option<&'static str> {
@@ -224,5 +312,7 @@ mod tests {
         assert_eq!(WAHL16_I18N_ENTRIES.len(), 9);
         assert_eq!(RETAPROMPT_WAHL15_ENTRIES.len(), 66);
         assert_eq!(RETAPROMPT_WAHL16_ENTRIES.len(), 10);
+        assert_eq!(RETAPROMPT_WAHL15_KEYS.len(), RETAPROMPT_WAHL15_ENTRIES.len());
+        assert_eq!(RETAPROMPT_WAHL16_KEYS.len(), RETAPROMPT_WAHL16_ENTRIES.len());
     }
 }
