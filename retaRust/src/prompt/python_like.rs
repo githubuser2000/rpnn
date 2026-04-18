@@ -1564,7 +1564,7 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     non_whole_fraction_para: Some("--gebrochenemotion="),
                     equal_fraction_para: None,
                     equal_fraction_cols: None,
-                    include_reverse_non_whole: false,
+                    include_reverse_non_whole: true,
                     dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
@@ -1648,7 +1648,7 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     non_whole_fraction_para: Some("--gebrochengroesse="),
                     equal_fraction_para: None,
                     equal_fraction_cols: None,
-                    include_reverse_non_whole: false,
+                    include_reverse_non_whole: true,
                     dynamic_universe_columns: false,
                 },
                 PromptSemanticSpec {
@@ -2002,6 +2002,43 @@ fn strip_row_piece_prefixes(piece: &str) -> (bool, &str) {
     }
 
     (subtract, strip_matching_row_wrappers(rest))
+}
+
+fn split_python_fraction_piece_prefixes(piece: &str) -> Option<(bool, String)> {
+    let mut rest = strip_matching_row_wrappers(piece.trim());
+    let mut subtract = false;
+    let mut vielfache = false;
+
+    loop {
+        rest = rest.trim_start();
+        if let Some(next) = rest.strip_prefix('-') {
+            subtract = !subtract;
+            rest = next.trim_start();
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix('v') {
+            vielfache = true;
+            rest = next.trim_start();
+            if let Some(next) = rest.strip_prefix('-') {
+                subtract = !subtract;
+                rest = next.trim_start();
+            }
+            continue;
+        }
+        break;
+    }
+
+    let rest = strip_matching_row_wrappers(rest.trim());
+    if rest.is_empty() || !rest.contains('/') {
+        return None;
+    }
+
+    let mut normalized = String::new();
+    if vielfache {
+        normalized.push('v');
+    }
+    normalized.push_str(rest);
+    Some((subtract, normalized))
 }
 
 fn split_fraction_operator(text: &str, operator: char) -> Option<(&str, &str)> {
@@ -2908,6 +2945,30 @@ fn finalize_fraction_group_map(map: BTreeMap<i64, BTreeSet<i64>>) -> BTreeMap<i6
         .collect()
 }
 
+fn should_use_python_reverse_fraction_groups(map: &BTreeMap<i64, BTreeSet<i64>>) -> bool {
+    if map.is_empty() {
+        return false;
+    }
+
+    let unique_values = map
+        .values()
+        .flat_map(|values| values.iter().copied())
+        .collect::<BTreeSet<_>>();
+    unique_values.len() < map.len()
+}
+
+fn invert_python_fraction_groups(
+    map: &BTreeMap<i64, BTreeSet<i64>>,
+) -> BTreeMap<i64, BTreeSet<i64>> {
+    let mut inverted: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
+    for (key, values) in map {
+        for value in values {
+            insert_fraction_group_value(&mut inverted, *value, *key);
+        }
+    }
+    inverted
+}
+
 fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
     let mut buckets = PythonRowBuckets::default();
 
@@ -2932,7 +2993,17 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
                 continue;
             }
 
-            let (subtract, core) = strip_row_piece_prefixes(piece_trimmed);
+            let (subtract, core): (bool, std::borrow::Cow<'_, str>) = if let Some((
+                fraction_subtract,
+                fraction_core,
+            )) = split_python_fraction_piece_prefixes(piece_trimmed)
+            {
+                (fraction_subtract, std::borrow::Cow::Owned(fraction_core))
+            } else {
+                let (piece_subtract, piece_core) = strip_row_piece_prefixes(piece_trimmed);
+                (piece_subtract, std::borrow::Cow::Borrowed(piece_core))
+            };
+            let core = core.as_ref();
 
             if core.contains('/')
                 && !python_row_piece_is_integer_like(piece_trimmed)
@@ -3114,9 +3185,15 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
         .map(|value| value.to_string())
         .collect();
 
-    buckets.non_whole_fraction_denominator_groups =
-        finalize_fraction_group_map(non_whole_fraction_groups);
-    buckets.non_whole_fraction_numerator_groups = BTreeMap::new();
+    if should_use_python_reverse_fraction_groups(&non_whole_fraction_groups) {
+        buckets.non_whole_fraction_denominator_groups = BTreeMap::new();
+        buckets.non_whole_fraction_numerator_groups =
+            finalize_fraction_group_map(invert_python_fraction_groups(&non_whole_fraction_groups));
+    } else {
+        buckets.non_whole_fraction_denominator_groups =
+            finalize_fraction_group_map(non_whole_fraction_groups);
+        buckets.non_whole_fraction_numerator_groups = BTreeMap::new();
+    }
 
     buckets
 }
@@ -5163,6 +5240,25 @@ mod tests {
         assert!(!calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=3"));
+    }
+
+    #[test]
+    fn fraction_v_minus_prefix_subtracts_like_python_bruch_management() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "v1/2,v-1/2"]));
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn repeated_denominator_fraction_range_uses_python_reverse_mapping() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/5-3/5"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=5"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,3"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=1"));
     }
 
     #[test]
