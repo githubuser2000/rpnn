@@ -634,7 +634,7 @@ fn build_value_candidates_from_state(
     let stripped = parameter_token.trim_start_matches('-');
     let key = stripped.trim_end_matches('=');
     let section = state.current_section();
-    let candidates = match section {
+    let mut candidates = match section {
         Some(RetaMainSection::Zeilen) => zeilen_value_candidates(key),
         Some(RetaMainSection::Spalten) => spalten_value_candidates(key),
         Some(RetaMainSection::Kombination) => kombi_value_candidates(key),
@@ -642,7 +642,208 @@ fn build_value_candidates_from_state(
         None => Vec::new(),
     };
 
-    build_completion_candidates(candidates, fragment, replace_start, None, false)
+    if candidates.is_empty() && !key.is_empty() {
+        candidates = close_parameter_key_candidates(section, key);
+    }
+
+    build_completion_candidates(candidates, fragment, replace_start, None, true)
+}
+
+fn close_parameter_key_candidates(section: Option<RetaMainSection>, key: &str) -> Vec<String> {
+    let normalized_key = normalize_completion_text(key);
+    if normalized_key.is_empty() {
+        return Vec::new();
+    }
+
+    let mut scored = Vec::new();
+    let mut seen = BTreeSet::new();
+    for (index, candidate) in value_parameter_keys_for_section(section)
+        .into_iter()
+        .enumerate()
+    {
+        let normalized_candidate = normalize_completion_text(&candidate);
+        if !seen.insert(normalized_candidate.clone()) {
+            continue;
+        }
+        if let Some(score) = close_parameter_key_score(&normalized_candidate, &normalized_key) {
+            scored.push((score, index, normalized_candidate, candidate));
+        }
+    }
+
+    scored.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+
+    scored
+        .into_iter()
+        .map(|(_, _, _, candidate)| candidate)
+        .collect()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct CloseParameterKeyScore {
+    tier: usize,
+    distance: usize,
+    start: usize,
+    span: usize,
+    candidate_len: usize,
+}
+
+fn close_parameter_key_score(candidate: &str, key: &str) -> Option<CloseParameterKeyScore> {
+    let candidate_len = candidate.chars().count();
+    if candidate.starts_with(key) {
+        return Some(CloseParameterKeyScore {
+            tier: 0,
+            distance: 0,
+            start: 0,
+            span: key.chars().count(),
+            candidate_len,
+        });
+    }
+
+    if let Some(start_byte) = candidate.find(key) {
+        let start = candidate[..start_byte].chars().count();
+        return Some(CloseParameterKeyScore {
+            tier: 1,
+            distance: 0,
+            start,
+            span: key.chars().count(),
+            candidate_len,
+        });
+    }
+
+    if let Some(score) = fuzzy_completion_score(candidate, key) {
+        return Some(CloseParameterKeyScore {
+            tier: 2,
+            distance: score.gaps,
+            start: score.start,
+            span: score.span,
+            candidate_len,
+        });
+    }
+
+    let distance = levenshtein_distance(candidate, key);
+    let key_len = key.chars().count();
+    let threshold = 2usize.max(key_len / 3);
+    (distance <= threshold).then_some(CloseParameterKeyScore {
+        tier: 3,
+        distance,
+        start: 0,
+        span: candidate_len,
+        candidate_len,
+    })
+}
+
+fn levenshtein_distance(left: &str, right: &str) -> usize {
+    let right_chars = right.chars().collect::<Vec<_>>();
+    let mut previous = (0..=right_chars.len()).collect::<Vec<_>>();
+    let mut current = vec![0usize; right_chars.len() + 1];
+
+    for (left_index, left_char) in left.chars().enumerate() {
+        current[0] = left_index + 1;
+        for (right_index, right_char) in right_chars.iter().enumerate() {
+            let substitution_cost = if left_char == *right_char { 0 } else { 1 };
+            current[right_index + 1] = (previous[right_index + 1] + 1)
+                .min(current[right_index] + 1)
+                .min(previous[right_index] + substitution_cost);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+
+    previous[right_chars.len()]
+}
+
+fn value_parameter_keys_for_section(section: Option<RetaMainSection>) -> Vec<String> {
+    match section {
+        Some(RetaMainSection::Zeilen) => zeilen_value_parameter_keys()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        Some(RetaMainSection::Spalten) => spalten_value_parameter_keys(),
+        Some(RetaMainSection::Kombination) => kombi_value_parameter_keys()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        Some(RetaMainSection::Ausgabe) => ausgabe_value_parameter_keys()
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
+fn zeilen_value_parameter_keys() -> [&'static str; 25] {
+    [
+        "alles",
+        "gestern",
+        "heute",
+        "hoehemaximal",
+        "mond",
+        "morgen",
+        "nachtraeglichneuabzaehlung",
+        "nachtraeglichneuabzaehlungvielfache",
+        "oberesmaximum",
+        "planet",
+        "potenzenvonzahlen",
+        "primzahlvielfache",
+        "schwarzesonne",
+        "sonne",
+        "typ",
+        "vielfachevonzahlen",
+        "vorhervonausschnitt",
+        "vorhervonausschnittteiler",
+        "zaehlung",
+        "zeit",
+        "primzahlen",
+        "aussenerste",
+        "innenerste",
+        "aussenalle",
+        "innenalle",
+    ]
+}
+
+fn ausgabe_value_parameter_keys() -> [&'static str; 14] {
+    [
+        "nocolor",
+        "justtext",
+        "art",
+        "onetable",
+        "spaltenreihenfolgeundnurdiese",
+        "endlessscreen",
+        "endless",
+        "dontwrap",
+        "breite",
+        "breiten",
+        "keineleereninhalte",
+        "keinenummerierung",
+        "keineueberschriften",
+        "*",
+    ]
+}
+
+fn kombi_value_parameter_keys() -> [&'static str; 3] {
+    ["galaxie", "universum", "*"]
+}
+
+fn spalten_value_parameter_keys() -> Vec<String> {
+    let words = shared_words();
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for entry in &words.paraNdataMatrix {
+        for alias in &entry.parameterMainNames {
+            push_unique_ordered(&mut out, &mut seen, alias.clone());
+        }
+    }
+
+    for extra in ["breite", "breiten", "*"] {
+        push_unique_ordered(&mut out, &mut seen, extra);
+    }
+
+    out
 }
 
 fn safe_prefix(line: &str, pos: usize) -> &str {
@@ -770,7 +971,7 @@ fn section_from_main_token(token: &str) -> Option<RetaMainSection> {
 fn is_main_switch(token: &str) -> bool {
     matches!(
         token,
-        "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" | "-h" | "-help"
+        "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" | "-h" | "-help" | "-nichts"
     )
 }
 
@@ -976,29 +1177,93 @@ fn filter_candidate_values(
 
     let normalized_fragment = normalize_completion_text(fragment);
     let mut prefix_matches = Vec::new();
-    let mut contains_matches = Vec::new();
-    let mut prefix_seen = BTreeSet::new();
-    let mut contains_seen = BTreeSet::new();
+    let mut seen = BTreeSet::new();
 
     for candidate in candidates {
         let normalized_candidate = normalize_completion_text(candidate);
         if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment)
         {
-            if prefix_seen.insert(normalized_candidate.clone()) {
+            if seen.insert(normalized_candidate) {
                 prefix_matches.push(candidate.clone());
-            }
-        } else if fallback_contains && normalized_candidate.contains(&normalized_fragment) {
-            if contains_seen.insert(normalized_candidate) {
-                contains_matches.push(candidate.clone());
             }
         }
     }
 
-    if !prefix_matches.is_empty() {
-        prefix_matches
-    } else {
-        contains_matches
+    if !fallback_contains || normalized_fragment.is_empty() {
+        return prefix_matches;
     }
+
+    let mut fuzzy_matches = Vec::new();
+    for (index, candidate) in candidates.iter().enumerate() {
+        let normalized_candidate = normalize_completion_text(candidate);
+        if seen.contains(&normalized_candidate) {
+            continue;
+        }
+        if let Some(score) = fuzzy_completion_score(&normalized_candidate, &normalized_fragment) {
+            fuzzy_matches.push((score, index, normalized_candidate, candidate.clone()));
+        }
+    }
+
+    fuzzy_matches.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+
+    let mut out = prefix_matches;
+    for (_, _, normalized_candidate, candidate) in fuzzy_matches {
+        if seen.insert(normalized_candidate) {
+            out.push(candidate);
+        }
+    }
+
+    out
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct FuzzyCompletionScore {
+    start: usize,
+    span: usize,
+    gaps: usize,
+    candidate_len: usize,
+}
+
+fn fuzzy_completion_score(candidate: &str, fragment: &str) -> Option<FuzzyCompletionScore> {
+    if fragment.is_empty() {
+        return Some(FuzzyCompletionScore {
+            start: 0,
+            span: 0,
+            gaps: 0,
+            candidate_len: candidate.chars().count(),
+        });
+    }
+
+    let mut fragment_chars = fragment.chars();
+    let mut wanted = fragment_chars.next()?;
+    let mut matched_positions = Vec::new();
+
+    for (index, ch) in candidate.chars().enumerate() {
+        if ch == wanted {
+            matched_positions.push(index);
+            if let Some(next) = fragment_chars.next() {
+                wanted = next;
+            } else {
+                let start = matched_positions[0];
+                let end = *matched_positions.last().unwrap_or(&start);
+                let span = end.saturating_sub(start) + 1;
+                let gaps = span.saturating_sub(matched_positions.len());
+                return Some(FuzzyCompletionScore {
+                    start,
+                    span,
+                    gaps,
+                    candidate_len: candidate.chars().count(),
+                });
+            }
+        }
+    }
+
+    None
 }
 
 fn filter_candidates_for_special_fragment(
@@ -1270,7 +1535,7 @@ fn main_switches_vec() -> Vec<String> {
         .collect()
 }
 
-fn reta_main_switches() -> [&'static str; 6] {
+fn reta_main_switches() -> [&'static str; 7] {
     [
         "-zeilen",
         "-spalten",
@@ -1278,10 +1543,11 @@ fn reta_main_switches() -> [&'static str; 6] {
         "-ausgabe",
         "-h",
         "-help",
+        "-nichts",
     ]
 }
 
-fn zeilen_parameter_tokens() -> [&'static str; 14] {
+fn zeilen_parameter_tokens() -> [&'static str; 15] {
     [
         "--zeit=",
         "--zaehlung=",
@@ -1297,6 +1563,7 @@ fn zeilen_parameter_tokens() -> [&'static str; 14] {
         "--oberesmaximum=",
         "--primzahlen=",
         "--invertieren",
+        "--*=",
     ]
 }
 
@@ -1471,9 +1738,7 @@ fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<Stri
     let mut seen = BTreeSet::new();
     for value in values {
         push_unique_ordered(&mut out, &mut seen, value);
-        if value != "*" {
-            push_unique_ordered(&mut out, &mut seen, format!("-{value}"));
-        }
+        push_unique_ordered(&mut out, &mut seen, format!("-{value}"));
     }
     out
 }
@@ -1726,4 +1991,42 @@ mod tests {
         assert!(contains_normalized(&values, "morgen"));
         assert!(!contains_normalized(&values, "heute"));
     }
+
+    #[test]
+    fn zeilen_parameters_include_python_wildcard_value_parameter() {
+        let values = candidates_for_input("reta -zeilen --*");
+        assert!(contains_normalized(&values, "--*="));
+    }
+
+    #[test]
+    fn fuzzy_prompt_completion_matches_python_fuzzy_word_completer() {
+        let values = candidates_for_input("unv");
+        assert!(contains_normalized(&values, "universum"));
+    }
+
+    #[test]
+    fn fuzzy_value_completion_matches_python_fuzzy_word_completer() {
+        let values = candidates_for_input("reta -zeilen --typ=snn");
+        assert!(contains_normalized(&values, "sonne"));
+    }
+
+    #[test]
+    fn zeilen_negative_wildcard_value_is_available_like_python() {
+        let values = candidates_for_input("reta -zeilen --typ=-");
+        assert!(contains_normalized(&values, "-*"));
+    }
+
+
+    #[test]
+    fn reta_main_switches_include_python_nichts() {
+        let values = candidates_for_input("reta -n");
+        assert!(contains_normalized(&values, "-nichts"));
+    }
+
+    #[test]
+    fn mistyped_value_parameter_suggests_close_python_dictionary_keys() {
+        let values = candidates_for_input("reta -zeilen --ty=");
+        assert!(contains_normalized(&values, "typ"));
+    }
+
 }
