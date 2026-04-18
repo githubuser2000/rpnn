@@ -9,8 +9,8 @@ use reedline::{
 };
 
 use super::commands::{
-    compile_command_with_state, execute_command, help_text, EditModeKind, PromptCommand,
-    PromptOutput, SessionState,
+    compile_command_with_state, execute_command, help_text, take_auto_prompt_command,
+    EditModeKind, PromptCommand, PromptOutput, SessionState,
 };
 use super::completion::{
     build_default_completer_with_runtime, new_completion_runtime_handle,
@@ -444,7 +444,34 @@ fn run_one_shot(
             print_output(state, output.clone());
             output.exit_code
         }
-        Ok(None) => 0,
+        Ok(None) => {
+            if let Some(auto_command) = take_auto_prompt_command(state) {
+                match execute_command(auto_command, state) {
+                    Ok(Some(output)) => {
+                        if state.logging_enabled {
+                            append_log_output(log_path, &output);
+                        }
+                        print_output(state, output.clone());
+                        output.exit_code
+                    }
+                    Ok(None) => 0,
+                    Err(err) => {
+                        if state.logging_enabled {
+                            append_log_line(log_path, "execute-error", &err);
+                        }
+                        let output = PromptOutput {
+                            title: "error".to_string(),
+                            text: err,
+                            exit_code: 1,
+                        };
+                        print_output(state, output.clone());
+                        output.exit_code
+                    }
+                }
+            } else {
+                0
+            }
+        }
         Err(err) => {
             if state.logging_enabled {
                 append_log_line(log_path, "execute-error", &err);
@@ -488,6 +515,54 @@ fn run_interactive_loop(
     };
 
     loop {
+        if let Some(auto_command) = take_auto_prompt_command(state) {
+            let previous_editor_mode = state.current_mode();
+            let previous_logging_enabled = state.logging_enabled;
+
+            match execute_command(auto_command, state) {
+                Ok(Some(output)) => {
+                    if state.logging_enabled {
+                        append_log_output(&log_path, &output);
+                    }
+                    print_output(state, output);
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    if state.logging_enabled {
+                        append_log_line(&log_path, "execute-error", &err);
+                    }
+                    print_output(
+                        state,
+                        PromptOutput {
+                            title: "error".to_string(),
+                            text: err,
+                            exit_code: 1,
+                        },
+                    );
+                }
+            }
+
+            let rebuild_editor = previous_editor_mode != state.current_mode()
+                || previous_logging_enabled != state.logging_enabled;
+
+            if rebuild_editor {
+                editor = match build_editor(
+                    &history_path,
+                    state.current_mode(),
+                    state.logging_enabled,
+                    &completion_runtime,
+                ) {
+                    Ok(editor) => editor,
+                    Err(err) => {
+                        eprintln!("rp konnte reedline nicht neu initialisieren: {err}");
+                        return 1;
+                    }
+                };
+            }
+
+            continue;
+        }
+
         set_completion_runtime_context(
             &completion_runtime,
             state.prompt_mode,

@@ -33,6 +33,7 @@ pub enum PromptCommand {
     StoreInline(String),
     DeleteStoredStart,
     DeleteStoredSelection(String),
+    EnterStoredOutputMode(Option<String>),
     ShowStored(Option<String>),
     Clear,
     LaunchUi,
@@ -63,6 +64,7 @@ pub struct SessionState {
     pub stored_placeholder: String,
     pub stored_commands: Vec<String>,
     pub stored_expanded_tokens: Vec<String>,
+    pub pending_show_stored_suffix: Option<String>,
 }
 
 impl SessionState {
@@ -80,6 +82,7 @@ impl SessionState {
             stored_placeholder: String::new(),
             stored_commands: Vec::new(),
             stored_expanded_tokens: Vec::new(),
+            pending_show_stored_suffix: None,
         }
     }
 
@@ -109,7 +112,9 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
         "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
         "l" | "BefehlSpeicherungLöschen" => return Ok(PromptCommand::DeleteStoredStart),
-        "o" | "BefehlSpeicherungAusgeben" => return Ok(PromptCommand::ShowStored(None)),
+        "o" | "BefehlSpeicherungAusgeben" => {
+            return Ok(PromptCommand::EnterStoredOutputMode(None))
+        }
         "leeren" | "clear" => return Ok(PromptCommand::Clear),
         ":ui" | ":preview" => return Ok(PromptCommand::LaunchUi),
         ":history" => return Ok(PromptCommand::PrintHistory),
@@ -284,7 +289,7 @@ fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
             .cloned()
             .collect::<Vec<_>>()
             .join(" ");
-        return Some(PromptCommand::ShowStored(
+        return Some(PromptCommand::EnterStoredOutputMode(
             (!payload.trim().is_empty()).then_some(payload),
         ));
     }
@@ -340,6 +345,99 @@ fn is_store_after_token(token: &str) -> bool {
 
 fn is_show_stored_token(token: &str) -> bool {
     matches!(token, "o" | "BefehlSpeicherungAusgeben")
+}
+
+fn normalize_optional_storage_payload(text: Option<String>) -> Option<String> {
+    text.and_then(|payload| {
+        let trimmed = payload.trim();
+        (!trimmed.is_empty()).then_some(trimmed.to_string())
+    })
+}
+
+fn enter_stored_output_mode(state: &mut SessionState, additional_text: Option<String>) {
+    state.pending_show_stored_suffix = normalize_optional_storage_payload(additional_text);
+    state.prompt_mode = if state.pending_show_stored_suffix.is_some() {
+        PromptModus::SpeicherungAusgabenMitZusatz
+    } else {
+        PromptModus::SpeicherungAusgaben
+    };
+}
+
+pub fn take_auto_prompt_command(state: &mut SessionState) -> Option<PromptCommand> {
+    let additional_text = state.pending_show_stored_suffix.take();
+    let command = match state.prompt_mode {
+        PromptModus::SpeicherungAusgaben => Some(PromptCommand::ShowStored(None)),
+        PromptModus::SpeicherungAusgabenMitZusatz => {
+            Some(PromptCommand::ShowStored(additional_text))
+        }
+        _ => None,
+    }?;
+
+    state.prompt_mode = PromptModus::Normal;
+    Some(command)
+}
+
+fn nested_input_starts_with_reta(input: &str) -> bool {
+    match split_shell_like(input.trim()) {
+        Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
+        Err(_) => false,
+    }
+}
+
+fn rpe_output_group_for_nested_execution() -> Vec<String> {
+    vec![
+        "-ausgabe".to_string(),
+        "--art=emacs".to_string(),
+        "--keineueberschriften".to_string(),
+    ]
+}
+
+fn apply_rpe_emacs_output_to_nested_argv(
+    mut argv: Vec<String>,
+    append_after_user_args: bool,
+) -> Vec<String> {
+    let output_group = rpe_output_group_for_nested_execution();
+
+    if argv.is_empty() {
+        return output_group;
+    }
+
+    if append_after_user_args {
+        argv.extend(output_group);
+        argv
+    } else {
+        let mut rebuilt = vec![argv[0].clone()];
+        rebuilt.extend(output_group);
+        rebuilt.extend(argv.into_iter().skip(1));
+        rebuilt
+    }
+}
+
+fn apply_nested_frontend_overrides(
+    command: PromptCommand,
+    input: &str,
+    state: &SessionState,
+) -> PromptCommand {
+    if state.program_name != "rpe" {
+        return command;
+    }
+
+    let append_after_user_args = nested_input_starts_with_reta(input);
+    match command {
+        PromptCommand::Reta(argv) => PromptCommand::Reta(apply_rpe_emacs_output_to_nested_argv(
+            argv,
+            append_after_user_args,
+        )),
+        PromptCommand::RetaBatch(argvs) => PromptCommand::RetaBatch(
+            argvs
+                .into_iter()
+                .map(|argv| {
+                    apply_rpe_emacs_output_to_nested_argv(argv, append_after_user_args)
+                })
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 fn compose_input_with_stored_placeholder(
@@ -565,7 +663,11 @@ fn run_nested_prompt_input(
     input: &str,
     state: &mut SessionState,
 ) -> Result<Option<PromptOutput>, String> {
-    let nested_command = compile_command_inner(input, PromptModus::AusgabeSelektiv)?;
+    let nested_command = apply_nested_frontend_overrides(
+        compile_command_inner(input, PromptModus::AusgabeSelektiv)?,
+        input,
+        state,
+    );
     match nested_command {
         PromptCommand::Noop => Ok(None),
         PromptCommand::Exit => {
@@ -577,6 +679,7 @@ fn run_nested_prompt_input(
         | PromptCommand::StoreInline(_)
         | PromptCommand::DeleteStoredStart
         | PromptCommand::DeleteStoredSelection(_)
+        | PromptCommand::EnterStoredOutputMode(_)
         | PromptCommand::ShowStored(_) => Err(
             "Gespeicherte Platzhalter dürfen keine Speicher-Kommandos rekursiv auslösen."
                 .to_string(),
@@ -664,6 +767,10 @@ pub fn execute_command(
                 text,
                 exit_code: 0,
             }))
+        }
+        PromptCommand::EnterStoredOutputMode(additional_text) => {
+            enter_stored_output_mode(state, additional_text);
+            Ok(None)
         }
         PromptCommand::ShowStored(additional_text) => {
             let effective_input = match additional_text {
@@ -1268,8 +1375,8 @@ pub fn render_history_text(history: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_command_with_state, merge_stored_placeholder, refresh_stored_placeholder_cache,
-        PromptCommand, SessionState,
+        compile_command_with_state, execute_command, merge_stored_placeholder,
+        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand, SessionState,
     };
 
     #[test]
@@ -1351,4 +1458,33 @@ mod tests {
             "reta -zeilen --vorhervonausschnitt=4,7-10 --oberesmaximum=1025 -spalten --licht"
         );
     }
+
+    #[test]
+    fn show_stored_enters_python_output_mode_before_execution() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("o 12-15 emotion", &state).unwrap();
+        assert!(matches!(
+            command,
+            PromptCommand::EnterStoredOutputMode(Some(ref payload)) if payload == "12-15 emotion"
+        ));
+    }
+
+    #[test]
+    fn stored_output_mode_produces_auto_prompt_command_like_python_loop() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        execute_command(
+            PromptCommand::EnterStoredOutputMode(Some("12-15 emotion".to_string())),
+            &mut state,
+        )
+        .unwrap();
+
+        let command = take_auto_prompt_command(&mut state).unwrap();
+        assert!(matches!(
+            command,
+            PromptCommand::ShowStored(Some(ref payload)) if payload == "12-15 emotion"
+        ));
+        assert_eq!(state.prompt_mode, super::PromptModus::Normal);
+        assert_eq!(state.pending_show_stored_suffix, None);
+    }
+
 }
