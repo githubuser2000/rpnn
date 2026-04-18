@@ -320,10 +320,6 @@ impl Program {
         rowsAsNumbers.retain(|n| !self.puniverseprims.contains(n));
     }
 
-    fn should_show_concat1_non_generated_column_py(&self) -> bool {
-        self.generated2_selections_exact_py().is_empty()
-    }
-
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
         self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect()
     }
@@ -544,10 +540,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn generator_row_end_py(&self) -> usize {
-        // Python-näher: Generatoren rechnen über die bereits aufgebaute Gesamttabelle
-        // und die spätere Ausgabe filtert erst danach. Kein Kappen auf aktuell sichtbare
-        // Zeilenwünsche, solange die Tabelle die Zeilen bereits trägt.
-        self.relitable.len().saturating_sub(1)
+        let table_end = self.relitable.len().saturating_sub(1);
+        let requested_end = usize::try_from(self.lastLineNumber).unwrap_or(table_end);
+        std::cmp::min(table_end, requested_end)
     }
 
     fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
@@ -2105,6 +2100,53 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         tableToAdd
     }
 
+    fn concat_table_n_and_inverse_spalten_py(&self, concatTable: i64) -> Option<(usize, usize)> {
+        match concatTable {
+            2 | 3 => Some((10, 42)),
+            4 | 5 => Some((5, 131)),
+            6 | 7 => Some((243, 284)),
+            8 | 9 => Some((4, 197)),
+            _ => None,
+        }
+    }
+
+    fn readConcatCsv_tabelleDazuColchange_py(
+        &self,
+        zeilenNr: usize,
+        tabelleDazuCol: Vec<String>,
+        concatTable: i64,
+        gebr_table: &Vec<Vec<String>>,
+    ) -> Vec<String> {
+        let Some(n_and_invers_spalten) = self.concat_table_n_and_inverse_spalten_py(concatTable) else {
+            return tabelleDazuCol;
+        };
+        let if_transponiert = matches!(concatTable, 3 | 5 | 7 | 9);
+        let is_not_universe = !matches!(concatTable, 4 | 5);
+
+        tabelleDazuCol
+            .into_iter()
+            .enumerate()
+            .map(|(idx, _cell)| {
+                let col_idx = idx + 1;
+                let koord = if if_transponiert {
+                    PyFrac::new(col_idx as i64, zeilenNr as i64)
+                } else {
+                    PyFrac::new(zeilenNr as i64, col_idx as i64)
+                };
+                koord
+                    .and_then(|frac| {
+                        self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                            frac,
+                            n_and_invers_spalten,
+                            gebr_table,
+                            is_not_universe,
+                        )
+                    })
+                    .unwrap_or_default()
+            })
+            .collect()
+    }
+
     fn readConcatCsv_set_generated_metadata_exact_py(
         &mut self,
         concatTable: i64,
@@ -2154,9 +2196,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         let mut concatCSVspalten: Vec<i64> = vec![];
         if concatTableSelection.is_empty() { return concatCSVspalten; }
         let Some(csvFileName) = self.concat_csv_name_py(concatTable) else { return concatCSVspalten; };
-        let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csvFileName) else { return concatCSVspalten; };
-        tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, tableToAdd);
-        let show_concat1_non_generated = self.should_show_concat1_non_generated_column_py();
+        let Ok(rawTableToAdd) = self.load_csv_rows_semicolon_exact_path(csvFileName) else { return concatCSVspalten; };
+        let gebr_table = rawTableToAdd.clone();
+        let mut tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, rawTableToAdd);
         if concatTable == 1 {
             let mut tableToAdd2 = vec![vec!["Primzahlvielfache, nicht generiert".to_string()]];
             for zeile in tableToAdd.into_iter().skip(1) {
@@ -2183,11 +2225,19 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         let maxlen = tableToAdd.iter().map(|r| r.len()).max().unwrap_or(0);
         for i in 0..target_rows {
             if tableToAdd[i].len() < maxlen { tableToAdd[i].resize(maxlen, String::new()); }
+            if i != 0 && (2..=9).contains(&concatTable) {
+                let transformed = self.readConcatCsv_tabelleDazuColchange_py(i, tableToAdd[i].clone(), concatTable, &gebr_table);
+                tableToAdd[i] = transformed;
+            }
             let start = self.relitable[i].len() as i64;
             self.relitable[i].extend(tableToAdd[i].clone());
             if i == 0 {
                 for u in 0..maxlen {
-                    if ((u as i64 + 2).checked_sub(0).unwrap_or(0) != 0 && concatTableSelection.contains(&(u as i64 + 2)) && (2..=9).contains(&concatTable)) || (concatTable == 1 && show_concat1_non_generated) {
+                    let selected_concat_fraction_column = (2..=9).contains(&concatTable)
+                        && (u + 1 != maxlen)
+                        && concatTableSelection.contains(&(u as i64 + 2));
+                    let selected_concat1_column = concatTable == 1;
+                    if selected_concat_fraction_column || selected_concat1_column {
                         let selectedSpalten = start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
                         Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
                         concatCSVspalten.push(selectedSpalten);
