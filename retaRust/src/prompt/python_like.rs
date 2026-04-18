@@ -1838,16 +1838,21 @@ fn prompt_python_default_oberesmaximum_seed() -> i64 {
     1024
 }
 
+fn another_oberesmaximum_from_row_specs_with_seed(row_specs: &[String], seed: i64) -> String {
+    let max_row = parse_row_spec_numbers(row_specs)
+        .and_then(|numbers| numbers.into_iter().map(i64::abs).max())
+        .unwrap_or(seed);
+    format!("--oberesmaximum={}", std::cmp::max(max_row, seed) + 1)
+}
+
 fn another_oberesmaximum_from_row_specs(row_specs: &[String]) -> Option<String> {
-    let numbers = parse_row_spec_numbers(row_specs)?;
-    if numbers.is_empty() {
+    if row_specs.is_empty() {
         return None;
     }
-    let max_row = numbers.into_iter().map(i64::abs).max()?;
-    let hoechste_zeile = prompt_python_default_oberesmaximum_seed();
-    Some(format!(
-        "--oberesmaximum={}",
-        std::cmp::max(max_row, hoechste_zeile) + 1
+
+    Some(another_oberesmaximum_from_row_specs_with_seed(
+        row_specs,
+        prompt_python_default_oberesmaximum_seed(),
     ))
 }
 
@@ -1856,12 +1861,13 @@ struct BuiltRowSection {
     tokens: Vec<String>,
 }
 
-fn build_python_row_section(
+fn build_python_row_section_with_custom_oberesmaximum(
     row_specs: &[String],
     use_range: bool,
     use_teiler: bool,
     use_vielfache: bool,
     invert: bool,
+    forced_oberesmaximum_seed: Option<i64>,
 ) -> Option<BuiltRowSection> {
     if row_specs.is_empty() {
         return None;
@@ -1908,6 +1914,12 @@ fn build_python_row_section(
         }
         value_parts.append(&mut suffix_parts);
         tokens.push(format!("{prefix}{}", value_parts.join(",")));
+        if let Some(seed) = forced_oberesmaximum_seed {
+            tokens.push(another_oberesmaximum_from_row_specs_with_seed(
+                &base_specs,
+                seed,
+            ));
+        }
     } else {
         let prefix = if use_range {
             "--zaehlung="
@@ -1915,7 +1927,12 @@ fn build_python_row_section(
             "--vorhervonausschnitt="
         };
         tokens.push(format!("{prefix}{}", base_specs.join(",")));
-        if let Some(oberesmaximum) = another_oberesmaximum_from_row_specs(&base_specs) {
+        if let Some(seed) = forced_oberesmaximum_seed {
+            tokens.push(another_oberesmaximum_from_row_specs_with_seed(
+                &base_specs,
+                seed,
+            ));
+        } else if let Some(oberesmaximum) = another_oberesmaximum_from_row_specs(&base_specs) {
             tokens.push(oberesmaximum);
         }
     }
@@ -1925,6 +1942,23 @@ fn build_python_row_section(
     }
 
     Some(BuiltRowSection { tokens })
+}
+
+fn build_python_row_section(
+    row_specs: &[String],
+    use_range: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    invert: bool,
+) -> Option<BuiltRowSection> {
+    build_python_row_section_with_custom_oberesmaximum(
+        row_specs,
+        use_range,
+        use_teiler,
+        use_vielfache,
+        invert,
+        None,
+    )
 }
 
 fn build_trailing_primary_zeilen_tokens(
@@ -2091,6 +2125,126 @@ fn build_general_semantic_call(
         argv.push(token.clone());
     }
     argv
+}
+
+fn build_python_special_prompt_call(
+    row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    para: &str,
+    cols: Option<&str>,
+    extra_params: &[String],
+) -> Vec<String> {
+    build_general_semantic_call(
+        row_specs,
+        use_range,
+        invert,
+        use_teiler,
+        use_vielfache,
+        suppress_empty,
+        no_headers,
+        para,
+        cols,
+        extra_params,
+        &[],
+    )
+}
+
+fn build_primzahlkreuz_prompt_call(
+    row_specs: &[String],
+    use_range: bool,
+    invert: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+) -> Vec<String> {
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+    if let Some(section) = build_python_row_section_with_custom_oberesmaximum(
+        row_specs,
+        use_range,
+        use_teiler,
+        use_vielfache,
+        invert,
+        Some(1028),
+    ) {
+        argv.extend(section.tokens);
+    } else {
+        argv.push(another_oberesmaximum_from_row_specs_with_seed(&[], 1028));
+    }
+    argv.push("-spalten".to_string());
+    argv.push("--bedeutung=primzahlkreuz".to_string());
+    argv.push("-ausgabe".to_string());
+    argv.push("--breite=0".to_string());
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    append_passthrough_params_to_reta_argv(&mut argv, extra_params);
+    argv
+}
+
+fn append_python_special_prompt_calls(
+    calls: &mut Vec<Vec<String>>,
+    normalized: &[String],
+    row_buckets: &PythonRowBuckets,
+    use_range: bool,
+    invert: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+) {
+    if normalized.iter().any(|token| token == "mond") {
+        calls.push(build_python_special_prompt_call(
+            &row_buckets.primary_row_specs,
+            use_range,
+            invert,
+            use_teiler,
+            use_vielfache,
+            suppress_empty,
+            no_headers,
+            "--bedeutung=gestirn",
+            Some("3-6"),
+            extra_params,
+        ));
+    }
+
+    if normalized.iter().any(|token| token == "alles") {
+        calls.push(build_python_special_prompt_call(
+            &row_buckets.primary_row_specs,
+            use_range,
+            invert,
+            use_teiler,
+            use_vielfache,
+            suppress_empty,
+            no_headers,
+            "--alles",
+            None,
+            extra_params,
+        ));
+    }
+
+    if normalized.iter().any(|token| token == "primzahlkreuz") {
+        calls.push(build_primzahlkreuz_prompt_call(
+            &row_buckets.primary_row_specs,
+            use_range,
+            invert,
+            use_teiler,
+            use_vielfache,
+            suppress_empty,
+            no_headers,
+            extra_params,
+        ));
+    }
 }
 
 fn build_fractional_prompt_row_section(
@@ -2512,6 +2666,19 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
             &trailing,
         ));
     }
+
+    append_python_special_prompt_calls(
+        &mut calls,
+        &normalized,
+        &row_buckets,
+        use_range,
+        invert,
+        teiler,
+        vielfache,
+        suppress_empty,
+        no_headers,
+        &extra_params,
+    );
 
     if !contains_blocking_abc(&normalized) {
         let rows_for_15_16 = if !row_buckets.primary_row_specs.is_empty() {
@@ -3449,5 +3616,37 @@ mod tests {
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=2")));
+    }
+
+    #[test]
+    fn mond_command_builds_python_bedeutung_call() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["mond", "12"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].iter().any(|token| token == "--bedeutung=gestirn"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=3-6"));
+    }
+
+    #[test]
+    fn alles_command_builds_python_alles_call() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["alles", "12"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].iter().any(|token| token == "--alles"));
+        assert!(!calls[0]
+            .iter()
+            .any(|token| token.starts_with("--spaltenreihenfolgeundnurdiese=")));
+    }
+
+    #[test]
+    fn primzahlkreuz_command_uses_python_upper_bound_seed() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["primzahlkreuz", "12"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--bedeutung=primzahlkreuz"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--oberesmaximum=1029"));
     }
 }
