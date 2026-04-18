@@ -682,14 +682,17 @@ fn expand_reta_simple_regex_like_token(token: &str, current_section: Option<&str
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
 
-    let parameter_fragment = token.strip_prefix("--").unwrap_or(token);
-    if let Some(matcher) = parse_special_fragment_matcher(parameter_fragment) {
-        let inventory = current_section
-            .map(reta_section_parameter_inventory_for_regex)
-            .unwrap_or_else(reta_global_parameter_inventory_for_regex);
-        for (parameter, values) in inventory {
-            if values.is_empty() && special_fragment_matches_candidate(&parameter, &matcher) {
-                push_unique_preserving_normalized(&mut out, &mut seen, format!("--{parameter}"));
+    if let Some(section) = current_section {
+        let parameter_fragment = token.strip_prefix("--").unwrap_or(token);
+        if let Some(matcher) = parse_special_fragment_matcher(parameter_fragment) {
+            for (parameter, values) in reta_section_parameter_inventory_for_regex(section) {
+                if values.is_empty() && special_fragment_matches_candidate(&parameter, &matcher) {
+                    push_unique_preserving_normalized(
+                        &mut out,
+                        &mut seen,
+                        format!("--{parameter}"),
+                    );
+                }
             }
         }
     }
@@ -706,6 +709,47 @@ fn expand_reta_simple_regex_like_token(token: &str, current_section: Option<&str
     }
 
     out
+}
+
+fn collapse_python_style_equals_tokens(tokens: &[String]) -> Vec<String> {
+    fn flush_group(target: &mut Vec<String>, prefix: &mut Option<String>, values: &mut Vec<String>) {
+        let Some(current_prefix) = prefix.take() else {
+            return;
+        };
+
+        if values.is_empty() {
+            target.push(current_prefix);
+            return;
+        }
+
+        target.push(format!("{}{}", current_prefix, values.join(",")));
+        values.clear();
+    }
+
+    let mut collapsed = Vec::new();
+    let mut current_prefix: Option<String> = None;
+    let mut current_values: Vec<String> = Vec::new();
+
+    for token in tokens {
+        if let Some(eq_index) = token.find('=') {
+            let prefix = token[..=eq_index].to_string();
+            let value = token[eq_index + 1..].to_string();
+            if current_prefix.as_deref() == Some(prefix.as_str()) {
+                current_values.push(value);
+                continue;
+            }
+            flush_group(&mut collapsed, &mut current_prefix, &mut current_values);
+            current_prefix = Some(prefix);
+            current_values = vec![value];
+            continue;
+        }
+
+        flush_group(&mut collapsed, &mut current_prefix, &mut current_values);
+        collapsed.push(token.clone());
+    }
+
+    flush_group(&mut collapsed, &mut current_prefix, &mut current_values);
+    collapsed
 }
 
 fn expand_rhs_regex_pieces(pieces: &[&str], allowed_values: &[String]) -> Vec<String> {
@@ -738,12 +782,16 @@ fn expand_reta_equals_regex_like_token(
     right: &str,
     current_section: Option<&str>,
 ) -> Vec<String> {
-    let left_core = left.trim().strip_prefix("--").unwrap_or(left.trim());
-    let inventory = current_section
-        .map(reta_section_parameter_inventory_for_regex)
-        .unwrap_or_else(reta_global_parameter_inventory_for_regex);
+    let Some(section) = current_section else {
+        return Vec::new();
+    };
 
-    let parameter_names = if let Some(matcher) = parse_special_fragment_matcher(left_core) {
+    let left_core = left.trim().strip_prefix("--").unwrap_or(left.trim());
+    let inventory = reta_section_parameter_inventory_for_regex(section);
+
+    let parameter_names = if left_core.trim().is_empty() {
+        inventory.keys().cloned().collect::<Vec<_>>()
+    } else if let Some(matcher) = parse_special_fragment_matcher(left_core) {
         inventory
             .keys()
             .filter(|parameter| {
@@ -795,6 +843,7 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     let input_is_reta = matches!(tokens.first().map(String::as_str), Some("reta"));
     let mut current_section: Option<&str> = None;
     let mut out = Vec::new();
+    let mut changed = false;
 
     for token in tokens {
         if token == "reta" {
@@ -820,13 +869,22 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
         };
 
         if expanded.is_empty() {
+            if token_has_python_regex_or_glob(token) {
+                changed = true;
+                continue;
+            }
             out.push(token.clone());
         } else {
+            changed = true;
             out.extend(expanded);
         }
     }
 
-    out
+    if changed {
+        collapse_python_style_equals_tokens(&out)
+    } else {
+        out
+    }
 }
 
 pub fn replace_prompt_alias(token: &str) -> String {
@@ -1158,6 +1216,8 @@ struct PromptSemanticSpec {
     integer_cols: &'static str,
     reciprocal_whole_cols: &'static str,
     non_whole_fraction_para: Option<&'static str>,
+    equal_fraction_para: Option<&'static str>,
+    equal_fraction_cols: Option<&'static str>,
     include_reverse_non_whole: bool,
     dynamic_universe_columns: bool,
 }
@@ -1174,6 +1234,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "2",
                     reciprocal_whole_cols: "2",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1184,6 +1246,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "2,3",
                     reciprocal_whole_cols: "4,5",
                     non_whole_fraction_para: Some("--gebrochenemotion="),
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1194,6 +1258,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1,2",
                     reciprocal_whole_cols: "5",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1204,6 +1270,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1",
                     reciprocal_whole_cols: "2",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1214,6 +1282,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1,4",
                     reciprocal_whole_cols: "3",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1224,6 +1294,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "6",
                     reciprocal_whole_cols: "7",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1234,6 +1306,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "3",
                     reciprocal_whole_cols: "4",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1244,6 +1318,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1-4,8",
                     reciprocal_whole_cols: "5-7",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1254,6 +1330,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1-3",
                     reciprocal_whole_cols: "99",
                     non_whole_fraction_para: Some("--gebrochengroesse="),
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1264,6 +1342,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1-2",
                     reciprocal_whole_cols: "99",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1274,6 +1354,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1-3",
                     reciprocal_whole_cols: "99",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1284,6 +1366,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1",
                     reciprocal_whole_cols: "3",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1294,6 +1378,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1",
                     reciprocal_whole_cols: "3",
                     non_whole_fraction_para: Some("--gebrochengalaxie="),
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: true,
                     dynamic_universe_columns: false,
                 },
@@ -1304,6 +1390,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1",
                     reciprocal_whole_cols: "1",
                     non_whole_fraction_para: Some("--gebrochenuniversum="),
+                    equal_fraction_para: Some("--universum=verhaeltnisgleicherzahl"),
+                    equal_fraction_cols: Some("1"),
                     include_reverse_non_whole: true,
                     dynamic_universe_columns: true,
                 },
@@ -1314,6 +1402,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     integer_cols: "1",
                     reciprocal_whole_cols: "1",
                     non_whole_fraction_para: None,
+                    equal_fraction_para: None,
+                    equal_fraction_cols: None,
                     include_reverse_non_whole: false,
                     dynamic_universe_columns: false,
                 },
@@ -1422,6 +1512,7 @@ struct PythonRowBuckets {
     primary_row_specs: Vec<String>,
     reciprocal_row_specs: Vec<String>,
     raw_fraction_specs: Vec<String>,
+    equal_fraction_row_specs: Vec<String>,
     non_whole_fraction_denominator_groups: BTreeMap<i64, Vec<String>>,
     non_whole_fraction_numerator_groups: BTreeMap<i64, Vec<String>>,
 }
@@ -1618,6 +1709,8 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
     let mut reciprocal_numbers = BTreeSet::new();
     let mut negative_primary_numbers = BTreeSet::new();
     let mut negative_reciprocal_numbers = BTreeSet::new();
+    let mut equal_fraction_numbers = BTreeSet::new();
+    let mut negative_equal_fraction_numbers = BTreeSet::new();
     let mut non_whole_fraction_pairs = BTreeSet::new();
     let mut negative_non_whole_fraction_pairs = BTreeSet::new();
 
@@ -1643,6 +1736,13 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
                         let denominator_abs = denominator.abs();
                         if numerator_abs == 0 || denominator_abs == 0 {
                             continue;
+                        }
+                        if numerator_abs == denominator_abs && numerator_abs > 1 {
+                            if subtract {
+                                negative_equal_fraction_numbers.insert(numerator_abs);
+                            } else {
+                                equal_fraction_numbers.insert(numerator_abs);
+                            }
                         }
                         if numerator_abs % denominator_abs == 0 {
                             let value = numerator_abs / denominator_abs;
@@ -1697,6 +1797,9 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
     for value in negative_reciprocal_numbers {
         reciprocal_numbers.remove(&value);
     }
+    for value in negative_equal_fraction_numbers {
+        equal_fraction_numbers.remove(&value);
+    }
     for pair in negative_non_whole_fraction_pairs {
         non_whole_fraction_pairs.remove(&pair);
     }
@@ -1706,6 +1809,10 @@ fn build_python_row_buckets(row_specs: &[String]) -> PythonRowBuckets {
         .map(|value| value.to_string())
         .collect();
     buckets.reciprocal_row_specs = reciprocal_numbers
+        .into_iter()
+        .map(|value| value.to_string())
+        .collect();
+    buckets.equal_fraction_row_specs = equal_fraction_numbers
         .into_iter()
         .map(|value| value.to_string())
         .collect();
@@ -2102,6 +2209,43 @@ fn build_non_whole_fraction_semantic_calls(
     calls
 }
 
+fn build_equal_fraction_semantic_call(
+    spec: &PromptSemanticSpec,
+    row_buckets: &PythonRowBuckets,
+    use_range: bool,
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+) -> Option<Vec<String>> {
+    let para = spec.equal_fraction_para?;
+    let cols = spec.equal_fraction_cols?;
+    if row_buckets.equal_fraction_row_specs.is_empty() {
+        return None;
+    }
+
+    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
+    let section = build_fractional_prompt_row_section(
+        &row_buckets.equal_fraction_row_specs,
+        use_range,
+        invert,
+    )?;
+    argv.extend(section.tokens);
+    argv.push("-spalten".to_string());
+    argv.push(para.to_string());
+    argv.push("-ausgabe".to_string());
+    argv.push("--breite=0".to_string());
+    argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+    if suppress_empty {
+        argv.push("--keineleereninhalte".to_string());
+    }
+    if no_headers {
+        argv.push("--keineueberschriften".to_string());
+    }
+    append_passthrough_params_to_reta_argv(&mut argv, extra_params);
+    Some(argv)
+}
+
 fn build_single_semantic_call(
     spec: &PromptSemanticSpec,
     normalized: &[String],
@@ -2314,6 +2458,17 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                         no_headers,
                         &extra_params,
                     ));
+                    if let Some(call) = build_equal_fraction_semantic_call(
+                        spec,
+                        &row_buckets,
+                        use_range,
+                        invert,
+                        suppress_empty,
+                        no_headers,
+                        &extra_params,
+                    ) {
+                        calls.push(call);
+                    }
                 }
                 break;
             }
@@ -3123,6 +3278,30 @@ mod tests {
     }
 
     #[test]
+    fn prompt_execution_regex_allows_double_dash_wildcard_parameter_name_like_python() {
+        let expanded =
+            expand_python_regex_like_tokens(&strings(&["reta", "-zeilen", "--=r\"heu.*\""]));
+        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_collapses_repeated_equals_tokens_like_python() {
+        let expanded = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "-zeilen",
+            "--zeit=r\"heu.*\"",
+            "--zeit=morgen",
+        ]));
+        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute,morgen"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_at_reta_root_does_not_expand_section_flags() {
+        let expanded = expand_python_regex_like_tokens(&strings(&["reta", "r\"^end.*\""]));
+        assert_eq!(expanded, strings(&["reta"]));
+    }
+
+    #[test]
     fn build_reta_calls_supports_concept_prefixed_prompt_commands() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["12", "EIGNweisheit"]));
         assert_eq!(calls.len(), 1);
@@ -3231,6 +3410,17 @@ mod tests {
         assert!(calls.iter().any(|call| call
             .iter()
             .any(|token| token == "--spaltenreihenfolgeundnurdiese=2")));
+    }
+
+    #[test]
+    fn universum_equal_fraction_range_emits_verhaeltnisgleicherzahl_call() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "2-4/2-4"]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--universum=verhaeltnisgleicherzahl")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,3,4")));
     }
 
     #[test]
