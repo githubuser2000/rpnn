@@ -1685,24 +1685,28 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn primMultiple_pairs_py(&self, num: i64) -> Vec<(i64, i64)> {
-        let mut out: Vec<(i64, i64)> = vec![];
-        if num <= 0 {
-            return out;
+        let mut multiples: Vec<(i64, i64)> = vec![(1, num)];
+        for (prim, _amount) in self.primRepeat(self.primFak(num)) {
+            if prim != 0 {
+                multiples.push((prim, num / prim));
+            }
         }
-        out.push((1, num));
-        if num == 1 {
-            return out;
-        }
-        let mut a = 2i64;
-        while a * a <= num {
-            if num % a == 0 {
-                let b = num / a;
-                let pair = if a <= b { (a, b) } else { (b, a) };
-                if !out.contains(&pair) {
-                    out.push(pair);
+        multiples
+    }
+
+    fn center_multiples_py(&self, a: i64, mul1: bool) -> Vec<(i64, i64)> {
+        let mut menge: BTreeSet<(i64, i64)> = BTreeSet::new();
+        if a > 1 {
+            let upper_exclusive = ((a as f64).sqrt() + 1.0).floor() as i64;
+            for b in 2..upper_exclusive {
+                if b != 0 && a % b == 0 {
+                    menge.insert((a / b, b));
                 }
             }
-            a += 1;
+        }
+        let mut out: Vec<(i64, i64)> = menge.into_iter().collect();
+        if mul1 {
+            out.push((a, 1));
         }
         out
     }
@@ -2561,14 +2565,16 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
 
-        let hard_coded_couple = [10usize, 42usize];
-        let transzendentalien_nrezi = [5usize, 131usize];
+        let hard_coded_couple = (10usize, 42usize);
+        let transzendentalien_nrezi = (5usize, 131usize);
         let mut motivation: [Vec<String>; 2] = [vec![], vec![]];
         let mut transzendentalien: [Vec<String>; 2] = [vec![], vec![]];
         for cols in &relitableCopy {
             for zwei in 0..=1usize {
-                motivation[zwei].push(cols.get(hard_coded_couple[zwei]).cloned().unwrap_or_default());
-                transzendentalien[zwei].push(cols.get(transzendentalien_nrezi[zwei]).cloned().unwrap_or_default());
+                let motivation_col = if zwei == 0 { hard_coded_couple.0 } else { hard_coded_couple.1 };
+                let transzendentalien_col = if zwei == 0 { transzendentalien_nrezi.0 } else { transzendentalien_nrezi.1 };
+                motivation[zwei].push(cols.get(motivation_col).cloned().unwrap_or_default());
+                transzendentalien[zwei].push(cols.get(transzendentalien_col).cloned().unwrap_or_default());
             }
         }
 
@@ -2623,7 +2629,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                             teile.push("[list]".to_string());
                         }
                         if brr == 0 {
-                            let mut multipless = self.primMultiple_pairs_py(i as i64);
+                            let mut multipless = self.center_multiples_py(i as i64, true);
                             multipless.sort();
                             for (k, multi) in multipless.iter().enumerate() {
                                 if k > 0 && self.outType != "html" && self.outType != "bbcode" {
@@ -2676,16 +2682,15 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     gal_or_uni_n_or_invers[null_bis_drei].1
 };
 
-let n_and_inverse_spalten = (gal_or_uni_tuple[0], gal_or_uni_tuple[1]);
 let von = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
     multi.0,
-    n_and_inverse_spalten,
+    gal_or_uni_tuple,
     csv_von,
     !(null_bis_drei >= 2),
 );
 let bis = self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
     multi.1,
-    n_and_inverse_spalten,
+    gal_or_uni_tuple,
     csv_bis,
     !(null_bis_drei == 1 || null_bis_drei == 3),
 );
