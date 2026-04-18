@@ -1706,8 +1706,8 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                     names: &["richtung"],
                     integer_para: "--primzahlwirkung=galaxieabsicht",
                     reciprocal_whole_para: None,
-                    integer_cols: "1",
-                    reciprocal_whole_cols: "1",
+                    integer_cols: "",
+                    reciprocal_whole_cols: "",
                     non_whole_fraction_para: None,
                     equal_fraction_para: None,
                     equal_fraction_cols: None,
@@ -2419,7 +2419,9 @@ fn build_general_semantic_call(
     argv.push("-ausgabe".to_string());
     argv.push("--breite=0".to_string());
     if let Some(cols) = cols {
-        argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+        if !cols.trim().is_empty() {
+            argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
+        }
     }
     if suppress_empty {
         argv.push("--keineleereninhalte".to_string());
@@ -2510,6 +2512,44 @@ fn append_python_special_prompt_calls(
     no_headers: bool,
     extra_params: &[String],
 ) {
+    if normalized.iter().any(|token| token == "groesse")
+        && !row_buckets.primary_row_specs.is_empty()
+    {
+        let call = build_python_special_prompt_call(
+            &row_buckets.primary_row_specs,
+            use_range,
+            invert,
+            use_teiler,
+            use_vielfache,
+            suppress_empty,
+            no_headers,
+            "--strukturgroesse=strukturgroesse",
+            Some("1,2"),
+            extra_params,
+        );
+        if !calls.contains(&call) {
+            calls.push(call);
+        }
+
+        if !row_buckets.reciprocal_row_specs.is_empty() {
+            let reciprocal_call = build_python_special_prompt_call(
+                &row_buckets.reciprocal_row_specs,
+                use_range,
+                invert,
+                use_teiler,
+                use_vielfache,
+                suppress_empty,
+                no_headers,
+                "--strukturgroesse=strukturgroesse",
+                Some("4"),
+                extra_params,
+            );
+            if !calls.contains(&reciprocal_call) {
+                calls.push(reciprocal_call);
+            }
+        }
+    }
+
     if normalized.iter().any(|token| token == "mond") {
         calls.push(build_python_special_prompt_call(
             &row_buckets.primary_row_specs,
@@ -2747,7 +2787,7 @@ fn build_single_semantic_call(
         suppress_empty,
         no_headers,
         para,
-        Some(cols.as_str()),
+        (!cols.trim().is_empty()).then_some(cols.as_str()),
         extra_params,
         trailing_tokens,
     ))
@@ -3707,27 +3747,68 @@ fn parse_integer_range_piece(piece: &str) -> Option<(i64, i64)> {
     Some((start, end))
 }
 
+fn rotate_python_trailing_prompt_prefix(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+
+    let chars = text.chars().collect::<Vec<_>>();
+    let has_open_wrapper = chars.iter().any(|ch| matches!(ch, '(' | '[' | '{'));
+    let contains_reta = text.contains("reta");
+    let mut trailing_prefix_len = 0usize;
+
+    for (reverse_index, ch) in chars.iter().rev().enumerate() {
+        if ch.is_ascii_digit()
+            || (matches!(ch, ')' | ']' | '}') && !contains_reta && has_open_wrapper)
+        {
+            trailing_prefix_len = reverse_index;
+            break;
+        }
+    }
+
+    if trailing_prefix_len == 0 || trailing_prefix_len >= chars.len() {
+        return text.to_string();
+    }
+
+    let split_at = chars.len() - trailing_prefix_len;
+    chars[split_at..]
+        .iter()
+        .chain(chars[..split_at].iter())
+        .collect()
+}
+
 fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
     if text.is_empty() {
         return None;
     }
-    let chars: Vec<char> = text.chars().collect();
+
+    let rotated = rotate_python_trailing_prompt_prefix(text);
+    let chars: Vec<char> = rotated.chars().collect();
+    let has_close_wrapper = chars.iter().any(|ch| matches!(ch, ')' | ']' | '}'));
+    let contains_reta = rotated.contains("reta");
     let mut split_at: Option<usize> = None;
+
     for (i, ch) in chars.iter().enumerate() {
-        if ch.is_ascii_digit() || matches!(ch, '(' | '[' | '{') {
+        if ch.is_ascii_digit()
+            || (matches!(ch, '(' | '[' | '{') && !contains_reta && has_close_wrapper)
+        {
             split_at = Some(i);
             break;
         }
     }
-    let split_at = split_at?;
+
+    let mut split_at = split_at?;
     if split_at == 0 {
         return None;
     }
-    let mut prefix = chars[..split_at].iter().collect::<String>();
-    if prefix.ends_with('-') {
-        prefix.pop();
-        return Some((prefix, chars[split_at - 1..].iter().collect::<String>()));
+    if split_at > 0 && chars[split_at - 1] == '-' {
+        split_at -= 1;
     }
+    if split_at == 0 {
+        return None;
+    }
+
+    let prefix = chars[..split_at].iter().collect::<String>();
     let suffix = chars[split_at..].iter().collect::<String>();
     Some((prefix, suffix))
 }
@@ -3735,10 +3816,10 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_reta_calls_from_prompt_tokens, expand_python_regex_like_tokens,
-        prepare_prompt_big_output_for_stored_reta,
+        build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
+        expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows,
+        prepare_prompt_big_output_for_stored_rows, PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -4187,6 +4268,64 @@ mod tests {
         assert!(calls[0]
             .iter()
             .any(|token| token == "--oberesmaximum=1029"));
+    }
+
+    #[test]
+    fn groesse_command_emits_second_python_reta_execute_call() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["groesse", "12"]));
+        assert_eq!(calls.len(), 2);
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--strukturgroesse=organisation")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--strukturgroesse=strukturgroesse")
+                && call
+                    .iter()
+                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2")));
+    }
+
+    #[test]
+    fn richtung_command_keeps_python_style_without_column_filter() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["richtung", "12"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--primzahlwirkung=galaxieabsicht"));
+        assert!(!calls[0]
+            .iter()
+            .any(|token| token.starts_with("--spaltenreihenfolgeundnurdiese=")));
+    }
+
+    #[test]
+    fn trailing_short_commands_after_rows_are_rotated_like_python() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["12at"]));
+        assert_eq!(expanded, strings(&["a", "t", "12"]));
+        let calls = build_reta_calls_from_prompt_tokens(&expanded);
+        assert_eq!(calls.len(), 2);
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--menschliches=motivation")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--galaxie=thomas")));
+        assert!(calls.iter().all(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=12")));
+    }
+
+    #[test]
+    fn trailing_short_commands_after_fraction_are_rotated_like_python() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["2/3u"]));
+        assert_eq!(expanded, strings(&["u", "2/3"]));
+        let calls = build_reta_calls_from_prompt_tokens(&expanded);
+        assert!(!calls.is_empty());
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=3")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=2")));
     }
 
     #[test]
