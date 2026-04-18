@@ -1046,6 +1046,74 @@ fn prime_repeat_display(mut factors: Vec<i64>) -> String {
         .join(" ")
 }
 
+fn prime_factor_product_display(factors: &[i64]) -> String {
+    if factors.is_empty() {
+        "1".to_string()
+    } else {
+        factors
+            .iter()
+            .map(|factor| factor.to_string())
+            .collect::<Vec<_>>()
+            .join(" * ")
+    }
+}
+
+fn unique_numbers_preserving_prompt_order(numbers: &[i64]) -> Vec<i64> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut unique = Vec::new();
+    for n in numbers {
+        if seen.insert(*n) {
+            unique.push(*n);
+        }
+    }
+    unique
+}
+
+fn common_prime_factor_multiset(numbers: &[i64]) -> Vec<i64> {
+    let Some((first, rest)) = numbers.split_first() else {
+        return Vec::new();
+    };
+    let mut common = prime_factors(*first, false);
+    for n in rest {
+        let mut next = prime_factors(*n, false);
+        let mut intersection = Vec::new();
+        for candidate in common {
+            if let Some(position) = next.iter().position(|value| *value == candidate) {
+                intersection.push(candidate);
+                next.remove(position);
+            }
+        }
+        common = intersection;
+    }
+    common
+}
+
+fn render_primfaktorenvergleich_like_python(numbers: &[i64]) -> Vec<String> {
+    let common = common_prime_factor_multiset(numbers);
+    let product = common
+        .iter()
+        .copied()
+        .fold(1i64, |acc, factor| acc.saturating_mul(factor));
+    let mut lines = vec![format!(
+        "Gemeinsamkeiten: {} := {}",
+        product,
+        prime_factor_product_display(&common)
+    )];
+
+    for n in numbers {
+        let quotient = if product == 0 { *n } else { *n / product };
+        let remaining = prime_factors(quotient, false);
+        lines.push(format!(
+            "{:<5} := {:<5} / {:<5} -> {}",
+            quotient,
+            n,
+            product,
+            prime_factor_product_display(&remaining)
+        ));
+    }
+    lines
+}
+
 fn factor_pairs(a: i64) -> Vec<(i64, i64)> {
     let mut pairs = Vec::new();
     if a <= 0 {
@@ -1084,16 +1152,34 @@ fn factor_triples(a: i64) -> Vec<(i64, i64, i64)> {
     set.into_iter().collect()
 }
 
-fn modulo_remainders_display(n: i64) -> String {
-    if n == 0 {
-        return "0: Divisionen nicht definiert".to_string();
+fn modulo_classification_text(value: i64) -> &'static str {
+    match value {
+        0 => "ja",
+        1 => "Gegenteil",
+        2 => "ähnlich",
+        3 => "entferntes Gegenteil",
+        4 => "entfernt ähnlich",
+        _ => "None",
     }
-    let upper = n.abs();
-    let parts = (1..=upper)
-        .map(|divisor| format!("{}→{}", divisor, n.rem_euclid(divisor)))
+}
+
+fn modulo_remainders_display(n: i64) -> String {
+    (2..=25)
+        .map(|divisor| {
+            let remainder = n.rem_euclid(divisor);
+            let complement = divisor - remainder;
+            format!(
+                "{} % {} = {} {}, {} {}",
+                n,
+                divisor,
+                remainder,
+                modulo_classification_text(remainder),
+                complement,
+                modulo_classification_text(complement)
+            )
+        })
         .collect::<Vec<_>>()
-        .join(", ");
-    format!("{}: {}", n, parts)
+        .join("\n")
 }
 
 fn abstand_usage_text() -> String {
@@ -1295,30 +1381,13 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
         }
     }
     if token_set.contains("primfaktorenvergleich") && !numbers.is_empty() {
-        matched = true;
-        let mut common = prime_factors(numbers[0], false);
-        for n in numbers.iter().skip(1) {
-            let mut next = prime_factors(*n, false);
-            let mut out = Vec::new();
-            for c in common {
-                if let Some(pos) = next.iter().position(|x| *x == c) {
-                    out.push(c);
-                    next.remove(pos);
-                }
-            }
-            common = out;
+        let comparison_numbers = unique_numbers_preserving_prompt_order(&numbers);
+        let render_comparison = comparison_numbers.len() > 1
+            || !(token_set.contains("mulpri") || token_set.contains("p"));
+        if render_comparison {
+            matched = true;
+            lines.extend(render_primfaktorenvergleich_like_python(&comparison_numbers));
         }
-        let product = common
-            .iter()
-            .copied()
-            .fold(1i64, |acc, x| acc.saturating_mul(x));
-        let common_text = if common.is_empty() {
-            "1".to_string()
-        } else {
-            prime_repeat_display(common.clone())
-        };
-        lines.push(format!("gemeinsame Primfaktoren: {}", common_text));
-        lines.push(format!("ggT: {}", product));
     }
     if token_set.contains("modulo") {
         matched = true;
@@ -1714,6 +1783,48 @@ mod tests {
                 assert!(output.text.contains("verlangt mindestens 2 Zahlenangaben"));
             }
             other => panic!("expected immediate abstand usage output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn primfaktorenvergleich_renders_python_gemeinsamkeiten_block() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("primfaktorenvergleich 12,18", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(
+                    output.text,
+                    "Gemeinsamkeiten: 6 := 2 * 3\n2     := 12    / 6     -> 2\n3     := 18    / 6     -> 3"
+                );
+            }
+            other => panic!("expected immediate primfaktorenvergleich output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mulpri_single_number_suppresses_python_comparison_side_output() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("mulpri 7", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(!output.text.contains("Gemeinsamkeiten:"));
+                assert!(output.text.contains("7:"));
+            }
+            other => panic!("expected immediate mulpri output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn modulo_renders_python_moduloa_rows() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("modulo 7", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.starts_with("7 % 2 = 1 Gegenteil, 1 Gegenteil"));
+                assert!(output.text.contains("7 % 5 = 2 ähnlich, 3 entferntes Gegenteil"));
+                assert!(output.text.contains("7 % 25 = 7 None, 18 None"));
+            }
+            other => panic!("expected immediate modulo output, got {other:?}"),
         }
     }
 
