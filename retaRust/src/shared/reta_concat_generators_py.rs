@@ -540,9 +540,10 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn generator_row_end_py(&self) -> usize {
-        let table_end = self.relitable.len().saturating_sub(1);
-        let requested_end = usize::try_from(self.lastLineNumber).unwrap_or(table_end);
-        std::cmp::min(table_end, requested_end)
+        // Python-näher: Generatoren rechnen über die bereits aufgebaute Gesamttabelle
+        // und die spätere Ausgabe filtert erst danach. Kein Kappen auf aktuell sichtbare
+        // Zeilenwünsche, solange die Tabelle die Zeilen bereits trägt.
+        self.relitable.len().saturating_sub(1)
     }
 
     fn spalteMetaKonkretAbstrakt_isGanzZahlig_py(&self, zahl: f64, spaltenWahl: bool) -> bool {
@@ -2117,7 +2118,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         concatTable: i64,
         gebr_table: &Vec<Vec<String>>,
     ) -> Vec<String> {
-        let Some(n_and_invers_spalten) = self.concat_table_n_and_inverse_spalten_py(concatTable) else {
+        let Some(n_and_inverse_spalten) = self.concat_table_n_and_inverse_spalten_py(concatTable) else {
             return tabelleDazuCol;
         };
         let if_transponiert = matches!(concatTable, 3 | 5 | 7 | 9);
@@ -2137,7 +2138,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                     .and_then(|frac| {
                         self.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
                             frac,
-                            n_and_invers_spalten,
+                            n_and_inverse_spalten,
                             gebr_table,
                             is_not_universe,
                         )
@@ -2226,8 +2227,12 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         for i in 0..target_rows {
             if tableToAdd[i].len() < maxlen { tableToAdd[i].resize(maxlen, String::new()); }
             if i != 0 && (2..=9).contains(&concatTable) {
-                let transformed = self.readConcatCsv_tabelleDazuColchange_py(i, tableToAdd[i].clone(), concatTable, &gebr_table);
-                tableToAdd[i] = transformed;
+                tableToAdd[i] = self.readConcatCsv_tabelleDazuColchange_py(
+                    i,
+                    tableToAdd[i].clone(),
+                    concatTable,
+                    &gebr_table,
+                );
             }
             let start = self.relitable[i].len() as i64;
             self.relitable[i].extend(tableToAdd[i].clone());
