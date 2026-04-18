@@ -5,6 +5,7 @@ pub mod history;
 pub mod preset;
 pub mod frontend_profile;
 pub mod python_like;
+pub mod semantic_choices;
 pub mod tokenize;
 pub mod tui;
 pub mod frontends;

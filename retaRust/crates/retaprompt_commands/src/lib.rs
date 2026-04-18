@@ -202,6 +202,8 @@ pub mod domain {
 pub mod frontend_profile;
 #[path = "../../../src/prompt/tokenize.rs"]
 pub mod tokenize;
+#[path = "../../../src/prompt/semantic_choices.rs"]
+pub mod semantic_choices;
 #[path = "../../../src/prompt/python_like.rs"]
 pub mod python_like;
 #[path = "../../../src/prompt/history.rs"]
