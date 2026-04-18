@@ -571,9 +571,288 @@ fn strip_regex_like_anchors(pattern: &str) -> (bool, bool, &str) {
 }
 
 fn contains_regex_like_metacharacters(pattern: &str) -> bool {
-    pattern
-        .chars()
-        .any(|ch| matches!(ch, '.' | '*' | '^' | '$'))
+    pattern.chars().any(|ch| {
+        matches!(
+            ch,
+            '.' | '*' | '+' | '?' | '^' | '$' | '|' | '(' | ')' | '[' | ']' | '\\'
+        )
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RegexLikeQuantifier {
+    ExactlyOne,
+    ZeroOrMore,
+    OneOrMore,
+    ZeroOrOne,
+}
+
+#[derive(Clone, Debug)]
+enum RegexLikeAtom {
+    Literal(char),
+    Any,
+    Class {
+        negated: bool,
+        ranges: Vec<(char, char)>,
+    },
+    Group(Vec<Vec<RegexLikeToken>>),
+}
+
+#[derive(Clone, Debug)]
+struct RegexLikeToken {
+    atom: RegexLikeAtom,
+    quantifier: RegexLikeQuantifier,
+}
+
+struct RegexLikeParser {
+    chars: Vec<char>,
+    pos: usize,
+}
+
+impl RegexLikeParser {
+    fn new(pattern: &str) -> Self {
+        Self {
+            chars: pattern.chars().collect(),
+            pos: 0,
+        }
+    }
+
+    fn parse(pattern: &str) -> Option<Vec<Vec<RegexLikeToken>>> {
+        let mut parser = Self::new(pattern);
+        let alternatives = parser.parse_alternatives(None)?;
+        (parser.pos == parser.chars.len()).then_some(alternatives)
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.chars.get(self.pos).copied()
+    }
+
+    fn peek_next(&self) -> Option<char> {
+        self.chars.get(self.pos + 1).copied()
+    }
+
+    fn bump(&mut self) -> Option<char> {
+        let ch = self.peek()?;
+        self.pos += 1;
+        Some(ch)
+    }
+
+    fn parse_alternatives(&mut self, until: Option<char>) -> Option<Vec<Vec<RegexLikeToken>>> {
+        let mut alternatives = Vec::new();
+        loop {
+            alternatives.push(self.parse_sequence(until)?);
+            match (self.peek(), until) {
+                (Some('|'), _) => {
+                    self.pos += 1;
+                }
+                (Some(ch), Some(end)) if ch == end => {
+                    self.pos += 1;
+                    break;
+                }
+                (None, None) => break,
+                (None, Some(_)) => return None,
+                _ => break,
+            }
+        }
+        Some(alternatives)
+    }
+
+    fn parse_sequence(&mut self, until: Option<char>) -> Option<Vec<RegexLikeToken>> {
+        let mut tokens = Vec::new();
+        while let Some(ch) = self.peek() {
+            if ch == '|' || until.is_some_and(|end| ch == end) {
+                break;
+            }
+            let atom = self.parse_atom()?;
+            let quantifier = match self.peek() {
+                Some('*') => {
+                    self.pos += 1;
+                    RegexLikeQuantifier::ZeroOrMore
+                }
+                Some('+') => {
+                    self.pos += 1;
+                    RegexLikeQuantifier::OneOrMore
+                }
+                Some('?') => {
+                    self.pos += 1;
+                    RegexLikeQuantifier::ZeroOrOne
+                }
+                _ => RegexLikeQuantifier::ExactlyOne,
+            };
+            tokens.push(RegexLikeToken { atom, quantifier });
+        }
+        Some(tokens)
+    }
+
+    fn parse_atom(&mut self) -> Option<RegexLikeAtom> {
+        match self.bump()? {
+            '\\' => self.bump().map(RegexLikeAtom::Literal),
+            '.' => Some(RegexLikeAtom::Any),
+            '[' => self.parse_class(),
+            '(' => self.parse_group(),
+            ch => Some(RegexLikeAtom::Literal(ch)),
+        }
+    }
+
+    fn parse_group(&mut self) -> Option<RegexLikeAtom> {
+        if self.peek() == Some('?') && self.peek_next() == Some(':') {
+            self.pos += 2;
+        }
+        let alternatives = self.parse_alternatives(Some(')'))?;
+        Some(RegexLikeAtom::Group(alternatives))
+    }
+
+    fn parse_class_char(&mut self) -> Option<char> {
+        match self.bump()? {
+            '\\' => self.bump(),
+            ch => Some(ch),
+        }
+    }
+
+    fn parse_class(&mut self) -> Option<RegexLikeAtom> {
+        let negated = matches!(self.peek(), Some('^') | Some('!'));
+        if negated {
+            self.pos += 1;
+        }
+
+        let mut ranges = Vec::new();
+        let mut closed = false;
+        while self.pos < self.chars.len() {
+            if self.peek() == Some(']') {
+                self.pos += 1;
+                closed = true;
+                break;
+            }
+
+            let start = self.parse_class_char()?;
+            if self.peek() == Some('-') && self.peek_next() != Some(']') {
+                self.pos += 1;
+                let end = self.parse_class_char()?;
+                if start <= end {
+                    ranges.push((start, end));
+                } else {
+                    ranges.push((end, start));
+                }
+            } else {
+                ranges.push((start, start));
+            }
+        }
+
+        if !closed {
+            return None;
+        }
+
+        Some(RegexLikeAtom::Class { negated, ranges })
+    }
+}
+
+fn regex_like_atom_match_positions(
+    atom: &RegexLikeAtom,
+    text: &[char],
+    start: usize,
+) -> BTreeSet<usize> {
+    let mut out = BTreeSet::new();
+    match atom {
+        RegexLikeAtom::Literal(expected) => {
+            if text.get(start).is_some_and(|actual| actual == expected) {
+                out.insert(start + 1);
+            }
+        }
+        RegexLikeAtom::Any => {
+            if start < text.len() {
+                out.insert(start + 1);
+            }
+        }
+        RegexLikeAtom::Class { negated, ranges } => {
+            if let Some(actual) = text.get(start) {
+                let contained = ranges
+                    .iter()
+                    .any(|(begin, end)| begin <= actual && actual <= end);
+                if contained != *negated {
+                    out.insert(start + 1);
+                }
+            }
+        }
+        RegexLikeAtom::Group(alternatives) => {
+            for alternative in alternatives {
+                out.extend(regex_like_sequence_match_positions(alternative, text, start));
+            }
+        }
+    }
+    out
+}
+
+fn regex_like_repeat_positions(
+    atom: &RegexLikeAtom,
+    text: &[char],
+    start: usize,
+) -> BTreeSet<usize> {
+    let mut seen = BTreeSet::new();
+    let mut frontier = BTreeSet::new();
+    seen.insert(start);
+    frontier.insert(start);
+
+    while !frontier.is_empty() {
+        let mut next_frontier = BTreeSet::new();
+        for position in frontier {
+            for next in regex_like_atom_match_positions(atom, text, position) {
+                if next != position && seen.insert(next) {
+                    next_frontier.insert(next);
+                }
+            }
+        }
+        frontier = next_frontier;
+    }
+
+    seen
+}
+
+fn regex_like_token_match_positions(
+    token: &RegexLikeToken,
+    text: &[char],
+    start: usize,
+) -> BTreeSet<usize> {
+    match token.quantifier {
+        RegexLikeQuantifier::ExactlyOne => {
+            regex_like_atom_match_positions(&token.atom, text, start)
+        }
+        RegexLikeQuantifier::ZeroOrOne => {
+            let mut out = BTreeSet::new();
+            out.insert(start);
+            out.extend(regex_like_atom_match_positions(&token.atom, text, start));
+            out
+        }
+        RegexLikeQuantifier::ZeroOrMore => regex_like_repeat_positions(&token.atom, text, start),
+        RegexLikeQuantifier::OneOrMore => {
+            let mut out = BTreeSet::new();
+            for first_end in regex_like_atom_match_positions(&token.atom, text, start) {
+                out.extend(regex_like_repeat_positions(&token.atom, text, first_end));
+            }
+            out
+        }
+    }
+}
+
+fn regex_like_sequence_match_positions(
+    tokens: &[RegexLikeToken],
+    text: &[char],
+    start: usize,
+) -> BTreeSet<usize> {
+    let mut positions = BTreeSet::new();
+    positions.insert(start);
+
+    for token in tokens {
+        let mut next_positions = BTreeSet::new();
+        for position in positions {
+            next_positions.extend(regex_like_token_match_positions(token, text, position));
+        }
+        if next_positions.is_empty() {
+            return BTreeSet::new();
+        }
+        positions = next_positions;
+    }
+
+    positions
 }
 
 fn regex_like_search(pattern: &str, text: &str) -> bool {
@@ -590,6 +869,34 @@ fn regex_like_search(pattern: &str, text: &str) -> bool {
         return text.contains(core);
     }
 
+    let Some(alternatives) = RegexLikeParser::parse(core) else {
+        return regex_like_search_fallback_dot_star(pattern, text);
+    };
+    let text_chars = text.chars().collect::<Vec<_>>();
+    let starts = if start_anchor {
+        vec![0usize]
+    } else {
+        (0..=text_chars.len()).collect::<Vec<_>>()
+    };
+
+    for start in starts {
+        for alternative in &alternatives {
+            let ends = regex_like_sequence_match_positions(alternative, &text_chars, start);
+            if end_anchor {
+                if ends.contains(&text_chars.len()) {
+                    return true;
+                }
+            } else if !ends.is_empty() {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn regex_like_search_fallback_dot_star(pattern: &str, text: &str) -> bool {
+    let (start_anchor, end_anchor, core) = strip_regex_like_anchors(pattern);
     let core_chars = core.chars().collect::<Vec<_>>();
     let text_chars = text.chars().collect::<Vec<_>>();
     let starts = if start_anchor {
@@ -3603,6 +3910,31 @@ mod tests {
         let expanded =
             expand_python_regex_like_tokens(&strings(&["reta", "-zeilen", "--zeit=r\"heu.*\""]));
         assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_supports_python_alternation_and_groups() {
+        let expanded = expand_python_regex_like_tokens(&strings(&["r\"^(emotion|freiheit)$\""]));
+        assert_eq!(expanded, strings(&["emotion", "freiheit"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_supports_python_char_classes_and_plus() {
+        let expanded = expand_python_regex_like_tokens(&strings(&["r\"^prim[0-9]+$\""]));
+        assert_eq!(expanded, strings(&["prim24"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_expands_reta_values_with_alternation() {
+        let expanded = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "-ausgabe",
+            "--art=r\"^(html|csv)$\"",
+        ]));
+        assert_eq!(
+            expanded,
+            strings(&["reta", "-ausgabe", "--art=html,csv"])
+        );
     }
 
     #[test]
