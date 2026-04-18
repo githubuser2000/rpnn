@@ -1383,9 +1383,6 @@ pub fn looks_like_single_numeric_or_fraction_part(text: &str) -> bool {
             .into_iter()
             .all(|piece| looks_like_single_numeric_or_fraction_part(&piece));
     }
-    if trimmed.contains('/') && python_bruch_range_from_text(trimmed).is_some() {
-        return true;
-    }
     if trimmed.contains('+') {
         return trimmed
             .split('+')
@@ -1941,11 +1938,6 @@ fn contains_blocking_abc(tokens: &[String]) -> bool {
     tokens.iter().any(|t| t == "abc" || t == "abcd")
 }
 
-fn python_prompt_uses_vielfache(tokens: &[String]) -> bool {
-    tokens.iter().any(|t| t == "vielfache")
-        && !tokens.iter().any(|t| t == "einzeln")
-}
-
 #[derive(Clone, Debug, Default)]
 struct PythonRowBuckets {
     primary_row_specs: Vec<String>,
@@ -2085,39 +2077,55 @@ fn inclusive_i64_range(start: i64, end: i64) -> Vec<i64> {
 }
 
 const PYTHON_ROW_MULTIPLE_LIMIT: i64 = 1028;
-// Python LibRetaPrompt derives gebrochenErlaubteZahlen from the generated
-// gebrochen-rational parameter matrix and then removes the highest entry.
-// In the bundled i18n data gebrochenSpaltenMaximumPlus1 is 24, therefore the
-// usable set is 2..=22.  This is intentionally kept next to the row/range
-// machinery because bruchBereichsManagementAndWbefehl uses it only for
-// fraction-multiple expansion, not for normal row multiples.
-const PYTHON_FRACTION_ALLOWED_MIN: i64 = 2;
-const PYTHON_FRACTION_ALLOWED_MAX: i64 = 22;
 
-fn python_fraction_allowed_values() -> BTreeSet<i64> {
-    (PYTHON_FRACTION_ALLOWED_MIN..=PYTHON_FRACTION_ALLOWED_MAX).collect()
+fn python_fraction_allowed_numbers() -> &'static [i64] {
+    static ALLOWED: OnceLock<Vec<i64>> = OnceLock::new();
+    ALLOWED
+        .get_or_init(|| {
+            let mut values = BTreeSet::new();
+            for entry in &shared_words().paraNdataMatrix {
+                let is_fraction_parameter = entry.parameterMainNames.iter().any(|name| {
+                    let normalized = normalize_match_text(name);
+                    normalized.contains("gebrochen-rational")
+                        || normalized.contains("gebrochenuniversum")
+                        || normalized.contains("gebrochengalaxie")
+                        || normalized.contains("gebrochenemotion")
+                        || normalized.contains("gebrochengroesse")
+                });
+                if is_fraction_parameter {
+                    for name in &entry.parameterNames {
+                        if let Ok(value) = name.parse::<i64>() {
+                            if value > 0 {
+                                values.insert(value);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if values.is_empty() {
+                values.extend(2..=23);
+            }
+
+            values.into_iter().collect()
+        })
+        .as_slice()
 }
 
-fn python_fraction_allowed_multiples(value: i64) -> BTreeSet<i64> {
-    let base = value.abs();
-    if base == 0 {
-        return BTreeSet::new();
-    }
-
-    let allowed = python_fraction_allowed_values();
+fn expand_values_over_python_fraction_allowed_multiples(values: &[i64]) -> Vec<i64> {
     let mut out = BTreeSet::new();
-    let mut multiplier = 1i64;
-    loop {
-        let Some(candidate) = base.checked_mul(multiplier) else {
-            break;
-        };
-        if !allowed.contains(&candidate) {
-            break;
+    for value in values {
+        let base = value.abs();
+        if base == 0 {
+            continue;
         }
-        out.insert(candidate);
-        multiplier += 1;
+        for allowed in python_fraction_allowed_numbers() {
+            if *allowed > 0 && *allowed % base == 0 {
+                out.insert(*allowed);
+            }
+        }
     }
-    out
+    out.into_iter().collect()
 }
 
 fn parse_unsigned_row_i64(text: &str) -> Option<i64> {
@@ -2411,6 +2419,21 @@ impl<'a> PythonRowExprParser<'a> {
         }
 
         let ident = self.parse_identifier()?;
+        if self.consume_text("(") {
+            let value = self.parse_expr()?;
+            if self.consume_text(",") {
+                return None;
+            }
+            if !self.consume_text(")") {
+                return None;
+            }
+            return match ident.as_str() {
+                "abs" => value.checked_abs(),
+                "int" | "round" => Some(value),
+                _ => None,
+            };
+        }
+
         match self.var {
             Some(var) if var.name == ident => Some(var.value),
             _ => None,
@@ -2565,6 +2588,16 @@ fn eval_python_row_condition(text: &str, var: Option<(&str, i64)>) -> Option<boo
     if let Some(rest) = trimmed.strip_prefix("not ") {
         return Some(!eval_python_row_condition(rest, var)?);
     }
+    if let Some(index) = find_top_level_keyword(trimmed, " not in ") {
+        let left = eval_python_row_expr(&trimmed[..index], var)?;
+        let right_values = parse_python_iterable_values(&trimmed[index + " not in ".len()..])?;
+        return Some(!right_values.contains(&left));
+    }
+    if let Some(index) = find_top_level_keyword(trimmed, " in ") {
+        let left = eval_python_row_expr(&trimmed[..index], var)?;
+        let right_values = parse_python_iterable_values(&trimmed[index + " in ".len()..])?;
+        return Some(right_values.contains(&left));
+    }
     if let Some((left, operator, right)) = split_top_level_comparison(trimmed) {
         let left = eval_python_row_expr(left, var)?;
         let right = eval_python_row_expr(right, var)?;
@@ -2612,6 +2645,88 @@ fn parse_python_range_values(text: &str) -> Option<Vec<i64>> {
     Some(out)
 }
 
+fn split_top_level_iterable_binary<'a>(text: &'a str, operator: char) -> Option<(&'a str, &'a str)> {
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+
+    for (index, ch) in text.char_indices() {
+        if ch == operator && index > 0 && round == 0 && square == 0 && curly == 0 {
+            let left = text[..index].trim();
+            let right = text[index + ch.len_utf8()..].trim();
+            if !left.is_empty() && !right.is_empty() {
+                return Some((left, right));
+            }
+        }
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn parse_python_call_inner<'a>(text: &'a str, name: &str) -> Option<&'a str> {
+    let trimmed = text.trim();
+    let rest = trimmed.strip_prefix(name)?.trim_start();
+    if !rest.starts_with('(') || !rest.ends_with(')') {
+        return None;
+    }
+    Some(&rest[1..rest.len() - 1])
+}
+
+fn parse_python_builtin_iterable_values(text: &str) -> Option<Vec<i64>> {
+    for name in ["list", "tuple", "set", "frozenset", "sorted"] {
+        if let Some(inner) = parse_python_call_inner(text, name) {
+            let source = if name == "sorted" {
+                custom_split_delim_parenthesized(inner, ',')
+                    .into_iter()
+                    .next()
+                    .unwrap_or_default()
+            } else {
+                inner.to_string()
+            };
+            return parse_python_iterable_values(&source);
+        }
+    }
+    None
+}
+
+fn parse_python_iterable_values(text: &str) -> Option<Vec<i64>> {
+    let trimmed = text.trim();
+
+    if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        if split_top_level_iterable_binary(inner, '|').is_some()
+            || split_top_level_iterable_binary(inner, '+').is_some()
+        {
+            return parse_python_iterable_values(inner);
+        }
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '|') {
+        let mut out = parse_python_iterable_values(left)?;
+        out.extend(parse_python_iterable_values(right)?);
+        return Some(out.into_iter().collect::<BTreeSet<_>>().into_iter().collect());
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '+') {
+        let mut out = parse_python_iterable_values(left)?;
+        out.extend(parse_python_iterable_values(right)?);
+        return Some(out);
+    }
+
+    parse_python_range_values(trimmed)
+        .or_else(|| parse_python_builtin_iterable_values(trimmed))
+        .or_else(|| parse_python_generated_row_values(trimmed))
+}
+
 fn parse_python_generated_row_values(text: &str) -> Option<Vec<i64>> {
     let inner = strip_python_collection_wrappers(text)?;
     let inner = inner.trim();
@@ -2635,7 +2750,7 @@ fn parse_python_generated_row_values(text: &str) -> Option<Vec<i64>> {
             source_text = source_text[..if_index].trim();
         }
 
-        let source_values = parse_python_range_values(source_text)?;
+        let source_values = parse_python_iterable_values(source_text)?;
         let mut out = BTreeSet::new();
         for value in source_values {
             let var = Some((var_name, value));
@@ -2834,268 +2949,327 @@ fn expand_fraction_piece_values(piece: &str) -> Option<Vec<(i64, i64)>> {
         .or_else(|| parse_simple_fraction_piece(inner).map(|fraction| vec![fraction]))
 }
 
-
 #[derive(Clone, Debug)]
-struct PythonBruchColumn {
-    parts: Vec<BTreeMap<usize, String>>,
+struct PythonBruchSpaltPart {
+    number_before_text: Vec<String>,
+    text: Vec<String>,
+    number_after_text: Vec<String>,
+    only_numbers: bool,
 }
 
-fn ordered_map_values(map: &BTreeMap<usize, String>) -> Vec<String> {
+impl PythonBruchSpaltPart {
+    fn only(numbers: Vec<String>) -> Self {
+        Self {
+            number_before_text: numbers,
+            text: Vec::new(),
+            number_after_text: Vec::new(),
+            only_numbers: true,
+        }
+    }
+
+    fn mixed(
+        number_before_text: Vec<String>,
+        text: Vec<String>,
+        number_after_text: Vec<String>,
+    ) -> Self {
+        Self {
+            number_before_text,
+            text,
+            number_after_text,
+            only_numbers: false,
+        }
+    }
+
+    fn before_fraction_text(&self) -> Vec<String> {
+        if self.only_numbers {
+            Vec::new()
+        } else {
+            self.text.clone()
+        }
+    }
+
+    fn after_fraction_text(&self) -> Vec<String> {
+        if self.only_numbers {
+            Vec::new()
+        } else {
+            self.text.clone()
+        }
+    }
+
+    fn numerator_side_values(&self) -> Vec<String> {
+        if self.only_numbers {
+            self.number_before_text.clone()
+        } else {
+            self.number_after_text.clone()
+        }
+    }
+
+    fn denominator_side_values(&self) -> Vec<String> {
+        self.number_before_text.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PythonBruchRanges {
+    numerators: Vec<i64>,
+    denominator_spec: String,
+}
+
+fn ordered_values_from_segment_map(map: &BTreeMap<usize, String>) -> Vec<String> {
     map.values().cloned().collect()
 }
 
-fn python_bruch_column_prefix_text(column: &PythonBruchColumn) -> Vec<String> {
-    if column.parts.len() == 1 {
-        Vec::new()
-    } else {
-        ordered_map_values(&column.parts[1])
-    }
-}
-
-fn python_bruch_column_left_number(column: &PythonBruchColumn) -> Vec<String> {
-    if column.parts.len() == 1 {
-        ordered_map_values(&column.parts[0])
-    } else {
-        ordered_map_values(&column.parts[2])
-    }
-}
-
-fn python_bruch_column_right_number(column: &PythonBruchColumn) -> Vec<String> {
-    ordered_map_values(&column.parts[0])
-}
-
-fn python_bruch_column_suffix_text(column: &PythonBruchColumn) -> Vec<String> {
-    if column.parts.len() == 1 {
-        Vec::new()
-    } else {
-        ordered_map_values(&column.parts[1])
-    }
-}
-
 fn python_bruch_spalt(text: &str) -> Option<Vec<Vec<String>>> {
-    let bruch_spalten = text.split('/').collect::<Vec<_>>();
-    if bruch_spalten.len() < 2 {
+    let parts = text.split('/').collect::<Vec<_>>();
+    if parts.len() < 2 {
         return None;
     }
 
-    let mut bruch_spalten_neu: Vec<PythonBruchColumn> = Vec::new();
-    let mut bruch_spalten_neu2: Vec<Vec<String>> = Vec::new();
+    let mut parsed_parts: Vec<PythonBruchSpaltPart> = Vec::new();
+    let mut out: Vec<Vec<String>> = Vec::new();
 
-    for (k, segment) in bruch_spalten.iter().enumerate() {
-        let mut zahl: BTreeMap<usize, String> = BTreeMap::new();
-        let mut keine_zahl: BTreeMap<usize, String> = BTreeMap::new();
-        let mut go_next: usize = 0;
+    for (index, part) in parts.iter().enumerate() {
+        let mut numbers: BTreeMap<usize, String> = BTreeMap::new();
+        let mut non_numbers: BTreeMap<usize, String> = BTreeMap::new();
         let mut was_number = false;
+        let mut go_next = 0usize;
 
-        for ch in segment.chars() {
+        for ch in part.chars() {
             if ch.is_ascii_digit() {
                 if !was_number {
-                    go_next += 1;
+                    go_next = go_next.saturating_add(1);
                 }
-                zahl.entry(go_next).or_default().push(ch);
+                numbers.entry(go_next).or_default().push(ch);
                 was_number = true;
             } else {
                 if was_number {
-                    go_next += 1;
+                    go_next = go_next.saturating_add(1);
                 }
-                keine_zahl.entry(go_next).or_default().push(ch);
+                non_numbers.entry(go_next).or_default().push(ch);
                 was_number = false;
             }
         }
 
-        if zahl.is_empty() {
+        if numbers.is_empty() {
             return None;
         }
 
-        let all_vergleich = keine_zahl
+        let all_comparison = non_numbers
             .keys()
-            .zip(zahl.keys())
-            .map(|(keine_key, zahl_key)| zahl_key > keine_key)
+            .zip(numbers.keys())
+            .map(|(non_number_key, number_key)| number_key > non_number_key)
             .collect::<Vec<_>>();
-        let zahl_keys = zahl.keys().copied().collect::<BTreeSet<_>>();
-        let keine_zahl_keys = keine_zahl.keys().copied().collect::<BTreeSet<_>>();
-        let anfang = k == 0;
-        let ende = k == bruch_spalten.len() - 1;
-
-        let flag = if anfang && all_vergleich.iter().all(|value| *value) {
+        let is_first = index == 0;
+        let is_last = index + 1 == parts.len();
+        let valid = if is_first && all_comparison.iter().all(|value| *value) {
             true
-        } else if ende && !all_vergleich.iter().any(|value| *value) {
+        } else if is_last && !all_comparison.iter().any(|value| *value) {
             true
-        } else if !anfang && !ende {
-            let min_zahl = zahl_keys.iter().next().copied();
-            let max_zahl = zahl_keys.iter().next_back().copied();
-            match (min_zahl, max_zahl) {
-                (Some(min_zahl), Some(max_zahl)) => keine_zahl_keys
-                    .iter()
-                    .all(|key| *key > min_zahl && *key < max_zahl),
-                _ => false,
-            }
+        } else if !is_first && !is_last && !non_numbers.is_empty() {
+            let min_number = *numbers.keys().next()?;
+            let max_number = *numbers.keys().last()?;
+            non_numbers
+                .keys()
+                .all(|key| *key > min_number && *key < max_number)
         } else {
             false
         };
-
-        if !flag {
+        if !valid {
             return None;
         }
 
-        let column = if !keine_zahl_keys.is_empty() {
-            let min_keine = keine_zahl_keys.iter().next().copied()?;
-            let max_keine = keine_zahl_keys.iter().next_back().copied()?;
-            let zahlen_kleiner = zahl
-                .iter()
-                .filter_map(|(key, value)| (*key < min_keine).then_some((*key, value.clone())))
-                .collect::<BTreeMap<_, _>>();
-            let zahlen_groesser = zahl
-                .iter()
-                .filter_map(|(key, value)| (*key > max_keine).then_some((*key, value.clone())))
-                .collect::<BTreeMap<_, _>>();
-            if ende && !zahlen_groesser.is_empty() {
+        let parsed = if non_numbers.is_empty() {
+            if is_first || is_last {
+                PythonBruchSpaltPart::only(ordered_values_from_segment_map(&numbers))
+            } else {
                 return None;
             }
-            PythonBruchColumn {
-                parts: vec![zahlen_kleiner, keine_zahl, zahlen_groesser],
-            }
-        } else if anfang || ende {
-            PythonBruchColumn { parts: vec![zahl] }
         } else {
-            return None;
+            let min_non_number = *non_numbers.keys().next()?;
+            let max_non_number = *non_numbers.keys().last()?;
+            let number_before_text = numbers
+                .iter()
+                .filter(|(key, _)| **key < min_non_number)
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>();
+            let number_after_text = numbers
+                .iter()
+                .filter(|(key, _)| **key > max_non_number)
+                .map(|(_, value)| value.clone())
+                .collect::<Vec<_>>();
+            if is_last && !number_after_text.is_empty() {
+                return None;
+            }
+            PythonBruchSpaltPart::mixed(
+                number_before_text,
+                ordered_values_from_segment_map(&non_numbers),
+                number_after_text,
+            )
         };
 
-        bruch_spalten_neu.push(column);
+        parsed_parts.push(parsed);
 
-        if k == 1 {
-            let vor_zahl1 = python_bruch_column_prefix_text(&bruch_spalten_neu[0]);
-            let mut zahl1 = python_bruch_column_left_number(&bruch_spalten_neu[0]);
-            zahl1.extend(python_bruch_column_right_number(&bruch_spalten_neu[1]));
-            if k == bruch_spalten.len() - 1 {
-                let nach_zahl2 = python_bruch_column_suffix_text(bruch_spalten_neu.last()?);
-                bruch_spalten_neu2.push(vor_zahl1);
-                bruch_spalten_neu2.push(zahl1);
-                bruch_spalten_neu2.push(nach_zahl2);
-            } else {
-                bruch_spalten_neu2.push(vor_zahl1);
-                bruch_spalten_neu2.push(zahl1);
+        if index == 1 {
+            let previous = &parsed_parts[0];
+            let current = &parsed_parts[1];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
+            if is_last {
+                out.push(current.after_fraction_text());
             }
-        } else if k == bruch_spalten.len() - 1 && k > 1 {
-            let previous = &bruch_spalten_neu[k - 1];
-            let current = &bruch_spalten_neu[k];
-            let vor_zahl1 = python_bruch_column_prefix_text(previous);
-            let mut zahl1 = python_bruch_column_left_number(previous);
-            zahl1.extend(python_bruch_column_right_number(current));
-            let nach_zahl2 = python_bruch_column_suffix_text(current);
-            bruch_spalten_neu2.push(vor_zahl1);
-            bruch_spalten_neu2.push(zahl1);
-            bruch_spalten_neu2.push(nach_zahl2);
-        } else if k > 1 {
-            let previous = &bruch_spalten_neu[k - 1];
-            let current = &bruch_spalten_neu[k];
-            let vor_zahl1 = python_bruch_column_prefix_text(previous);
-            let mut zahl1 = python_bruch_column_left_number(previous);
-            zahl1.extend(python_bruch_column_right_number(current));
-            bruch_spalten_neu2.push(vor_zahl1);
-            bruch_spalten_neu2.push(zahl1);
+        } else if is_last && index > 1 {
+            let previous = &parsed_parts[index - 1];
+            let current = &parsed_parts[index];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
+            out.push(current.after_fraction_text());
+        } else if index > 1 {
+            let previous = &parsed_parts[index - 1];
+            let current = &parsed_parts[index];
+            out.push(previous.before_fraction_text());
+            let mut fraction = previous.numerator_side_values();
+            fraction.extend(current.denominator_side_values());
+            out.push(fraction);
         }
     }
 
-    Some(bruch_spalten_neu2)
+    Some(out)
 }
 
-fn python_create_ranges_for_bruch_lists(bruch_list: &[Vec<String>]) -> Option<(Vec<i64>, String)> {
-    let simple_fraction = bruch_list.len() == 3
+fn is_python_bruch_fraction_tuple(values: &[String]) -> bool {
+    values.len() == 2 && values.iter().all(|value| parse_unsigned_row_i64(value).is_some())
+}
+
+fn parse_python_bruch_fraction_tuple(values: &[String]) -> Option<(i64, i64)> {
+    if !is_python_bruch_fraction_tuple(values) {
+        return None;
+    }
+    Some((
+        parse_unsigned_row_i64(&values[0])?,
+        parse_unsigned_row_i64(&values[1])?,
+    ))
+}
+
+fn create_ranges_for_python_bruch_list(bruch_list: &[Vec<String>]) -> Option<PythonBruchRanges> {
+    let special_simple_fraction = bruch_list.len() == 3
         && bruch_list[0].is_empty()
-        && bruch_list[1].len() == 2
-        && bruch_list[2].is_empty()
-        && bruch_list[1]
-            .iter()
-            .all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_digit()));
-    if simple_fraction {
-        return Some((
-            vec![bruch_list[1][0].parse::<i64>().ok()?],
-            bruch_list[1][1].clone(),
-        ));
+        && is_python_bruch_fraction_tuple(&bruch_list[1])
+        && bruch_list[2].is_empty();
+    if special_simple_fraction {
+        let (numerator, denominator) = parse_python_bruch_fraction_tuple(&bruch_list[1])?;
+        return Some(PythonBruchRanges {
+            numerators: vec![numerator],
+            denominator_spec: denominator.to_string(),
+        });
     }
 
-    let mut n1: Vec<i64> = Vec::new();
-    let mut n2: Vec<i64> = Vec::new();
-    let mut listen_range: Vec<i64> = Vec::new();
-    let mut listen_range_ursprung: Vec<i64> = Vec::new();
+    let mut first_fraction_numerators: Vec<i64> = Vec::new();
+    let mut first_fraction_denominators: Vec<i64> = Vec::new();
+    let mut numerator_range: Vec<i64> = Vec::new();
+    let mut numerator_range_origin: Vec<i64> = Vec::new();
     let mut flag = 0i32;
-    let mut ergebnis: Vec<String> = Vec::new();
+    let mut denominator_pieces: Vec<String> = Vec::new();
 
-    for (i, b) in bruch_list.iter().enumerate() {
+    for (index, values) in bruch_list.iter().enumerate() {
         if flag == -1 {
             return None;
         }
         if flag > 3 {
             return None;
         } else if flag == 3 {
-            if n1.len() < 2 || n2.len() < 2 {
-                return None;
-            }
-            ergebnis.push(n2[n2.len() - 2].to_string());
-            ergebnis.push("-".to_string());
-            ergebnis.push(n2[n2.len() - 1].to_string());
-            let start = n1[n1.len() - 2];
-            let end = n1[n1.len() - 1];
-            listen_range = if start <= end {
+            let left_denominator = *first_fraction_denominators.get(first_fraction_denominators.len().saturating_sub(2))?;
+            let right_denominator = *first_fraction_denominators.last()?;
+            denominator_pieces.push(left_denominator.to_string());
+            denominator_pieces.push("-".to_string());
+            denominator_pieces.push(right_denominator.to_string());
+
+            let start = *first_fraction_numerators.get(first_fraction_numerators.len().saturating_sub(2))?;
+            let end = *first_fraction_numerators.last()?;
+            numerator_range = if start <= end {
                 (start..=end).collect()
             } else {
                 Vec::new()
             };
-            listen_range_ursprung = listen_range.clone();
+            numerator_range_origin = numerator_range.clone();
             flag = -1;
         }
 
-        let is_fraction_pair = b.len() == 2
-            && b.iter()
-                .all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_digit()));
-        if is_fraction_pair {
-            let next_is_minus = i + 1 < bruch_list.len()
-                && bruch_list[i + 1].len() == 1
-                && bruch_list[i + 1][0] == "-"
-                && flag == 0;
-            let prev_is_minus = i > 0
-                && bruch_list[i - 1].len() == 1
-                && bruch_list[i - 1][0] == "-"
-                && flag == 2;
-            if next_is_minus || prev_is_minus {
-                n1.push(b[0].parse::<i64>().ok()?);
-                n2.push(b[1].parse::<i64>().ok()?);
+        if let Some((numerator, denominator)) = parse_python_bruch_fraction_tuple(values) {
+            let next_is_minus = bruch_list
+                .get(index + 1)
+                .map(|next| next.len() == 1 && next[0] == "-")
+                .unwrap_or(false);
+            let previous_is_minus = index > 0
+                && bruch_list
+                    .get(index - 1)
+                    .map(|previous| previous.len() == 1 && previous[0] == "-")
+                    .unwrap_or(false);
+            if (next_is_minus && flag == 0) || (previous_is_minus && flag == 2) {
+                first_fraction_numerators.push(numerator);
+                first_fraction_denominators.push(denominator);
                 flag += 1;
             } else {
-                ergebnis.push(b[1].clone());
-                let numerator = b[0].parse::<i64>().ok()?;
-                if !listen_range.is_empty()
-                    && i > 0
-                    && bruch_list[i - 1].len() == 1
-                    && bruch_list[i - 1][0] == "+"
-                {
-                    let mut listen_range2 = Vec::new();
-                    for lr in &listen_range_ursprung {
-                        listen_range2.push(lr + numerator);
-                        listen_range2.push(lr - numerator);
+                denominator_pieces.push(denominator.to_string());
+                let previous_is_plus = index > 0
+                    && bruch_list
+                        .get(index - 1)
+                        .map(|previous| previous.len() == 1 && previous[0] == "+")
+                        .unwrap_or(false);
+                if !numerator_range.is_empty() && previous_is_plus {
+                    let mut next_range = Vec::new();
+                    for origin in &numerator_range_origin {
+                        next_range.push(origin.saturating_add(numerator));
+                        next_range.push(origin.saturating_sub(numerator));
                     }
-                    listen_range = listen_range2;
-                } else if listen_range.is_empty() {
-                    listen_range = vec![numerator];
-                    listen_range_ursprung = listen_range.clone();
+                    numerator_range = next_range;
+                } else if numerator_range.is_empty() {
+                    numerator_range = vec![numerator];
+                    numerator_range_origin = numerator_range.clone();
                 }
             }
-        } else if b.len() == 1 && b[0] == "-" && flag > 0 {
+        } else if values.len() == 1 && values[0] == "-" && flag > 0 {
             flag += 1;
         } else {
             flag = 0;
-            ergebnis.extend(b.iter().cloned());
+            denominator_pieces.extend(values.iter().cloned());
         }
     }
 
-    Some((listen_range, ergebnis.join("")))
+    Some(PythonBruchRanges {
+        numerators: numerator_range,
+        denominator_spec: denominator_pieces.join(""),
+    })
 }
 
-fn python_bruch_range_from_text(text: &str) -> Option<(Vec<i64>, String)> {
-    let bruch_list = python_bruch_spalt(text)?;
-    python_create_ranges_for_bruch_lists(&bruch_list)
+fn parse_python_bruch_spalt_group_piece(piece: &str) -> Option<PythonFractionGroup> {
+    let inner = strip_matching_row_wrappers(piece.trim());
+    let bruch_list = python_bruch_spalt(inner)?;
+    let ranges = create_ranges_for_python_bruch_list(&bruch_list)?;
+    if ranges.denominator_spec.trim().is_empty() {
+        return Some(PythonFractionGroup {
+            numerator_values: Vec::new(),
+            denominator_values: Vec::new(),
+        });
+    }
+
+    let numerator_values = ranges
+        .numerators
+        .into_iter()
+        .filter(|value| *value > 0)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let denominator_values = fraction_denominator_values_from_python_spec(&ranges.denominator_spec);
+    Some(PythonFractionGroup {
+        numerator_values,
+        denominator_values,
+    })
 }
+
 
 #[derive(Clone, Debug)]
 struct PythonFractionGroup {
@@ -3133,36 +3307,31 @@ fn parse_fraction_pair_with_inline_vielfache(piece: &str) -> Option<(bool, i64, 
 
 fn fraction_denominator_values_from_python_spec(spec: &str) -> Vec<i64> {
     let trimmed = spec.trim();
-    let (inline_vielfache, body) = match trimmed.strip_prefix('v') {
+    let (inline_vielfache, core) = match trimmed.strip_prefix('v') {
         Some(rest) => (true, rest.trim_start()),
         None => (false, trimmed),
     };
 
     let base_values = python_row_spec_to_numbers_with_options(
-        body,
+        core,
         false,
         Some(PYTHON_ROW_MULTIPLE_LIMIT),
     )
     .unwrap_or_else(|| {
-        parse_unsigned_row_i64(body)
+        parse_unsigned_row_i64(core)
             .map(|value| vec![value])
             .unwrap_or_default()
-    });
+    })
+    .into_iter()
+    .filter(|value| *value > 0)
+    .collect::<BTreeSet<_>>()
+    .into_iter()
+    .collect::<Vec<_>>();
 
     if inline_vielfache {
-        base_values
-            .into_iter()
-            .flat_map(python_fraction_allowed_multiples)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect()
+        expand_values_over_python_fraction_allowed_multiples(&base_values)
     } else {
         base_values
-            .into_iter()
-            .filter(|value| *value > 0)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect()
     }
 }
 
@@ -3172,22 +3341,8 @@ fn parse_python_fraction_group_piece(piece: &str) -> Option<PythonFractionGroup>
         return None;
     }
 
-    if let Some((numerator_values_raw, denominator_spec)) = python_bruch_range_from_text(inner) {
-        let numerator_values = numerator_values_raw
-            .into_iter()
-            .filter(|value| *value > 0)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        let denominator_values = fraction_denominator_values_from_python_spec(&denominator_spec);
-        // Once the Python bruchSpalt/createRangesForBruchLists path has
-        // accepted a token, we must not fall back to the older symmetric Rust
-        // range parser.  Python's range(4, 3) is intentionally empty for a
-        // form like 4/5-2/3, while the old Rust fallback expanded it backwards.
-        return Some(PythonFractionGroup {
-            numerator_values,
-            denominator_values,
-        });
+    if let Some(group) = parse_python_bruch_spalt_group_piece(inner) {
+        return Some(group);
     }
 
     if let Some((left, right)) = split_fraction_operator(inner, '-') {
@@ -3293,11 +3448,23 @@ fn should_use_python_reverse_fraction_groups(map: &BTreeMap<i64, BTreeSet<i64>>)
         return false;
     }
 
-    let unique_values = map
-        .values()
-        .flat_map(|values| values.iter().copied())
-        .collect::<BTreeSet<_>>();
-    unique_values.len() < map.len()
+    // Python bruchBereichsManagementAndWbefehl does not invert merely because
+    // several numerator/range keys share the same denominator/value.  It builds a
+    // cumulative union of the already expanded value sets, sums that cumulative
+    // length for each key, and inverts only when the resulting average is below
+    // one.  For a non-empty Rust map with non-empty BTreeSet values this is false;
+    // keeping the explicit calculation avoids the old over-eager reverse mapping
+    // for cases like 2/5-3/5.
+    let mut cumulative_values = BTreeSet::new();
+    let mut value_len_sum = 0usize;
+    for values in map.values() {
+        for value in values {
+            cumulative_values.insert(*value);
+        }
+        value_len_sum = value_len_sum.saturating_add(cumulative_values.len());
+    }
+
+    value_len_sum < map.len()
 }
 
 fn invert_python_fraction_groups(
@@ -3313,20 +3480,20 @@ fn invert_python_fraction_groups(
 }
 
 fn expand_python_fraction_groups_for_global_vielfache(
-    map: BTreeMap<i64, BTreeSet<i64>>,
+    map: &BTreeMap<i64, BTreeSet<i64>>,
 ) -> BTreeMap<i64, BTreeSet<i64>> {
-    let mut expanded = BTreeMap::new();
+    let mut expanded: BTreeMap<i64, BTreeSet<i64>> = BTreeMap::new();
 
     for (numerator, denominators) in map {
-        let numerator_multiples = python_fraction_allowed_multiples(numerator);
+        let numerator_multiples =
+            expand_values_over_python_fraction_allowed_multiples(&[*numerator]);
         if numerator_multiples.is_empty() {
             continue;
         }
 
-        let denominator_multiples = denominators
-            .into_iter()
-            .flat_map(python_fraction_allowed_multiples)
-            .collect::<BTreeSet<_>>();
+        let denominator_values = denominators.iter().copied().collect::<Vec<_>>();
+        let denominator_multiples =
+            expand_values_over_python_fraction_allowed_multiples(&denominator_values);
         if denominator_multiples.is_empty() {
             continue;
         }
@@ -3345,21 +3512,36 @@ fn expand_python_fraction_groups_for_global_vielfache(
     expanded
 }
 
-fn subtract_python_fraction_groups(
-    target: &mut BTreeMap<i64, BTreeSet<i64>>,
-    removals: BTreeMap<i64, BTreeSet<i64>>,
+fn add_python_fraction_integer_side_effects(
+    groups: &BTreeMap<i64, BTreeSet<i64>>,
+    primary_numbers: &mut BTreeSet<i64>,
+    reciprocal_numbers: &mut BTreeSet<i64>,
+    equal_fraction_numbers: &mut BTreeSet<i64>,
 ) {
-    for (key, values) in removals {
-        if let Some(current) = target.get_mut(&key) {
-            for value in values {
-                current.remove(&value);
+    for (numerator, denominators) in groups {
+        let numerator = (*numerator).abs();
+        for denominator in denominators {
+            let denominator = (*denominator).abs();
+            if numerator == 0 || denominator == 0 {
+                continue;
+            }
+            if numerator == denominator && numerator > 1 {
+                equal_fraction_numbers.insert(numerator);
+            }
+            if numerator % denominator == 0 {
+                primary_numbers.insert(numerator / denominator);
+            }
+            if denominator % numerator == 0 {
+                reciprocal_numbers.insert(denominator / numerator);
             }
         }
     }
-    target.retain(|_, values| !values.is_empty());
 }
 
-fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> PythonRowBuckets {
+fn build_python_row_buckets_with_global_vielfache(
+    row_specs: &[String],
+    global_vielfache: bool,
+) -> PythonRowBuckets {
     let mut buckets = PythonRowBuckets::default();
 
     let mut primary_numbers: BTreeSet<i64> = BTreeSet::new();
@@ -3407,8 +3589,8 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
                             if *numerator == 0 || *denominator == 0 {
                                 continue;
                             }
-                            let numerator_abs = numerator.abs();
-                            let denominator_abs = denominator.abs();
+                            let numerator_abs = (*numerator).abs();
+                            let denominator_abs = (*denominator).abs();
 
                             if numerator_abs == denominator_abs && numerator_abs > 1 {
                                 if subtract {
@@ -3437,7 +3619,7 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
 
                         if *numerator == 1 {
                             for denominator in &group.denominator_values {
-                                let denominator_abs = denominator.abs();
+                                let denominator_abs = (*denominator).abs();
                                 if denominator_abs == 0 {
                                     continue;
                                 }
@@ -3451,8 +3633,8 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
                         }
 
                         for denominator in &group.denominator_values {
-                            let numerator_abs = numerator.abs();
-                            let denominator_abs = denominator.abs();
+                            let numerator_abs = (*numerator).abs();
+                            let denominator_abs = (*denominator).abs();
                             if numerator_abs == 0 || denominator_abs == 0 {
                                 continue;
                             }
@@ -3544,6 +3726,57 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
         }
     }
 
+    if global_vielfache {
+        non_whole_fraction_groups =
+            expand_python_fraction_groups_for_global_vielfache(&non_whole_fraction_groups);
+        negative_non_whole_fraction_groups =
+            expand_python_fraction_groups_for_global_vielfache(
+                &negative_non_whole_fraction_groups,
+            );
+        reciprocal_numbers = expand_values_over_python_fraction_allowed_multiples(
+            &reciprocal_numbers.iter().copied().collect::<Vec<_>>(),
+        )
+        .into_iter()
+        .collect();
+        negative_reciprocal_numbers = expand_values_over_python_fraction_allowed_multiples(
+            &negative_reciprocal_numbers
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
+        )
+        .into_iter()
+        .collect();
+        equal_fraction_numbers = expand_values_over_python_fraction_allowed_multiples(
+            &equal_fraction_numbers.iter().copied().collect::<Vec<_>>(),
+        )
+        .into_iter()
+        .collect();
+        negative_equal_fraction_numbers = expand_values_over_python_fraction_allowed_multiples(
+            &negative_equal_fraction_numbers
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
+        )
+        .into_iter()
+        .collect();
+    }
+
+    for (key, values) in negative_non_whole_fraction_groups {
+        if let Some(current) = non_whole_fraction_groups.get_mut(&key) {
+            for value in values {
+                current.remove(&value);
+            }
+        }
+    }
+    non_whole_fraction_groups.retain(|_, values| !values.is_empty());
+
+    add_python_fraction_integer_side_effects(
+        &non_whole_fraction_groups,
+        &mut primary_numbers,
+        &mut reciprocal_numbers,
+        &mut equal_fraction_numbers,
+    );
+
     for value in negative_primary_numbers {
         primary_numbers.remove(&value);
     }
@@ -3553,22 +3786,6 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
     for value in negative_equal_fraction_numbers {
         equal_fraction_numbers.remove(&value);
     }
-    if global_vielfache {
-        // Python bruchBereichsManagementAndWbefehl expands both sides of
-        // nicht-ganzzahlige Brueche through gebrochenErlaubteZahlen whenever
-        // `v`/`vielfache` is active globally.  The expansion happens before
-        // Abzug is applied, so a negative fraction removes the same generated
-        // numerator/denominator cross-product from the positive map.
-        non_whole_fraction_groups =
-            expand_python_fraction_groups_for_global_vielfache(non_whole_fraction_groups);
-        negative_non_whole_fraction_groups = expand_python_fraction_groups_for_global_vielfache(
-            negative_non_whole_fraction_groups,
-        );
-    }
-    subtract_python_fraction_groups(
-        &mut non_whole_fraction_groups,
-        negative_non_whole_fraction_groups,
-    );
 
     buckets.primary_row_specs = primary_numbers
         .into_iter()
@@ -3595,6 +3812,7 @@ fn build_python_row_buckets(row_specs: &[String], global_vielfache: bool) -> Pyt
 
     buckets
 }
+
 
 fn prompt_python_default_oberesmaximum_seed() -> i64 {
     // Python retaPrompt liest hier letztlich `tables.hoechsteZeile[1024]` aus dem
@@ -4406,8 +4624,9 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
     let use_range = normalized.iter().any(|t| t == "range");
     let invert = normalized.iter().any(|t| t == "invertieren");
     let teiler = normalized.iter().any(|t| t == "teiler");
-    let vielfache = python_prompt_uses_vielfache(&normalized);
-    let row_buckets = build_python_row_buckets(&row_specs, vielfache);
+    let einzeln = normalized.iter().any(|t| t == "einzeln");
+    let vielfache = !einzeln && normalized.iter().any(|t| t == "vielfache");
+    let row_buckets = build_python_row_buckets_with_global_vielfache(&row_specs, vielfache);
     let extra_params = extract_passthrough_reta_parameters(&normalized);
     let mut calls: Vec<Vec<String>> = Vec::new();
     let mut seen_labels = BTreeSet::new();
@@ -4636,8 +4855,9 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
     let use_range = normalized.iter().any(|t| t == "range");
     let invert = normalized.iter().any(|t| t == "invertieren");
     let teiler = normalized.iter().any(|t| t == "teiler");
-    let vielfache = python_prompt_uses_vielfache(&normalized);
-    let row_buckets = build_python_row_buckets(&row_specs, vielfache);
+    let einzeln = normalized.iter().any(|t| t == "einzeln");
+    let vielfache = !einzeln && normalized.iter().any(|t| t == "vielfache");
+    let row_buckets = build_python_row_buckets_with_global_vielfache(&row_specs, vielfache);
     let generic_rows = if !row_buckets.primary_row_specs.is_empty() {
         row_buckets.primary_row_specs.clone()
     } else {
@@ -4727,8 +4947,6 @@ fn parse_selective_prompt_row_input(tokens: &[String]) -> Option<SelectivePrompt
         ..SelectivePromptRowInput::default()
     };
 
-    let suppress_vielfache = tokens.iter().any(|token| token == "einzeln");
-
     for token in tokens {
         if is_row_spec_token(token) {
             continue;
@@ -4737,8 +4955,7 @@ fn parse_selective_prompt_row_input(tokens: &[String]) -> Option<SelectivePrompt
         match token.as_str() {
             "range" => selective.use_range = true,
             "teiler" => selective.use_teiler = true,
-            "vielfache" if !suppress_vielfache => selective.use_vielfache = true,
-            "vielfache" | "einzeln" => {},
+            "vielfache" => selective.use_vielfache = true,
             "invertieren" | "--invertieren" => selective.use_invertieren = true,
             "ee" | "--keineueberschriften" => selective.request_no_headers = true,
             "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" | "--keineleereninhalte" => {
@@ -4899,7 +5116,6 @@ fn is_selective_reta_modifier(token: &str) -> bool {
         "range"
             | "teiler"
             | "vielfache"
-            | "einzeln"
             | "invertieren"
             | "--invertieren"
             | "ee"
@@ -5250,11 +5466,9 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 mod tests {
     use super::{
         build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
-        expand_python_regex_like_tokens, fraction_denominator_values_from_python_spec,
-        prepare_prompt_big_output_for_stored_reta,
+        expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows, python_bruch_range_from_text,
-        python_row_spec_to_numbers, PromptModus,
+        prepare_prompt_big_output_for_stored_rows, python_row_spec_to_numbers, PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -5558,39 +5772,6 @@ mod tests {
     }
 
     #[test]
-    fn python_bruch_spalt_create_ranges_matches_py_retaprompt() {
-        assert_eq!(
-            python_bruch_range_from_text("1/2-3/4"),
-            Some((vec![1, 2, 3], "2-4".to_string()))
-        );
-        assert_eq!(
-            python_bruch_range_from_text("1/2+3/4"),
-            Some((vec![4, -2], "2+4".to_string()))
-        );
-        assert_eq!(
-            python_bruch_range_from_text("4/5-2/3"),
-            Some((Vec::<i64>::new(), "5-3".to_string()))
-        );
-    }
-
-    #[test]
-    fn fraction_plus_keeps_only_python_positive_generated_rows() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "1/2+3/4"]));
-        assert_eq!(calls.len(), 1);
-        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=4"));
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=6"));
-        assert!(!calls[0].iter().any(|token| token == "--gebrochenemotion=2"));
-    }
-
-    #[test]
-    fn reverse_fraction_range_stays_empty_like_python_range() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "4/5-2/3"]));
-        assert!(calls.is_empty());
-    }
-
-    #[test]
     fn fractional_emotion_builds_python_oriented_gebrochenemotion_call() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/3"]));
         assert_eq!(calls.len(), 1);
@@ -5667,6 +5848,32 @@ mod tests {
     }
 
     #[test]
+    fn fraction_mixed_range_and_distance_uses_python_bruch_spalt_pipeline() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "1/2-3/4+5/6"]));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=6")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=7")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=8")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=8,9,10")));
+        assert!(!calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
+    }
+
+    #[test]
+    fn descending_fraction_range_keeps_python_empty_range_semantics() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "3/4-1/2"]));
+        assert!(calls.is_empty());
+    }
+
+    #[test]
     fn fraction_subtraction_removes_python_fraction_group_values() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "-2/3,2/5"]));
         assert_eq!(calls.len(), 1);
@@ -5686,16 +5893,92 @@ mod tests {
     }
 
     #[test]
-    fn repeated_denominator_fraction_range_uses_python_reverse_mapping() {
+    fn repeated_denominator_fraction_range_keeps_python_normal_mapping() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/5-3/5"]));
+        assert_eq!(calls.len(), 2);
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenemotion=2")
+            && call
+                .iter()
+                .any(|token| token == "--vorhervonausschnitt=5")
+            && call
+                .iter()
+                .any(|token| token == "--spaltenreihenfolgeundnurdiese=2")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenemotion=3")
+            && call
+                .iter()
+                .any(|token| token == "--vorhervonausschnitt=5")
+            && call
+                .iter()
+                .any(|token| token == "--spaltenreihenfolgeundnurdiese=2")));
+        assert!(!calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=5")));
+    }
+
+    #[test]
+    fn fraction_global_vielfache_expands_non_whole_numerators_like_python() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "emotion",
+            "vielfache",
+            "2/3",
+            "-4/3",
+        ]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--gebrochenemotion=2")
+            && call
+                .iter()
+                .any(|token| token == "--vorhervonausschnitt=3,6,9,12,15,18,21")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=6")));
+        assert!(!calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=4")));
+        assert!(!calls
+            .iter()
+            .flat_map(|call| call.iter())
+            .any(|token| token.contains("1026")));
+    }
+
+    #[test]
+    fn fraction_global_vielfache_adds_integer_side_effect_rows_like_python() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "vielfache", "2/3"]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--grundstrukturen=emotion")
+            && call.iter().any(|token| {
+                token.starts_with("--vielfachevonzahlen=") && token.contains('2')
+            })));
+    }
+
+    #[test]
+    fn fraction_global_vielfache_adds_equal_fraction_side_effect_like_python() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "vielfache", "2/3"]));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--universum=verhaeltnisgleicherzahl")));
+    }
+
+    #[test]
+    fn einzeln_disables_python_vielfache_row_rewrite() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "emotion",
+            "12",
+            "vielfache",
+            "einzeln",
+        ]));
         assert_eq!(calls.len(), 1);
-        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=5"));
         assert!(calls[0]
             .iter()
-            .any(|token| token == "--vorhervonausschnitt=2,3"));
-        assert!(calls[0]
+            .any(|token| token == "--vorhervonausschnitt=12"));
+        assert!(!calls[0]
             .iter()
-            .any(|token| token == "--spaltenreihenfolgeundnurdiese=1"));
+            .any(|token| token.starts_with("--vielfachevonzahlen=")));
     }
 
     #[test]
@@ -5916,81 +6199,84 @@ mod tests {
     }
 
     #[test]
-    fn inline_fraction_vielfache_uses_python_gebrochen_allowed_values() {
+    fn python_generator_rows_accept_literal_iterable_sources() {
         assert_eq!(
-            fraction_denominator_values_from_python_spec("v3"),
-            vec![3, 6, 9, 12, 15, 18, 21]
+            python_row_spec_to_numbers("[n * 3 for n in [1,2,3] if n != 2]"),
+            Some(vec![3, 9])
         );
-        assert_eq!(
-            fraction_denominator_values_from_python_spec("v5"),
-            vec![5, 10, 15, 20]
-        );
-    }
-
-    #[test]
-    fn einzeln_suppresses_global_vielfache_like_python_prompt() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&[
             "emotion",
-            "vielfache",
-            "einzeln",
-            "12",
+            "{n + 10 for n in {1,2,3} if n >= 2}",
         ]));
         assert_eq!(calls.len(), 1);
         assert!(calls[0]
             .iter()
-            .any(|token| token == "--vorhervonausschnitt=12"));
-        assert!(!calls[0]
-            .iter()
-            .any(|token| token == "--vielfachevonzahlen=12"));
+            .any(|token| token == "--vorhervonausschnitt=12,13"));
     }
 
     #[test]
-    fn global_vielfache_expands_non_whole_fraction_groups_like_python() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "vielfache", "2/3"]));
+    fn python_generator_rows_support_membership_filters_and_simple_builtins() {
+        assert_eq!(
+            python_row_spec_to_numbers("(n for n in (1,2,3,4) if n not in (2,4))"),
+            Some(vec![1, 3])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[abs(n-3) for n in range(1,6) if n in {1,3,5}]"),
+            Some(vec![0, 2])
+        );
+    }
 
-        assert!(calls.iter().any(|call| {
-            call.iter().any(|token| token == "--gebrochenemotion=3")
-                && call.iter().any(|token| {
-                    token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22"
-                })
-                && call
-                    .iter()
-                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=2")
-        }));
-        assert!(calls.iter().any(|call| {
-            call.iter().any(|token| token == "--gebrochenemotion=21")
-                && call.iter().any(|token| {
-                    token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22"
-                })
-        }));
+    #[test]
+    fn python_generator_rows_accept_builtin_iterable_wrappers_like_eval() {
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in list(range(1,5)) if n in set([1,3,4])]"),
+            Some(vec![1, 3, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("{n * 2 for n in sorted({3,1,2})}"),
+            Some(vec![2, 4, 6])
+        );
+    }
+
+    #[test]
+    fn python_generator_rows_accept_eval_style_iterable_unions_and_concats() {
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in ([1,2] + [3,4]) if n >= 2]"),
+            Some(vec![2, 3, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in ({1,2} | {2,5}) if n != 1]"),
+            Some(vec![2, 5])
+        );
+    }
+
+    #[test]
+    fn fraction_inline_vielfache_uses_python_gebrochen_allowed_numbers() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "v2/3"]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--gebrochenemotion=2"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=3,6,9,12,15,18,21"));
+        assert!(!calls[0].iter().any(|token| token.contains("1026")));
+    }
+
+    #[test]
+    fn fraction_global_vielfache_expands_numerator_like_python() {
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/3", "vielfache"]));
+        assert!(!calls.is_empty());
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=3")));
+        assert!(calls.iter().any(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22")));
         assert!(!calls
             .iter()
-            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=24")));
+            .flat_map(|call| call.iter())
+            .any(|token| token.contains("1026")));
     }
 
-    #[test]
-    fn global_vielfache_fraction_subtraction_removes_generated_cross_product() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
-            "emotion",
-            "vielfache",
-            "2/3,-4/6",
-        ]));
-
-        assert!(calls.iter().any(|call| {
-            call.iter().any(|token| token == "--gebrochenemotion=6")
-                && call.iter().any(|token| {
-                    token == "--vorhervonausschnitt=2,6,10,14,18,22"
-                })
-        }));
-        assert!(calls.iter().any(|call| {
-            call.iter().any(|token| token == "--gebrochenemotion=3")
-                && call.iter().any(|token| {
-                    token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22"
-                })
-        }));
-        assert!(!calls.iter().any(|call| {
-            call.iter().any(|token| token == "--gebrochenemotion=6")
-                && call.iter().any(|token| token.contains("4,8,12,16,20"))
-        }));
-    }
 }
