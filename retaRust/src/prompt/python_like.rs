@@ -2425,14 +2425,27 @@ impl<'a> PythonRowExprParser<'a> {
             self.pos = args_start;
             let inner = self.take_call_inner_after_open_paren()?;
             let vars = self.vars_as_map();
-            let values = parse_python_iterable_values_with_vars(&inner, &vars);
+            let call_parts = custom_split_delim_parenthesized(&inner, ',');
             return match ident.as_str() {
-                "sum" => values?
-                    .into_iter()
-                    .try_fold(0i64, |acc, value| acc.checked_add(value)),
-                "len" => Some(values?.len() as i64),
-                "min" => values?.into_iter().min(),
-                "max" => values?.into_iter().max(),
+                "sum" if !call_parts.is_empty() && call_parts.len() <= 2 => {
+                    let start = if call_parts.len() == 2 {
+                        eval_python_row_expr_with_vars(&call_parts[1], &vars)?
+                    } else {
+                        0
+                    };
+                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?
+                        .into_iter()
+                        .try_fold(start, |acc, value| acc.checked_add(value))
+                }
+                "len" if call_parts.len() == 1 => {
+                    Some(parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.len() as i64)
+                }
+                "min" if call_parts.len() == 1 => {
+                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.into_iter().min()
+                }
+                "max" if call_parts.len() == 1 => {
+                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.into_iter().max()
+                }
                 _ => None,
             };
         }
@@ -2606,22 +2619,35 @@ fn is_python_row_identifier(text: &str) -> bool {
         && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
-fn strip_python_collection_wrappers(text: &str) -> Option<&str> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PythonCollectionKind {
+    SequenceLike,
+    SetOrDictLike,
+}
+
+impl PythonCollectionKind {
+    fn deduplicates_like_python_set_conversion(self) -> bool {
+        matches!(self, Self::SetOrDictLike)
+    }
+}
+
+fn strip_python_collection_wrappers_with_kind(text: &str) -> Option<(&str, PythonCollectionKind)> {
     let trimmed = text.trim();
     if trimmed.len() < 2 {
         return None;
     }
-    let (open, close) = match (trimmed.chars().next()?, trimmed.chars().last()?) {
-        ('[', ']') => ('[', ']'),
-        ('{', '}') => ('{', '}'),
-        ('(', ')') => ('(', ')'),
+    let (open, close, kind) = match (trimmed.chars().next()?, trimmed.chars().last()?) {
+        ('[', ']') => ('[', ']', PythonCollectionKind::SequenceLike),
+        ('{', '}') => ('{', '}', PythonCollectionKind::SetOrDictLike),
+        ('(', ')') => ('(', ')', PythonCollectionKind::SequenceLike),
         _ => return None,
     };
     if !trimmed.starts_with(open) || !trimmed.ends_with(close) {
         return None;
     }
-    Some(&trimmed[open.len_utf8()..trimmed.len() - close.len_utf8()])
+    Some((&trimmed[open.len_utf8()..trimmed.len() - close.len_utf8()], kind))
 }
+
 
 fn strip_top_level_wrapping_parens(text: &str) -> Option<&str> {
     let trimmed = text.trim();
@@ -2782,12 +2808,12 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>)
         return eval_python_row_condition_with_vars(inner, vars);
     }
     if let Some(inner) = parse_python_call_inner(trimmed, "all") {
-        let values = parse_python_iterable_values_with_vars(inner, vars)?;
-        return Some(values.into_iter().all(|value| value != 0));
+        let values = parse_python_truth_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().all(|value| value));
     }
     if let Some(inner) = parse_python_call_inner(trimmed, "any") {
-        let values = parse_python_iterable_values_with_vars(inner, vars)?;
-        return Some(values.into_iter().any(|value| value != 0));
+        let values = parse_python_truth_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().any(|value| value));
     }
     if let Some(index) = find_top_level_keyword(trimmed, " or ") {
         return Some(
@@ -2983,6 +3009,9 @@ fn parse_python_builtin_iterable_values_with_vars(
                 inner.to_string()
             };
             let mut values = parse_python_iterable_values_with_vars(&source, vars)?;
+            if name == "set" || name == "frozenset" {
+                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+            }
             if name == "reversed" {
                 values.reverse();
             }
@@ -3063,6 +3092,7 @@ fn parse_python_iterable_values_with_vars(
 
     parse_python_range_values_with_vars(trimmed, vars)
         .or_else(|| parse_python_builtin_iterable_values_with_vars(trimmed, vars))
+        .or_else(|| parse_python_bare_generator_row_values_with_vars(trimmed, vars))
         .or_else(|| parse_python_generated_row_values_with_vars(trimmed, vars))
 }
 
@@ -3181,10 +3211,10 @@ fn expand_python_comprehension_values(
     clause_index: usize,
     expr_text: &str,
     vars: &mut BTreeMap<String, i64>,
-    out: &mut BTreeSet<i64>,
+    out: &mut Vec<i64>,
 ) -> Option<()> {
     if clause_index >= clauses.len() {
-        out.insert(eval_python_row_expr_with_vars(expr_text, vars)?);
+        out.push(eval_python_row_expr_with_vars(expr_text, vars)?);
         return Some(());
     }
 
@@ -3218,11 +3248,22 @@ fn expand_python_comprehension_values(
     Some(())
 }
 
-fn parse_python_generated_row_values_with_vars(
-    text: &str,
+fn python_collection_values_finish(
+    values: Vec<i64>,
+    kind: PythonCollectionKind,
+) -> Vec<i64> {
+    if kind.deduplicates_like_python_set_conversion() {
+        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+    } else {
+        values
+    }
+}
+
+fn parse_python_generated_row_values_inner_with_kind(
+    inner: &str,
+    kind: PythonCollectionKind,
     outer_vars: &BTreeMap<String, i64>,
 ) -> Option<Vec<i64>> {
-    let inner = strip_python_collection_wrappers(text)?;
     let inner = inner.trim();
     if inner.is_empty() {
         return Some(Vec::new());
@@ -3236,29 +3277,205 @@ fn parse_python_generated_row_values_with_vars(
         let tail = inner[for_index + 5..].trim();
         let clauses = parse_python_comprehension_clauses(tail)?;
         let mut vars = outer_vars.clone();
-        let mut out = BTreeSet::new();
+        let mut out = Vec::new();
         expand_python_comprehension_values(&clauses, 0, expr_text, &mut vars, &mut out)?;
-        return Some(out.into_iter().collect());
+        return Some(python_collection_values_finish(out, kind));
     }
 
-    let mut out = BTreeSet::new();
+    let mut out = Vec::new();
     for part in custom_split_delim_parenthesized(inner, ',') {
         let trimmed = part.trim();
         if trimmed.is_empty() {
             continue;
         }
         if let Some(starred_iterable) = trimmed.strip_prefix('*') {
-            for value in parse_python_iterable_values_with_vars(starred_iterable, outer_vars)? {
-                out.insert(value);
-            }
+            out.extend(parse_python_iterable_values_with_vars(starred_iterable, outer_vars)?);
             continue;
         }
         let expr_text = split_top_level_dict_key_value(trimmed)
             .map(|(key, _)| key)
             .unwrap_or(trimmed);
-        out.insert(eval_python_row_expr_with_vars(expr_text, outer_vars)?);
+        out.push(eval_python_row_expr_with_vars(expr_text, outer_vars)?);
     }
-    Some(out.into_iter().collect())
+    Some(python_collection_values_finish(out, kind))
+}
+
+fn parse_python_bare_generator_row_values_with_vars(
+    text: &str,
+    outer_vars: &BTreeMap<String, i64>,
+) -> Option<Vec<i64>> {
+    find_top_level_keyword(text, " for ")?;
+    parse_python_generated_row_values_inner_with_kind(
+        text,
+        PythonCollectionKind::SequenceLike,
+        outer_vars,
+    )
+}
+
+fn parse_python_generated_row_values_with_vars(
+    text: &str,
+    outer_vars: &BTreeMap<String, i64>,
+) -> Option<Vec<i64>> {
+    let (inner, kind) = strip_python_collection_wrappers_with_kind(text)?;
+    parse_python_generated_row_values_inner_with_kind(inner, kind, outer_vars)
+}
+
+fn python_truth_values_finish(
+    values: Vec<bool>,
+    kind: PythonCollectionKind,
+) -> Vec<bool> {
+    if kind.deduplicates_like_python_set_conversion() {
+        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+    } else {
+        values
+    }
+}
+
+fn expand_python_truth_comprehension_values(
+    clauses: &[PythonComprehensionClause],
+    clause_index: usize,
+    expr_text: &str,
+    vars: &mut BTreeMap<String, i64>,
+    out: &mut Vec<bool>,
+) -> Option<()> {
+    if clause_index >= clauses.len() {
+        out.push(eval_python_row_condition_with_vars(expr_text, vars)?);
+        return Some(());
+    }
+
+    let clause = &clauses[clause_index];
+    let source_values = parse_python_iterable_values_with_vars(&clause.source_text, vars)?;
+    let had_previous = vars.get(&clause.var_name).copied();
+
+    for value in source_values {
+        vars.insert(clause.var_name.clone(), value);
+        let keep = clause
+            .filters
+            .iter()
+            .map(|filter| eval_python_row_condition_with_vars(filter, vars))
+            .collect::<Option<Vec<_>>>()?
+            .into_iter()
+            .all(|value| value);
+        if keep {
+            expand_python_truth_comprehension_values(clauses, clause_index + 1, expr_text, vars, out)?;
+        }
+    }
+
+    match had_previous {
+        Some(value) => {
+            vars.insert(clause.var_name.clone(), value);
+        }
+        None => {
+            vars.remove(&clause.var_name);
+        }
+    }
+
+    Some(())
+}
+
+fn parse_python_truth_generated_values_inner_with_kind(
+    inner: &str,
+    kind: PythonCollectionKind,
+    outer_vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
+    let inner = inner.trim();
+    if inner.is_empty() {
+        return Some(Vec::new());
+    }
+
+    if let Some(for_index) = find_top_level_keyword(inner, " for ") {
+        let expr_text = inner[..for_index].trim();
+        let expr_text = split_top_level_dict_key_value(expr_text)
+            .map(|(key, _)| key)
+            .unwrap_or(expr_text);
+        let tail = inner[for_index + 5..].trim();
+        let clauses = parse_python_comprehension_clauses(tail)?;
+        let mut vars = outer_vars.clone();
+        let mut out = Vec::new();
+        expand_python_truth_comprehension_values(&clauses, 0, expr_text, &mut vars, &mut out)?;
+        return Some(python_truth_values_finish(out, kind));
+    }
+
+    let mut out = Vec::new();
+    for part in custom_split_delim_parenthesized(inner, ',') {
+        let trimmed = part.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(starred_iterable) = trimmed.strip_prefix('*') {
+            out.extend(parse_python_truth_iterable_values_with_vars(starred_iterable, outer_vars)?);
+            continue;
+        }
+        let expr_text = split_top_level_dict_key_value(trimmed)
+            .map(|(key, _)| key)
+            .unwrap_or(trimmed);
+        out.push(eval_python_row_condition_with_vars(expr_text, outer_vars)?);
+    }
+    Some(python_truth_values_finish(out, kind))
+}
+
+fn parse_python_bare_generator_truth_values_with_vars(
+    text: &str,
+    outer_vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
+    find_top_level_keyword(text, " for ")?;
+    parse_python_truth_generated_values_inner_with_kind(
+        text,
+        PythonCollectionKind::SequenceLike,
+        outer_vars,
+    )
+}
+
+fn parse_python_truth_generated_values_with_vars(
+    text: &str,
+    outer_vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
+    let (inner, kind) = strip_python_collection_wrappers_with_kind(text)?;
+    parse_python_truth_generated_values_inner_with_kind(inner, kind, outer_vars)
+}
+
+fn parse_python_truth_builtin_iterable_values_with_vars(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
+    for name in ["list", "tuple", "set", "frozenset", "sorted", "reversed"] {
+        if let Some(inner) = parse_python_call_inner(text, name) {
+            if inner.trim().is_empty() {
+                return match name {
+                    "list" | "tuple" | "set" | "frozenset" => Some(Vec::new()),
+                    _ => None,
+                };
+            }
+            let source = if name == "sorted" || name == "reversed" {
+                custom_split_delim_parenthesized(inner, ',')
+                    .into_iter()
+                    .next()
+                    .unwrap_or_default()
+            } else {
+                inner.to_string()
+            };
+            let mut values = parse_python_truth_iterable_values_with_vars(&source, vars)?;
+            if name == "set" || name == "frozenset" {
+                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+            }
+            if name == "reversed" {
+                values.reverse();
+            }
+            return Some(values);
+        }
+    }
+    None
+}
+
+fn parse_python_truth_iterable_values_with_vars(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
+    parse_python_iterable_values_with_vars(text, vars)
+        .map(|values| values.into_iter().map(|value| value != 0).collect())
+        .or_else(|| parse_python_truth_builtin_iterable_values_with_vars(text, vars))
+        .or_else(|| parse_python_bare_generator_truth_values_with_vars(text, vars))
+        .or_else(|| parse_python_truth_generated_values_with_vars(text, vars))
 }
 
 fn expand_python_row_generated_values_vielfache(
@@ -6935,6 +7152,32 @@ mod tests {
         );
         assert_eq!(python_row_spec_to_numbers("({1,2,3} - {2}) & {1,3,4}"), Some(vec![1, 3]));
         assert_eq!(python_row_spec_to_numbers("{1,2,3} ^ {3,4}"), Some(vec![1, 2, 4]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_preserve_sequence_duplicates_before_final_set_conversion() {
+        assert_eq!(python_row_spec_to_numbers("[sum([1,1,2])]"), Some(vec![4]));
+        assert_eq!(python_row_spec_to_numbers("[len([1,1,2])]"), Some(vec![3]));
+        assert_eq!(python_row_spec_to_numbers("[len(set([1,1,2]))]"), Some(vec![2]));
+        assert_eq!(python_row_spec_to_numbers("[sum([n for n in [1,1,2]])]"), Some(vec![4]));
+        assert_eq!(python_row_spec_to_numbers("[sum(n for n in [1,1,2])]"), Some(vec![4]));
+        assert_eq!(python_row_spec_to_numbers("[sum([1,2,3], 10)]"), Some(vec![16]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_boolean_generators_for_all_any() {
+        assert_eq!(
+            python_row_spec_to_numbers("[7 if all(n < 5 for n in range(5)) else 9]"),
+            Some(vec![7])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in range(6) if any(m == n for m in [2,4])]"),
+            Some(vec![2, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[1 if all([True, 1, not False]) else 2]"),
+            Some(vec![1])
+        );
     }
 
 }
