@@ -1371,14 +1371,11 @@ pub fn looks_like_single_numeric_or_fraction_part(text: &str) -> bool {
     if !trimmed.contains('/') && python_row_piece_is_integer_like(trimmed) {
         return true;
     }
-    if trimmed.starts_with('(') && trimmed.ends_with(')') {
-        return looks_like_numeric_or_fraction_range(&trimmed[1..trimmed.len() - 1]);
-    }
-    if trimmed.starts_with('[') && trimmed.ends_with(']') {
-        return looks_like_numeric_or_fraction_range(&trimmed[1..trimmed.len() - 1]);
-    }
-    if trimmed.starts_with('{') && trimmed.ends_with('}') {
-        return looks_like_numeric_or_fraction_range(&trimmed[1..trimmed.len() - 1]);
+    if trimmed
+        .chars()
+        .any(|ch| matches!(ch, '(' | ')' | '[' | ']' | '{' | '}'))
+    {
+        return false;
     }
     if trimmed.contains(',') {
         return custom_split_delim_parenthesized(trimmed, ',')
@@ -1386,9 +1383,9 @@ pub fn looks_like_single_numeric_or_fraction_part(text: &str) -> bool {
             .all(|piece| looks_like_single_numeric_or_fraction_part(&piece));
     }
     if trimmed.contains('+') {
-        return trimmed
-            .split('+')
-            .all(|piece| looks_like_single_numeric_or_fraction_part(piece));
+        return custom_split_delim_parenthesized(trimmed, '+')
+            .into_iter()
+            .all(|piece| looks_like_single_numeric_or_fraction_part(&piece));
     }
     if let Some((left, right)) = trimmed.split_once('-') {
         if left.is_empty() {
@@ -2245,11 +2242,13 @@ impl<'a> PythonRowExprParser<'a> {
                 }
                 value = value.checked_rem(rhs)?;
             } else if self.consume_text("/") {
-                let rhs = self.parse_power()?;
-                if rhs == 0 || value % rhs != 0 {
-                    return None;
-                }
-                value = value.checked_div(rhs)?;
+                // Python eval() keeps `/` as floating point division.  The
+                // original retaPrompt accepts generated row collections only
+                // when every evaluated element has exact type `int`, so even
+                // expressions such as `[4/2]` are rejected there.  Keep `//` as
+                // the integer-division form and reject `/` in this row-expression
+                // subset instead of silently turning it into integer division.
+                return None;
             } else if self.consume_text("*") {
                 value = value.checked_mul(self.parse_power()?)?;
             } else {
@@ -2298,16 +2297,15 @@ impl<'a> PythonRowExprParser<'a> {
 
         let ident = self.parse_identifier()?;
         if self.consume_text("(") {
-            let value = self.parse_expr()?;
-            if self.consume_text(",") {
-                return None;
-            }
-            if !self.consume_text(")") {
-                return None;
-            }
+            let args = self.parse_call_args_after_open_paren()?;
             return match ident.as_str() {
-                "abs" => value.checked_abs(),
-                "int" | "round" => Some(value),
+                "abs" if args.len() == 1 => args[0].checked_abs(),
+                "int" | "round" if args.len() == 1 => Some(args[0]),
+                "min" if !args.is_empty() => args.into_iter().min(),
+                "max" if !args.is_empty() => args.into_iter().max(),
+                "pow" if args.len() == 2 && (0..=31).contains(&args[1]) => {
+                    args[0].checked_pow(args[1] as u32)
+                }
                 _ => None,
             };
         }
@@ -2316,6 +2314,27 @@ impl<'a> PythonRowExprParser<'a> {
             Some(var) if var.name == ident => Some(var.value),
             _ => None,
         }
+    }
+
+    fn parse_call_args_after_open_paren(&mut self) -> Option<Vec<i64>> {
+        let mut args = Vec::new();
+        self.skip_ws();
+        if self.consume_text(")") {
+            return Some(args);
+        }
+
+        loop {
+            args.push(self.parse_expr()?);
+            self.skip_ws();
+            if self.consume_text(")") {
+                break;
+            }
+            if !self.consume_text(",") {
+                return None;
+            }
+        }
+
+        Some(args)
     }
 
     fn parse_number(&mut self) -> Option<i64> {
@@ -2605,6 +2624,31 @@ fn parse_python_iterable_values(text: &str) -> Option<Vec<i64>> {
         .or_else(|| parse_python_generated_row_values(trimmed))
 }
 
+fn python_str_as_generator_source(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.len() < 2 {
+        return None;
+    }
+
+    if trimmed.starts_with('(') && trimmed.ends_with(')') {
+        return Some(format!("[{}]", &trimmed[1..trimmed.len() - 1]));
+    }
+
+    if (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        || (trimmed.starts_with('{') && trimmed.ends_with('}'))
+    {
+        return Some(trimmed.to_string());
+    }
+
+    None
+}
+
+fn parse_python_str_as_generator_values(text: &str) -> Option<Vec<i64>> {
+    let source = python_str_as_generator_source(text)?;
+    let values = parse_python_iterable_values(&source)?;
+    Some(values.into_iter().collect::<BTreeSet<_>>().into_iter().collect())
+}
+
 fn parse_python_generated_row_values(text: &str) -> Option<Vec<i64>> {
     let inner = strip_python_collection_wrappers(text)?;
     let inner = inner.trim();
@@ -2649,6 +2693,12 @@ fn parse_python_generated_row_values(text: &str) -> Option<Vec<i64>> {
         if trimmed.is_empty() {
             continue;
         }
+        if let Some(starred_iterable) = trimmed.strip_prefix('*') {
+            for value in parse_python_iterable_values(starred_iterable)? {
+                out.insert(value);
+            }
+            continue;
+        }
         out.insert(eval_python_row_expr(trimmed, None)?);
     }
     Some(out.into_iter().collect())
@@ -2685,7 +2735,7 @@ fn python_row_piece_is_integer_like(piece: &str) -> bool {
     let Some((_, _, body)) = parse_python_row_piece_flags(piece) else {
         return false;
     };
-    parse_python_generated_row_values(body).is_some()
+    parse_python_str_as_generator_values(body).is_some()
         || parse_python_integer_row_piece_core(body).is_some()
 }
 
@@ -2697,7 +2747,7 @@ fn python_row_piece_to_numbers(
     let (subtract, inline_vielfache, body) = parse_python_row_piece_flags(piece)?;
     let use_vielfache = inherited_vielfache || inline_vielfache;
 
-    if let Some(values) = parse_python_generated_row_values(body) {
+    if let Some(values) = parse_python_str_as_generator_values(body) {
         let values = if use_vielfache {
             expand_python_row_generated_values_vielfache(&values, max_zahl)
         } else {
@@ -2738,8 +2788,7 @@ fn python_row_spec_to_numbers_with_options(
             python_row_piece_to_numbers(trimmed, inherited_vielfache, max_zahl)?;
         saw_piece = true;
         for value in values {
-            let value = value.abs();
-            if value == 0 {
+            if value <= 0 {
                 continue;
             }
             if subtract {
@@ -3587,14 +3636,13 @@ fn build_python_row_buckets_with_global_vielfache(
                 python_row_piece_to_numbers(piece_trimmed, false, Some(python_row_multiple_limit()))
             {
                 for value in values {
-                    let value_abs = value.abs();
-                    if value_abs == 0 {
+                    if value <= 0 {
                         continue;
                     }
                     if piece_subtract {
-                        negative_primary_numbers.insert(value_abs);
+                        negative_primary_numbers.insert(value);
                     } else {
-                        primary_numbers.insert(value_abs);
+                        primary_numbers.insert(value);
                     }
                 }
             }
@@ -5347,7 +5395,7 @@ mod tests {
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, is_15or16_command,
-        python_row_spec_to_numbers, PromptModus,
+        looks_like_numeric_or_fraction_range, python_row_spec_to_numbers, PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -6173,8 +6221,48 @@ mod tests {
         );
         assert_eq!(
             python_row_spec_to_numbers("[abs(n-3) for n in range(1,6) if n in {1,3,5}]"),
-            Some(vec![0, 2])
+            Some(vec![2])
         );
+    }
+
+    #[test]
+    fn python_eval_style_row_collections_accept_concat_union_and_star_unpacking() {
+        assert_eq!(python_row_spec_to_numbers("[1,2]+[2,4]"), Some(vec![1, 2, 4]));
+        assert_eq!(python_row_spec_to_numbers("{1,2}|{2,5}"), Some(vec![1, 2, 5]));
+        assert_eq!(python_row_spec_to_numbers("[*range(1,4),7]"), Some(vec![1, 2, 3, 7]));
+
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
+            "emotion",
+            "[1,2]+[2,4]",
+        ]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=1,2,4"));
+    }
+
+    #[test]
+    fn python_eval_style_row_collections_reject_float_division_like_python() {
+        assert_eq!(python_row_spec_to_numbers("[4/2]"), None);
+        assert_eq!(python_row_spec_to_numbers("[4//2]"), Some(vec![2]));
+    }
+
+    #[test]
+    fn python_eval_style_row_collections_accept_common_integer_builtins() {
+        assert_eq!(
+            python_row_spec_to_numbers("[min(4,2),max(1,3),pow(2,3),abs(-5)]"),
+            Some(vec![2, 3, 5, 8])
+        );
+    }
+
+    #[test]
+    fn python_eval_style_row_collections_filter_non_positive_results_like_bereich_to_numbers2() {
+        assert_eq!(python_row_spec_to_numbers("[-2,0,3]"), Some(vec![3]));
+        assert_eq!(python_row_spec_to_numbers("(1-3,5)"), Some(vec![5]));
+        assert_eq!(python_row_spec_to_numbers("([1]+[2])"), None);
+        assert!(looks_like_numeric_or_fraction_range("(1-3,5)"));
+        assert!(!looks_like_numeric_or_fraction_range("([1]+[2])"));
+        assert!(!looks_like_numeric_or_fraction_range("(1-3)+[5]"));
     }
 
     #[test]
