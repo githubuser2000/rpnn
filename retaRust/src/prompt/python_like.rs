@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
+use crate::shared::words_py::PyValue;
 use crate::domain::python_source_of_truth::{
     all_main_alias_groups, parameter_alias_groups_for_main,
 };
@@ -1963,7 +1964,42 @@ fn inclusive_i64_range(start: i64, end: i64) -> Vec<i64> {
     }
 }
 
-const PYTHON_ROW_MULTIPLE_LIMIT: i64 = 1028;
+const PYTHON_DEFAULT_OBERESMAXIMUM_FALLBACK: i64 = 1024;
+const PYTHON_ROW_MULTIPLE_LIMIT_FALLBACK: i64 = 1028;
+
+fn py_value_max_int(value: &PyValue) -> Option<i64> {
+    match value {
+        PyValue::Int(value) => Some(*value),
+        PyValue::Tuple(values) => values.iter().filter_map(py_value_max_int).max(),
+        PyValue::Str(_) | PyValue::Bool(_) | PyValue::NoneValue => None,
+    }
+}
+
+fn prompt_python_table_maximum_seed() -> i64 {
+    static MAXIMUM: OnceLock<i64> = OnceLock::new();
+    *MAXIMUM.get_or_init(|| {
+        let words_maximum = shared_words()
+            .paraNdataMatrix
+            .iter()
+            .flat_map(|entry| entry.datas.iter())
+            .flat_map(|row| row.iter())
+            .filter_map(py_value_max_int)
+            .filter(|value| *value > 0)
+            .max()
+            .unwrap_or(PYTHON_DEFAULT_OBERESMAXIMUM_FALLBACK);
+
+        // Python `reta.Program.oberesMaximumArg` never lets the dynamic table
+        // maximum fall below the canonical 1024-row prompt universe. Scanning
+        // the generated words snapshot keeps Rust tied to the Python data when
+        // future tables grow, while preserving the shipped 1024 baseline.
+        std::cmp::max(words_maximum, PYTHON_DEFAULT_OBERESMAXIMUM_FALLBACK)
+    })
+}
+
+fn python_row_multiple_limit() -> i64 {
+    let dynamic_limit = prompt_python_table_maximum_seed().saturating_add(4);
+    std::cmp::max(dynamic_limit, PYTHON_ROW_MULTIPLE_LIMIT_FALLBACK)
+}
 
 fn python_fraction_allowed_numbers() -> &'static [i64] {
     static ALLOWED: OnceLock<Vec<i64>> = OnceLock::new();
@@ -2127,7 +2163,7 @@ fn expand_python_row_numbers_vielfache(
     around: &[i64],
     max_zahl: Option<i64>,
 ) -> Vec<i64> {
-    let limit = max_zahl.unwrap_or(PYTHON_ROW_MULTIPLE_LIMIT);
+    let limit = max_zahl.unwrap_or_else(python_row_multiple_limit);
     if start <= 0 || limit <= 0 {
         return Vec::new();
     }
@@ -2675,7 +2711,7 @@ fn expand_python_row_generated_values_vielfache(
     values: &[i64],
     max_zahl: Option<i64>,
 ) -> Vec<i64> {
-    let limit = max_zahl.unwrap_or(PYTHON_ROW_MULTIPLE_LIMIT);
+    let limit = max_zahl.unwrap_or_else(python_row_multiple_limit);
     if limit <= 0 {
         return Vec::new();
     }
@@ -2779,7 +2815,7 @@ fn python_row_spec_to_numbers_with_options(
 }
 
 pub fn python_row_spec_to_numbers(spec: &str) -> Option<Vec<i64>> {
-    python_row_spec_to_numbers_with_options(spec, false, Some(PYTHON_ROW_MULTIPLE_LIMIT))
+    python_row_spec_to_numbers_with_options(spec, false, Some(python_row_multiple_limit()))
 }
 
 
@@ -3210,7 +3246,7 @@ fn fraction_denominator_values_from_python_spec(spec: &str) -> Vec<i64> {
     let base_values = python_row_spec_to_numbers_with_options(
         core,
         false,
-        Some(PYTHON_ROW_MULTIPLE_LIMIT),
+        Some(python_row_multiple_limit()),
     )
     .unwrap_or_else(|| {
         parse_unsigned_row_i64(core)
@@ -3601,7 +3637,7 @@ fn build_python_row_buckets_with_global_vielfache(
             }
 
             if let Some((piece_subtract, values)) =
-                python_row_piece_to_numbers(piece_trimmed, false, Some(PYTHON_ROW_MULTIPLE_LIMIT))
+                python_row_piece_to_numbers(piece_trimmed, false, Some(python_row_multiple_limit()))
             {
                 for value in values {
                     let value_abs = value.abs();
@@ -3709,9 +3745,9 @@ fn build_python_row_buckets_with_global_vielfache(
 fn prompt_python_default_oberesmaximum_seed() -> i64 {
     // Python retaPrompt liest hier letztlich `tables.hoechsteZeile[1024]` aus dem
     // laufenden Programm oder faellt auf das globale `retaProgram` zurueck.
-    // Auf dem split prompt crate existiert diese Program-Template-Schicht nicht,
-    // daher verwenden wir hier den gleichen Python-Defaultwert direkt.
-    1024
+    // Der Rust-Prompt leitet denselben Seed aus dem generierten Python-Words-
+    // Snapshot ab und begrenzt ihn wie Python mindestens auf 1024.
+    prompt_python_table_maximum_seed()
 }
 
 fn another_oberesmaximum_from_row_specs_with_seed(row_specs: &[String], seed: i64) -> String {
@@ -4049,11 +4085,14 @@ fn build_primzahlkreuz_prompt_call(
         use_teiler,
         use_vielfache,
         invert,
-        Some(1028),
+        Some(python_row_multiple_limit()),
     ) {
         argv.extend(section.tokens);
     } else {
-        argv.push(another_oberesmaximum_from_row_specs_with_seed(&[], 1028));
+        argv.push(another_oberesmaximum_from_row_specs_with_seed(
+            &[],
+            python_row_multiple_limit(),
+        ));
     }
     argv.push("-spalten".to_string());
     argv.push("--bedeutung=primzahlkreuz".to_string());
@@ -5901,6 +5940,12 @@ mod tests {
         let allowed = python_fraction_allowed_numbers();
         assert!(allowed.contains(&22));
         assert!(!allowed.contains(&23));
+    }
+
+    #[test]
+    fn oberesmaximum_seed_is_data_backed_but_keeps_python_baseline() {
+        assert!(prompt_python_default_oberesmaximum_seed() >= 1024);
+        assert!(python_row_multiple_limit() >= prompt_python_default_oberesmaximum_seed() + 4);
     }
 
     #[test]

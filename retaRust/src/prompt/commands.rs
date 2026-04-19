@@ -5,7 +5,7 @@ use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
     finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
-    prepare_prompt_big_output_for_stored_reta,
+    prepare_prompt_big_output_for_stored_reta, python_row_spec_to_numbers,
     prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
 };
@@ -953,33 +953,12 @@ fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
         if token.contains('/') {
             continue;
         }
-        for part in token.split(',').filter(|p| !p.trim().is_empty()) {
-            let part = part.trim();
-            if let Some((a, b)) = part.split_once('-') {
-                if !a.is_empty()
-                    && !b.is_empty()
-                    && a.chars().all(|c| c.is_ascii_digit())
-                    && b.chars().all(|c| c.is_ascii_digit())
-                {
-                    let start: i64 = a.parse().ok()?;
-                    let end: i64 = b.parse().ok()?;
-                    if start <= end {
-                        for n in start..=end {
-                            out.push(n);
-                        }
-                    } else {
-                        for n in (end..=start).rev() {
-                            out.push(n);
-                        }
-                    }
-                    continue;
-                }
-            }
-            if part.chars().all(|c| c.is_ascii_digit()) {
-                out.push(part.parse().ok()?);
-            }
+
+        if let Some(numbers) = python_row_spec_to_numbers(token) {
+            out.extend(numbers);
         }
     }
+
     if out.is_empty() {
         None
     } else {
@@ -1188,38 +1167,10 @@ fn abstand_usage_text() -> String {
 }
 
 fn parse_integer_row_numbers_from_spec(spec: &str) -> Option<Vec<i64>> {
-    let mut out = Vec::new();
-    let trimmed = spec.trim();
-    if trimmed.is_empty() || trimmed.contains('/') {
+    if spec.contains('/') {
         return None;
     }
-
-    for part in trimmed.split(',').filter(|part| !part.trim().is_empty()) {
-        let part = part.trim();
-        if let Some((a, b)) = part.split_once('-') {
-            if !a.is_empty()
-                && !b.is_empty()
-                && a.chars().all(|c| c.is_ascii_digit())
-                && b.chars().all(|c| c.is_ascii_digit())
-            {
-                let start: i64 = a.parse().ok()?;
-                let end: i64 = b.parse().ok()?;
-                if start <= end {
-                    out.extend(start..=end);
-                } else {
-                    out.extend((end..=start).rev());
-                }
-                continue;
-            }
-        }
-        if part.chars().all(|c| c.is_ascii_digit()) {
-            out.push(part.parse().ok()?);
-        } else {
-            return None;
-        }
-    }
-
-    (!out.is_empty()).then_some(out)
+    python_row_spec_to_numbers(spec).filter(|numbers| !numbers.is_empty())
 }
 
 fn parse_integer_row_set_from_spec(spec: &str) -> Option<std::collections::BTreeSet<i64>> {
@@ -1615,8 +1566,9 @@ pub fn render_history_text(history: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_command_with_state, execute_command, merge_stored_placeholder,
-        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand, SessionState,
+        compile_command, compile_command_with_state, execute_command, merge_stored_placeholder,
+        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand, PromptModus,
+        SessionState,
     };
 
     #[test]
@@ -1663,6 +1615,29 @@ mod tests {
             ),
             other => panic!("expected PromptCommand::Reta, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn direct_number_commands_use_python_row_generators() {
+        let output = compile_command("prim [2,3,4]", PromptModus::Normal)
+            .expect("generated row list should compile");
+        let PromptCommand::Immediate(output) = output else {
+            panic!("expected immediate number output");
+        };
+        assert!(output.text.contains("2:"));
+        assert!(output.text.contains("3:"));
+        assert!(output.text.contains("4:"));
+    }
+
+    #[test]
+    fn abstand_uses_python_row_generators() {
+        let output = compile_command("abstand [2,4] [3,5]", PromptModus::Normal)
+            .expect("generated row list should compile");
+        let PromptCommand::Immediate(output) = output else {
+            panic!("expected immediate abstand output");
+        };
+        assert!(output.text.contains("3->:"));
+        assert!(output.text.contains("5->:"));
     }
 
     #[test]
