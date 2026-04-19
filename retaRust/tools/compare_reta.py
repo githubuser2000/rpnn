@@ -13,8 +13,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Iterable
-
 ROOT = Path(__file__).resolve().parents[1]
 PY_REF = ROOT / "python_reference" / "reta.py"
 PY_REF_DIR = ROOT / "python_reference"
@@ -48,12 +46,52 @@ def _python_env() -> dict[str, str]:
     return env
 
 
+def _rust_library_filename() -> str:
+    if sys.platform.startswith("linux") or "bsd" in sys.platform:
+        return "libreta.so"
+    if sys.platform == "darwin":
+        return "libreta.dylib"
+    if sys.platform.startswith("win"):
+        return "reta.dll"
+    return "libreta.so"
+
+
+def _rust_env() -> dict[str, str]:
+    env = os.environ.copy()
+    debug_lib = ROOT / "target" / "debug" / _rust_library_filename()
+    release_lib = ROOT / "target" / "release" / _rust_library_filename()
+    if debug_lib.exists():
+        env["RETA_LIB_PATH"] = str(debug_lib)
+    elif release_lib.exists():
+        env["RETA_LIB_PATH"] = str(release_lib)
+    return env
+
+
+def prepare_rust_library() -> int:
+    # Das reta-Binary ist ein dünner Loader um die cdylib. `cargo run --bin reta`
+    # baut diese Library nicht in jedem Cargo-Pfad implizit mit. Deshalb bauen
+    # wir die Lib vorher gezielt und setzen RETA_LIB_PATH für den Vergleich.
+    completed = subprocess.run(
+        ["cargo", "build", "--quiet", "--package", "reta", "--lib"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        print("Rust-Library konnte nicht gebaut werden:", file=sys.stderr)
+        if completed.stdout:
+            print(completed.stdout, file=sys.stderr, end="")
+        if completed.stderr:
+            print(completed.stderr, file=sys.stderr, end="")
+    return completed.returncode
+
+
 def _run(label: str, command: list[str], argv: list[str], *, timeout: float) -> RunResult:
     try:
         completed = subprocess.run(
             command,
             cwd=ROOT,
-            env=_python_env() if label == "python" else os.environ.copy(),
+            env=_python_env() if label == "python" else _rust_env(),
             text=True,
             capture_output=True,
             timeout=timeout,
@@ -201,6 +239,9 @@ def main(argv: list[str]) -> int:
     if shutil.which("cargo") is None:
         print("cargo nicht gefunden; Rust-Vergleich kann hier nicht laufen.", file=sys.stderr)
         return 2
+    build_rc = prepare_rust_library()
+    if build_rc != 0:
+        return build_rc
 
     samples, timeout, compare_stderr, diff_limit = parse_args(argv[1:])
     all_ok = True

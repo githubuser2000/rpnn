@@ -1,189 +1,34 @@
-#![allow(non_snake_case)]
-use crate::doc_tools::markdown_reader;
-use crate::runtime::I18nExact;
-use indexmap::IndexMap;
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import os
+import sys
 
-pub const PYTHON_SOURCE__GENERATE4README_FALLBACK: &str = r#"Python source is expected at python_reference/generate4readme.py or python_reference/libs/generate4readme.py.
-This Rust fallback only avoids a build-time include failure when the file was not copied.
-"#;
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "i18n"))
+import os
+import platform
+import pprint
+import re
+import sys
+from collections import OrderedDict
 
-pub fn python_source_generate4readme() -> String {
-    for candidate in python_source_candidates_generate4readme() {
-        if let Ok(text) = std::fs::read_to_string(&candidate) {
-            return text;
-        }
-    }
-    PYTHON_SOURCE__GENERATE4README_FALLBACK.to_string()
-}
+import i18n.words as i18n
 
-fn python_source_candidates_generate4readme() -> Vec<std::path::PathBuf> {
-    let mut out = Vec::new();
-    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    if let Ok(current) = std::env::current_dir() {
-        // Python-Wahrheit im gebündelten Projekt: generate4readme.py liegt
-        // direkt unter python_reference/. Ältere Zwischenstände suchten nur
-        // unter python_reference/libs/ und fielen dadurch still auf Fallback-
-        // Texte zurück. Die libs-Pfade bleiben danach als Kompatibilitäts-
-        // Kandidaten erhalten, falls ein externer Checkout so aufgebaut ist.
-        out.push(current.join("python_reference").join("generate4readme.py"));
-        out.push(
-            current
-                .join("retaRust")
-                .join("python_reference")
-                .join("generate4readme.py"),
-        );
-        out.push(
-            current
-                .join("python_reference")
-                .join("libs")
-                .join("generate4readme.py"),
-        );
-        out.push(
-            current
-                .join("retaRust")
-                .join("python_reference")
-                .join("libs")
-                .join("generate4readme.py"),
-        );
-    }
-    out.push(manifest.join("python_reference").join("generate4readme.py"));
-    out.push(
-        manifest
-            .join("retaRust")
-            .join("python_reference")
-            .join("generate4readme.py"),
-    );
-    out.push(
-        manifest
-            .join("python_reference")
-            .join("libs")
-            .join("generate4readme.py"),
-    );
-    out.push(
-        manifest
-            .join("retaRust")
-            .join("python_reference")
-            .join("libs")
-            .join("generate4readme.py"),
-    );
-    out
-}
+try:
+    from collections import Callable
+except ImportError:
+    from typing import Callable
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum LanguageMode {
-    German,
-    English,
-}
+from itertools import filterfalse
+from typing import Optional
 
-#[derive(Clone, Debug)]
-enum ThingValue {
-    Text(String),
-    Many(Vec<String>),
-}
+try:
+    from orderedset import OrderedSet
+except (ModuleNotFoundError, ImportError):
+    OrderedSet = set
 
-impl LanguageMode {
-    fn from_argv(argv: &[String]) -> Self {
-        if argv
-            .iter()
-            .any(|arg| arg == "-language=english" || arg == "-language=englisch")
-        {
-            Self::English
-        } else {
-            Self::German
-        }
-    }
-}
-
-pub fn main_like_python(argv: &[String]) -> i32 {
-    let language = LanguageMode::from_argv(argv);
-
-    if argv.iter().any(|arg| arg == "--render-retaprompt") {
-        match markdown_reader::retaprompt_hilfe_rendered_like_python() {
-            Ok(text) => {
-                print!("{text}");
-                return 0;
-            }
-            Err(err) => {
-                eprintln!("retaprompt-readme konnte nicht gelesen oder gerendert werden: {err}");
-                return 1;
-            }
-        }
-    }
-    if argv.iter().any(|arg| arg == "--render-reta") {
-        match markdown_reader::reta_hilfe_rendered_like_python() {
-            Ok(text) => {
-                print!("{text}");
-                return 0;
-            }
-            Err(err) => {
-                eprintln!("reta-readme konnte nicht gelesen werden: {err}");
-                return 1;
-            }
-        }
-    }
-    if argv.iter().any(|arg| arg == "--show-python-source") {
-        print!("{}", python_source_generate4readme());
-        return 0;
-    }
-
-    let i18n = I18nExact::from_python_evaluated_shapes();
-    print!("{}", ensure_trailing_newline(&python_header(language)));
-    print_things_like_python(&i18n);
-    print_combination_section(language, &i18n);
-    print!("{}", ensure_trailing_newline(&python_footer(language)));
-    0
-}
-
-fn ensure_trailing_newline(text: &str) -> String {
-    if text.ends_with('\n') {
-        text.to_string()
-    } else {
-        let mut out = String::with_capacity(text.len() + 1);
-        out.push_str(text);
-        out.push('\n');
-        out
-    }
-}
-
-fn python_header(language: LanguageMode) -> String {
-    let source = python_source_generate4readme();
-    match language {
-        LanguageMode::English => extract_triple_quoted_assignment(&source, "anfang", 0)
-            .unwrap_or_else(|| EN_HEADER_FALLBACK.to_string()),
-        LanguageMode::German => extract_triple_quoted_assignment(&source, "anfang", 1)
-            .unwrap_or_else(|| DE_HEADER_FALLBACK.to_string()),
-    }
-}
-
-fn python_footer(language: LanguageMode) -> String {
-    let source = python_source_generate4readme();
-    match language {
-        LanguageMode::English => extract_triple_quoted_assignment(&source, "ende", 0)
-            .unwrap_or_else(|| EN_FOOTER_FALLBACK.to_string()),
-        LanguageMode::German => extract_triple_quoted_assignment(&source, "ende", 1)
-            .unwrap_or_else(|| DE_FOOTER_FALLBACK.to_string()),
-    }
-}
-
-fn extract_triple_quoted_assignment(
-    source: &str,
-    name: &str,
-    branch_index: usize,
-) -> Option<String> {
-    let needle = format!("{name} = \"\"\"");
-    let mut starts = Vec::new();
-    let mut offset = 0usize;
-    while let Some(idx) = source[offset..].find(&needle) {
-        starts.push(offset + idx + needle.len());
-        offset += idx + needle.len();
-    }
-    let start = *starts.get(branch_index)?;
-    let rest = &source[start..];
-    let end_rel = rest.find("\"\"\"")?;
-    Some(rest[..end_rel].to_string())
-}
-
-const EN_HEADER_FALLBACK: &str = r#"Main program is reta or reta.py.
+if "-language=english" in sys.argv or "-language=englisch" in sys.argv:
+    anfang = """Main program is reta or reta.py.
 More convenient is retaPrompt, which is still available with presets as rp and rpl.
 
 User manual:
@@ -251,9 +96,9 @@ Secondary parameters start with 2 minus --.
         * 40
         * 70
     * --widths=
-        * 20,50,10,70"#;
-
-const DE_HEADER_FALLBACK: &str = r#"Hauptprogramm ist reta oder reta.py
+        * 20,50,10,70"""
+else:
+    anfang = """Hauptprogramm ist reta oder reta.py
 Bequemer ist retaPrompt, was es mit Voreinstellungen noch als rp und rpl gibt.
 
 Bedienungsanleitung:
@@ -321,9 +166,59 @@ Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!
         * 40
     * --breiten=
         * 30,40,70
-    "#;
+    """
+print(anfang)
 
-const EN_FOOTER_FALLBACK: &str = r#"
+things: set = {}
+
+
+for entry in i18n.paraNdataMatrix:
+    position = entry[0][1] if len(entry[0]) > 1 else entry[0][0]
+    if len(entry) > 1 and len(entry[1]) > 0 and type(entry[1]) in [list, tuple]:
+        thing = entry[1][1] if len(entry[1]) > 1 else entry[1][0]
+        if type(thing) is str and type(position) is str:
+            try:
+                things[position] += [thing]
+            except KeyError:
+                things[position] = [thing]
+    else:
+        try:
+            things[position] += [list(entry[1])]
+        except KeyError:
+            things[position] = [list(entry[1])]
+for key, value in things.items():
+    hasEntries = True if len(value) > 0 and len(value[0]) > 0 else False
+    print("    * --{}{} ".format(key, "=" if hasEntries else ""))
+
+    # try:
+    if hasEntries:
+        print(
+            "        * "
+            + (
+                ",".join([v for v in value if type(v) is str])
+                if type(value[0]) is str
+                # else (",".join([v2 for v1 in value for v2 in v1]))
+                # else str(value)
+                else ",".join([b for v in value for b in v])
+            )
+        )
+    # except:
+    #    print(value)
+if "-language=english" in sys.argv or "-language=englisch" in sys.argv:
+    print()
+    print()
+    print("## -combination")
+    print("""    * --galaxy=""")
+    print(
+        "        * "
+        + (",".join([v for b in i18n.kombiParaNdataMatrix.values() for v in b]))
+    )
+    print("""    * --universe=""")
+    print(
+        "        * "
+        + (",".join([v for b in i18n.kombiParaNdataMatrix2.values() for v in b]))
+    )
+    ende = """
 
 ## -output
     * --nocolor
@@ -395,9 +290,23 @@ const EN_FOOTER_FALLBACK: &str = r#"
         * instead generator {2*n for n in range(2,5)} python calculations are possible as [2*3].
 
 Better read this with a markdown reader!
-        "#;
+        """
+else:
+    print()
+    print()
+    print("## -kombination")
+    print("""    * --galaxie=""")
+    print(
+        "        * "
+        + (",".join([v for b in i18n.kombiParaNdataMatrix.values() for v in b]))
+    )
+    print("""    * --universum=""")
+    print(
+        "        * "
+        + (",".join([v for b in i18n.kombiParaNdataMatrix2.values() for v in b]))
+    )
 
-const DE_FOOTER_FALLBACK: &str = r#"
+    ende = """
 
 ## -ausgabe
     * --nocolor
@@ -467,143 +376,5 @@ const DE_FOOTER_FALLBACK: &str = r#"
         `reta -zeilen "--vorhervonausschnitt={2*n for n in range(2,5)},10" --oberesmaximum=1025 -spalten --Menschliches=motivation --breite=0 -ausgabe "--spaltenreihenfolgeundnurdiese=[3*n for n in range(2)]"`
         Ein Minus vor so einem Python Generator würde den Bereich abziehen: -[n for n in range(3)]
         * statt Generator {2*n for n in range(2,5)} geht auch eine Rechnung wie [2*3].
-        Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!"#;
-
-fn print_things_like_python(i18n: &I18nExact) {
-    let things = collect_things_like_python(i18n);
-
-    for (key, value) in things {
-        let has_entries = match value.first() {
-            Some(ThingValue::Text(text)) => !text.is_empty(),
-            Some(ThingValue::Many(items)) => !items.is_empty(),
-            None => false,
-        };
-
-        println!("    * --{}{} ", key, if has_entries { "=" } else { "" });
-
-        if has_entries {
-            let rendered = render_thing_values_like_python(&value);
-            println!("        * {rendered}");
-        }
-    }
-}
-
-fn print_combination_section(language: LanguageMode, i18n: &I18nExact) {
-    println!();
-    println!();
-    match language {
-        LanguageMode::English => {
-            println!("## -combination");
-            println!(r#"    * --galaxy="#);
-            println!(
-                "        * {}",
-                i18n.kombiParaNdataMatrix
-                    .values()
-                    .flat_map(|values| values.iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            );
-            println!(r#"    * --universe="#);
-            println!(
-                "        * {}",
-                i18n.kombiParaNdataMatrix2
-                    .values()
-                    .flat_map(|values| values.iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            );
-        }
-        LanguageMode::German => {
-            println!("## -kombination");
-            println!(r#"    * --galaxie="#);
-            println!(
-                "        * {}",
-                i18n.kombiParaNdataMatrix
-                    .values()
-                    .flat_map(|values| values.iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            );
-            println!(r#"    * --universum="#);
-            println!(
-                "        * {}",
-                i18n.kombiParaNdataMatrix2
-                    .values()
-                    .flat_map(|values| values.iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(",")
-            );
-        }
-    }
-}
-
-fn collect_things_like_python(i18n: &I18nExact) -> IndexMap<String, Vec<ThingValue>> {
-    let mut things: IndexMap<String, Vec<ThingValue>> = IndexMap::new();
-
-    for entry in &i18n.paraNdataMatrix {
-        let position = entry
-            .parameterMainNames
-            .get(1)
-            .or_else(|| entry.parameterMainNames.first())
-            .cloned()
-            .unwrap_or_default();
-
-        if entry.parameterNames.is_empty() {
-            things
-                .entry(position)
-                .or_default()
-                .push(ThingValue::Many(Vec::new()));
-            continue;
-        }
-
-        let thing = entry
-            .parameterNames
-            .get(1)
-            .or_else(|| entry.parameterNames.first())
-            .cloned()
-            .unwrap_or_default();
-
-        things.entry(position).or_default().push(ThingValue::Text(thing));
-    }
-
-    things
-}
-
-fn render_thing_values_like_python(values: &[ThingValue]) -> String {
-    match values.first() {
-        Some(ThingValue::Text(_)) => values
-            .iter()
-            .filter_map(|value| match value {
-                ThingValue::Text(text) => Some(text.clone()),
-                ThingValue::Many(_) => None,
-            })
-            .collect::<Vec<_>>()
-            .join(","),
-        Some(ThingValue::Many(_)) => values
-            .iter()
-            .flat_map(|value| match value {
-                ThingValue::Text(_) => Vec::new(),
-                ThingValue::Many(items) => items.clone(),
-            })
-            .collect::<Vec<_>>()
-            .join(","),
-        None => String::new(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn python_source_generate4readme_reads_bundled_reference_before_fallback() {
-        let source = python_source_generate4readme();
-        assert!(source.starts_with("#!/usr/bin/env python3"));
-        assert!(source.contains("things: set = {}"));
-        assert!(!source.contains("This Rust fallback only avoids"));
-    }
-}
+        Besser die Readme aus Markdown mit einem Markdown-Leseprogramm lesen!"""
+print(ende)

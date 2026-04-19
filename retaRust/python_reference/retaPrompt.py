@@ -3,6 +3,11 @@
 import os
 import sys
 
+try:
+    exit
+except NameError:  # `python -S` does not install site.py's helper.
+    exit = sys.exit
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "libs"))
 import os
 import platform
