@@ -847,7 +847,7 @@ fn regex_like_sequence_match_positions(
     positions
 }
 
-pub(crate) fn regex_like_search(pattern: &str, text: &str) -> bool {
+pub fn regex_like_search(pattern: &str, text: &str) -> bool {
     if pattern.is_empty() {
         return true;
     }

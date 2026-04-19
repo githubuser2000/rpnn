@@ -14,6 +14,9 @@ mod reta_runtime_bridge;
 
 pub mod ffi;
 
+#[path = "prompt/semantic_choices.rs"]
+pub mod semantic_choices;
+
 use std::sync::OnceLock;
 
 use crate::shared::reta_program_types::Program;

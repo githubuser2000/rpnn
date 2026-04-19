@@ -1163,11 +1163,8 @@ dependencies = [
 name = "retaprompt_commands"
 version = "0.5.0"
 dependencies = [
- "crossterm",
  "indexmap",
  "libloading",
- "ratatui",
- "reedline",
  "serde",
  "serde_json",
 ]
@@ -1184,7 +1181,11 @@ dependencies = [
 name = "retaprompt_input"
 version = "0.5.0"
 dependencies = [
- "libloading",
+ "crossterm",
+ "indexmap",
+ "ratatui",
+ "reedline",
+ "retaprompt_commands",
 ]
 
 [[package]]

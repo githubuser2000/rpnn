@@ -1,6 +1,6 @@
 use crate::{run_reta_from_args, RetaRunResult};
 
-use super::completion::candidates_for_prefix;
+use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
@@ -1606,7 +1606,14 @@ pub fn commands_text() -> String {
         String::new(),
         "Completion-Kandidatenbeispiele:".to_string(),
     ];
-    for candidate in candidates_for_prefix("--") {
+    let mut candidates = RETAPROMPT_RETA_MAIN_SWITCHES
+        .iter()
+        .chain(RETAPROMPT_RETA_SECTION_SWITCHES.iter())
+        .copied()
+        .collect::<Vec<_>>();
+    candidates.sort_unstable();
+    candidates.dedup();
+    for candidate in candidates {
         lines.push(format!("  {candidate}"));
     }
     lines.push(String::new());

@@ -198,28 +198,14 @@ pub mod domain {
     }
 }
 
-#[path = "../../../src/prompt/frontend_profile.rs"]
-pub mod frontend_profile;
 #[path = "../../../src/prompt/tokenize.rs"]
 pub mod tokenize;
 #[path = "../../../src/prompt/semantic_choices.rs"]
 pub mod semantic_choices;
 #[path = "../../../src/prompt/python_like.rs"]
 pub mod python_like;
-#[path = "../../../src/prompt/history.rs"]
-pub mod history;
-#[path = "../../../src/prompt/preset.rs"]
-pub mod preset;
-#[path = "../../../src/prompt/completion.rs"]
-pub mod completion;
 #[path = "../../../src/prompt/commands.rs"]
 pub mod commands;
-#[path = "../../../src/prompt/tui.rs"]
-pub mod tui;
-#[path = "../../../src/prompt/app.rs"]
-pub mod app;
-#[path = "../../../src/prompt/frontends.rs"]
-pub mod frontends;
 
 #[derive(Debug, Clone, Default)]
 pub struct RetaRunResult {
@@ -525,30 +511,18 @@ unsafe fn take_owned_string(ptr: *mut c_char, free: RetaFreeStringFn) -> String 
     owned
 }
 
-pub use app::{
-    run_prompt_command_frontend_with_profile,
-    run_prompt_frontend,
-    run_prompt_frontend_from_env,
-    run_prompt_frontend_with_profile,
-    run_prompt_frontend_with_profile_from_env,
-    run_prompt_input_frontend_with_profile,
-};
+
 pub use commands::{
     commands_text,
     compile_command,
+    compile_command_with_state,
     execute_command,
     help_text,
+    take_auto_prompt_command,
     EditModeKind,
     PromptCommand,
     PromptOutput,
     SessionState,
-};
-pub use frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
-pub use frontends::{
-    run_rp_frontend_from_env,
-    run_rpb_frontend_from_env,
-    run_rpe_frontend_from_env,
-    run_rpl_frontend_from_env,
 };
 pub use python_like::PromptModus;
 
@@ -589,30 +563,43 @@ impl PromptCommandFrontendKind {
         argv.first().and_then(|arg0| Self::from_program_name(arg0))
     }
 
-    pub fn profile(self) -> PromptFrontendProfile {
+    pub const fn abi_value(self) -> i32 {
         match self {
-            Self::Rp => PromptFrontendProfile::rp(),
-            Self::Rpl => PromptFrontendProfile::rpl(),
-            Self::Rpb => PromptFrontendProfile::rpb(),
-            Self::Rpe => PromptFrontendProfile::rpe(),
+            Self::Rp => 1,
+            Self::Rpl => 2,
+            Self::Rpb => 3,
+            Self::Rpe => 4,
         }
+    }
+
+    pub const fn program_name(self) -> &'static str {
+        match self {
+            Self::Rp => "rp",
+            Self::Rpl => "rpl",
+            Self::Rpb => "rpb",
+            Self::Rpe => "rpe",
+        }
+    }
+
+    fn default_exact_mode(self, argv: &[String]) -> bool {
+        match self {
+            Self::Rp => false,
+            Self::Rpl => !argv.iter().any(|arg| arg == "-debug"),
+            Self::Rpb | Self::Rpe => true,
+        }
+    }
+
+    const fn emacs_output_mode(self) -> bool {
+        matches!(self, Self::Rpe)
     }
 }
 
-pub fn profile_rp() -> PromptFrontendProfile {
-    PromptCommandFrontendKind::Rp.profile()
-}
-
-pub fn profile_rpl() -> PromptFrontendProfile {
-    PromptCommandFrontendKind::Rpl.profile()
-}
-
-pub fn profile_rpb() -> PromptFrontendProfile {
-    PromptCommandFrontendKind::Rpb.profile()
-}
-
-pub fn profile_rpe() -> PromptFrontendProfile {
-    PromptCommandFrontendKind::Rpe.profile()
+#[derive(Clone, Debug)]
+struct CommandStartupArgs {
+    show_help: bool,
+    exact_mode: bool,
+    command_text: Option<String>,
+    trailing_args: Vec<String>,
 }
 
 pub fn compile_for_rp(input: &str) -> Result<PromptCommand, String> {
@@ -632,7 +619,7 @@ pub fn compile_for_rpe(input: &str) -> Result<PromptCommand, String> {
 }
 
 pub fn run_kind(argv: Vec<String>, kind: PromptCommandFrontendKind) -> i32 {
-    run_prompt_command_frontend_with_profile(argv, kind.profile())
+    run_command_one_shot_frontend(argv, kind)
 }
 
 pub fn run_kind_from_env(kind: PromptCommandFrontendKind) -> i32 {
@@ -645,8 +632,9 @@ pub fn run_current_executable(argv: Vec<String>) -> i32 {
         None => {
             let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
             eprintln!(
-                "retaprompt_commands cannot infer frontend kind from executable name: {arg0}"
+                "retaprompt_commands cannot infer command frontend kind from executable name: {arg0}"
             );
+            eprintln!("expected one of: rp, rpl, rpb, rpe");
             1
         }
     }
@@ -698,35 +686,297 @@ pub fn run_kind_from_abi_value(kind: i32) -> i32 {
     }
 }
 
-pub fn run_input_kind(argv: Vec<String>, kind: PromptCommandFrontendKind) -> i32 {
-    if let Err(message) = preload_reta_bridge() {
-        eprintln!("retaprompt_commands could not preload libreta.so for input frontend: {message}");
-    }
-
-    match kind {
-        PromptCommandFrontendKind::Rp
-        | PromptCommandFrontendKind::Rpl
-        | PromptCommandFrontendKind::Rpe => {
-            run_prompt_input_frontend_with_profile(argv, kind.profile())
-        }
-        PromptCommandFrontendKind::Rpb => {
-            eprintln!("retaprompt input mode does not support rpb");
-            1
-        }
-    }
-}
-
-pub fn run_input_kind_from_env(kind: PromptCommandFrontendKind) -> i32 {
-    run_input_kind(std::env::args().collect(), kind)
-}
-
 pub fn run_input_kind_from_abi_value(kind: i32) -> i32 {
-    match PromptCommandFrontendKind::from_abi_value(kind) {
-        Some(kind) => run_input_kind_from_env(kind),
-        None => {
-            eprintln!("invalid retaprompt input kind via commands bridge: {kind}");
-            1
+    eprintln!(
+        "retaprompt input frontends live in libretaprompt_input.so; retaprompt_commands received kind {kind}"
+    );
+    1
+}
+
+fn parse_command_startup_args(argv: &[String], kind: PromptCommandFrontendKind) -> CommandStartupArgs {
+    let mut startup = CommandStartupArgs {
+        show_help: false,
+        exact_mode: kind.default_exact_mode(argv),
+        command_text: None,
+        trailing_args: Vec::new(),
+    };
+
+    let mut index = 1usize;
+    while index < argv.len() {
+        match argv[index].as_str() {
+            "-e" => {
+                startup.exact_mode = true;
+                index += 1;
+            }
+            "-h" | "-help" | "--help" => {
+                startup.show_help = true;
+                index += 1;
+            }
+            "-debug" | "-vi" | "-log" => {
+                index += 1;
+            }
+            "-befehl" | "-command" => {
+                startup.command_text = Some(argv[index + 1..].join(" "));
+                return startup;
+            }
+            _ => {
+                startup.trailing_args = argv[index..].to_vec();
+                break;
+            }
         }
+    }
+
+    if startup.command_text.is_none() && !startup.trailing_args.is_empty() {
+        startup.command_text = Some(startup.trailing_args.join(" "));
+    }
+
+    startup
+}
+
+fn run_command_one_shot_frontend(argv: Vec<String>, kind: PromptCommandFrontendKind) -> i32 {
+    if let Err(message) = preload_reta_bridge() {
+        eprintln!("retaprompt_commands could not preload libreta.so: {message}");
+    }
+
+    let startup = parse_command_startup_args(&argv, kind);
+    if startup.show_help {
+        println!("{}", help_text());
+        return 0;
+    }
+
+    let program_name = program_name_from_argv(&argv).unwrap_or_else(|| kind.program_name().to_string());
+    let mut input = startup
+        .command_text
+        .unwrap_or_else(|| startup.trailing_args.join(" "));
+    if startup.exact_mode {
+        input = apply_exact_mode_to_input(&input);
+    }
+
+    run_command_one_shot(input, program_name, kind.emacs_output_mode())
+}
+
+fn run_command_one_shot(input: String, program_name: String, emacs_output_mode: bool) -> i32 {
+    let mut state = SessionState::new(program_name.clone(), true, false);
+
+    if input.trim().is_empty() {
+        let output = PromptOutput {
+            title: "usage".to_string(),
+            text: format!(
+                "{program_name} erwartet einen direkten Befehl als Argument, z. B. '{program_name} av12-15' oder '{program_name} reta -zeilen --alles'."
+            ),
+            exit_code: 1,
+        };
+        print_command_output(&mut state, output.clone());
+        return output.exit_code;
+    }
+
+    state.previous_input = state.last_input.clone();
+    state.last_input = input.clone();
+    state.history_lines.push(input.clone());
+
+    let compiled = match compile_command_with_state(&input, &state) {
+        Ok(command) => {
+            if emacs_output_mode {
+                apply_rpe_emacs_output_to_command(command, &input)
+            } else {
+                command
+            }
+        }
+        Err(err) => {
+            let output = PromptOutput {
+                title: "error".to_string(),
+                text: err,
+                exit_code: 1,
+            };
+            print_command_output(&mut state, output.clone());
+            return output.exit_code;
+        }
+    };
+
+    if matches!(&compiled, PromptCommand::Exit) {
+        return 0;
+    }
+
+    if matches!(&compiled, PromptCommand::LaunchUi) {
+        let output = PromptOutput {
+            title: "ui-error".to_string(),
+            text: format!("{program_name} unterstützt keinen interaktiven UI-Start."),
+            exit_code: 1,
+        };
+        print_command_output(&mut state, output.clone());
+        return output.exit_code;
+    }
+
+    match execute_command(compiled, &mut state) {
+        Ok(Some(output)) => {
+            print_command_output(&mut state, output.clone());
+            output.exit_code
+        }
+        Ok(None) => {
+            if let Some(auto_command) = take_auto_prompt_command(&mut state) {
+                match execute_command(auto_command, &mut state) {
+                    Ok(Some(output)) => {
+                        print_command_output(&mut state, output.clone());
+                        output.exit_code
+                    }
+                    Ok(None) => 0,
+                    Err(err) => {
+                        let output = PromptOutput {
+                            title: "error".to_string(),
+                            text: err,
+                            exit_code: 1,
+                        };
+                        print_command_output(&mut state, output.clone());
+                        output.exit_code
+                    }
+                }
+            } else {
+                0
+            }
+        }
+        Err(err) => {
+            let output = PromptOutput {
+                title: "error".to_string(),
+                text: err,
+                exit_code: 1,
+            };
+            print_command_output(&mut state, output.clone());
+            output.exit_code
+        }
+    }
+}
+
+fn program_name_from_argv(argv: &[String]) -> Option<String> {
+    argv.first().map(|arg0| {
+        std::path::PathBuf::from(arg0)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| arg0.clone())
+    })
+}
+
+fn apply_exact_mode_to_input(input: &str) -> String {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || !should_append_exact_suffix(trimmed) {
+        return trimmed.to_string();
+    }
+    format!("{trimmed} keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
+}
+
+fn should_append_exact_suffix(input: &str) -> bool {
+    let tokenized = match tokenize::split_shell_like(input) {
+        Ok(tokens) => tokens,
+        Err(_) => return false,
+    };
+
+    if tokenized.tokens.is_empty() {
+        return false;
+    }
+
+    let first = tokenized.tokens[0].as_str();
+    if first == "reta" || first.starts_with('-') || first.starts_with(':') {
+        return false;
+    }
+
+    if tokenized.tokens.iter().any(|token| {
+        matches!(
+            token.as_str(),
+            "s"
+                | "S"
+                | "l"
+                | "o"
+                | "BefehlSpeichernDavor"
+                | "BefehlSpeichernDanach"
+                | "BefehlSpeicherungLöschen"
+                | "BefehlSpeicherungAusgeben"
+        )
+    }) {
+        return false;
+    }
+
+    !matches!(
+        first,
+        "help"
+            | "hilfe"
+            | "befehle"
+            | "kurzbefehle"
+            | "shell"
+            | "python"
+            | "math"
+            | "q"
+            | "quit"
+            | "exit"
+            | "ende"
+            | "clear"
+            | "leeren"
+            | "loggen"
+            | "nichtloggen"
+    )
+}
+
+fn input_starts_with_reta(input: &str) -> bool {
+    match tokenize::split_shell_like(input.trim()) {
+        Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
+        Err(_) => false,
+    }
+}
+
+fn rpe_output_group() -> Vec<String> {
+    vec![
+        "-ausgabe".to_string(),
+        "--art=emacs".to_string(),
+        "--keineueberschriften".to_string(),
+    ]
+}
+
+fn apply_rpe_emacs_output_to_argv(
+    mut argv: Vec<String>,
+    append_after_user_args: bool,
+) -> Vec<String> {
+    let output_group = rpe_output_group();
+
+    if argv.is_empty() {
+        return output_group;
+    }
+
+    if append_after_user_args {
+        argv.extend(output_group);
+        argv
+    } else {
+        let mut rebuilt = vec![argv[0].clone()];
+        rebuilt.extend(output_group);
+        rebuilt.extend(argv.into_iter().skip(1));
+        rebuilt
+    }
+}
+
+fn apply_rpe_emacs_output_to_command(command: PromptCommand, input: &str) -> PromptCommand {
+    let append_after_user_args = input_starts_with_reta(input);
+
+    match command {
+        PromptCommand::Reta(argv) => {
+            PromptCommand::Reta(apply_rpe_emacs_output_to_argv(argv, append_after_user_args))
+        }
+        PromptCommand::RetaBatch(argvs) => PromptCommand::RetaBatch(
+            argvs
+                .into_iter()
+                .map(|argv| apply_rpe_emacs_output_to_argv(argv, append_after_user_args))
+                .collect(),
+        ),
+        PromptCommand::Sequence(commands) => PromptCommand::Sequence(
+            commands
+                .into_iter()
+                .map(|command| apply_rpe_emacs_output_to_command(command, input))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
+fn print_command_output(state: &mut SessionState, output: PromptOutput) {
+    state.last_output = output.clone();
+    if !output.text.is_empty() {
+        println!("{}", output.text);
     }
 }
 

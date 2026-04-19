@@ -11,4 +11,8 @@ path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-libloading = "0.8"
+indexmap = { version = "2", features = ["serde"] }
+retaprompt_commands = { path = "../retaprompt_commands" }
+reedline = "0.47.0"
+ratatui = { version = "0.30.0", features = ["crossterm"] }
+crossterm = "0.29.0"

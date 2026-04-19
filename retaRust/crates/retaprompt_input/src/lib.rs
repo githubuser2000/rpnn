@@ -1,8 +1,64 @@
 #![allow(non_snake_case)]
 
-use std::path::PathBuf;
+pub mod shared {
+    pub mod words_py {
+        pub use retaprompt_commands::shared::words_py::*;
+    }
+}
 
-use libloading::{library_filename, Library};
+pub mod domain {
+    pub mod python_source_of_truth {
+        pub use retaprompt_commands::domain::python_source_of_truth::*;
+    }
+}
+
+pub use retaprompt_commands::{run_reta_from_args, shared_words, RetaRunResult};
+
+pub mod semantic_choices {
+    pub use retaprompt_commands::semantic_choices::*;
+}
+
+pub mod tokenize {
+    pub use retaprompt_commands::tokenize::*;
+}
+
+pub mod python_like {
+    pub use retaprompt_commands::python_like::*;
+}
+
+pub mod commands {
+    pub use retaprompt_commands::commands::*;
+}
+
+#[path = "../../../src/prompt/frontend_profile.rs"]
+pub mod frontend_profile;
+#[path = "../../../src/prompt/history.rs"]
+pub mod history;
+#[path = "../../../src/prompt/preset.rs"]
+pub mod preset;
+#[path = "../../../src/prompt/completion.rs"]
+pub mod completion;
+#[path = "../../../src/prompt/tui.rs"]
+pub mod tui;
+#[path = "../../../src/prompt/app.rs"]
+pub mod app;
+#[path = "../../../src/prompt/frontends.rs"]
+pub mod frontends;
+
+pub use app::{
+    run_prompt_frontend,
+    run_prompt_frontend_from_env,
+    run_prompt_frontend_with_profile,
+    run_prompt_frontend_with_profile_from_env,
+    run_prompt_input_frontend_with_profile,
+};
+pub use frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
+pub use frontends::{
+    run_rp_frontend_from_env,
+    run_rpb_frontend_from_env,
+    run_rpe_frontend_from_env,
+    run_rpl_frontend_from_env,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PromptInputFrontendKind {
@@ -46,11 +102,19 @@ impl PromptInputFrontendKind {
         argv.first().and_then(|arg0| Self::from_program_name(arg0))
     }
 
-    pub fn abi_value(self) -> i32 {
+    pub const fn abi_value(self) -> i32 {
         match self {
             Self::Rp => 1,
             Self::Rpl => 2,
             Self::Rpe => 4,
+        }
+    }
+
+    pub const fn profile(self) -> PromptFrontendProfile {
+        match self {
+            Self::Rp => PromptFrontendProfile::rp(),
+            Self::Rpl => PromptFrontendProfile::rpl(),
+            Self::Rpe => PromptFrontendProfile::rpe(),
         }
     }
 }
@@ -85,10 +149,8 @@ impl PromptLauncherKind {
     }
 }
 
-type CommandsRunKindFn = unsafe extern "C" fn(i32) -> i32;
-
 pub fn run_kind(argv: Vec<String>, kind: PromptInputFrontendKind) -> i32 {
-    run_input_kind_via_commands(argv, kind)
+    run_prompt_input_frontend_with_profile(argv, kind.profile())
 }
 
 pub fn run_kind_from_env(kind: PromptInputFrontendKind) -> i32 {
@@ -103,6 +165,7 @@ pub fn run_current_executable(argv: Vec<String>) -> i32 {
             eprintln!(
                 "retaprompt_input cannot infer input frontend kind from executable name: {arg0}"
             );
+            eprintln!("expected one of: rp, rpl, rpe");
             1
         }
     }
@@ -114,10 +177,10 @@ pub fn run_current_executable_from_env() -> i32 {
 
 pub fn run_launcher_kind(argv: Vec<String>, kind: PromptLauncherKind) -> i32 {
     match kind {
-        PromptLauncherKind::Rp => run_input_kind_via_commands(argv, PromptInputFrontendKind::Rp),
-        PromptLauncherKind::Rpl => run_input_kind_via_commands(argv, PromptInputFrontendKind::Rpl),
-        PromptLauncherKind::Rpb => run_command_kind_via_commands(argv, 3),
-        PromptLauncherKind::Rpe => run_input_kind_via_commands(argv, PromptInputFrontendKind::Rpe),
+        PromptLauncherKind::Rp => run_kind(argv, PromptInputFrontendKind::Rp),
+        PromptLauncherKind::Rpl => run_kind(argv, PromptInputFrontendKind::Rpl),
+        PromptLauncherKind::Rpb => retaprompt_commands::run_rpb(argv),
+        PromptLauncherKind::Rpe => run_kind(argv, PromptInputFrontendKind::Rpe),
     }
 }
 
@@ -185,90 +248,6 @@ pub fn run_launcher_kind_from_abi_value(kind: i32) -> i32 {
             1
         }
     }
-}
-
-fn run_input_kind_via_commands(_argv: Vec<String>, kind: PromptInputFrontendKind) -> i32 {
-    with_commands_symbol(b"retaprompt_commands_input_run_kind_from_env", |symbol| unsafe {
-        symbol(kind.abi_value())
-    })
-}
-
-fn run_command_kind_via_commands(_argv: Vec<String>, kind: i32) -> i32 {
-    with_commands_symbol(b"retaprompt_commands_run_kind_from_env", |symbol| unsafe {
-        symbol(kind)
-    })
-}
-
-fn with_commands_symbol<F>(symbol_name: &[u8], f: F) -> i32
-where
-    F: FnOnce(libloading::Symbol<'_, CommandsRunKindFn>) -> i32,
-{
-    let library = match load_commands_library() {
-        Ok(library) => library,
-        Err(message) => {
-            eprintln!("retaprompt_input failed to load libretaprompt_commands.so: {message}");
-            return 127;
-        }
-    };
-
-    unsafe {
-        match library.get::<CommandsRunKindFn>(symbol_name) {
-            Ok(symbol) => f(symbol),
-            Err(error) => {
-                let display = String::from_utf8_lossy(symbol_name);
-                eprintln!("retaprompt_input missing symbol {display}: {error}");
-                127
-            }
-        }
-    }
-}
-
-fn load_commands_library() -> Result<Library, String> {
-    let mut errors = Vec::new();
-    for candidate in library_candidates("retaprompt_commands", "RETAPROMPT_COMMANDS_LIB_PATH") {
-        let display = candidate.display().to_string();
-        match unsafe { Library::new(&candidate) } {
-            Ok(library) => return Ok(library),
-            Err(error) => errors.push(format!("{display}: {error}")),
-        }
-    }
-    Err(format!(
-        "could not load libretaprompt_commands.so; tried {}",
-        errors.join(" | ")
-    ))
-}
-
-fn library_candidates(base_name: &str, env_var: &str) -> Vec<PathBuf> {
-    let filename = PathBuf::from(library_filename(base_name));
-    let mut candidates = Vec::new();
-
-    if let Ok(path) = std::env::var(env_var) {
-        let path = path.trim();
-        if !path.is_empty() {
-            candidates.push(PathBuf::from(path));
-        }
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            candidates.push(dir.join(&filename));
-            candidates.push(dir.join("lib").join(&filename));
-            candidates.push(dir.join("..").join("lib").join(&filename));
-        }
-    }
-
-    candidates.push(filename);
-    dedup_paths(candidates)
-}
-
-fn dedup_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
-    let mut deduped = Vec::new();
-    for path in paths {
-        if !deduped.iter().any(|existing| existing == &path) {
-            deduped.push(path);
-        }
-    }
-    deduped
 }
 
 #[unsafe(no_mangle)]
