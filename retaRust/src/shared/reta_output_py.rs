@@ -925,7 +925,13 @@ fn html_exact_header_attrs_py(
             return BTreeSet::new();
         }
 
-        let effective_max = if !vielfache && max_zahl == 0 { i64::MAX / 4 } else if max_zahl <= 0 { 1028 } else { max_zahl };
+        // Python `center.BereichToNumbers2` changes `maxZahl == 0` to
+        // `float("inf")` only for the outer non-`vielfache` call.  If a
+        // single range then starts with `v`, Python passes 1028 into the
+        // `vielfache` helper.  Keeping one global Rust maximum here used to
+        // turn `v2` with open maximum into an almost unbounded loop.
+        let python_global_max_is_inf = !vielfache && max_zahl == 0;
+        let python_global_max = if python_global_max_is_inf { i64::MAX / 4 } else { max_zahl };
         let mut dazu: BTreeSet<i64> = BTreeSet::new();
         let mut hinfort: BTreeSet<i64> = BTreeSet::new();
 
@@ -950,6 +956,11 @@ fn html_exact_header_attrs_py(
                 ein_bereich = rest.to_string();
                 vielfache2 = true;
             }
+            let range_max = if vielfache2 && python_global_max_is_inf {
+                1028
+            } else {
+                python_global_max
+            };
 
             let mut remove = false;
             if let Some(rest) = ein_bereich.strip_prefix('-') {
@@ -1009,11 +1020,11 @@ fn html_exact_header_attrs_py(
                 for number in start..=end {
                     for a in &around {
                         let c = number + *a;
-                        if c < effective_max {
+                        if c < range_max {
                             menge.insert(c);
                         }
                         let d = number - *a;
-                        if d > 0 && d < effective_max {
+                        if d > 0 && d < range_max {
                             menge.insert(d);
                         }
                     }
@@ -1022,7 +1033,7 @@ fn html_exact_header_attrs_py(
                 let around_only_zero = around.is_empty() || around.iter().all(|a| *a == 0);
                 let mut i = 0i64;
                 loop {
-                    let cond = around.iter().all(|a| start.saturating_mul(i) < effective_max.saturating_sub(*a));
+                    let cond = around.iter().all(|a| start.saturating_mul(i) < range_max.saturating_sub(*a));
                     if !cond {
                         break;
                     }
@@ -1030,17 +1041,17 @@ fn html_exact_header_attrs_py(
                     for number in start..=end {
                         if around_only_zero {
                             let c = number.saturating_mul(i);
-                            if c <= effective_max {
+                            if c <= range_max {
                                 menge.insert(c);
                             }
                         } else {
                             for a in &around {
                                 let c = number.saturating_mul(i) + *a;
-                                if c <= effective_max {
+                                if c <= range_max {
                                     menge.insert(c);
                                 }
                                 let d = number.saturating_mul(i) - *a;
-                                if d > 0 && d < effective_max {
+                                if d > 0 && d < range_max {
                                     menge.insert(d);
                                 }
                             }
@@ -2299,6 +2310,21 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use crate::shared::reta_program_types::Program;
+
+    #[test]
+    fn bereich_to_numbers2_v_prefix_open_max_matches_python_cap() {
+        let values = Program::bereich_to_numbers2_py("v2", false, 0, false);
+        assert_eq!(values.len(), 514);
+        assert!(values.contains(&2));
+        assert!(values.contains(&1028));
+        assert!(!values.contains(&1030));
+    }
+
+    #[test]
+    fn bereich_to_numbers2_outer_vielfache_zero_max_stays_python_empty() {
+        let values = Program::bereich_to_numbers2_py("2", true, 0, false);
+        assert!(values.is_empty());
+    }
 
     #[test]
     fn text_height_limits_wrapped_shell_output_lines() {

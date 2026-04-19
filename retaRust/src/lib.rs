@@ -132,7 +132,8 @@ pub fn run_reta_from_env_args() -> RetaRunResult {
 }
 
 pub fn print_reta_result(result: &RetaRunResult) {
-    println!("{}", result.render_text());
+    eprint!("{}", result.stderr);
+    print!("{}", result.stdout);
 }
 
 pub fn run_reta_and_print_from_env() -> i32 {
@@ -145,4 +146,35 @@ pub fn run_reta_and_print_from_env() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_run_and_print_from_env_ffi() -> i32 {
     run_reta_and_print_from_env()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::RetaRunResult;
+
+    #[test]
+    fn render_text_empty_response_stays_empty() {
+        assert_eq!(RetaRunResult::default().render_text(), "");
+    }
+
+    #[test]
+    fn render_text_keeps_stdout_bytes_without_extra_newline() {
+        let result = RetaRunResult {
+            stdout: "alpha\n".to_string(),
+            stderr: String::new(),
+            exit_code: 0,
+        };
+        assert_eq!(result.render_text(), "alpha\n");
+    }
+
+    #[test]
+    fn render_text_separates_stdout_and_stderr_only_when_needed() {
+        let result = RetaRunResult {
+            stdout: "alpha".to_string(),
+            stderr: "beta\n".to_string(),
+            exit_code: 1,
+        };
+        assert_eq!(result.render_text(), "alpha\nbeta\n");
+    }
 }

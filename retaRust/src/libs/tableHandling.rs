@@ -31,7 +31,10 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use indexmap::IndexMap;
 
 use crate::shared::lib4tables_enum_py::ST;
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
+use crate::shared::reta_generators_inventory_py::{GENERATED2_SPECS, METAKONKRET_SPECS};
+use crate::shared::reta_program_types::{
+    dedup_preserve_order_i64, Generated2Selection, GeneratorPairSelection, PairStr, Program,
+};
 
 pub const PYTHON_SOURCE__TABLE_HANDLING: &str = include_str!("../../python_reference/tableHandling.py");
 
@@ -609,7 +612,7 @@ mod syntax_tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
     use crate::shared::lib4tables_enum_py::ST;
-    use crate::shared::reta_program_types::PairStr;
+    use crate::shared::reta_program_types::{PairStr, Program};
 
     #[test]
     fn prim_creativity_matches_lib4tables_branches() {
@@ -670,6 +673,42 @@ mod syntax_tests {
             "<td class=\"z_0 r_6 p1_✗Grundstrukturen,, p2_p3_0_sternpolygon, p4_0,3\">\n"
         );
     }
+
+    #[test]
+    fn tablehandling_facade_seeds_generated2_numeric_keys_like_python_wrapper() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        seed_generated2_from_numeric_keys_py(&mut program, &[2]);
+        assert!(program
+            .generated2Codes
+            .iter()
+            .any(|code| code == "primzahlkreuzprocontra"));
+        assert!(program.generated2Selections.iter().any(|selection| {
+            selection.code == "primzahlkreuzprocontra"
+                && selection.parameter_main_name == "Grundstrukturen"
+        }));
+    }
+
+    #[test]
+    fn tablehandling_facade_seeds_generated2_from_parameter_texts() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        let mut para_text_namen = BTreeMap::new();
+        para_text_namen.insert(999, vec![vec!["PrimCSV".to_string()]]);
+        seed_generated2_from_parameter_texts_py(&mut program, &para_text_namen);
+        assert!(program.generated2Codes.iter().any(|code| code == "PrimCSV"));
+    }
+
+    #[test]
+    fn tablehandling_facade_seeds_metakonkret_pairs_with_names() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        seed_metakonkret_from_pairs_py(&mut program, &[(2, 0)]);
+        assert!(program.metakonkretPairs.contains(&(2, 0)));
+        assert!(program.metakonkretSelections.iter().any(|selection| {
+            selection.left == 2
+                && selection.right == 0
+                && selection.parameter_main_name == "Meta_vs_Konkret_(Universum)"
+        }));
+    }
+
 }
 
 pub static shellRowsAmount: AtomicI64 = AtomicI64::new(0);
@@ -799,6 +838,206 @@ where
     let extra = f(&mut guard.program, &mut rows);
     let relitable_out = guard.program.relitable.clone();
     (relitable_out, rows, extra)
+}
+
+fn push_unique_string_py(target: &mut Vec<String>, value: String) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn push_unique_generated2_selection_py(target: &mut Vec<Generated2Selection>, value: Generated2Selection) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn push_unique_pair_i64_py(target: &mut Vec<(i64, i64)>, value: (i64, i64)) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn push_unique_generator_pair_selection_py(target: &mut Vec<GeneratorPairSelection>, value: GeneratorPairSelection) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn seed_generated2_spec_py(
+    program: &mut Program,
+    main_name: &str,
+    parameter_name: &str,
+    code: &str,
+) {
+    push_unique_string_py(&mut program.generated2Codes, code.to_string());
+    push_unique_generated2_selection_py(
+        &mut program.generated2Selections,
+        Generated2Selection {
+            parameter_main_name: main_name.to_string(),
+            parameter_name: parameter_name.to_string(),
+            code: code.to_string(),
+        },
+    );
+}
+
+fn seed_generated2_inventory_spec_py(
+    program: &mut Program,
+    spec: &crate::shared::reta_generators_inventory_py::GeneratorTextSpec,
+) {
+    seed_generated2_spec_py(program, spec.main_name, spec.parameter_name, spec.code);
+}
+
+fn seed_primzahlkreuz_generated2_specs_py(program: &mut Program) {
+    for spec in GENERATED2_SPECS
+        .iter()
+        .filter(|spec| spec.code == "primzahlkreuzprocontra")
+    {
+        seed_generated2_inventory_spec_py(program, spec);
+    }
+}
+
+fn normalize_generator_lookup_text_py(text: &str) -> String {
+    text.trim()
+        .replace('_', " ")
+        .replace('-', " ")
+        .replace('(', " ")
+        .replace(')', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn generated2_spec_matches_text_py(
+    spec: &crate::shared::reta_generators_inventory_py::GeneratorTextSpec,
+    text: &str,
+) -> bool {
+    let raw = text.trim();
+    if raw.is_empty() {
+        return false;
+    }
+    if raw == spec.code || raw == spec.parameter_name || raw == spec.main_name {
+        return true;
+    }
+
+    let haystack = normalize_generator_lookup_text_py(raw);
+    if haystack.is_empty() {
+        return false;
+    }
+
+    let mut needles = vec![
+        normalize_generator_lookup_text_py(spec.code),
+        normalize_generator_lookup_text_py(spec.parameter_name),
+        normalize_generator_lookup_text_py(spec.main_name),
+        normalize_generator_lookup_text_py(&format!("{} {}", spec.main_name, spec.parameter_name)),
+    ];
+    if spec.code == "primzahlkreuzprocontra" {
+        needles.push("primzahlkreuz pro contra".to_string());
+    }
+
+    needles
+        .into_iter()
+        .filter(|needle| !needle.is_empty())
+        .any(|needle| haystack == needle || haystack.contains(&needle))
+}
+
+fn seed_generated2_from_parameter_texts_py(
+    program: &mut Program,
+    para_text_namen: &BTreeMap<i64, Vec<Vec<String>>>,
+) {
+    for groups in para_text_namen.values() {
+        for group in groups {
+            for text in group {
+                for spec in GENERATED2_SPECS
+                    .iter()
+                    .filter(|spec| generated2_spec_matches_text_py(spec, text))
+                {
+                    seed_generated2_inventory_spec_py(program, spec);
+                }
+            }
+        }
+    }
+}
+
+fn seed_generated2_from_numeric_keys_py(program: &mut Program, generated2_keys: &[i64]) {
+    for key in generated2_keys.iter().copied() {
+        let index = if key == 0 {
+            Some(0usize)
+        } else if key > 0 {
+            Some((key - 1) as usize)
+        } else {
+            None
+        };
+        if let Some(index) = index {
+            if let Some(spec) = GENERATED2_SPECS.get(index) {
+                seed_generated2_inventory_spec_py(program, spec);
+            }
+        }
+    }
+}
+
+fn seed_generated2_from_wrapper_args_py(
+    program: &mut Program,
+    generated2_keys: &[i64],
+    para_text_namen: &BTreeMap<i64, Vec<Vec<String>>>,
+) {
+    seed_generated2_from_parameter_texts_py(program, para_text_namen);
+    seed_generated2_from_numeric_keys_py(program, generated2_keys);
+}
+
+fn parameter_main_mentions_primzahlkreuz_py(parameters_main: &BTreeMap<String, Vec<String>>) -> bool {
+    parameters_main.iter().any(|(main, values)| {
+        generated2_spec_matches_text_py(&GENERATED2_SPECS[1], main)
+            || main.to_lowercase().contains("primzahlkreuz")
+            || main.to_lowercase().contains("pro_contra")
+            || values.iter().any(|value| {
+                generated2_spec_matches_text_py(&GENERATED2_SPECS[1], value)
+                    || value.to_lowercase().contains("primzahlkreuz")
+                    || value.to_lowercase().contains("pro_contra")
+            })
+    })
+}
+
+fn seed_primzahlkreuz_from_wrapper_args_py(
+    program: &mut Program,
+    generated2_keys: &[i64],
+    parameters_main: &BTreeMap<String, Vec<String>>,
+) {
+    seed_generated2_from_numeric_keys_py(program, generated2_keys);
+    if parameter_main_mentions_primzahlkreuz_py(parameters_main) {
+        seed_primzahlkreuz_generated2_specs_py(program);
+    }
+}
+
+fn seed_metakonkret_from_pairs_py(program: &mut Program, couples: &[(i64, i64)]) {
+    for &(left, right) in couples {
+        push_unique_pair_i64_py(&mut program.metakonkretPairs, (left, right));
+        if let Some(spec) = METAKONKRET_SPECS
+            .iter()
+            .find(|spec| spec.col_a == left && spec.col_b == right)
+        {
+            push_unique_generator_pair_selection_py(
+                &mut program.metakonkretSelections,
+                GeneratorPairSelection {
+                    parameter_main_name: spec.main_name.to_string(),
+                    parameter_name: spec.parameter_name.to_string(),
+                    left,
+                    right,
+                },
+            );
+        } else {
+            push_unique_generator_pair_selection_py(
+                &mut program.metakonkretSelections,
+                GeneratorPairSelection {
+                    parameter_main_name: String::new(),
+                    parameter_name: String::new(),
+                    left,
+                    right,
+                },
+            );
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1754,14 +1993,17 @@ impl TablesConcat {
         &self,
         relitable: Vec<Vec<String>>,
         rowsAsNumbers: Vec<i64>,
-        _generated2_keys: Vec<i64>,
-        _paraTextNamen: BTreeMap<i64, Vec<Vec<String>>>,
+        generated2_keys: Vec<i64>,
+        paraTextNamen: BTreeMap<i64, Vec<Vec<String>>>,
     ) -> (Vec<Vec<String>>, Vec<i64>) {
         let (relitable, rows, _unit) = update_program_with_relitable_and_rows(
             &self.state,
             relitable,
             rowsAsNumbers,
-            |program, rows| program.concat1RowPrimUniverse2(rows),
+            |program, rows| {
+                seed_generated2_from_wrapper_args_py(program, &generated2_keys, &paraTextNamen);
+                program.concat1RowPrimUniverse2(rows)
+            },
         );
         (relitable, rows)
     }
@@ -1770,14 +2012,17 @@ impl TablesConcat {
         &self,
         relitable: Vec<Vec<String>>,
         rowsAsNumbers: Vec<i64>,
-        _generated2_keys: Vec<i64>,
-        _ParametersMain: BTreeMap<String, Vec<String>>,
+        generated2_keys: Vec<i64>,
+        ParametersMain: BTreeMap<String, Vec<String>>,
     ) -> (Vec<Vec<String>>, Vec<i64>) {
         let (relitable, rows, _unit) = update_program_with_relitable_and_rows(
             &self.state,
             relitable,
             rowsAsNumbers,
-            |program, rows| program.concat1PrimzahlkreuzProContra(rows),
+            |program, rows| {
+                seed_primzahlkreuz_from_wrapper_args_py(program, &generated2_keys, &ParametersMain);
+                program.concat1PrimzahlkreuzProContra(rows)
+            },
         );
         (relitable, rows)
     }
@@ -1814,13 +2059,16 @@ impl TablesConcat {
         &self,
         relitable: Vec<Vec<String>>,
         rowsAsNumbers: Vec<i64>,
-        _couplesX: Vec<(i64, i64)>,
+        couplesX: Vec<(i64, i64)>,
     ) -> (Vec<Vec<String>>, Vec<i64>) {
         let (relitable, rows, _unit) = update_program_with_relitable_and_rows(
             &self.state,
             relitable,
             rowsAsNumbers,
-            |program, rows| program.spalteMetaKontretTheorieAbstrakt_etc_1(rows),
+            |program, rows| {
+                seed_metakonkret_from_pairs_py(program, &couplesX);
+                program.spalteMetaKontretTheorieAbstrakt_etc_1(rows)
+            },
         );
         (relitable, rows)
     }
