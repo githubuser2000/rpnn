@@ -2352,16 +2352,10 @@ impl<'a> PythonRowExprParser<'a> {
         loop {
             if self.consume_text("//") {
                 let rhs = self.parse_power()?;
-                if rhs == 0 {
-                    return None;
-                }
-                value = value.checked_div(rhs)?;
+                value = python_floor_div(value, rhs)?;
             } else if self.consume_text("%") {
                 let rhs = self.parse_power()?;
-                if rhs == 0 {
-                    return None;
-                }
-                value = value.checked_rem(rhs)?;
+                value = python_mod(value, rhs)?;
             } else if self.consume_text("/") {
                 let rhs = self.parse_power()?;
                 if rhs == 0 || value % rhs != 0 {
@@ -2488,13 +2482,40 @@ impl<'a> PythonRowExprParser<'a> {
                 .into_iter()
                 .max(),
             "max" if !args.is_empty() => eval_expr_args()?.into_iter().max(),
-            "sum" if args.len() == 1 => {
+            "sum" if !args.is_empty() && args.len() <= 2 => {
                 let values = parse_python_iterable_values_with_vars(&args[0], vars)?;
-                values.into_iter().try_fold(0i64, |acc, value| acc.checked_add(value))
+                let start = if args.len() == 2 {
+                    eval_python_row_expr_with_vars(&args[1], vars)?
+                } else {
+                    0
+                };
+                values.into_iter().try_fold(start, |acc, value| acc.checked_add(value))
             }
             "len" if args.len() == 1 => {
                 let values = parse_python_iterable_values_with_vars(&args[0], vars)?;
                 i64::try_from(values.len()).ok()
+            }
+            "bool" if args.len() == 1 => {
+                if let Some(values) = parse_python_iterable_values_with_vars(&args[0], vars) {
+                    Some(if values.is_empty() { 0 } else { 1 })
+                } else {
+                    Some(if eval_python_row_expr_with_vars(&args[0], vars)? == 0 { 0 } else { 1 })
+                }
+            }
+            "all" if args.len() == 1 => {
+                let values = parse_python_iterable_values_with_vars(&args[0], vars)?;
+                Some(if values.into_iter().all(|value| value != 0) { 1 } else { 0 })
+            }
+            "any" if args.len() == 1 => {
+                let values = parse_python_iterable_values_with_vars(&args[0], vars)?;
+                Some(if values.into_iter().any(|value| value != 0) { 1 } else { 0 })
+            }
+            "math.prod" if args.len() == 1 => {
+                let values = parse_python_iterable_values_with_vars(&args[0], vars)?;
+                values.into_iter().try_fold(1i64, |acc, value| acc.checked_mul(value))
+            }
+            "math.floor" | "math.ceil" | "math.trunc" if args.len() == 1 => {
+                Some(eval_python_row_expr_with_vars(&args[0], vars)?)
             }
             _ => None,
         }
@@ -2529,12 +2550,49 @@ impl<'a> PythonRowExprParser<'a> {
         self.pos += 1;
         while !self.finished()
             && (self.chars[self.pos] == '_'
+                || self.chars[self.pos] == '.'
                 || self.chars[self.pos].is_ascii_alphanumeric())
         {
             self.pos += 1;
         }
-        Some(self.chars[start..self.pos].iter().collect())
+        let ident: String = self.chars[start..self.pos].iter().collect();
+        if ident.ends_with('.') || ident.contains("..") {
+            None
+        } else {
+            Some(ident)
+        }
     }
+}
+
+fn python_floor_div(lhs: i64, rhs: i64) -> Option<i64> {
+    if rhs == 0 {
+        return None;
+    }
+    let quotient = lhs.checked_div(rhs)?;
+    let remainder = lhs.checked_rem(rhs)?;
+    if remainder != 0 && ((lhs < 0) != (rhs < 0)) {
+        quotient.checked_sub(1)
+    } else {
+        Some(quotient)
+    }
+}
+
+fn python_mod(lhs: i64, rhs: i64) -> Option<i64> {
+    if rhs == 0 {
+        return None;
+    }
+    let quotient = python_floor_div(lhs, rhs)?;
+    lhs.checked_sub(quotient.checked_mul(rhs)?)
+}
+
+fn python_row_expr_text_is_condition(text: &str) -> bool {
+    let trimmed = text.trim();
+    trimmed.strip_prefix("not ").is_some()
+        || split_top_level_comparison_chain(trimmed).is_some()
+        || find_top_level_keyword(trimmed, " or ").is_some()
+        || find_top_level_keyword(trimmed, " and ").is_some()
+        || find_top_level_keyword(trimmed, " not in ").is_some()
+        || find_top_level_keyword(trimmed, " in ").is_some()
 }
 
 fn eval_python_row_expr_with_vars(text: &str, vars: &PythonRowVars) -> Option<i64> {
@@ -2549,6 +2607,11 @@ fn eval_python_row_expr_with_vars(text: &str, vars: &PythonRowVars) -> Option<i6
         } else {
             eval_python_row_expr_with_vars(falsy, vars)
         };
+    }
+
+    if python_row_expr_text_is_condition(trimmed) {
+        return eval_python_row_condition_with_vars(trimmed, vars)
+            .map(|value| if value { 1 } else { 0 });
     }
 
     let mut parser = PythonRowExprParser::new(trimmed, vars);
@@ -2632,22 +2695,33 @@ fn split_python_conditional_expr(text: &str) -> Option<(&str, &str, &str)> {
     }
 }
 
-fn split_top_level_comparison(text: &str) -> Option<(&str, &str, &str)> {
+fn split_top_level_comparison_chain<'a>(text: &'a str) -> Option<(Vec<&'a str>, Vec<&'a str>)> {
     let mut round = 0i32;
     let mut square = 0i32;
     let mut curly = 0i32;
-    let operators = ["==", "!=", "<=", ">=", "<", ">"];
+    let comparison_operators = ["==", "!=", "<=", ">=", "<", ">"];
+    let mut operands = Vec::new();
+    let mut operators = Vec::new();
+    let mut start = 0usize;
+    let mut index = 0usize;
 
-    for (index, ch) in text.char_indices() {
+    while index < text.len() {
+        let ch = text[index..].chars().next()?;
         if round == 0 && square == 0 && curly == 0 {
-            for operator in operators {
-                if text[index..].starts_with(operator) {
-                    let left = text[..index].trim();
-                    let right = text[index + operator.len()..].trim();
-                    if !left.is_empty() && !right.is_empty() {
-                        return Some((left, operator, right));
-                    }
+            if let Some(operator) = comparison_operators
+                .iter()
+                .copied()
+                .find(|operator| text[index..].starts_with(operator))
+            {
+                let left = text[start..index].trim();
+                if left.is_empty() {
+                    return None;
                 }
+                operands.push(left);
+                operators.push(operator);
+                index += operator.len();
+                start = index;
+                continue;
             }
         }
         match ch {
@@ -2659,8 +2733,40 @@ fn split_top_level_comparison(text: &str) -> Option<(&str, &str, &str)> {
             '}' => curly -= 1,
             _ => {}
         }
+        index += ch.len_utf8();
     }
-    None
+
+    if operators.is_empty() {
+        return None;
+    }
+    let last = text[start..].trim();
+    if last.is_empty() {
+        return None;
+    }
+    operands.push(last);
+    (operands.len() == operators.len() + 1).then_some((operands, operators))
+}
+
+fn eval_python_row_chained_comparison_with_vars(text: &str, vars: &PythonRowVars) -> Option<bool> {
+    let (operands, operators) = split_top_level_comparison_chain(text)?;
+    let mut previous = eval_python_row_expr_with_vars(operands[0], vars)?;
+    for (operator, right_text) in operators.iter().zip(operands.iter().skip(1)) {
+        let right = eval_python_row_expr_with_vars(right_text, vars)?;
+        let matches = match *operator {
+            "==" => previous == right,
+            "!=" => previous != right,
+            "<=" => previous <= right,
+            ">=" => previous >= right,
+            "<" => previous < right,
+            ">" => previous > right,
+            _ => return None,
+        };
+        if !matches {
+            return Some(false);
+        }
+        previous = right;
+    }
+    Some(true)
 }
 
 fn eval_python_row_condition_with_vars(text: &str, vars: &PythonRowVars) -> Option<bool> {
@@ -2705,18 +2811,8 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &PythonRowVars) -> Opti
         )?;
         return Some(right_values.contains(&left));
     }
-    if let Some((left, operator, right)) = split_top_level_comparison(trimmed) {
-        let left = eval_python_row_expr_with_vars(left, vars)?;
-        let right = eval_python_row_expr_with_vars(right, vars)?;
-        return match operator {
-            "==" => Some(left == right),
-            "!=" => Some(left != right),
-            "<=" => Some(left <= right),
-            ">=" => Some(left >= right),
-            "<" => Some(left < right),
-            ">" => Some(left > right),
-            _ => None,
-        };
+    if let Some(result) = eval_python_row_chained_comparison_with_vars(trimmed, vars) {
+        return Some(result);
     }
     Some(eval_python_row_expr_with_vars(trimmed, vars)? != 0)
 }
@@ -2789,19 +2885,28 @@ fn parse_python_call_inner<'a>(text: &'a str, name: &str) -> Option<&'a str> {
 }
 
 fn parse_python_builtin_iterable_values_with_vars(text: &str, vars: &PythonRowVars) -> Option<Vec<i64>> {
-    for name in ["list", "tuple", "set", "frozenset", "sorted"] {
+    for name in ["list", "tuple", "set", "frozenset", "sorted", "reversed"] {
         if let Some(inner) = parse_python_call_inner(text, name) {
-            let source = if name == "sorted" {
-                custom_split_delim_parenthesized(inner, ',')
-                    .into_iter()
-                    .next()
-                    .unwrap_or_default()
+            let parts = custom_split_delim_parenthesized(inner, ',');
+            let source = if name == "sorted" || name == "reversed" {
+                parts.into_iter().next().unwrap_or_default()
             } else {
                 inner.to_string()
             };
             let mut values = parse_python_iterable_values_with_vars(&source, vars)?;
-            if name == "sorted" {
-                values.sort_unstable();
+            match name {
+                "sorted" => {
+                    values.sort_unstable();
+                    if custom_split_delim_parenthesized(inner, ',')
+                        .into_iter()
+                        .skip(1)
+                        .any(|part| part.trim() == "reverse=True")
+                    {
+                        values.reverse();
+                    }
+                }
+                "reversed" => values.reverse(),
+                _ => {}
             }
             return Some(values);
         }
@@ -2825,7 +2930,10 @@ fn parse_python_iterable_values_with_vars(text: &str, vars: &PythonRowVars) -> O
     if trimmed.starts_with('(') && trimmed.ends_with(')') {
         let inner = &trimmed[1..trimmed.len() - 1];
         if split_top_level_iterable_binary(inner, '|').is_some()
+            || split_top_level_iterable_binary(inner, '&').is_some()
+            || split_top_level_iterable_binary(inner, '-').is_some()
             || split_top_level_iterable_binary(inner, '+').is_some()
+            || split_top_level_iterable_binary(inner, '*').is_some()
         {
             return parse_python_iterable_values_with_vars(inner, vars);
         }
@@ -2837,13 +2945,66 @@ fn parse_python_iterable_values_with_vars(text: &str, vars: &PythonRowVars) -> O
         return Some(out.into_iter().collect::<BTreeSet<_>>().into_iter().collect());
     }
 
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '&') {
+        let left_values: BTreeSet<_> = parse_python_iterable_values_with_vars(left, vars)?
+            .into_iter()
+            .collect();
+        let right_values: BTreeSet<_> = parse_python_iterable_values_with_vars(right, vars)?
+            .into_iter()
+            .collect();
+        return Some(left_values.intersection(&right_values).copied().collect());
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '-') {
+        if let (Some(left_values), Some(right_values)) = (
+            parse_python_iterable_values_with_vars(left, vars),
+            parse_python_iterable_values_with_vars(right, vars),
+        ) {
+            let right_set: BTreeSet<_> = right_values.into_iter().collect();
+            return Some(
+                left_values
+                    .into_iter()
+                    .filter(|value| !right_set.contains(value))
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+            );
+        }
+    }
+
     if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '+') {
         let mut out = parse_python_iterable_values_with_vars(left, vars)?;
         out.extend(parse_python_iterable_values_with_vars(right, vars)?);
         return Some(out);
     }
 
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '*') {
+        if let Some(values) = parse_python_iterable_values_with_vars(left, vars) {
+            let repeat = eval_python_row_expr_with_vars(right, vars)?;
+            return repeat_python_iterable_values(values, repeat);
+        }
+        if let Some(values) = parse_python_iterable_values_with_vars(right, vars) {
+            let repeat = eval_python_row_expr_with_vars(left, vars)?;
+            return repeat_python_iterable_values(values, repeat);
+        }
+    }
+
     None
+}
+
+fn repeat_python_iterable_values(values: Vec<i64>, repeat: i64) -> Option<Vec<i64>> {
+    if repeat <= 0 {
+        return Some(Vec::new());
+    }
+    let repeat = usize::try_from(repeat).ok()?;
+    if repeat > 20_000 || values.len().saturating_mul(repeat) > 20_000 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(values.len() * repeat);
+    for _ in 0..repeat {
+        out.extend(values.iter().copied());
+    }
+    Some(out)
 }
 
 #[derive(Clone, Debug)]
@@ -6507,6 +6668,40 @@ mod tests {
         assert_eq!(
             python_row_spec_to_numbers("[len(range(n)) for n in range(1,4)]"),
             Some(vec![1, 2, 3])
+        );
+    }
+
+    #[test]
+    fn python_generator_rows_support_more_eval_iterable_builtins_and_set_ops() {
+        assert_eq!(
+            python_row_spec_to_numbers(
+                "[n for n in reversed(range(1,5)) if any([n % 2 == 0, n == 6])]"
+            ),
+            Some(vec![2, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers(
+                "[n for n in ({1,2,3,4} & {2,4,6}) if all([bool(n), n <= 4])]",
+            ),
+            Some(vec![2, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in (([1,2] * 2) + list({3,4} - {2}))]"),
+            Some(vec![1, 2, 3, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[math.prod(range(1,n)) for n in range(3,6)]"),
+            Some(vec![2, 6, 24])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in range(1,6) if 1 < n < 5]"),
+            Some(vec![2, 3, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers(
+                "[n for n in range(1,4) if (-n // 2) == -2 or (-n % 2) == 1]",
+            ),
+            Some(vec![1, 3])
         );
     }
 
