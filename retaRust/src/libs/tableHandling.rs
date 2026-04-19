@@ -31,7 +31,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use indexmap::IndexMap;
 
 use crate::shared::lib4tables_enum_py::ST;
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
 
 pub const PYTHON_SOURCE__TABLE_HANDLING: &str = include_str!("../../python_reference/tableHandling.py");
 
@@ -150,6 +150,429 @@ pub struct csvSyntax;
 #[derive(Clone, Debug, Default)]
 pub struct emacsSyntax;
 
+fn python_isdecimal_ascii(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|ch| ch.is_ascii_digit())
+}
+
+fn python_int_if_decimal_else_zero<T: ToString>(value: T) -> i64 {
+    let text = value.to_string();
+    if python_isdecimal_ascii(&text) {
+        text.parse::<i64>().unwrap_or(0)
+    } else {
+        0
+    }
+}
+
+fn python_int_like<T: ToString>(value: T) -> i64 {
+    value.to_string().parse::<i64>().unwrap_or(0)
+}
+
+fn lib4tables_prim_fak_py(n: i64) -> Vec<i64> {
+    let mut faktoren = Vec::new();
+    let mut z = n;
+    while z > 1 {
+        let mut i = 2i64;
+        let mut gefunden = false;
+        let mut p = z;
+        while i * i <= n && !gefunden {
+            if z % i == 0 {
+                gefunden = true;
+                p = i;
+            } else {
+                i += 1;
+            }
+        }
+        if !gefunden {
+            p = z;
+        }
+        faktoren.push(p);
+        z /= p;
+    }
+    faktoren
+}
+
+fn lib4tables_prim_repeat_py(n: &[i64]) -> Vec<(i64, i64)> {
+    let mut d: Vec<(i64, i64)> = Vec::new();
+    let mut c = 1i64;
+    let mut b: Option<i64> = None;
+
+    for a in n.iter().rev().copied() {
+        if b == Some(a) {
+            c += 1;
+        } else {
+            c = 1;
+        }
+        d.push((a, c));
+        b = Some(a);
+    }
+
+    d.reverse();
+    let mut f = Vec::new();
+    let mut previous: Option<i64> = None;
+    for (e, g) in d {
+        if previous != Some(e) {
+            f.push((e, g));
+        }
+        previous = Some(e);
+    }
+    f
+}
+
+fn lib4tables_divisors_excluding_one_py(n: i64) -> BTreeSet<i64> {
+    let mut divisors = BTreeSet::new();
+    if n <= 0 {
+        return divisors;
+    }
+    let mut i = 1i64;
+    while (i as f64) < (n as f64).sqrt() + 1.0 {
+        if n % i == 0 {
+            divisors.insert(i);
+            if i * i != n {
+                divisors.insert(n / i);
+            }
+        }
+        i += 1;
+    }
+    divisors.remove(&1);
+    divisors
+}
+
+pub fn lib4tables_primCreativity_py(num: i64) -> i64 {
+    if num == 0 {
+        return 0;
+    }
+    let factors = lib4tables_prim_fak_py(num);
+    let repeated = lib4tables_prim_repeat_py(&factors);
+    if repeated.len() == 1 && repeated[0].1 == 1 {
+        return 1;
+    }
+    if repeated.len() == 1 {
+        return 3;
+    }
+    if repeated.is_empty() {
+        return 0;
+    }
+
+    let mut schnittmenge: Option<BTreeSet<i64>> = None;
+    for (_, prim_amount) in repeated {
+        let divisors = lib4tables_divisors_excluding_one_py(prim_amount);
+        if divisors.is_empty() {
+            schnittmenge = None;
+            break;
+        }
+        schnittmenge = Some(if let Some(existing) = schnittmenge {
+            existing.intersection(&divisors).copied().collect()
+        } else {
+            divisors
+        });
+    }
+
+    match schnittmenge {
+        Some(common) if !common.is_empty() => 3,
+        _ => 2,
+    }
+}
+
+pub fn primCreativity(num: i64) -> i64 {
+    lib4tables_primCreativity_py(num)
+}
+
+fn python_even_cell_content(content: Option<&str>) -> bool {
+    content
+        .and_then(|value| value.parse::<i64>().ok())
+        .map(|value| value % 2 == 0)
+        .unwrap_or(false)
+}
+
+impl OutputSyntax {
+    pub fn beginTable(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::BbCode => "[table]",
+            OutputSyntaxKind::Html => "<table border=0 id=\"bigtable\">",
+            _ => "",
+        }
+    }
+
+    pub fn endTable(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::BbCode => "[/table]",
+            OutputSyntaxKind::Html => "</table>\n",
+            _ => "",
+        }
+    }
+
+    pub fn beginCell(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::Markdown | OutputSyntaxKind::Emacs => "|",
+            OutputSyntaxKind::BbCode => "[td]",
+            OutputSyntaxKind::Html => "<td>\n",
+            _ => "",
+        }
+    }
+
+    pub fn endCell(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::BbCode => "[/td]",
+            OutputSyntaxKind::Html => "\n</td>\n",
+            _ => "",
+        }
+    }
+
+    pub fn beginZeile(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::Markdown | OutputSyntaxKind::Emacs => "|",
+            OutputSyntaxKind::BbCode => "[tr]",
+            _ => "",
+        }
+    }
+
+    pub fn endZeile(&self) -> &'static str {
+        match self.kind {
+            OutputSyntaxKind::Markdown | OutputSyntaxKind::Emacs => "|",
+            OutputSyntaxKind::BbCode => "[/tr]",
+            OutputSyntaxKind::Html => "</tr>\n",
+            _ => "",
+        }
+    }
+
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String {
+        self.beginZeile().to_string()
+    }
+
+    pub fn generateCell<T>(
+        &self,
+        _num: i64,
+        _dataDict: &T,
+        _content: Option<&str>,
+        _zeile: Option<&str>,
+    ) -> String {
+        self.beginCell().to_string()
+    }
+}
+
+impl NichtsSyntax {
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String {
+        String::new()
+    }
+
+    pub fn generateCell<T>(
+        &self,
+        _num: i64,
+        _dataDict: &T,
+        _content: Option<&str>,
+        _zeile: Option<&str>,
+    ) -> String {
+        String::new()
+    }
+}
+
+impl bbCodeSyntax {
+    pub fn coloredBeginCol<T: ToString>(&self, num: T, rest: bool) -> String {
+        let num = python_int_if_decimal_else_zero(num);
+        let number_type = primCreativity(num);
+        if rest {
+            return "[tr]".to_string();
+        }
+        match (number_type, num % 2 == 0, num) {
+            (1, true, _) => "[tr=\"background-color:#66ff66;color:#000000;\"]".to_string(),
+            (1, false, _) => "[tr=\"background-color:#009900;color:#ffffff;\"]".to_string(),
+            (2, true, _) | (_, true, 1) => "[tr=\"background-color:#ffff66;color:#000099;\"]".to_string(),
+            (2, false, _) | (_, false, 1) => "[tr=\"background-color:#555500;color:#aaaaff;\"]".to_string(),
+            (3, true, _) => "[tr=\"background-color:#9999ff;color:#202000;\"]".to_string(),
+            (3, false, _) => "[tr=\"background-color:#000099;color:#ffff66;\"]".to_string(),
+            (_, _, 0) => "[tr=\"background-color:#ff2222;color:#002222;\"]".to_string(),
+            _ => String::new(),
+        }
+    }
+
+    pub fn generateCell<T>(
+        &self,
+        spalte: i64,
+        _SpaltenParameter: &T,
+        content: Option<&str>,
+        _zeile: Option<&str>,
+    ) -> String {
+        let spalte = spalte + 2;
+        let attrs = if spalte == 0 {
+            if python_even_cell_content(content) {
+                "=\"background-color:#000000;color:#ffffff\""
+            } else {
+                "=\"background-color:#ffffff;color:#000000\""
+            }
+        } else {
+            "=\"\""
+        };
+        format!("[td{attrs}]")
+    }
+
+    pub fn beginTable(&self) -> &'static str { "[table]" }
+    pub fn endTable(&self) -> &'static str { "[/table]" }
+    pub fn beginCell(&self) -> &'static str { "[td]" }
+    pub fn endCell(&self) -> &'static str { "[/td]" }
+    pub fn beginZeile(&self) -> &'static str { "[tr]" }
+    pub fn endZeile(&self) -> &'static str { "[/tr]" }
+}
+
+fn html_syntax_tuple_for_special_column(spalte: i64) -> Option<Vec<Vec<PairStr>>> {
+    match spalte {
+        -2 => Some(vec![vec![PairStr("Zählung".to_string(), String::new())]]),
+        -1 => Some(vec![vec![PairStr("Nummerierung".to_string(), String::new())]]),
+        _ => None,
+    }
+}
+
+fn html_class_name_from_pair(pair: &PairStr, para_num: usize, column_group: usize) -> String {
+    let value = if para_num == 0 { &pair.0 } else { &pair.1 };
+    if para_num == 1 {
+        format!("p3_{column_group}_{value}")
+    } else {
+        value.clone()
+    }
+}
+
+impl htmlSyntax {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn coloredBeginCol<T: ToString>(&self, num: T, rest: bool) -> String {
+        let num = python_int_if_decimal_else_zero(num);
+        let number_type = primCreativity(num);
+        if rest {
+            return "<tr>\n".to_string();
+        }
+        match (number_type, num % 2 == 0, num) {
+            (1, true, _) => "<tr style=\"background-color:#66ff66;color:#000000;\">\n".to_string(),
+            (1, false, _) => "<tr style=\"background-color:#009900;color:#ffffff;\">\n".to_string(),
+            (2, true, _) | (_, true, 1) => "<tr style=\"background-color:#ffff66;color:#000099;\">\n".to_string(),
+            (2, false, _) | (_, false, 1) => "<tr style=\"background-color:#555500;color:#aaaaff;\">\n".to_string(),
+            (3, true, _) => "<tr style=\"background-color:#9999ff;color:#202000;\">\n".to_string(),
+            (3, false, _) => "<tr style=\"background-color:#000099;color:#ffff66;\">\n".to_string(),
+            (_, _, 0) => "<tr style=\"background-color:#ff2222;color:#002222;\">\n".to_string(),
+            _ => String::new(),
+        }
+    }
+
+    pub fn generateCell(
+        &self,
+        spalte: i64,
+        SpaltenParameter: &BTreeMap<i64, Vec<Vec<PairStr>>>,
+        content: Option<&str>,
+        zeile: Option<&str>,
+        generatedSpaltenParameter_Tags: &BTreeMap<i64, BTreeSet<ST>>,
+    ) -> String {
+        let zeile_string = match zeile {
+            Some("") | None => "0".to_string(),
+            Some(value) => value.to_string(),
+        };
+        let zeile_num = python_int_like(&zeile_string);
+
+        let tupleOfListsOfCouples = if let Some(special) = html_syntax_tuple_for_special_column(spalte) {
+            special
+        } else if let Some(found) = SpaltenParameter.get(&spalte) {
+            found.clone()
+        } else if python_isdecimal_ascii(&spalte.to_string()) {
+            panic!("ValueError");
+        } else {
+            vec![vec![PairStr("?".to_string(), "?".to_string())]]
+        };
+
+        let mut things1: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+        for (c, couples) in tupleOfListsOfCouples.iter().enumerate() {
+            if let Some(first_pair) = couples.first() {
+                for para_num in 0..=1usize {
+                    let para_name = html_class_name_from_pair(first_pair, para_num, c);
+                    things1.entry(para_num).or_default().push(para_name);
+                }
+            }
+        }
+
+        let mut things: BTreeMap<usize, String> = BTreeMap::new();
+        for (key, values) in &things1 {
+            let mut joined = String::new();
+            for el in values {
+                if el != "alles" {
+                    if *key == 0 {
+                        joined.push('✗');
+                    }
+                    joined.push_str(el);
+                    joined.push(',');
+                }
+            }
+            things.insert(*key, joined);
+        }
+
+        let spalte_shifted = spalte + 2;
+        if things.len() < 2 {
+            return String::new();
+        }
+
+        let p4 = generatedSpaltenParameter_Tags
+            .get(&(spalte_shifted - 2))
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|tag| tag.py_value().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+
+        let mut out = String::from("<td");
+        if zeile_num == 0 {
+            out.push_str(&format!(
+                " class=\"z_{} r_{} p1_{}, p2_{} p4_{}\"",
+                zeile_num,
+                spalte_shifted,
+                things.get(&0).cloned().unwrap_or_default(),
+                things.get(&1).cloned().unwrap_or_default(),
+                p4
+            ));
+        }
+
+        if spalte_shifted == 0 || spalte_shifted == 1 {
+            if python_even_cell_content(content) {
+                out.push_str(" style=\"background-color:#000000;color:#ffffff;\"");
+            } else if spalte_shifted == 0 {
+                out.push_str(" style=\"background-color:#ffffff;color:#000000;\"");
+            }
+        } else if things1
+            .get(&0)
+            .map(|values| values.iter().any(|value| value == "Symbole"))
+            .unwrap_or(false)
+        {
+            out.push_str(
+                " class=\"tdSymbole\" style=\"background-image: url();background-size: cover;background-repeat: no-repeat;background-position: right; \"",
+            );
+        }
+
+        out.push_str(">\n");
+        out
+    }
+
+    pub fn beginTable(&self) -> &'static str { "<table border=0 id=\"bigtable\">" }
+    pub fn endTable(&self) -> &'static str { "</table>\n" }
+    pub fn beginCell(&self) -> &'static str { "<td>\n" }
+    pub fn endCell(&self) -> &'static str { "\n</td>\n" }
+    pub fn beginZeile(&self) -> &'static str { "" }
+    pub fn endZeile(&self) -> &'static str { "</tr>\n" }
+}
+
+impl csvSyntax {
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { String::new() }
+    pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { String::new() }
+}
+
+impl markdownSyntax {
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { "|".to_string() }
+    pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { "|".to_string() }
+}
+
+impl emacsSyntax {
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { "|".to_string() }
+    pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { "|".to_string() }
+}
+
 impl From<NichtsSyntax> for OutputSyntax {
     fn from(_: NichtsSyntax) -> Self {
         OutputSyntax::nichts()
@@ -178,6 +601,74 @@ impl From<csvSyntax> for OutputSyntax {
 impl From<emacsSyntax> for OutputSyntax {
     fn from(_: emacsSyntax) -> Self {
         OutputSyntax::emacs()
+    }
+}
+
+#[cfg(test)]
+mod syntax_tests {
+    use super::*;
+    use std::collections::{BTreeMap, BTreeSet};
+    use crate::shared::lib4tables_enum_py::ST;
+    use crate::shared::reta_program_types::PairStr;
+
+    #[test]
+    fn prim_creativity_matches_lib4tables_branches() {
+        assert_eq!(primCreativity(0), 0);
+        assert_eq!(primCreativity(2), 1);
+        assert_eq!(primCreativity(4), 3);
+        assert_eq!(primCreativity(6), 2);
+        assert_eq!(primCreativity(36), 3);
+    }
+
+    #[test]
+    fn bbcode_syntax_matches_python_coloring_and_cells() {
+        let bbcode = bbCodeSyntax::default();
+        assert_eq!(
+            bbcode.coloredBeginCol("2", false),
+            "[tr=\"background-color:#66ff66;color:#000000;\"]"
+        );
+        assert_eq!(bbcode.coloredBeginCol("x", true), "[tr]");
+        assert_eq!(
+            bbcode.generateCell(
+                -2,
+                &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(),
+                Some("2"),
+                None,
+            ),
+            "[td=\"background-color:#000000;color:#ffffff\"]"
+        );
+        assert_eq!(
+            bbcode.generateCell(1, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None),
+            "[td=\"\"]"
+        );
+    }
+
+    #[test]
+    fn html_syntax_generates_python_header_classes() {
+        let html = htmlSyntax::new();
+        assert_eq!(
+            html.coloredBeginCol("0", false),
+            "<tr style=\"background-color:#ff2222;color:#002222;\">\n"
+        );
+
+        let mut spalten_parameter = BTreeMap::new();
+        spalten_parameter.insert(
+            4,
+            vec![vec![PairStr(
+                "Grundstrukturen".to_string(),
+                "sternpolygon".to_string(),
+            )]],
+        );
+        let mut tags = BTreeMap::new();
+        let mut tag_set = BTreeSet::new();
+        tag_set.insert(ST::sternPolygon);
+        tag_set.insert(ST::galaxie);
+        tags.insert(4, tag_set);
+
+        assert_eq!(
+            html.generateCell(4, &spalten_parameter, None, Some("0"), &tags),
+            "<td class=\"z_0 r_6 p1_✗Grundstrukturen,, p2_p3_0_sternpolygon, p4_0,3\">\n"
+        );
     }
 }
 

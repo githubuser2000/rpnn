@@ -1336,6 +1336,211 @@ pub fn custom_split_delim_parenthesized(text: &str, delim: char) -> Vec<String> 
         .collect()
 }
 
+fn split_kpattern_comma_here(tail_after_comma: &str) -> bool {
+    for ch in tail_after_comma.chars() {
+        if matches!(ch, ']' | '}' | ')') {
+            return false;
+        }
+        if matches!(ch, '[' | '{' | '(') {
+            return true;
+        }
+    }
+    true
+}
+
+/// Python `center.kpattern`: r",(?![^\[\]\{\}\(\)]*[\]\}\)])".
+///
+/// Unlike `libreta_prompt_custom_split2`, this keeps Python's trailing empty
+/// split element and intentionally follows the regex look-ahead rather than a
+/// balanced-bracket stack.  `LibRetaPrompt.verifyBruchNganzZahlCommaList` uses
+/// exactly this splitter.
+pub fn libreta_prompt_split_kpattern_commas_py(input_string: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut start = 0usize;
+
+    for (idx, ch) in input_string.char_indices() {
+        if ch == ',' && split_kpattern_comma_here(&input_string[idx + ch.len_utf8()..]) {
+            result.push(input_string[start..idx].to_string());
+            start = idx + ch.len_utf8();
+        }
+    }
+
+    result.push(input_string[start..].to_string());
+    result
+}
+
+fn ascii_digit_run(chars: &[char], pos: &mut usize) -> bool {
+    let start = *pos;
+    while *pos < chars.len() && chars[*pos].is_ascii_digit() {
+        *pos += 1;
+    }
+    *pos > start
+}
+
+fn python_between_commas_integer_range_shape(text: &str) -> bool {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.is_empty() {
+        return false;
+    }
+
+    let mut pos = 0usize;
+    if chars.get(pos) == Some(&'v') {
+        pos += 1;
+    }
+    if chars.get(pos) == Some(&'-') {
+        pos += 1;
+    }
+    if !ascii_digit_run(&chars, &mut pos) {
+        return false;
+    }
+
+    if chars.get(pos) == Some(&'-') {
+        pos += 1;
+        if !ascii_digit_run(&chars, &mut pos) {
+            return false;
+        }
+    }
+
+    while chars.get(pos) == Some(&'+') {
+        pos += 1;
+        if !ascii_digit_run(&chars, &mut pos) {
+            return false;
+        }
+    }
+
+    pos == chars.len()
+}
+
+#[allow(non_snake_case)]
+pub fn isZeilenAngabe_betweenKommas(g: &str) -> bool {
+    if python_between_commas_integer_range_shape(g) {
+        return true;
+    }
+    if parse_python_str_as_generator_values(g).is_some() {
+        return true;
+    }
+
+    let mut chars = g.chars();
+    if chars.next().is_none() {
+        return false;
+    }
+    let without_first = chars.collect::<String>();
+    parse_python_str_as_generator_values(&without_first).is_some()
+}
+
+pub fn is_zeilen_angabe_between_kommas_py(g: &str) -> bool {
+    isZeilenAngabe_betweenKommas(g)
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VerifyBruchGanzZahlBetweenCommasResult {
+    pub bruchAndGanzZahlEtwaKorrekterBereich: Vec<bool>,
+    pub bruchBereichsAngaben: Vec<String>,
+    pub bruchRanges: Vec<Vec<String>>,
+    pub zahlenAngaben_: Vec<String>,
+    pub bruchAndGanzZahlEtwaKorrekterBereichAllTrue: bool,
+}
+
+#[allow(non_snake_case)]
+pub fn verifyBruchNganzZahlBetweenCommas(
+    mut bruchAndGanzZahlEtwaKorrekterBereich: Vec<bool>,
+    bruchBereichsAngabe: &str,
+    mut bruchBereichsAngaben: Vec<String>,
+    bruchRange: Vec<String>,
+    mut bruchRanges: Vec<Vec<String>>,
+    etwaBruch: &str,
+    mut zahlenAngaben_: Vec<String>,
+) -> VerifyBruchGanzZahlBetweenCommasResult {
+    let isBruch = isZeilenAngabe_betweenKommas(bruchBereichsAngabe);
+    let isGanzZahl = isZeilenAngabe_betweenKommas(etwaBruch);
+
+    if isBruch != isGanzZahl {
+        bruchAndGanzZahlEtwaKorrekterBereich.push(true);
+        if isBruch {
+            bruchRanges.push(bruchRange);
+            bruchBereichsAngaben.push(bruchBereichsAngabe.to_string());
+        } else if isGanzZahl {
+            zahlenAngaben_.push(etwaBruch.to_string());
+        }
+    } else {
+        bruchAndGanzZahlEtwaKorrekterBereich.push(false);
+    }
+
+    let bruchAndGanzZahlEtwaKorrekterBereichAllTrue =
+        bruchAndGanzZahlEtwaKorrekterBereich.iter().all(|value| *value);
+
+    VerifyBruchGanzZahlBetweenCommasResult {
+        bruchAndGanzZahlEtwaKorrekterBereich,
+        bruchBereichsAngaben,
+        bruchRanges,
+        zahlenAngaben_,
+        bruchAndGanzZahlEtwaKorrekterBereichAllTrue,
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VerifyBruchGanzZahlCommaListResult {
+    pub bruchAndGanzZahlEtwaKorrekterBereich: Vec<Vec<bool>>,
+    pub bruchBereichsAngaben: Vec<Vec<String>>,
+    pub bruchRanges: Vec<Vec<Vec<String>>>,
+    pub zahlenAngaben_: Vec<Vec<String>>,
+    pub fullBlockIsZahlenbereichAndBruch_Z: bool,
+}
+
+#[allow(non_snake_case)]
+pub fn verifyBruchNganzZahlCommaList(
+    mut bruchAndGanzZahlEtwaKorrekterBereich1: Vec<bool>,
+    bruchBereichsAngabe: &str,
+    mut bruchBereichsAngaben1: Vec<String>,
+    bruchRange: Vec<String>,
+    mut bruchRanges1: Vec<Vec<String>>,
+    commaListe: &str,
+    mut zahlenAngaben_1: Vec<String>,
+) -> VerifyBruchGanzZahlCommaListResult {
+    let mut bruchAndGanzZahlEtwaKorrekterBereich = Vec::new();
+    let mut bruchBereichsAngaben = Vec::new();
+    let mut bruchRanges = Vec::new();
+    let mut zahlenAngaben_ = Vec::new();
+
+    for etwaBruch in libreta_prompt_split_kpattern_commas_py(commaListe) {
+        let verified = verifyBruchNganzZahlBetweenCommas(
+            bruchAndGanzZahlEtwaKorrekterBereich1,
+            bruchBereichsAngabe,
+            bruchBereichsAngaben1,
+            bruchRange.clone(),
+            bruchRanges1,
+            &etwaBruch,
+            zahlenAngaben_1,
+        );
+        bruchAndGanzZahlEtwaKorrekterBereich1 =
+            verified.bruchAndGanzZahlEtwaKorrekterBereich;
+        bruchBereichsAngaben1 = verified.bruchBereichsAngaben;
+        bruchRanges1 = verified.bruchRanges;
+        zahlenAngaben_1 = verified.zahlenAngaben_;
+
+        bruchAndGanzZahlEtwaKorrekterBereich
+            .push(bruchAndGanzZahlEtwaKorrekterBereich1.clone());
+        bruchBereichsAngaben.push(bruchBereichsAngaben1.clone());
+        bruchRanges.push(bruchRanges1.clone());
+        zahlenAngaben_.push(zahlenAngaben_1.clone());
+    }
+
+    // Python calls `all()` on a list of lists here.  Non-empty inner lists are
+    // truthy even when they contain `False`, so this deliberately does not fold
+    // the contained booleans.
+    let fullBlockIsZahlenbereichAndBruch_Z = bruchAndGanzZahlEtwaKorrekterBereich
+        .iter()
+        .all(|entry| !entry.is_empty());
+
+    VerifyBruchGanzZahlCommaListResult {
+        bruchAndGanzZahlEtwaKorrekterBereich,
+        bruchBereichsAngaben,
+        bruchRanges,
+        zahlenAngaben_,
+        fullBlockIsZahlenbereichAndBruch_Z,
+    }
+}
+
 
 #[allow(non_snake_case)]
 pub fn is15or16command(text: &str) -> bool {
@@ -7298,9 +7503,11 @@ mod tests {
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, is_15or16_command,
-        isReTaParameter, libreta_prompt_custom_split, libreta_prompt_custom_split2,
-        looks_like_numeric_or_fraction_range, python_row_spec_to_numbers, verkuerze_dict,
-        PromptModus,
+        is_zeilen_angabe_between_kommas_py, isReTaParameter,
+        libreta_prompt_custom_split, libreta_prompt_custom_split2,
+        libreta_prompt_split_kpattern_commas_py, looks_like_numeric_or_fraction_range,
+        python_row_spec_to_numbers, verifyBruchNganzZahlBetweenCommas,
+        verifyBruchNganzZahlCommaList, verkuerze_dict, PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -7323,6 +7530,102 @@ mod tests {
             strings(&["a", " b", "(c,d)", "", "e"])
         );
         assert_eq!(libreta_prompt_custom_split2("a,", ','), strings(&["a"]));
+    }
+
+    #[test]
+    fn libreta_prompt_kpattern_split_preserves_python_re_split_edges() {
+        assert_eq!(
+            libreta_prompt_split_kpattern_commas_py("a,[b,c],d,"),
+            strings(&["a", "[b,c]", "d", ""])
+        );
+        assert_eq!(
+            libreta_prompt_split_kpattern_commas_py("a,(b,c),{d,e}"),
+            strings(&["a", "(b,c)", "{d,e}"])
+        );
+    }
+
+    #[test]
+    fn libreta_prompt_verify_bruch_ganzzahl_helpers_match_python_lists() {
+        assert!(is_zeilen_angabe_between_kommas_py("1-3+5"));
+        assert!(is_zeilen_angabe_between_kommas_py("v-3-5+2"));
+        assert!(is_zeilen_angabe_between_kommas_py("[n for n in range(3)]"));
+        assert!(!is_zeilen_angabe_between_kommas_py("1/2"));
+        assert!(!is_zeilen_angabe_between_kommas_py("1,2"));
+
+        let bruch_side = verifyBruchNganzZahlBetweenCommas(
+            Vec::new(),
+            "1-3",
+            Vec::new(),
+            strings(&["1/2"]),
+            Vec::new(),
+            "x",
+            Vec::new(),
+        );
+        assert_eq!(bruch_side.bruchAndGanzZahlEtwaKorrekterBereich, vec![true]);
+        assert_eq!(bruch_side.bruchBereichsAngaben, strings(&["1-3"]));
+        assert_eq!(bruch_side.bruchRanges, vec![strings(&["1/2"])]);
+        assert!(bruch_side.bruchAndGanzZahlEtwaKorrekterBereichAllTrue);
+
+        let ganzzahl_side = verifyBruchNganzZahlBetweenCommas(
+            Vec::new(),
+            "x",
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            "4",
+            Vec::new(),
+        );
+        assert_eq!(ganzzahl_side.zahlenAngaben_, strings(&["4"]));
+        assert!(ganzzahl_side.bruchAndGanzZahlEtwaKorrekterBereichAllTrue);
+
+        let both_same_kind = verifyBruchNganzZahlBetweenCommas(
+            Vec::new(),
+            "1",
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            "2",
+            Vec::new(),
+        );
+        assert_eq!(
+            both_same_kind.bruchAndGanzZahlEtwaKorrekterBereich,
+            vec![false]
+        );
+        assert!(!both_same_kind.bruchAndGanzZahlEtwaKorrekterBereichAllTrue);
+
+        let comma_result = verifyBruchNganzZahlCommaList(
+            Vec::new(),
+            "x",
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            "4,5",
+            Vec::new(),
+        );
+        assert_eq!(
+            comma_result.bruchAndGanzZahlEtwaKorrekterBereich,
+            vec![vec![true], vec![true, true]]
+        );
+        assert_eq!(
+            comma_result.zahlenAngaben_,
+            vec![strings(&["4"]), strings(&["4", "5"])]
+        );
+        assert!(comma_result.fullBlockIsZahlenbereichAndBruch_Z);
+
+        let python_truthy_bug = verifyBruchNganzZahlCommaList(
+            Vec::new(),
+            "1",
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            "2",
+            Vec::new(),
+        );
+        assert_eq!(
+            python_truthy_bug.bruchAndGanzZahlEtwaKorrekterBereich,
+            vec![vec![false]]
+        );
+        assert!(python_truthy_bug.fullBlockIsZahlenbereichAndBruch_Z);
     }
 
     #[test]
