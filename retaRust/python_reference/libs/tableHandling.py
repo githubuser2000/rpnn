@@ -1486,21 +1486,13 @@ class Tables:
                 self.relitable[1] += [
                     i18n.tableHandling.gestirnGrossschrift["Sonne (keine Potenzen)"]
                 ]
-                for i, line in enumerate(self.relitable[2:]):
-                    line1 = []
-                    if i % 3 == 1:
-                        line1 += [
-                            i18n.tableHandling.gestirnGrossschrift[
-                                "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht"
-                            ]
-                        ]
-
+                for i, line in enumerate(self.relitable[2:], start=2):
                     if moonNumber(i)[1] != []:
-                        line1 += [
+                        line1 = [
                             i18n.tableHandling.gestirnGrossschrift["Mond (Potenzen)"]
                         ]
                     else:
-                        line1 += [
+                        line1 = [
                             i18n.tableHandling.gestirnGrossschrift[
                                 "Sonne (keine Potenzen)"
                             ]
@@ -1509,6 +1501,13 @@ class Tables:
                         line1 += [
                             i18n.tableHandling.gestirnGrossschrift["Planet (2*n)"],
                         ]
+                    if i % 3 == 0:
+                        line1 += [
+                            i18n.tableHandling.gestirnGrossschrift[
+                                "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht"
+                            ]
+                        ]
+
                     line += [
                         i18n.tableHandling.gestirnGrossschrift[", und außerdem "].join(
                             line1

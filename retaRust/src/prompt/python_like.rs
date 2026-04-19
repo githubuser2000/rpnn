@@ -1266,100 +1266,113 @@ pub fn is_15or16_command(text: &str) -> bool {
     false
 }
 
-pub fn custom_split_whitespace_parenthesized(text: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut current = String::new();
-    let mut round = 0i32;
-    let mut square = 0i32;
-    let mut curly = 0i32;
+pub fn libreta_prompt_custom_split(text: &str) -> Vec<String> {
+    let mut stack: Vec<char> = Vec::new();
+    let mut result: Vec<String> = Vec::new();
+    let mut start = 0usize;
 
-    for ch in text.chars() {
-        match ch {
-            '(' => {
-                round += 1;
-                current.push(ch);
+    for (idx, ch) in text.char_indices() {
+        if matches!(ch, '(' | '{' | '[') {
+            stack.push(ch);
+        } else if matches!(ch, ')' | '}' | ']') {
+            if !stack.is_empty() {
+                stack.pop();
             }
-            ')' => {
-                round -= 1;
-                current.push(ch);
-            }
-            '[' => {
-                square += 1;
-                current.push(ch);
-            }
-            ']' => {
-                square -= 1;
-                current.push(ch);
-            }
-            '{' => {
-                curly += 1;
-                current.push(ch);
-            }
-            '}' => {
-                curly -= 1;
-                current.push(ch);
-            }
-            c if c.is_whitespace() && round == 0 && square == 0 && curly == 0 => {
-                if !current.trim().is_empty() {
-                    out.push(current.trim().to_string());
-                }
-                current.clear();
-            }
-            _ => current.push(ch),
+        } else if ch.is_whitespace() && stack.is_empty() {
+            result.push(text[start..idx].to_string());
+            start = idx + ch.len_utf8();
         }
     }
 
-    if !current.trim().is_empty() {
-        out.push(current.trim().to_string());
+    if start < text.len() {
+        result.push(text[start..].to_string());
     }
-    out
+    result
+}
+
+pub fn libreta_prompt_custom_split2(input_string: &str, delimiter: char) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    let mut temp = String::new();
+    let mut stack: Vec<char> = Vec::new();
+
+    for ch in input_string.chars() {
+        if matches!(ch, '(' | '{' | '[') {
+            stack.push('(');
+            temp.push(ch);
+        } else if matches!(ch, ')' | '}' | ']') {
+            if stack.last().map(|last| "({[".contains(*last)).unwrap_or(false) {
+                stack.pop();
+                temp.push(ch);
+            } else {
+                temp.push(ch);
+            }
+        } else if ch == delimiter && stack.is_empty() {
+            result.push(temp);
+            temp = String::new();
+        } else {
+            temp.push(ch);
+        }
+    }
+
+    if !temp.is_empty() {
+        result.push(temp);
+    }
+    result
+}
+
+pub fn custom_split_whitespace_parenthesized(text: &str) -> Vec<String> {
+    libreta_prompt_custom_split(text)
+        .into_iter()
+        .map(|piece| piece.trim().to_string())
+        .filter(|piece| !piece.is_empty())
+        .collect()
 }
 
 pub fn custom_split_delim_parenthesized(text: &str, delim: char) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut current = String::new();
-    let mut round = 0i32;
-    let mut square = 0i32;
-    let mut curly = 0i32;
+    libreta_prompt_custom_split2(text, delim)
+        .into_iter()
+        .map(|piece| piece.trim().to_string())
+        .filter(|piece| !piece.is_empty())
+        .collect()
+}
 
-    for ch in text.chars() {
-        match ch {
-            '(' => {
-                round += 1;
-                current.push(ch);
-            }
-            ')' => {
-                round -= 1;
-                current.push(ch);
-            }
-            '[' => {
-                square += 1;
-                current.push(ch);
-            }
-            ']' => {
-                square -= 1;
-                current.push(ch);
-            }
-            '{' => {
-                curly += 1;
-                current.push(ch);
-            }
-            '}' => {
-                curly -= 1;
-                current.push(ch);
-            }
-            c if c == delim && round == 0 && square == 0 && curly == 0 => {
-                out.push(current.trim().to_string());
-                current.clear();
-            }
-            _ => current.push(ch),
+
+#[allow(non_snake_case)]
+pub fn is15or16command(text: &str) -> bool {
+    is_15or16_command(text)
+}
+
+#[allow(non_snake_case)]
+pub fn isReTaParameter(t: &str) -> bool {
+    if t.is_empty() || !t.starts_with('-') || looks_like_numeric_or_fraction_range(t) {
+        return false;
+    }
+
+    let token_without_value = t.split_once('=').map(|(head, _)| head).unwrap_or(t);
+    if reta_main_switch_tokens_for_regex()
+        .iter()
+        .any(|candidate| *candidate == token_without_value)
+    {
+        return true;
+    }
+
+    if matches!(token_without_value, "--" | "--*") {
+        return true;
+    }
+
+    parameter_token_base(token_without_value)
+        .map(|base| reta_global_parameter_inventory_for_regex().contains_key(base))
+        .unwrap_or(false)
+}
+
+pub fn verkuerze_dict(dictionary: &[(String, String)]) -> Vec<(String, String)> {
+    let mut dict2: Vec<(String, String)> = Vec::new();
+    for (key, value) in dictionary {
+        if !dict2.iter().any(|(_, existing_value)| existing_value == value) {
+            dict2.push((key.clone(), value.clone()));
         }
     }
-
-    if !current.trim().is_empty() {
-        out.push(current.trim().to_string());
-    }
-    out
+    dict2
 }
 
 pub fn looks_like_single_numeric_or_fraction_part(text: &str) -> bool {
@@ -7285,11 +7298,58 @@ mod tests {
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, is_15or16_command,
-        looks_like_numeric_or_fraction_range, python_row_spec_to_numbers, PromptModus,
+        isReTaParameter, libreta_prompt_custom_split, libreta_prompt_custom_split2,
+        looks_like_numeric_or_fraction_range, python_row_spec_to_numbers, verkuerze_dict,
+        PromptModus,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn libreta_prompt_custom_split_keeps_python_empty_and_space_semantics() {
+        assert_eq!(
+            libreta_prompt_custom_split(" a  b (c d) [e f]"),
+            strings(&["", "a", "", "b", "(c d)", "[e f]"])
+        );
+        assert_eq!(libreta_prompt_custom_split("a "), strings(&["a"]));
+    }
+
+    #[test]
+    fn libreta_prompt_custom_split2_keeps_python_delimiter_semantics() {
+        assert_eq!(
+            libreta_prompt_custom_split2("a, b,(c,d),,e", ','),
+            strings(&["a", " b", "(c,d)", "", "e"])
+        );
+        assert_eq!(libreta_prompt_custom_split2("a,", ','), strings(&["a"]));
+    }
+
+    #[test]
+    fn libreta_prompt_parameter_detection_matches_python_shape() {
+        assert!(isReTaParameter("-zeilen"));
+        assert!(isReTaParameter("--zeit=heute"));
+        assert!(isReTaParameter("--="));
+        assert!(isReTaParameter("--*="));
+        assert!(!isReTaParameter("-3"));
+        assert!(!isReTaParameter("2/3"));
+        assert!(!isReTaParameter("--unbekannt=wert"));
+    }
+
+    #[test]
+    fn verkuerze_dict_preserves_first_key_per_value_like_python() {
+        let reduced = verkuerze_dict(&strings(&["a", "b", "c", "d"])
+            .into_iter()
+            .zip(strings(&["1", "2", "1", "3"]))
+            .collect::<Vec<_>>());
+        assert_eq!(
+            reduced,
+            vec![
+                ("a".to_string(), "1".to_string()),
+                ("b".to_string(), "2".to_string()),
+                ("d".to_string(), "3".to_string()),
+            ]
+        );
     }
 
     #[test]

@@ -1,4 +1,6 @@
 #![allow(non_snake_case)]
+
+use crate::semantic_choices::WAHL15_I18N_ENTRIES;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PyVal {
     NoneValue,
@@ -18,6 +20,12 @@ impl OrderedDictLike {
     pub fn get(&self, key: &str) -> Option<PyVal> {
         for (k, v) in &self.items {
             if k == key { return Some(v.clone()); }
+        }
+        None
+    }
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut PyVal> {
+        for (k, v) in self.items.iter_mut() {
+            if k == key { return Some(v); }
         }
         None
     }
@@ -45,64 +53,18 @@ pub struct I18nLike {
 
 impl I18nLike {
     pub fn new() -> Self {
-        let mut wahl15: Vec<(String, String)> = vec![];
-wahl15.push(("Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity,nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)".to_string(), "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15),Geist_(15),Model_of_Hierarchical_Complexity),,nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)".to_string()));
-        wahl15.push(("Konkreta_und_Focus_(2)".to_string(), "Konkreta_und_Focus_(2)".to_string()));
-        wahl15.push(("Impulse_(5)".to_string(), "Impulse_(5)".to_string()));
-        wahl15.push(("Gefühle_(7)".to_string(), "Gefühle_(7)".to_string()));
-        wahl15.push(("Modus_und_Sein_(8)".to_string(), "Modus_und_Sein_(8)".to_string()));
-        wahl15.push(("Wirklichkeiten_Wahrheit_Wahrnehmung_(10)".to_string(), "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)".to_string()));
-        wahl15.push(("Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12".to_string(), "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12".to_string()));
-        wahl15.push(("Paradigmen_sind_Absichten_(13)".to_string(), "Paradigmen_sind_Absichten_(13)".to_string()));
-        wahl15.push(("Gedanken_sind_Positionen_(17)".to_string(), "Gedanken_sind_Positionen_(17)".to_string()));
-        wahl15.push(("Verbundenheiten_(18)".to_string(), "Verbundenheiten_(18)".to_string()));
-        wahl15.push(("Triebe_und_Bedürfnisse_(6)".to_string(), "Triebe_und_Bedürfnisse_(6)".to_string()));
-        wahl15.push(("Lust_(9)".to_string(), "Lust_(9)".to_string()));
-        wahl15.push(("Reflexe_(3),Existenzialien_(3)".to_string(), "Reflexe_(3),Existenzialien_(3)".to_string()));
-        wahl15.push(("Absicht_6_ist_Vorteilsmaximierung".to_string(), "Absicht_6_ist_Vorteilsmaximierung".to_string()));
-        wahl15.push(("Absicht_7_ist_Selbstlosigkeit".to_string(), "Absicht_7_ist_Selbstlosigkeit".to_string()));
-        wahl15.push(("Absicht_10_ist_Wirklichkeit_erkennen".to_string(), "Absicht_10_ist_Wirklichkeit_erkennen".to_string()));
-        wahl15.push(("Absicht_17_ist_zu_meinen".to_string(), "Absicht_17_ist_zu_meinen".to_string()));
-        wahl15.push(("Zeit_(4)_als_Wirklichkeit".to_string(), "Zeit_(4)_als_Wirklichkeit".to_string()));
-        wahl15.push(("Funktionen_Vorstellungen_(16)".to_string(), "Funktionen_Vorstellungen_(16)".to_string()));
-        wahl15.push(("Achtung_(4)".to_string(), "Achtung_(4)".to_string()));
-        wahl15.push(("Absicht_1/8".to_string(), "Absicht_1/8".to_string()));
-        wahl15.push(("Absicht_1/6_ist_Reinigung_und_Klarheit".to_string(), "Absicht_1/6_ist_Reinigung_und_Klarheit".to_string()));
-        wahl15.push(("Reflektion_und_Kategorien_(1/15)".to_string(), "Reflektion_und_Kategorien_(1/15)".to_string()));
-        wahl15.push(("Bewusstheit_statt_Bewusstsein_(1)".to_string(), "Bewusstheit_statt_Bewusstsein_(1)".to_string()));
-        wahl15.push(("Energie_und_universelle_Eigenschaften_(30)".to_string(), "Energie_und_universelle_Eigenschaften_(30)".to_string()));
-        wahl15.push(("Stimmungen_Kombinationen_(14)".to_string(), "Stimmungen_Kombinationen_(14)".to_string()));
-        wahl15.push(("Klassen_(20)".to_string(), "Klassen_(20)".to_string()));
-        wahl15.push(("Empathie_(37)".to_string(), "Empathie_(37)".to_string()));
-        wahl15.push(("Garben_und_Verhalten_nachfühlen(31)".to_string(), "Garben_und_Verhalten_nachfühlen(31)".to_string()));
-        wahl15.push(("Verhalten_(11)".to_string(), "Verhalten_(11)".to_string()));
-        wahl15.push(("Bedeutung_(10)".to_string(), "Bedeutung_(10)".to_string()));
-        wahl15.push(("Themen_(6)".to_string(), "Themen_(6)".to_string()));
-        wahl15.push(("Optimierung_(10)".to_string(), "Optimierung_(10)".to_string()));
-        wahl15.push(("Attraktionen_(36)".to_string(), "Attraktionen_(36)".to_string()));
-        wahl15.push(("Absicht_16_ist_zu_genügen".to_string(), "Absicht_16_ist_zu_genügen".to_string()));
-        wahl15.push(("Liebe_(7)".to_string(), "Liebe_(7)".to_string()));
-        wahl15.push(("Koalitionen_(10)".to_string(), "Koalitionen_(10)".to_string()));
-        wahl15.push(("Ansichten_Standpunkte_(18_17)".to_string(), "Ansichten_Standpunkte_(18_17)".to_string()));
-        wahl15.push(("Prinzipien(1/8)".to_string(), "Prinzipien(1/8)".to_string()));
-        wahl15.push(("Bestrebungen(1/5)".to_string(), "Bestrebungen(1/5)".to_string()));
-        wahl15.push(("Bedingung_und_Auslöser_(1/3)".to_string(), "Bedingung_und_Auslöser_(1/3)".to_string()));
-        wahl15.push(("relativer_Zeit-Betrag_(15_10_4_18_6)".to_string(), "relativer_Zeit-Betrag_(15_10_4_18_6)".to_string()));
-        wahl15.push(("Zahlenvergleich_(15_18_6)".to_string(), "Zahlenvergleich_(15_18_6)".to_string()));
-        wahl15.push(("Leidenschaften_(21)".to_string(), "Leidenschaften_(21)".to_string()));
-        wahl15.push(("Erwartungshaltungen_(26)".to_string(), "Erwartungshaltungen_(26)".to_string()));
-        wahl15.push(("Extremalien_(19),Ziele_(19)".to_string(), "Extremalien_(19),Ziele_(19)".to_string()));
-        wahl15.push(("universeller_Komperativ_(18→15)".to_string(), "universeller_Komperativ_(18→15)".to_string()));
-        wahl15.push(("Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)".to_string(), "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)".to_string()));
-        wahl15.push(("Sollen_Frage_Vorgehensweise_(1/13)".to_string(), "Sollen_Frage_Vorgehensweise_(1/13)".to_string()));
-        wahl15.push(("Fundament_(1/19)".to_string(), "Fundament_(1/19)".to_string()));
-        wahl15.push(("abhängige_Verbundenheit_(90)".to_string(), "abhängige_Verbundenheit_(90)".to_string()));
-        wahl15.push(("Absicht_13_ist_Helfen".to_string(), "Absicht_13_ist_Helfen".to_string()));
-        wahl15.push(("Karte_Filter_und_Unterscheidung_(1/12)".to_string(), "Karte_Filter_und_Unterscheidung_(1/12)".to_string()));
-        wahl15.push(("Maßnahmen_39".to_string(), "Maßnahmen_(39)".to_string()));
+        // Python-Wahrheit: `grundStrukHtml.py` importiert `wahl15` aus
+        // `LibRetaPrompt`, welches direkt `i18n.wahl15` referenziert.
+        // Die alte Fassung hatte hier Werte als Keys eingefroren und war
+        // dadurch für `grundStrukHtml` strukturell falsch. Diese Fassung nutzt
+        // dieselbe generierte i18n-Inventarliste wie retaPrompt.
+        let wahl15: Vec<(String, String)> = WAHL15_I18N_ENTRIES
+            .iter()
+            .map(|entry| (entry.key.to_string(), entry.value.to_string()))
+            .collect();
         Self {
             wahl15,
-            grundstrukturen0: "grundstrukturen".to_string(),
+            grundstrukturen0: "Grundstrukturen".to_string(),
         }
     }
 }
@@ -181,19 +143,28 @@ pub fn od_from_items(items: Vec<(String, PyVal)>) -> OrderedDictLike {
 
 pub fn merge_dicts(dict1: OrderedDictLike, dict2: OrderedDictLike) -> OrderedDictLike {
     let mut dict1 = dict1;
+    merge_dicts_mutating_like_python(&mut dict1, dict2);
+    od_from_items(sorted(dict1.items()))
+}
+
+fn merge_dicts_mutating_like_python(dict1: &mut OrderedDictLike, dict2: OrderedDictLike) {
+    // Python `merge_dicts` mutiert verschachtelte OrderedDicts in place und
+    // ignoriert in diesem rekursiven Ast den sortierten Rueckgabewert. Das ist
+    // fuer die sichtbare Reihenfolge in `myprint` relevant: nur die aktuelle
+    // Aufrufebene wird am Ende sortiert, rekursiv gemergte Kind-Maps behalten
+    // ihre Einfuegeordnung plus angehaengte Bestandsteile aus dict2.
     for (key, dict2_value) in dict2.items() {
         if dict1.contains_key(&key)
             && matches!(dict1.get(&key), Some(PyVal::OrderedDictLike(_)))
-            && matches!(dict2_value, PyVal::OrderedDictLike(_))
+            && matches!(&dict2_value, PyVal::OrderedDictLike(_))
         {
-            if let Some(PyVal::OrderedDictLike(left)) = dict1.get(&key) {
-                if let PyVal::OrderedDictLike(right) = dict2_value.clone() {
-                    let merged = merge_dicts(left, right);
-                    dict1.set(key, PyVal::OrderedDictLike(merged));
+            if let Some(PyVal::OrderedDictLike(left)) = dict1.get_mut(&key) {
+                if let PyVal::OrderedDictLike(right) = dict2_value {
+                    merge_dicts_mutating_like_python(left, right);
                 }
             }
         } else if dict1.contains_key(&key)
-            && matches!(dict2_value, PyVal::OrderedDictLike(_))
+            && matches!(&dict2_value, PyVal::OrderedDictLike(_))
             && !matches!(dict1.get(&key), Some(PyVal::OrderedDictLike(_)))
         {
             if let Some(existing) = dict1.get(&key) {
@@ -208,7 +179,6 @@ pub fn merge_dicts(dict1: OrderedDictLike, dict2: OrderedDictLike) -> OrderedDic
             dict1.set(key, dict2_value);
         }
     }
-    od_from_items(sorted(dict1.items()))
 }
 
 pub fn traverseHierarchy(liste: Vec<String>, thing: OrderedDictLike, listenIndex: usize, value: &str) -> OrderedDictLike {
@@ -633,3 +603,61 @@ pub const PYTHON_SOURCE__WAHL15WORDS: &str = r#"wahl15Words: dict = {
     ),
     "Maßnahmen_39": _("Maßnahmen_(39)"),
 }"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn i18n_like_uses_python_wahl15_keys_and_values_not_old_value_keys() {
+        let i18n = I18nLike::new();
+        assert_eq!(i18n.grundstrukturen0, "Grundstrukturen");
+        assert_eq!(i18n.wahl15.len(), WAHL15_I18N_ENTRIES.len());
+        assert_eq!(i18n.wahl15.first().map(|(key, _)| key.as_str()), Some("15"));
+        assert!(i18n
+            .wahl15
+            .first()
+            .map(|(_, value)| value.contains("Biologischer_Baum_(15)"))
+            .unwrap_or(false));
+        assert_eq!(i18n.wahl15.last().map(|(key, _)| key.as_str()), Some("7mit6"));
+    }
+    #[test]
+    fn merge_dicts_keeps_python_nested_insertion_order_when_recursive_return_is_ignored() {
+        let new_branch = od_from_items(vec![
+            (
+                "5".to_string(),
+                PyVal::OrderedDictLike(od_from_items(vec![
+                    (
+                        "10".to_string(),
+                        PyVal::OrderedDictLike(od_from_items(vec![
+                            ("Bedeutung_(10)".to_string(), PyVal::NoneValue),
+                        ])),
+                    ),
+                ])),
+            ),
+        ]);
+        let old_branch = od_from_items(vec![
+            (
+                "5".to_string(),
+                PyVal::OrderedDictLike(od_from_items(vec![
+                    ("Impulse_(5)".to_string(), PyVal::NoneValue),
+                ])),
+            ),
+        ]);
+
+        let merged = merge_dicts(new_branch, old_branch);
+        let PyVal::OrderedDictLike(inner5) = merged
+            .get("5")
+            .expect("key 5 should exist after merge")
+        else {
+            panic!("key 5 should be an OrderedDictLike");
+        };
+        let keys = inner5
+            .items()
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect::<Vec<_>>();
+        assert_eq!(keys, vec!["10".to_string(), "Impulse_(5)".to_string()]);
+    }
+
+}

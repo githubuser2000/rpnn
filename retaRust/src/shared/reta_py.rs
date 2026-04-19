@@ -1,6 +1,14 @@
 #![allow(non_snake_case)]
 pub use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program, SpaltenTyp};
 use std::collections::BTreeSet;
+
+
+/// Python `reta.py::render_color`:
+/// `return '<span style="color:%s;">%s</span>' % (tag_name, value)`
+pub fn render_color(tag_name: &str, value: &str, _options: &str, _parent: &str, _context: &str) -> String {
+    format!("<span style=\"color:{tag_name};\">{value}</span>")
+}
+
 impl Program {
     pub fn init_spalten_arten_python_like(&mut self) {
         self.spaltenArtenKey_SpaltennummernValue.clear();
@@ -66,5 +74,19 @@ impl Program {
             self.textHeight,
             self.spaltenArtenKey_SpaltennummernValue.len()
         )
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::render_color;
+
+    #[test]
+    fn render_color_matches_python_percent_formatting() {
+        assert_eq!(
+            render_color("red", "abc", "", "", ""),
+            "<span style=\"color:red;\">abc</span>"
+        );
     }
 }
