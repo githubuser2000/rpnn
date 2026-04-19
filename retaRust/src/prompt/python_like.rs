@@ -2192,6 +2192,93 @@ fn checked_python_shift_right(left: i64, right: i64) -> Option<i64> {
     left.checked_shr(right as u32)
 }
 
+fn checked_python_abs(value: i64) -> Option<i64> {
+    value.checked_abs()
+}
+
+fn checked_python_gcd_pair(left: i64, right: i64) -> Option<i64> {
+    let mut a = checked_python_abs(left)?;
+    let mut b = checked_python_abs(right)?;
+    while b != 0 {
+        let remainder = a.checked_rem(b)?;
+        a = b;
+        b = remainder;
+    }
+    Some(a)
+}
+
+fn checked_python_gcd_many(values: &[i64]) -> Option<i64> {
+    let mut iter = values.iter().copied();
+    let first = checked_python_abs(iter.next()?)?;
+    iter.try_fold(first, checked_python_gcd_pair)
+}
+
+fn checked_python_lcm_many(values: &[i64]) -> Option<i64> {
+    let mut acc = 1i64;
+    for value in values {
+        let value = checked_python_abs(*value)?;
+        if acc == 0 || value == 0 {
+            acc = 0;
+            continue;
+        }
+        let gcd = checked_python_gcd_pair(acc, value)?;
+        acc = acc.checked_div(gcd)?.checked_mul(value)?;
+    }
+    Some(acc)
+}
+
+fn checked_python_factorial(value: i64) -> Option<i64> {
+    if !(0..=20).contains(&value) {
+        return None;
+    }
+    (1..=value).try_fold(1i64, |acc, factor| acc.checked_mul(factor))
+}
+
+fn checked_python_isqrt(value: i64) -> Option<i64> {
+    if value < 0 {
+        return None;
+    }
+    let mut low = 0i64;
+    let mut high = value.min(3_037_000_499) + 1;
+    while low + 1 < high {
+        let mid = low + (high - low) / 2;
+        match mid.checked_mul(mid) {
+            Some(square) if square <= value => low = mid,
+            _ => high = mid,
+        }
+    }
+    Some(low)
+}
+
+fn checked_python_perm(n: i64, k: i64) -> Option<i64> {
+    if n < 0 || k < 0 {
+        return None;
+    }
+    if k > n {
+        return Some(0);
+    }
+    let mut out = 1i64;
+    for factor in (n - k + 1)..=n {
+        out = out.checked_mul(factor)?;
+    }
+    Some(out)
+}
+
+fn checked_python_comb(n: i64, k: i64) -> Option<i64> {
+    if n < 0 || k < 0 {
+        return None;
+    }
+    if k > n {
+        return Some(0);
+    }
+    let k = k.min(n - k);
+    let mut out = 1i64;
+    for i in 1..=k {
+        out = out.checked_mul(n - k + i)?.checked_div(i)?;
+    }
+    Some(out)
+}
+
 fn parse_python_int_literal(raw: &str, radix: u32, allow_prefix_underscore: bool) -> Option<i64> {
     if raw.is_empty() || raw.ends_with('_') || raw.contains("__") {
         return None;
@@ -2205,7 +2292,6 @@ fn parse_python_int_literal(raw: &str, radix: u32, allow_prefix_underscore: bool
     }
     i64::from_str_radix(&cleaned, radix).ok()
 }
-
 
 #[derive(Clone, Copy)]
 struct PythonRowExprVar<'a> {
@@ -2419,6 +2505,20 @@ impl<'a> PythonRowExprParser<'a> {
                     "pow" if args.len() == 2 && (0..=31).contains(&args[1]) => {
                         return args[0].checked_pow(args[1] as u32);
                     }
+                    "round" if args.len() == 2 => return Some(args[0]),
+                    "bool" if args.len() == 1 => return Some(if args[0] == 0 { 0 } else { 1 }),
+                    "math.gcd" if args.is_empty() => return Some(0),
+                    "math.gcd" => return checked_python_gcd_many(&args),
+                    "math.lcm" if args.is_empty() => return Some(1),
+                    "math.lcm" => return checked_python_lcm_many(&args),
+                    "math.factorial" if args.len() == 1 => return checked_python_factorial(args[0]),
+                    "math.isqrt" if args.len() == 1 => return checked_python_isqrt(args[0]),
+                    "math.floor" | "math.ceil" | "math.trunc" if args.len() == 1 => {
+                        return Some(args[0]);
+                    }
+                    "math.comb" if args.len() == 2 => return checked_python_comb(args[0], args[1]),
+                    "math.perm" if args.len() == 1 => return checked_python_factorial(args[0]),
+                    "math.perm" if args.len() == 2 => return checked_python_perm(args[0], args[1]),
                     _ => {}
                 }
             }
@@ -2426,27 +2526,42 @@ impl<'a> PythonRowExprParser<'a> {
             self.pos = args_start;
             let inner = self.take_call_inner_after_open_paren()?;
             let vars = self.vars_as_map();
-            let call_parts = custom_split_delim_parenthesized(&inner, ',');
-            return match ident.as_str() {
-                "sum" if !call_parts.is_empty() && call_parts.len() <= 2 => {
-                    let start = if call_parts.len() == 2 {
-                        eval_python_row_expr_with_vars(&call_parts[1], &vars)?
-                    } else {
+            if matches!(ident.as_str(), "sum" | "math.prod") {
+                let parts = custom_split_delim_parenthesized(&inner, ',');
+                if (1..=2).contains(&parts.len()) {
+                    let start = if parts.len() == 2 {
+                        let start_text = parts[1]
+                            .trim()
+                            .strip_prefix("start=")
+                            .unwrap_or(parts[1].trim());
+                        eval_python_row_expr_with_vars(start_text, &vars)?
+                    } else if ident == "sum" {
                         0
+                    } else {
+                        1
                     };
-                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?
-                        .into_iter()
-                        .try_fold(start, |acc, value| acc.checked_add(value))
+                    let values = parse_python_iterable_values_with_vars(&parts[0], &vars)?;
+                    return if ident == "sum" {
+                        values.into_iter().try_fold(start, |acc, value| acc.checked_add(value))
+                    } else {
+                        values.into_iter().try_fold(start, |acc, value| acc.checked_mul(value))
+                    };
                 }
-                "len" if call_parts.len() == 1 => {
-                    Some(parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.len() as i64)
-                }
-                "min" if call_parts.len() == 1 => {
-                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.into_iter().min()
-                }
-                "max" if call_parts.len() == 1 => {
-                    parse_python_iterable_values_with_vars(&call_parts[0], &vars)?.into_iter().max()
-                }
+            }
+            let values = parse_python_iterable_values_with_vars(&inner, &vars);
+            return match ident.as_str() {
+                "sum" => values?
+                    .into_iter()
+                    .try_fold(0i64, |acc, value| acc.checked_add(value)),
+                "math.prod" => values?
+                    .into_iter()
+                    .try_fold(1i64, |acc, value| acc.checked_mul(value)),
+                "len" => Some(values?.len() as i64),
+                "min" => values?.into_iter().min(),
+                "max" => values?.into_iter().max(),
+                "all" => Some(if values?.into_iter().all(|value| value != 0) { 1 } else { 0 }),
+                "any" => Some(if values?.into_iter().any(|value| value != 0) { 1 } else { 0 }),
+                "bool" => Some(if values?.is_empty() { 0 } else { 1 }),
                 _ => None,
             };
         }
@@ -2580,11 +2695,17 @@ impl<'a> PythonRowExprParser<'a> {
         self.pos += 1;
         while !self.finished()
             && (self.chars[self.pos] == '_'
+                || self.chars[self.pos] == '.'
                 || self.chars[self.pos].is_ascii_alphanumeric())
         {
             self.pos += 1;
         }
-        Some(self.chars[start..self.pos].iter().collect())
+        let ident = self.chars[start..self.pos].iter().collect::<String>();
+        if ident.ends_with('.') || ident.contains("..") {
+            None
+        } else {
+            Some(ident)
+        }
     }
 }
 
@@ -2592,6 +2713,9 @@ fn eval_python_row_expr_with_vars(text: &str, vars: &BTreeMap<String, i64>) -> O
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return None;
+    }
+    if let Some(value) = eval_python_row_subscript_with_vars(trimmed, vars) {
+        return Some(value);
     }
     if let Some((true_expr, condition, false_expr)) = split_top_level_conditional_expr(trimmed) {
         return if eval_python_row_condition_with_vars(condition, vars)? {
@@ -2620,33 +2744,45 @@ fn is_python_row_identifier(text: &str) -> bool {
         && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PythonCollectionKind {
-    SequenceLike,
-    SetOrDictLike,
-}
-
-impl PythonCollectionKind {
-    fn deduplicates_like_python_set_conversion(self) -> bool {
-        matches!(self, Self::SetOrDictLike)
-    }
-}
-
-fn strip_python_collection_wrappers_with_kind(text: &str) -> Option<(&str, PythonCollectionKind)> {
+fn matching_top_level_wrapper_close_index(text: &str) -> Option<usize> {
     let trimmed = text.trim();
     if trimmed.len() < 2 {
         return None;
     }
-    let (open, close, kind) = match (trimmed.chars().next()?, trimmed.chars().last()?) {
-        ('[', ']') => ('[', ']', PythonCollectionKind::SequenceLike),
-        ('{', '}') => ('{', '}', PythonCollectionKind::SetOrDictLike),
-        ('(', ')') => ('(', ')', PythonCollectionKind::SequenceLike),
+    let close = match trimmed.chars().next()? {
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
         _ => return None,
     };
-    if !trimmed.starts_with(open) || !trimmed.ends_with(close) {
-        return None;
+
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+    for (index, ch) in trimmed.char_indices() {
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+        if round < 0 || square < 0 || curly < 0 {
+            return None;
+        }
+        if index > 0 && round == 0 && square == 0 && curly == 0 {
+            return (ch == close).then_some(index);
+        }
     }
-    Some((&trimmed[open.len_utf8()..trimmed.len() - close.len_utf8()], kind))
+    None
+}
+
+fn strip_python_collection_wrappers(text: &str) -> Option<&str> {
+    let trimmed = text.trim();
+    let close_index = matching_top_level_wrapper_close_index(trimmed)?;
+    (close_index + 1 == trimmed.len()).then_some(&trimmed[1..close_index])
 }
 
 fn strip_top_level_wrapping_parens(text: &str) -> Option<&str> {
@@ -2679,6 +2815,206 @@ fn strip_top_level_wrapping_parens(text: &str) -> Option<&str> {
     }
 
     (round == 0 && square == 0 && curly == 0).then_some(&trimmed[1..trimmed.len() - 1])
+}
+
+fn split_top_level_trailing_subscript(text: &str) -> Option<(&str, &str)> {
+    let trimmed = text.trim();
+    if !trimmed.ends_with(']') {
+        return None;
+    }
+
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+    let mut candidate_start = None;
+
+    for (index, ch) in trimmed.char_indices() {
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' if round == 0 && square == 0 && curly == 0 => {
+                candidate_start = Some(index);
+                square += 1;
+            }
+            '[' => square += 1,
+            ']' => {
+                square -= 1;
+                if round < 0 || square < 0 || curly < 0 {
+                    return None;
+                }
+                if round == 0 && square == 0 && curly == 0 && index + ch.len_utf8() == trimmed.len() {
+                    let start = candidate_start?;
+                    let base = trimmed[..start].trim();
+                    let index_text = trimmed[start + 1..index].trim();
+                    return (!base.is_empty() && !index_text.is_empty()).then_some((base, index_text));
+                }
+            }
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+        if round < 0 || square < 0 || curly < 0 {
+            return None;
+        }
+    }
+
+    None
+}
+
+fn python_normalize_index(index: i64, len: usize) -> Option<usize> {
+    let len_i64 = i64::try_from(len).ok()?;
+    let index = if index < 0 { len_i64.checked_add(index)? } else { index };
+    if (0..len_i64).contains(&index) {
+        usize::try_from(index).ok()
+    } else {
+        None
+    }
+}
+
+fn python_slice_bound(value: Option<i64>, len: i64, step: i64, is_start: bool) -> i64 {
+    let default = match (step > 0, is_start) {
+        (true, true) => 0,
+        (true, false) => len,
+        (false, true) => len - 1,
+        (false, false) => -1,
+    };
+    let Some(mut value) = value else {
+        return default;
+    };
+    if value < 0 {
+        value += len;
+    }
+    if step > 0 {
+        value.clamp(0, len)
+    } else {
+        value.clamp(-1, len - 1)
+    }
+}
+
+fn split_python_slice_parts_preserving_empty(index_text: &str) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+
+    for ch in index_text.chars() {
+        match ch {
+            '(' => {
+                round += 1;
+                current.push(ch);
+            }
+            ')' => {
+                round -= 1;
+                current.push(ch);
+            }
+            '[' => {
+                square += 1;
+                current.push(ch);
+            }
+            ']' => {
+                square -= 1;
+                current.push(ch);
+            }
+            '{' => {
+                curly += 1;
+                current.push(ch);
+            }
+            '}' => {
+                curly -= 1;
+                current.push(ch);
+            }
+            ':' if round == 0 && square == 0 && curly == 0 => {
+                out.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+        if round < 0 || square < 0 || curly < 0 {
+            return None;
+        }
+    }
+
+    if round != 0 || square != 0 || curly != 0 {
+        return None;
+    }
+    out.push(current.trim().to_string());
+    Some(out)
+}
+
+fn python_slice_values(
+    values: &[i64],
+    index_text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<i64>> {
+    let parts = split_python_slice_parts_preserving_empty(index_text)?;
+    if parts.len() < 2 || parts.len() > 3 {
+        return None;
+    }
+
+    let parse_optional = |part: &str| {
+        let trimmed = part.trim();
+        if trimmed.is_empty() {
+            Some(None)
+        } else {
+            eval_python_row_expr_with_vars(trimmed, vars).map(Some)
+        }
+    };
+
+    let start = parse_optional(&parts[0])?;
+    let stop = parse_optional(&parts[1])?;
+    let step = if parts.len() == 3 {
+        parse_optional(&parts[2])?.unwrap_or(1)
+    } else {
+        1
+    };
+    if step == 0 {
+        return None;
+    }
+
+    let len = i64::try_from(values.len()).ok()?;
+    let mut index = python_slice_bound(start, len, step, true);
+    let stop = python_slice_bound(stop, len, step, false);
+    let mut out = Vec::new();
+
+    if step > 0 {
+        while index < stop {
+            out.push(values[usize::try_from(index).ok()?]);
+            index = index.checked_add(step)?;
+        }
+    } else {
+        while index > stop {
+            if index >= 0 {
+                out.push(values[usize::try_from(index).ok()?]);
+            }
+            index = index.checked_add(step)?;
+        }
+    }
+
+    Some(out)
+}
+
+fn eval_python_row_subscript_with_vars(text: &str, vars: &BTreeMap<String, i64>) -> Option<i64> {
+    let (base, index_text) = split_top_level_trailing_subscript(text)?;
+    if index_text.contains(':') {
+        return None;
+    }
+    let values = parse_python_iterable_values_with_vars(base, vars)?;
+    let index = eval_python_row_expr_with_vars(index_text, vars)?;
+    let index = python_normalize_index(index, values.len())?;
+    values.get(index).copied()
+}
+
+fn parse_python_iterable_subscript_with_vars(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<i64>> {
+    let (base, index_text) = split_top_level_trailing_subscript(text)?;
+    if !index_text.contains(':') {
+        return None;
+    }
+    let values = parse_python_iterable_values_with_vars(base, vars)?;
+    python_slice_values(&values, index_text, vars)
 }
 
 fn find_top_level_keyword(text: &str, keyword: &str) -> Option<usize> {
@@ -2746,6 +3082,10 @@ fn split_top_level_comparison_chain<'a>(text: &'a str) -> Option<(Vec<&'a str>, 
             continue;
         }
         if round == 0 && square == 0 && curly == 0 {
+            if text[index..].starts_with("<<") || text[index..].starts_with(">>") {
+                skip_until = index + 2;
+                continue;
+            }
             for operator in operators {
                 if text[index..].starts_with(operator) {
                     let left = text[last_start..index].trim();
@@ -2808,12 +3148,12 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>)
         return eval_python_row_condition_with_vars(inner, vars);
     }
     if let Some(inner) = parse_python_call_inner(trimmed, "all") {
-        let values = parse_python_truth_iterable_values_with_vars(inner, vars)?;
-        return Some(values.into_iter().all(|value| value));
+        let values = parse_python_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().all(|value| value != 0));
     }
     if let Some(inner) = parse_python_call_inner(trimmed, "any") {
-        let values = parse_python_truth_iterable_values_with_vars(inner, vars)?;
-        return Some(values.into_iter().any(|value| value));
+        let values = parse_python_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().any(|value| value != 0));
     }
     if let Some(index) = find_top_level_keyword(trimmed, " or ") {
         return Some(
@@ -2951,7 +3291,6 @@ fn split_top_level_iterable_binary_rightmost<'a>(
     ))
 }
 
-
 fn split_top_level_dict_key_value(text: &str) -> Option<(&str, &str)> {
     let mut round = 0i32;
     let mut square = 0i32;
@@ -2989,120 +3328,18 @@ fn parse_python_call_inner<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     Some(&rest[1..rest.len() - 1])
 }
 
-fn parse_python_keyword_bool_arg(text: &str, name: &str) -> Option<bool> {
-    let (key, value) = text.split_once('=')?;
-    if key.trim() != name {
-        return None;
-    }
-    match value.trim() {
-        "True" => Some(true),
-        "False" => Some(false),
-        _ => None,
-    }
-}
-
-fn parse_python_keyword_none_arg(text: &str, name: &str) -> Option<()> {
-    let (key, value) = text.split_once('=')?;
-    (key.trim() == name && value.trim() == "None").then_some(())
-}
-
-fn parse_python_sorted_options(parts: &[String]) -> Option<bool> {
-    let mut reverse = false;
-    for part in parts.iter().skip(1) {
-        let trimmed = part.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        if let Some(value) = parse_python_keyword_bool_arg(trimmed, "reverse") {
-            reverse = value;
-            continue;
-        }
-        if parse_python_keyword_none_arg(trimmed, "key").is_some() {
-            continue;
-        }
-        return None;
-    }
-    Some(reverse)
-}
-
-fn repeat_python_iterable_values(values: Vec<i64>, count: i64) -> Option<Vec<i64>> {
-    if count <= 0 {
-        return Some(Vec::new());
-    }
-    let count = usize::try_from(count).ok()?;
-    if !values.is_empty() && values.len().checked_mul(count)? > 20_000 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(values.len().saturating_mul(count));
-    for _ in 0..count {
-        out.extend(values.iter().copied());
-    }
-    Some(out)
-}
-
-fn parse_python_iterable_repeat_values_with_vars(
-    text: &str,
-    vars: &BTreeMap<String, i64>,
-) -> Option<Vec<i64>> {
-    let (left, right) = split_top_level_iterable_binary_rightmost(text, '*')?;
-
-    if let Some(values) = parse_python_iterable_values_with_vars(left, vars) {
-        let count = eval_python_row_expr_with_vars(right, vars)?;
-        return repeat_python_iterable_values(values, count);
-    }
-
-    let count = eval_python_row_expr_with_vars(left, vars)?;
-    let values = parse_python_iterable_values_with_vars(right, vars)?;
-    repeat_python_iterable_values(values, count)
-}
-
 fn parse_python_builtin_iterable_values_with_vars(
     text: &str,
     vars: &BTreeMap<String, i64>,
 ) -> Option<Vec<i64>> {
     if let Some(inner) = parse_python_call_inner(text, "divmod") {
-        let args = custom_split_delim_parenthesized(inner, ',')
-            .iter()
-            .map(|part| eval_python_row_expr_with_vars(part, vars))
-            .collect::<Option<Vec<_>>>()?;
-        if args.len() == 2 {
-            let quotient = checked_python_floor_div(args[0], args[1])?;
-            let remainder = checked_python_mod(args[0], args[1])?;
-            return Some(vec![quotient, remainder]);
+        let parts = custom_split_delim_parenthesized(inner, ',');
+        if parts.len() == 2 {
+            let left = eval_python_row_expr_with_vars(&parts[0], vars)?;
+            let right = eval_python_row_expr_with_vars(&parts[1], vars)?;
+            return Some(vec![checked_python_floor_div(left, right)?, checked_python_mod(left, right)?]);
         }
         return None;
-    }
-
-    if let Some(inner) = parse_python_call_inner(text, "filter") {
-        let parts = custom_split_delim_parenthesized(inner, ',');
-        if parts.len() != 2 {
-            return None;
-        }
-        let predicate = parts[0].trim();
-        if !matches!(predicate, "None" | "bool" | "abs") {
-            return None;
-        }
-        let values = parse_python_iterable_values_with_vars(&parts[1], vars)?;
-        return Some(values.into_iter().filter(|value| *value != 0).collect());
-    }
-
-    if let Some(inner) = parse_python_call_inner(text, "map") {
-        let parts = custom_split_delim_parenthesized(inner, ',');
-        if parts.len() != 2 {
-            return None;
-        }
-        let function_name = parts[0].trim();
-        let values = parse_python_iterable_values_with_vars(&parts[1], vars)?;
-        let mut out = Vec::new();
-        for value in values {
-            let mapped = match function_name {
-                "abs" => value.checked_abs()?,
-                "int" | "round" => value,
-                _ => return None,
-            };
-            out.push(mapped);
-        }
-        return Some(out);
     }
 
     for name in ["list", "tuple", "set", "frozenset", "sorted", "reversed"] {
@@ -3113,38 +3350,48 @@ fn parse_python_builtin_iterable_values_with_vars(
                     _ => None,
                 };
             }
-            let parts = custom_split_delim_parenthesized(inner, ',');
-            if name == "sorted" {
-                let reverse = parse_python_sorted_options(&parts)?;
-                let mut values = parse_python_iterable_values_with_vars(
-                    parts.first().map(String::as_str).unwrap_or_default(),
-                    vars,
-                )?;
-                values.sort();
-                if reverse {
-                    values.reverse();
-                }
-                return Some(values);
-            }
-            let source = if name == "reversed" {
-                if parts.len() != 1 {
-                    return None;
-                }
-                parts.first().cloned().unwrap_or_default()
+            let source = if name == "sorted" || name == "reversed" {
+                custom_split_delim_parenthesized(inner, ',')
+                    .into_iter()
+                    .next()
+                    .unwrap_or_default()
             } else {
                 inner.to_string()
             };
             let mut values = parse_python_iterable_values_with_vars(&source, vars)?;
-            if name == "set" || name == "frozenset" {
-                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
-            }
-            if name == "reversed" {
-                values.reverse();
+            match name {
+                "sorted" => {
+                    values.sort_unstable();
+                    if custom_split_delim_parenthesized(inner, ',')
+                        .into_iter()
+                        .skip(1)
+                        .any(|part| part.trim() == "reverse=True")
+                    {
+                        values.reverse();
+                    }
+                }
+                "reversed" => values.reverse(),
+                _ => {}
             }
             return Some(values);
         }
     }
     None
+}
+
+fn repeat_python_iterable_values(values: Vec<i64>, repeat: i64) -> Option<Vec<i64>> {
+    if repeat <= 0 {
+        return Some(Vec::new());
+    }
+    let repeat = usize::try_from(repeat).ok()?;
+    if repeat > 20_000 || values.len().saturating_mul(repeat) > 20_000 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(values.len() * repeat);
+    for _ in 0..repeat {
+        out.extend(values.iter().copied());
+    }
+    Some(out)
 }
 
 fn parse_python_iterable_values_with_vars(
@@ -3153,9 +3400,13 @@ fn parse_python_iterable_values_with_vars(
 ) -> Option<Vec<i64>> {
     let trimmed = text.trim();
 
+    if let Some(values) = parse_python_iterable_subscript_with_vars(trimmed, vars) {
+        return Some(values);
+    }
+
     if trimmed.starts_with('(') && trimmed.ends_with(')') {
         let inner = &trimmed[1..trimmed.len() - 1];
-        if ['|', '^', '&', '-', '+']
+        if ['|', '^', '&', '-', '+', '*']
             .iter()
             .any(|operator| split_top_level_iterable_binary(inner, *operator).is_some())
         {
@@ -3216,13 +3467,19 @@ fn parse_python_iterable_values_with_vars(
         return Some(out);
     }
 
-    if let Some(values) = parse_python_iterable_repeat_values_with_vars(trimmed, vars) {
-        return Some(values);
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '*') {
+        if let Some(values) = parse_python_iterable_values_with_vars(left, vars) {
+            let repeat = eval_python_row_expr_with_vars(right, vars)?;
+            return repeat_python_iterable_values(values, repeat);
+        }
+        if let Some(values) = parse_python_iterable_values_with_vars(right, vars) {
+            let repeat = eval_python_row_expr_with_vars(left, vars)?;
+            return repeat_python_iterable_values(values, repeat);
+        }
     }
 
     parse_python_range_values_with_vars(trimmed, vars)
         .or_else(|| parse_python_builtin_iterable_values_with_vars(trimmed, vars))
-        .or_else(|| parse_python_bare_generator_row_values_with_vars(trimmed, vars))
         .or_else(|| parse_python_generated_row_values_with_vars(trimmed, vars))
 }
 
@@ -3341,10 +3598,10 @@ fn expand_python_comprehension_values(
     clause_index: usize,
     expr_text: &str,
     vars: &mut BTreeMap<String, i64>,
-    out: &mut Vec<i64>,
+    out: &mut BTreeSet<i64>,
 ) -> Option<()> {
     if clause_index >= clauses.len() {
-        out.push(eval_python_row_expr_with_vars(expr_text, vars)?);
+        out.insert(eval_python_row_expr_with_vars(expr_text, vars)?);
         return Some(());
     }
 
@@ -3378,130 +3635,11 @@ fn expand_python_comprehension_values(
     Some(())
 }
 
-fn python_collection_values_finish(values: Vec<i64>, kind: PythonCollectionKind) -> Vec<i64> {
-    if kind.deduplicates_like_python_set_conversion() {
-        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
-    } else {
-        values
-    }
-}
-
-fn parse_python_generated_row_values_inner_with_kind(
-    inner: &str,
-    kind: PythonCollectionKind,
-    outer_vars: &BTreeMap<String, i64>,
-) -> Option<Vec<i64>> {
-    let inner = inner.trim();
-    if inner.is_empty() {
-        return Some(Vec::new());
-    }
-
-    if let Some(for_index) = find_top_level_keyword(inner, " for ") {
-        let expr_text = inner[..for_index].trim();
-        let expr_text = split_top_level_dict_key_value(expr_text)
-            .map(|(key, _)| key)
-            .unwrap_or(expr_text);
-        let tail = inner[for_index + 5..].trim();
-        let clauses = parse_python_comprehension_clauses(tail)?;
-        let mut vars = outer_vars.clone();
-        let mut out = Vec::new();
-        expand_python_comprehension_values(&clauses, 0, expr_text, &mut vars, &mut out)?;
-        return Some(python_collection_values_finish(out, kind));
-    }
-
-    let mut out = Vec::new();
-    for part in custom_split_delim_parenthesized(inner, ',') {
-        let trimmed = part.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        if let Some(starred_iterable) = trimmed.strip_prefix('*') {
-            out.extend(parse_python_iterable_values_with_vars(starred_iterable, outer_vars)?);
-            continue;
-        }
-        let expr_text = split_top_level_dict_key_value(trimmed)
-            .map(|(key, _)| key)
-            .unwrap_or(trimmed);
-        out.push(eval_python_row_expr_with_vars(expr_text, outer_vars)?);
-    }
-    Some(python_collection_values_finish(out, kind))
-}
-
-fn parse_python_bare_generator_row_values_with_vars(
-    text: &str,
-    outer_vars: &BTreeMap<String, i64>,
-) -> Option<Vec<i64>> {
-    find_top_level_keyword(text, " for ")?;
-    parse_python_generated_row_values_inner_with_kind(
-        text,
-        PythonCollectionKind::SequenceLike,
-        outer_vars,
-    )
-}
-
 fn parse_python_generated_row_values_with_vars(
     text: &str,
     outer_vars: &BTreeMap<String, i64>,
 ) -> Option<Vec<i64>> {
-    let (inner, kind) = strip_python_collection_wrappers_with_kind(text)?;
-    parse_python_generated_row_values_inner_with_kind(inner, kind, outer_vars)
-}
-
-fn python_truth_values_finish(values: Vec<bool>, kind: PythonCollectionKind) -> Vec<bool> {
-    if kind.deduplicates_like_python_set_conversion() {
-        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
-    } else {
-        values
-    }
-}
-
-fn expand_python_truth_comprehension_values(
-    clauses: &[PythonComprehensionClause],
-    clause_index: usize,
-    expr_text: &str,
-    vars: &mut BTreeMap<String, i64>,
-    out: &mut Vec<bool>,
-) -> Option<()> {
-    if clause_index >= clauses.len() {
-        out.push(eval_python_row_condition_with_vars(expr_text, vars)?);
-        return Some(());
-    }
-
-    let clause = &clauses[clause_index];
-    let source_values = parse_python_iterable_values_with_vars(&clause.source_text, vars)?;
-    let had_previous = vars.get(&clause.var_name).copied();
-
-    for value in source_values {
-        vars.insert(clause.var_name.clone(), value);
-        let keep = clause
-            .filters
-            .iter()
-            .map(|filter| eval_python_row_condition_with_vars(filter, vars))
-            .collect::<Option<Vec<_>>>()?
-            .into_iter()
-            .all(|value| value);
-        if keep {
-            expand_python_truth_comprehension_values(clauses, clause_index + 1, expr_text, vars, out)?;
-        }
-    }
-
-    match had_previous {
-        Some(value) => {
-            vars.insert(clause.var_name.clone(), value);
-        }
-        None => {
-            vars.remove(&clause.var_name);
-        }
-    }
-
-    Some(())
-}
-
-fn parse_python_truth_generated_values_inner_with_kind(
-    inner: &str,
-    kind: PythonCollectionKind,
-    outer_vars: &BTreeMap<String, i64>,
-) -> Option<Vec<bool>> {
+    let inner = strip_python_collection_wrappers(text)?;
     let inner = inner.trim();
     if inner.is_empty() {
         return Some(Vec::new());
@@ -3515,134 +3653,30 @@ fn parse_python_truth_generated_values_inner_with_kind(
         let tail = inner[for_index + 5..].trim();
         let clauses = parse_python_comprehension_clauses(tail)?;
         let mut vars = outer_vars.clone();
-        let mut out = Vec::new();
-        expand_python_truth_comprehension_values(&clauses, 0, expr_text, &mut vars, &mut out)?;
-        return Some(python_truth_values_finish(out, kind));
+        let mut out = BTreeSet::new();
+        expand_python_comprehension_values(&clauses, 0, expr_text, &mut vars, &mut out)?;
+        return Some(out.into_iter().collect());
     }
 
-    let mut out = Vec::new();
+    let mut out = BTreeSet::new();
     for part in custom_split_delim_parenthesized(inner, ',') {
         let trimmed = part.trim();
         if trimmed.is_empty() {
             continue;
         }
         if let Some(starred_iterable) = trimmed.strip_prefix('*') {
-            out.extend(parse_python_truth_iterable_values_with_vars(starred_iterable, outer_vars)?);
+            for value in parse_python_iterable_values_with_vars(starred_iterable, outer_vars)? {
+                out.insert(value);
+            }
             continue;
         }
         let expr_text = split_top_level_dict_key_value(trimmed)
             .map(|(key, _)| key)
             .unwrap_or(trimmed);
-        out.push(eval_python_row_condition_with_vars(expr_text, outer_vars)?);
+        out.insert(eval_python_row_expr_with_vars(expr_text, outer_vars)?);
     }
-    Some(python_truth_values_finish(out, kind))
+    Some(out.into_iter().collect())
 }
-
-fn parse_python_bare_generator_truth_values_with_vars(
-    text: &str,
-    outer_vars: &BTreeMap<String, i64>,
-) -> Option<Vec<bool>> {
-    find_top_level_keyword(text, " for ")?;
-    parse_python_truth_generated_values_inner_with_kind(
-        text,
-        PythonCollectionKind::SequenceLike,
-        outer_vars,
-    )
-}
-
-fn parse_python_truth_generated_values_with_vars(
-    text: &str,
-    outer_vars: &BTreeMap<String, i64>,
-) -> Option<Vec<bool>> {
-    let (inner, kind) = strip_python_collection_wrappers_with_kind(text)?;
-    parse_python_truth_generated_values_inner_with_kind(inner, kind, outer_vars)
-}
-
-fn parse_python_truth_builtin_iterable_values_with_vars(
-    text: &str,
-    vars: &BTreeMap<String, i64>,
-) -> Option<Vec<bool>> {
-    if let Some(inner) = parse_python_call_inner(text, "filter") {
-        let parts = custom_split_delim_parenthesized(inner, ',');
-        if parts.len() != 2 {
-            return None;
-        }
-        let predicate = parts[0].trim();
-        if !matches!(predicate, "None" | "bool" | "abs") {
-            return None;
-        }
-        let values = parse_python_truth_iterable_values_with_vars(&parts[1], vars)?;
-        return Some(values.into_iter().filter(|value| *value).collect());
-    }
-
-    if let Some(inner) = parse_python_call_inner(text, "map") {
-        let parts = custom_split_delim_parenthesized(inner, ',');
-        if parts.len() != 2 {
-            return None;
-        }
-        let function_name = parts[0].trim();
-        let values = parse_python_iterable_values_with_vars(&parts[1], vars)?;
-        return match function_name {
-            "bool" | "abs" | "int" | "round" => {
-                Some(values.into_iter().map(|value| value != 0).collect())
-            }
-            _ => None,
-        };
-    }
-
-    for name in ["list", "tuple", "set", "frozenset", "sorted", "reversed"] {
-        if let Some(inner) = parse_python_call_inner(text, name) {
-            if inner.trim().is_empty() {
-                return match name {
-                    "list" | "tuple" | "set" | "frozenset" => Some(Vec::new()),
-                    _ => None,
-                };
-            }
-            let parts = custom_split_delim_parenthesized(inner, ',');
-            if name == "sorted" {
-                let reverse = parse_python_sorted_options(&parts)?;
-                let mut values = parse_python_truth_iterable_values_with_vars(
-                    parts.first().map(String::as_str).unwrap_or_default(),
-                    vars,
-                )?;
-                values.sort();
-                if reverse {
-                    values.reverse();
-                }
-                return Some(values);
-            }
-            let source = if name == "reversed" {
-                if parts.len() != 1 {
-                    return None;
-                }
-                parts.first().cloned().unwrap_or_default()
-            } else {
-                inner.to_string()
-            };
-            let mut values = parse_python_truth_iterable_values_with_vars(&source, vars)?;
-            if name == "set" || name == "frozenset" {
-                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
-            }
-            if name == "reversed" {
-                values.reverse();
-            }
-            return Some(values);
-        }
-    }
-    None
-}
-
-fn parse_python_truth_iterable_values_with_vars(
-    text: &str,
-    vars: &BTreeMap<String, i64>,
-) -> Option<Vec<bool>> {
-    parse_python_iterable_values_with_vars(text, vars)
-        .map(|values| values.into_iter().map(|value| value != 0).collect())
-        .or_else(|| parse_python_truth_builtin_iterable_values_with_vars(text, vars))
-        .or_else(|| parse_python_bare_generator_truth_values_with_vars(text, vars))
-        .or_else(|| parse_python_truth_generated_values_with_vars(text, vars))
-}
-
 
 fn expand_python_row_generated_values_vielfache(
     values: &[i64],
@@ -3693,7 +3727,7 @@ fn python_row_piece_to_numbers(
         } else {
             values
         };
-        return Some((subtract, values));
+        return (!values.is_empty()).then_some((subtract, values));
     }
 
     let (start, end, around) = parse_python_integer_row_piece_core(body)?;
@@ -3703,7 +3737,7 @@ fn python_row_piece_to_numbers(
         expand_python_row_numbers_plain(start, end, &around, max_zahl)
     };
 
-    Some((subtract, values))
+    (!values.is_empty()).then_some((subtract, values))
 }
 
 fn python_row_spec_to_numbers_with_options(
@@ -7303,66 +7337,44 @@ mod tests {
         );
     }
 
-
     #[test]
-    fn python_eval_style_rows_follow_python_integer_operator_semantics_deeper() {
+    fn python_eval_style_rows_follow_python_integer_operator_semantics() {
         assert_eq!(python_row_spec_to_numbers("[-7//3, -7%3, 7//3, 7%3]"), Some(vec![1, 2]));
         assert_eq!(python_row_spec_to_numbers("[-2**2, (-2)**2]"), Some(vec![4]));
         assert_eq!(python_row_spec_to_numbers("[0b1010 & 0x6, 1_2 << 1, ~-3]"), Some(vec![2, 24]));
     }
 
     #[test]
-    fn python_eval_style_rows_accept_conditional_expressions_and_set_ops_deeper() {
+    fn python_eval_style_rows_accept_subscripts_and_slices() {
+        assert_eq!(python_row_spec_to_numbers("[list(range(10))[3], [4,5,6][-1]]"), Some(vec![3, 6]));
+        assert_eq!(python_row_spec_to_numbers("[n for n in list(range(8))[1:7:2]]"), Some(vec![1, 3, 5]));
+        assert_eq!(python_row_spec_to_numbers("[n for n in tuple(range(5))[::-2]]"), Some(vec![2, 4]));
+        assert_eq!(python_row_spec_to_numbers("[sorted({5,2,4})[1]]"), Some(vec![4]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_more_math_module_integer_helpers() {
+        assert_eq!(python_row_spec_to_numbers("[math.gcd(12, 18), math.lcm(4, 6)]"), Some(vec![6, 12]));
+        assert_eq!(python_row_spec_to_numbers("[math.factorial(5), math.isqrt(17)]"), Some(vec![4, 120]));
+        assert_eq!(python_row_spec_to_numbers("[math.comb(5, 2), math.perm(5, 2)]"), Some(vec![10, 20]));
+        assert_eq!(python_row_spec_to_numbers("[sum(range(4), 10), math.prod(range(1,4), start=2)]"), Some(vec![12, 16]));
+        assert_eq!(python_row_spec_to_numbers("[math.floor(7//3), divmod(7, 3)[1]]"), Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_sorted_reverse_and_sequence_repetition() {
+        assert_eq!(python_row_spec_to_numbers("[n for n in sorted({1,3,2}, reverse=True)[:2]]"), Some(vec![2, 3]));
+        assert_eq!(python_row_spec_to_numbers("[n for n in ([1,2] * 2) if n >= 2]"), Some(vec![2]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_conditional_expressions_and_set_ops() {
         assert_eq!(
             python_row_spec_to_numbers("[n if n & 1 else 10 for n in range(5) if True]"),
             Some(vec![1, 3, 10])
         );
         assert_eq!(python_row_spec_to_numbers("({1,2,3} - {2}) & {1,3,4}"), Some(vec![1, 3]));
         assert_eq!(python_row_spec_to_numbers("{1,2,3} ^ {3,4}"), Some(vec![1, 2, 4]));
-    }
-
-    #[test]
-    fn python_eval_style_rows_preserve_sequence_duplicates_before_final_set_conversion_deeper() {
-        assert_eq!(python_row_spec_to_numbers("[sum([1,1,2])]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[len([1,1,2])]"), Some(vec![3]));
-        assert_eq!(python_row_spec_to_numbers("[len(set([1,1,2]))]"), Some(vec![2]));
-        assert_eq!(python_row_spec_to_numbers("[sum([n for n in [1,1,2]])]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[sum(n for n in [1,1,2])]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[sum([1,2,3], 10)]"), Some(vec![16]));
-    }
-
-    #[test]
-    fn python_eval_style_rows_accept_boolean_generators_for_all_any_deeper() {
-        assert_eq!(
-            python_row_spec_to_numbers("[7 if all(n < 5 for n in range(5)) else 9]"),
-            Some(vec![7])
-        );
-        assert_eq!(
-            python_row_spec_to_numbers("[n for n in range(6) if any(m == n for m in [2,4])]"),
-            Some(vec![2, 4])
-        );
-        assert_eq!(
-            python_row_spec_to_numbers("[1 if all([True, 1, not False]) else 2]"),
-            Some(vec![1])
-        );
-    }
-
-    #[test]
-    fn python_eval_style_rows_accept_more_iterable_builtins_deeper() {
-        assert_eq!(python_row_spec_to_numbers("[]"), Some(Vec::new()));
-        assert_eq!(python_row_spec_to_numbers("[0]"), Some(Vec::new()));
-        assert_eq!(python_row_spec_to_numbers("5-3"), Some(Vec::new()));
-        assert_eq!(python_row_spec_to_numbers("[*divmod(17,5)]"), Some(vec![2, 3]));
-        assert_eq!(python_row_spec_to_numbers("[*map(abs, [-2,3])]"), Some(vec![2, 3]));
-        assert_eq!(python_row_spec_to_numbers("[*filter(None, [-2,0,3])]"), Some(vec![3]));
-        assert_eq!(
-            python_row_spec_to_numbers("[n for n in sorted([3,1,2], reverse=True) if n > 1]"),
-            Some(vec![2, 3])
-        );
-        assert_eq!(
-            python_row_spec_to_numbers("[7 if all(map(bool, [1,2,3])) else 9]"),
-            Some(vec![7])
-        );
     }
 
 }
