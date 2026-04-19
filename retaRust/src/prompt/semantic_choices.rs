@@ -3,7 +3,9 @@
 //! Diese Konstanten entsprechen `i18n.words.wahl15`/`wahl16` plus der
 //! Prompt-spezifischen Mutation aus `retaPrompt.py`:
 //! `wahl15[""] = wahl15["15"]` und `wahl16[""] = wahl16["16"]`.
-//! Ausführung und Completion müssen diese Daten gemeinsam benutzen.
+//! Die Regex-/Completion-Inventare stammen aus denselben Python-Wörterbüchern,
+//! die `regExReplace` und `LibRetaPrompt.NestedCompleter` verwenden.
+//! Ausführung, Regex-Expansion und Completion müssen diese Daten gemeinsam benutzen.
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SemanticChoiceEntry {
@@ -249,6 +251,139 @@ pub const RETAPROMPT_WAHL16_KEYS: &[&str] = &[
     "20",
     "",
 ];
+pub const RETAPROMPT_RETA_MAIN_SWITCHES: &[&str] = &[
+    "-zeilen",
+    "-spalten",
+    "-kombination",
+    "-ausgabe",
+    "-h",
+    "-help",
+    "-debug",
+    "-nichts",
+];
+pub const RETAPROMPT_RETA_SECTION_SWITCHES: &[&str] = &[
+    "-zeilen",
+    "-spalten",
+    "-kombination",
+    "-ausgabe",
+];
+pub const RETAPROMPT_ZEILEN_REGEX_PARAMETERS: &[&str] = &[
+    "alles",
+    "gestern",
+    "heute",
+    "hoehemaximal",
+    "mond",
+    "morgen",
+    "nachtraeglichneuabzaehlung",
+    "nachtraeglichneuabzaehlungvielfache",
+    "oberesmaximum",
+    "planet",
+    "potenzenvonzahlen",
+    "primzahlvielfache",
+    "schwarzesonne",
+    "sonne",
+    "typ",
+    "vielfachevonzahlen",
+    "vorhervonausschnitt",
+    "vorhervonausschnittteiler",
+    "zaehlung",
+    "zeit",
+    "primzahlen",
+    "aussenerste",
+    "innenerste",
+    "aussenalle",
+    "innenalle",
+    "invertieren",
+    "SonneMitMondanteil",
+];
+pub const RETAPROMPT_ZEILEN_PARAMETER_TOKENS: &[&str] = &[
+    "--zeit=",
+    "--zaehlung=",
+    "--vorhervonausschnitt=",
+    "--vorhervonausschnittteiler",
+    "--primzahlvielfache=",
+    "--nachtraeglichneuabzaehlung=",
+    "--nachtraeglichneuabzaehlungvielfache=",
+    "--alles",
+    "--potenzenvonzahlen=",
+    "--typ=",
+    "--vielfachevonzahlen=",
+    "--oberesmaximum=",
+    "--primzahlen=",
+    "--invertieren",
+    "--*=",
+];
+pub const RETAPROMPT_ZEILEN_TYP_PARAMETER: &str = "typ";
+pub const RETAPROMPT_ZEILEN_TYP_VALUES: &[&str] = &[
+    "sonne",
+    "mond",
+    "planet",
+    "schwarzesonne",
+    "SonneMitMondanteil",
+];
+pub const RETAPROMPT_ZEILEN_ZEIT_PARAMETER: &str = "zeit";
+pub const RETAPROMPT_ZEILEN_ZEIT_VALUES: &[&str] = &[
+    "heute",
+    "gestern",
+    "morgen",
+];
+pub const RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER: &str = "primzahlen";
+pub const RETAPROMPT_ZEILEN_PRIMZAHLEN_VALUES: &[&str] = &[
+    "aussenerste",
+    "innenerste",
+    "aussenalle",
+    "innenalle",
+];
+pub const RETAPROMPT_AUSGABE_REGEX_PARAMETERS: &[&str] = &[
+    "nocolor",
+    "justtext",
+    "art",
+    "onetable",
+    "spaltenreihenfolgeundnurdiese",
+    "endlessscreen",
+    "endless",
+    "dontwrap",
+    "breite",
+    "breiten",
+    "keineleereninhalte",
+    "keinenummerierung",
+    "keineueberschriften",
+];
+pub const RETAPROMPT_AUSGABE_PARAMETER_TOKENS: &[&str] = &[
+    "--nocolor",
+    "--justtext",
+    "--art=",
+    "--onetable",
+    "--spaltenreihenfolgeundnurdiese=",
+    "--endlessscreen",
+    "--endless",
+    "--dontwrap",
+    "--breite=",
+    "--breiten=",
+    "--keineleereninhalte",
+    "--keinenummerierung",
+    "--keineueberschriften",
+    "--*=",
+];
+pub const RETAPROMPT_AUSGABE_ART_PARAMETER: &str = "art";
+pub const RETAPROMPT_AUSGABE_ART_VALUES: &[&str] = &[
+    "bbcode",
+    "html",
+    "csv",
+    "shell",
+    "markdown",
+    "emacs",
+    "nichts",
+];
+pub const RETAPROMPT_AUSGABE_BREITE_PARAMETER: &str = "breite";
+pub const RETAPROMPT_AUSGABE_BREITEN_PARAMETER: &str = "breiten";
+pub const RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER: &str = "galaxie";
+pub const RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER: &str = "universum";
+pub const RETAPROMPT_KOMBINATION_PARAMETER_TOKENS: &[&str] = &[
+    "--galaxie=",
+    "--universum=",
+    "--*=",
+];
 pub fn retaprompt_wahl15_entries() -> &'static [SemanticChoiceEntry] {
     RETAPROMPT_WAHL15_ENTRIES
 }
@@ -291,10 +426,25 @@ pub fn is_wahl16_key(key: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn assert_unique_choice_keys(entries: &[SemanticChoiceEntry]) {
+        let mut seen = std::collections::BTreeSet::new();
+        for entry in entries {
+            assert!(seen.insert(entry.key), "duplicate semantic choice key {:?}", entry.key);
+        }
+    }
+
     #[test]
     fn prompt_mutation_keeps_python_empty_choice_aliases() {
         assert_eq!(semantic_wahl15_value(""), semantic_wahl15_value("15"));
         assert_eq!(semantic_wahl16_value(""), semantic_wahl16_value("16"));
+    }
+
+    #[test]
+    fn prompt_choice_keys_keep_python_dict_uniqueness_after_prompt_mutation() {
+        assert_unique_choice_keys(WAHL15_I18N_ENTRIES);
+        assert_unique_choice_keys(WAHL16_I18N_ENTRIES);
+        assert_unique_choice_keys(RETAPROMPT_WAHL15_ENTRIES);
+        assert_unique_choice_keys(RETAPROMPT_WAHL16_ENTRIES);
     }
 
     #[test]
@@ -314,5 +464,17 @@ mod tests {
         assert_eq!(RETAPROMPT_WAHL16_ENTRIES.len(), 10);
         assert_eq!(RETAPROMPT_WAHL15_KEYS.len(), RETAPROMPT_WAHL15_ENTRIES.len());
         assert_eq!(RETAPROMPT_WAHL16_KEYS.len(), RETAPROMPT_WAHL16_ENTRIES.len());
+    }
+
+    #[test]
+    fn prompt_regex_and_completion_tables_come_from_python_words() {
+        assert!(RETAPROMPT_RETA_MAIN_SWITCHES.contains(&"-debug"));
+        assert!(RETAPROMPT_RETA_SECTION_SWITCHES.contains(&"-kombination"));
+        assert!(RETAPROMPT_ZEILEN_PARAMETER_TOKENS.contains(&"--typ="));
+        assert!(RETAPROMPT_ZEILEN_TYP_VALUES.contains(&"SonneMitMondanteil"));
+        assert!(RETAPROMPT_AUSGABE_PARAMETER_TOKENS.contains(&"--keineueberschriften"));
+        assert!(RETAPROMPT_AUSGABE_ART_VALUES.contains(&"markdown"));
+        assert_eq!(RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER, "galaxie");
+        assert!(RETAPROMPT_KOMBINATION_PARAMETER_TOKENS.contains(&"--universum="));
     }
 }

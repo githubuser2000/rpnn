@@ -9,7 +9,13 @@ use crate::shared_words;
 
 use super::semantic_choices::{
     semantic_wahl15_ordered_keys, semantic_wahl16_ordered_keys, semantic_wahl15_value,
-    semantic_wahl16_value,
+    semantic_wahl16_value, RETAPROMPT_AUSGABE_ART_PARAMETER, RETAPROMPT_AUSGABE_ART_VALUES,
+    RETAPROMPT_AUSGABE_REGEX_PARAMETERS, RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER,
+    RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER, RETAPROMPT_RETA_MAIN_SWITCHES,
+    RETAPROMPT_RETA_SECTION_SWITCHES, RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER,
+    RETAPROMPT_ZEILEN_PRIMZAHLEN_VALUES, RETAPROMPT_ZEILEN_REGEX_PARAMETERS,
+    RETAPROMPT_ZEILEN_TYP_PARAMETER, RETAPROMPT_ZEILEN_TYP_VALUES,
+    RETAPROMPT_ZEILEN_ZEIT_PARAMETER, RETAPROMPT_ZEILEN_ZEIT_VALUES,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -221,20 +227,11 @@ fn reta_main_switch_tokens_for_regex() -> &'static [&'static str] {
     // ueber die vier datenfuehrenden Abschnitte. Deshalb gehoeren -h, -help,
     // -debug und -nichts in die Regex-Expansion, auch wenn nur die ersten vier
     // Abschnitte Nebenparameter-Inventare haben.
-    &[
-        "-zeilen",
-        "-spalten",
-        "-kombination",
-        "-ausgabe",
-        "-h",
-        "-help",
-        "-debug",
-        "-nichts",
-    ]
+    RETAPROMPT_RETA_MAIN_SWITCHES
 }
 
 fn reta_section_switch_tokens_for_regex() -> &'static [&'static str] {
-    &["-zeilen", "-spalten", "-kombination", "-ausgabe"]
+    RETAPROMPT_RETA_SECTION_SWITCHES
 }
 
 fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
@@ -245,63 +242,29 @@ fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     // und ueberschreibt nur zeit/typ/primzahlen mit echten Wertemengen.
     // Numeric-Parameter wie zaehlung oder oberesmaximum haben dort keine
     // Zahlenliste; ein Regex auf deren RHS ergibt Python-artig den Flag-Token.
-    for key in [
-        "alles",
-        "gestern",
-        "heute",
-        "hoehemaximal",
-        "mond",
-        "morgen",
-        "nachtraeglichneuabzaehlung",
-        "nachtraeglichneuabzaehlungvielfache",
-        "oberesmaximum",
-        "planet",
-        "potenzenvonzahlen",
-        "primzahlvielfache",
-        "schwarzesonne",
-        "sonne",
-        "typ",
-        "vielfachevonzahlen",
-        "vorhervonausschnitt",
-        "vorhervonausschnittteiler",
-        "zaehlung",
-        "zeit",
-        "primzahlen",
-        "aussenerste",
-        "innenerste",
-        "aussenalle",
-        "innenalle",
-        "invertieren",
-        "SonneMitMondanteil",
-    ] {
-        inventory.insert(key.to_string(), Vec::new());
+    for key in RETAPROMPT_ZEILEN_REGEX_PARAMETERS {
+        inventory.insert((*key).to_string(), Vec::new());
     }
 
     inventory.insert(
-        "zeit".to_string(),
-        ["gestern", "heute", "morgen"]
-            .into_iter()
-            .map(str::to_string)
+        RETAPROMPT_ZEILEN_ZEIT_PARAMETER.to_string(),
+        RETAPROMPT_ZEILEN_ZEIT_VALUES
+            .iter()
+            .map(|value| (*value).to_string())
             .collect(),
     );
     inventory.insert(
-        "typ".to_string(),
-        [
-            "mond",
-            "sonne",
-            "planet",
-            "schwarzesonne",
-            "SonneMitMondanteil",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect(),
+        RETAPROMPT_ZEILEN_TYP_PARAMETER.to_string(),
+        RETAPROMPT_ZEILEN_TYP_VALUES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
     );
     inventory.insert(
-        "primzahlen".to_string(),
-        ["aussenerste", "innenerste", "innenalle", "aussenalle"]
-            .into_iter()
-            .map(str::to_string)
+        RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER.to_string(),
+        RETAPROMPT_ZEILEN_PRIMZAHLEN_VALUES
+            .iter()
+            .map(|value| (*value).to_string())
             .collect(),
     );
 
@@ -314,32 +277,16 @@ fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     // Python regExReplace gibt nur --art echte Werte aus i18n.ausgabeArt.
     // breite/breiten sind in der Completion numerisch, in der Regex-Expansion
     // aber wie Python {''}-Parameter ohne generierte Zahlenliste.
-    for key in [
-        "nocolor",
-        "justtext",
-        "art",
-        "onetable",
-        "spaltenreihenfolgeundnurdiese",
-        "endlessscreen",
-        "endless",
-        "dontwrap",
-        "breite",
-        "breiten",
-        "keineleereninhalte",
-        "keinenummerierung",
-        "keineueberschriften",
-    ] {
-        inventory.insert(key.to_string(), Vec::new());
+    for key in RETAPROMPT_AUSGABE_REGEX_PARAMETERS {
+        inventory.insert((*key).to_string(), Vec::new());
     }
 
     inventory.insert(
-        "art".to_string(),
-        [
-            "bbcode", "html", "csv", "shell", "markdown", "emacs", "nichts",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect(),
+        RETAPROMPT_AUSGABE_ART_PARAMETER.to_string(),
+        RETAPROMPT_AUSGABE_ART_VALUES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
     );
 
     inventory
@@ -355,7 +302,7 @@ fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> 
             push_unique_preserving_normalized(&mut galaxie, &mut galaxie_seen, value.clone());
         }
     }
-    inventory.insert("galaxie".to_string(), galaxie);
+    inventory.insert(RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER.to_string(), galaxie);
 
     let mut universum = Vec::new();
     let mut universum_seen = BTreeSet::new();
@@ -364,7 +311,7 @@ fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> 
             push_unique_preserving_normalized(&mut universum, &mut universum_seen, value.clone());
         }
     }
-    inventory.insert("universum".to_string(), universum);
+    inventory.insert(RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER.to_string(), universum);
     inventory
 }
 

@@ -12,6 +12,17 @@ use super::python_like::{
     expand_kurz_kurz_befehl, looks_like_numeric_or_fraction_range, prompt_words,
     regex_like_search as python_regex_like_search, PromptModus,
 };
+use super::semantic_choices::{
+    semantic_wahl15_value, semantic_wahl16_value, RETAPROMPT_AUSGABE_ART_PARAMETER,
+    RETAPROMPT_AUSGABE_ART_VALUES, RETAPROMPT_AUSGABE_BREITE_PARAMETER,
+    RETAPROMPT_AUSGABE_BREITEN_PARAMETER, RETAPROMPT_AUSGABE_PARAMETER_TOKENS,
+    RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER, RETAPROMPT_KOMBINATION_PARAMETER_TOKENS,
+    RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER, RETAPROMPT_RETA_MAIN_SWITCHES,
+    RETAPROMPT_ZEILEN_PARAMETER_TOKENS, RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER,
+    RETAPROMPT_ZEILEN_PRIMZAHLEN_VALUES, RETAPROMPT_ZEILEN_TYP_PARAMETER,
+    RETAPROMPT_ZEILEN_TYP_VALUES, RETAPROMPT_ZEILEN_ZEIT_PARAMETER,
+    RETAPROMPT_ZEILEN_ZEIT_VALUES,
+};
 
 pub const RP_META_COMMANDS: &[&str] = &[
     "help",
@@ -1000,10 +1011,8 @@ fn section_from_main_token(token: &str) -> Option<RetaMainSection> {
 }
 
 fn is_main_switch(token: &str) -> bool {
-    matches!(
-        token,
-        "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" | "-h" | "-help" | "-nichts"
-    )
+    let normalized = normalize_completion_text(token);
+    reta_main_switches().any(|candidate| normalize_completion_text(candidate) == normalized)
 }
 
 fn ordered_prompt_commands() -> Vec<String> {
@@ -1153,7 +1162,8 @@ fn build_completion_candidates_with_descriptions(
                 .find(|(candidate, _)| {
                     normalize_completion_text(candidate) == normalize_completion_text(&value)
                 })
-                .and_then(|(_, description)| description.clone());
+                .and_then(|(_, description)| description.clone())
+                .or_else(|| semantic_choice_completion_description(&value));
             CompletionCandidate {
                 append_whitespace: append_whitespace && !value.ends_with('='),
                 description,
@@ -1175,11 +1185,36 @@ fn build_completion_candidates(
         .into_iter()
         .map(|value| CompletionCandidate {
             append_whitespace: append_whitespace && !value.ends_with('='),
-            description: description.clone(),
+            description: description
+                .clone()
+                .or_else(|| semantic_choice_completion_description(&value)),
             replace_start,
             value,
         })
         .collect()
+}
+
+fn semantic_choice_completion_description(value: &str) -> Option<String> {
+    let normalized = normalize_completion_text(value);
+
+    if normalized == "16_15" {
+        return semantic_wahl15_value("15")
+            .map(|choice| format!("wahl15[15] = {choice}"));
+    }
+    if let Some(suffix) = normalized.strip_prefix("16_15_") {
+        return semantic_wahl15_value(suffix)
+            .map(|choice| format!("wahl15[{suffix}] = {choice}"));
+    }
+    if let Some(suffix) = normalized.strip_prefix("15_") {
+        return semantic_wahl15_value(suffix)
+            .map(|choice| format!("wahl15[{suffix}] = {choice}"));
+    }
+    if let Some(suffix) = normalized.strip_prefix("16_") {
+        return semantic_wahl16_value(suffix)
+            .map(|choice| format!("wahl16[{suffix}] = {choice}"));
+    }
+
+    None
 }
 
 #[derive(Clone, Debug)]
@@ -1473,59 +1508,20 @@ fn main_switches_vec() -> Vec<String> {
         .collect()
 }
 
-fn reta_main_switches() -> [&'static str; 7] {
-    [
-        "-zeilen",
-        "-spalten",
-        "-kombination",
-        "-ausgabe",
-        "-h",
-        "-help",
-        "-nichts",
-    ]
+fn reta_main_switches() -> impl Iterator<Item = &'static str> {
+    RETAPROMPT_RETA_MAIN_SWITCHES.iter().copied()
 }
 
-fn zeilen_parameter_tokens() -> [&'static str; 15] {
-    [
-        "--zeit=",
-        "--zaehlung=",
-        "--vorhervonausschnitt=",
-        "--vorhervonausschnittteiler",
-        "--primzahlvielfache=",
-        "--nachtraeglichneuabzaehlung=",
-        "--nachtraeglichneuabzaehlungvielfache=",
-        "--alles",
-        "--potenzenvonzahlen=",
-        "--typ=",
-        "--vielfachevonzahlen=",
-        "--oberesmaximum=",
-        "--primzahlen=",
-        "--invertieren",
-        "--*=",
-    ]
+fn zeilen_parameter_tokens() -> impl Iterator<Item = &'static str> {
+    RETAPROMPT_ZEILEN_PARAMETER_TOKENS.iter().copied()
 }
 
-fn ausgabe_parameter_tokens() -> [&'static str; 14] {
-    [
-        "--nocolor",
-        "--justtext",
-        "--art=",
-        "--onetable",
-        "--spaltenreihenfolgeundnurdiese=",
-        "--endlessscreen",
-        "--endless",
-        "--dontwrap",
-        "--breite=",
-        "--breiten=",
-        "--keineleereninhalte",
-        "--keinenummerierung",
-        "--keineueberschriften",
-        "--*=",
-    ]
+fn ausgabe_parameter_tokens() -> impl Iterator<Item = &'static str> {
+    RETAPROMPT_AUSGABE_PARAMETER_TOKENS.iter().copied()
 }
 
-fn kombi_parameter_tokens() -> [&'static str; 3] {
-    ["--galaxie=", "--universum=", "--*="]
+fn kombi_parameter_tokens() -> impl Iterator<Item = &'static str> {
+    RETAPROMPT_KOMBINATION_PARAMETER_TOKENS.iter().copied()
 }
 
 fn spalten_parameter_tokens() -> Vec<String> {
@@ -1553,33 +1549,32 @@ fn spalten_parameter_tokens() -> Vec<String> {
 }
 
 fn zeilen_value_candidates(key: &str) -> Vec<String> {
-    match key {
-        "typ" => with_negative_variants([
-            "sonne",
-            "mond",
-            "planet",
-            "schwarzesonne",
-            "SonneMitMondanteil",
-            "*",
-        ]),
-        "primzahlen" => {
-            with_negative_variants(["aussenerste", "innenerste", "aussenalle", "innenalle", "*"])
+    let normalized = normalize_completion_text(key);
+    if normalized == normalize_completion_text(RETAPROMPT_ZEILEN_TYP_PARAMETER) {
+        return with_negative_variants_and_any(RETAPROMPT_ZEILEN_TYP_VALUES);
+    }
+    if normalized == normalize_completion_text(RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER) {
+        return with_negative_variants_and_any(RETAPROMPT_ZEILEN_PRIMZAHLEN_VALUES);
+    }
+    if normalized == normalize_completion_text(RETAPROMPT_ZEILEN_ZEIT_PARAMETER) {
+        return with_negative_variants_and_any(RETAPROMPT_ZEILEN_ZEIT_VALUES);
+    }
+    if normalized == "*" {
+        let mut out = Vec::new();
+        let mut seen = BTreeSet::new();
+        for value in zeilen_value_candidates(RETAPROMPT_ZEILEN_TYP_PARAMETER) {
+            push_unique_ordered(&mut out, &mut seen, value);
         }
-        "zeit" => with_negative_variants(["heute", "gestern", "morgen", "*"]),
-        "*" => {
-            let mut out = Vec::new();
-            let mut seen = BTreeSet::new();
-            for value in zeilen_value_candidates("typ") {
-                push_unique_ordered(&mut out, &mut seen, value);
-            }
-            for value in zeilen_value_candidates("primzahlen") {
-                push_unique_ordered(&mut out, &mut seen, value);
-            }
-            for value in zeilen_value_candidates("zeit") {
-                push_unique_ordered(&mut out, &mut seen, value);
-            }
-            out
+        for value in zeilen_value_candidates(RETAPROMPT_ZEILEN_PRIMZAHLEN_PARAMETER) {
+            push_unique_ordered(&mut out, &mut seen, value);
         }
+        for value in zeilen_value_candidates(RETAPROMPT_ZEILEN_ZEIT_PARAMETER) {
+            push_unique_ordered(&mut out, &mut seen, value);
+        }
+        return out;
+    }
+
+    match normalized.as_str() {
         "zaehlung"
         | "vorhervonausschnitt"
         | "primzahlvielfache"
@@ -1593,16 +1588,22 @@ fn zeilen_value_candidates(key: &str) -> Vec<String> {
 }
 
 fn ausgabe_value_candidates(key: &str) -> Vec<String> {
-    match key {
-        "art" | "*" => [
-            "bbcode", "html", "csv", "shell", "markdown", "emacs", "nichts",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect(),
-        "breite" | "breiten" => (10..100).map(|n| n.to_string()).collect(),
-        _ => Vec::new(),
+    let normalized = normalize_completion_text(key);
+    if normalized == normalize_completion_text(RETAPROMPT_AUSGABE_ART_PARAMETER)
+        || normalized == "*"
+    {
+        return RETAPROMPT_AUSGABE_ART_VALUES
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect();
     }
+    if normalized == normalize_completion_text(RETAPROMPT_AUSGABE_BREITE_PARAMETER)
+        || normalized == normalize_completion_text(RETAPROMPT_AUSGABE_BREITEN_PARAMETER)
+    {
+        return (10..100).map(|n| n.to_string()).collect();
+    }
+
+    Vec::new()
 }
 
 fn kombi_value_candidates(key: &str) -> Vec<String> {
@@ -1620,14 +1621,14 @@ fn kombi_value_candidates(key: &str) -> Vec<String> {
         }
     };
 
-    match key {
-        "galaxie" => add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix),
-        "universum" => add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2),
-        "*" => {
-            add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix);
-            add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2);
-        }
-        _ => {}
+    let normalized = normalize_completion_text(key);
+    if normalized == normalize_completion_text(RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER) {
+        add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix);
+    } else if normalized == normalize_completion_text(RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER) {
+        add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2);
+    } else if normalized == "*" {
+        add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix);
+        add_flattened(&mut out, &mut seen, &words.kombiParaNdataMatrix2);
     }
 
     out
@@ -1671,10 +1672,10 @@ fn spalten_value_candidates(key: &str) -> Vec<String> {
     out
 }
 
-fn with_negative_variants<const N: usize>(values: [&'static str; N]) -> Vec<String> {
+fn with_negative_variants_and_any(values: &[&'static str]) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
-    for value in values {
+    for value in values.iter().copied().chain(std::iter::once("*")) {
         push_unique_ordered(&mut out, &mut seen, value);
         push_unique_ordered(&mut out, &mut seen, format!("-{value}"));
     }
@@ -2056,6 +2057,25 @@ mod tests {
         assert!(contains_normalized(&values, "16_15_1pro12"));
         assert!(contains_normalized(&values, "16_15_1pro13"));
         assert!(contains_normalized(&values, "16_15_1pro19"));
+    }
+
+    #[test]
+    fn reta_main_completion_uses_generated_python_switch_table() {
+        let values = candidates_for_input("reta -d");
+        assert!(contains_normalized(&values, "-debug"));
+    }
+
+    #[test]
+    fn semantic_choice_completion_descriptions_are_data_driven() {
+        let candidates = super::completion_candidates_for_line("15_9_");
+        let candidate = candidates
+            .iter()
+            .find(|candidate| normalize_completion_text(&candidate.value) == "15_9_6")
+            .expect("15_9_6 semantic completion candidate");
+        assert_eq!(
+            candidate.description.as_deref(),
+            Some("wahl15[9_6] = Größenordnung")
+        );
     }
 
 }
