@@ -586,13 +586,16 @@ fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
 
     if left_has_reta || right_has_reta {
         let mut merged = vec!["reta".to_string()];
-        if right_has_reta && !left_has_reta {
-            merged.extend(right_tokens);
-            merged.extend(left_tokens);
-        } else {
-            merged.extend(left_tokens);
-            merged.extend(right_tokens);
-        }
+        // Python `speichern()` keeps the already stored placeholder before the
+        // newly saved text once a leading `reta` marker has been stripped from
+        // either side:
+        //     "reta " + " ".join(TxtPlatzhalter.liste) + " " + " ".join(Txt.liste)
+        // An incoming `reta ...` selects the raw-reta storage path, but it does
+        // not reverse stored and incoming tokens. The execution-time swap is
+        // handled separately by `compose_input_with_stored_placeholder()`, which
+        // mirrors Python `verdreheWoReTaBefehl()`.
+        merged.extend(left_tokens);
+        merged.extend(right_tokens);
         return merged.join(" ");
     }
 
@@ -1653,9 +1656,15 @@ mod tests {
     }
 
     #[test]
-    fn merge_stored_placeholder_prefers_incoming_reta_order_like_python() {
+    fn merge_stored_placeholder_keeps_existing_before_incoming_reta_like_python() {
         let merged = merge_stored_placeholder("emotion 12", "reta -spalten --geist");
-        assert_eq!(merged, "reta -spalten --geist emotion 12");
+        assert_eq!(merged, "reta emotion 12 -spalten --geist");
+    }
+
+    #[test]
+    fn merge_stored_placeholder_strips_reta_marker_on_both_sides_like_python() {
+        let merged = merge_stored_placeholder("reta -ausgabe --nocolor", "reta -spalten --geist");
+        assert_eq!(merged, "reta -ausgabe --nocolor -spalten --geist");
     }
 
     #[test]
