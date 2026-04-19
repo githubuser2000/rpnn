@@ -47,6 +47,7 @@ pub enum PromptCommand {
     Python(String),
     Math(String),
     Immediate(PromptOutput),
+    Sequence(Vec<PromptCommand>),
     Reta(Vec<String>),
     RetaBatch(Vec<Vec<String>>),
 }
@@ -168,9 +169,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
             .to_string();
         return Ok(PromptCommand::Math(command_text));
     }
-    if let Some(output) = compile_direct_number_command(&effective_tokens) {
-        return Ok(PromptCommand::Immediate(output));
-    }
+    let direct_number_output = compile_direct_number_command(&effective_tokens);
     if let Some(output) = compile_abc_abcd_command(&effective_tokens) {
         return Ok(PromptCommand::Immediate(output));
     }
@@ -184,11 +183,13 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     }
     let calls = build_reta_calls_from_prompt_tokens(&effective_tokens);
     if !calls.is_empty() {
-        return if calls.len() == 1 {
-            Ok(PromptCommand::Reta(calls.into_iter().next().unwrap()))
-        } else {
-            Ok(PromptCommand::RetaBatch(calls))
-        };
+        return Ok(append_direct_number_output_like_python(
+            prompt_command_from_reta_calls(calls),
+            direct_number_output,
+        ));
+    }
+    if let Some(output) = direct_number_output {
+        return Ok(PromptCommand::Immediate(output));
     }
     if let Some(argv) = build_reta_argv_from_prompt_tokens(&effective_tokens) {
         return Ok(PromptCommand::Reta(argv));
@@ -443,6 +444,12 @@ fn apply_nested_frontend_overrides(
                 })
                 .collect(),
         ),
+        PromptCommand::Sequence(commands) => PromptCommand::Sequence(
+            commands
+                .into_iter()
+                .map(|command| apply_nested_frontend_overrides(command, input, state))
+                .collect(),
+        ),
         other => other,
     }
 }
@@ -452,6 +459,16 @@ fn prompt_command_from_reta_calls(calls: Vec<Vec<String>>) -> PromptCommand {
         PromptCommand::Reta(calls.into_iter().next().unwrap())
     } else {
         PromptCommand::RetaBatch(calls)
+    }
+}
+
+fn append_direct_number_output_like_python(
+    command: PromptCommand,
+    direct_number_output: Option<PromptOutput>,
+) -> PromptCommand {
+    match direct_number_output {
+        Some(output) => PromptCommand::Sequence(vec![command, PromptCommand::Immediate(output)]),
+        None => command,
     }
 }
 
@@ -916,6 +933,7 @@ pub fn execute_command(
         PromptCommand::Python(command_text) => run_python_command(&command_text),
         PromptCommand::Math(command_text) => run_math_command(&command_text),
         PromptCommand::Immediate(output) => Ok(Some(output)),
+        PromptCommand::Sequence(commands) => execute_command_sequence(commands, state),
         PromptCommand::Reta(argv) => {
             let result: RetaRunResult = run_reta_from_args(argv);
             Ok(Some(PromptOutput {
@@ -944,6 +962,52 @@ pub fn execute_command(
                 exit_code,
             }))
         }
+    }
+}
+
+fn append_output_text(combined: &mut String, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if !combined.is_empty() && !combined.ends_with('\n') {
+        combined.push('\n');
+    }
+    combined.push_str(text);
+    if !combined.ends_with('\n') {
+        combined.push('\n');
+    }
+}
+
+fn execute_command_sequence(
+    commands: Vec<PromptCommand>,
+    state: &mut SessionState,
+) -> Result<Option<PromptOutput>, String> {
+    let mut combined = String::new();
+    let mut exit_code = 0;
+    let mut titles: Vec<String> = Vec::new();
+
+    for command in commands {
+        if let Some(output) = execute_command(command, state)? {
+            if !output.title.trim().is_empty() {
+                titles.push(output.title.clone());
+            }
+            append_output_text(&mut combined, &output.text);
+            exit_code = exit_code.max(output.exit_code);
+        }
+    }
+
+    if combined.is_empty() && titles.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(PromptOutput {
+            title: if titles.is_empty() {
+                "prompt".to_string()
+            } else {
+                titles.join("+")
+            },
+            text: combined.trim_end_matches('\n').to_string(),
+            exit_code,
+        }))
     }
 }
 
@@ -1801,6 +1865,26 @@ mod tests {
             }
             other => panic!("expected immediate modulo output, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn direct_number_side_effects_do_not_suppress_semantic_reta_calls_like_python() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("mulpri emotion 12", &state).unwrap();
+        match command {
+            PromptCommand::Sequence(commands) => {
+                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Reta(_))));
+                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+            }
+            other => panic!("expected PromptCommand::Sequence, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn direct_number_only_command_still_bypasses_generic_prompt_reta_fallback() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("modulo 7", &state).unwrap();
+        assert!(matches!(command, PromptCommand::Immediate(_)));
     }
 
 }

@@ -225,6 +225,12 @@ fn apply_rpe_emacs_output_to_command(command: PromptCommand, input: &str) -> Pro
                 .map(|argv| apply_rpe_emacs_output_to_argv(argv, append_after_user_args))
                 .collect(),
         ),
+        PromptCommand::Sequence(commands) => PromptCommand::Sequence(
+            commands
+                .into_iter()
+                .map(|command| apply_rpe_emacs_output_to_command(command, input))
+                .collect(),
+        ),
         other => other,
     }
 }
