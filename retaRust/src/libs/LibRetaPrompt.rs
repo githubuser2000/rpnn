@@ -638,3 +638,77 @@ def verkuerze_dict(dictionary: dict) -> dict:
             dict2[key] = value
     return dict2
 "#;
+
+pub use crate::prompt::python_like::{
+    is15or16command,
+    isReTaParameter,
+    libreta_prompt_custom_split as custom_split,
+    libreta_prompt_custom_split2 as custom_split2,
+    verkuerze_dict,
+    verifyBruchNganzZahlBetweenCommas,
+    verifyBruchNganzZahlCommaList,
+    PromptModus,
+    VerifyBruchGanzZahlBetweenCommasResult,
+    VerifyBruchGanzZahlCommaListResult,
+};
+
+/// Rust-facing port of Python `LibRetaPrompt.stextFromKleinKleinKleinBefehl`.
+///
+/// The heavy lifting lives in `prompt::python_like` because the active prompt
+/// frontend already uses that module.  This wrapper restores the Python module
+/// architecture: code that imports `libs::LibRetaPrompt` can now call the same
+/// top-level helper names instead of reaching into prompt internals.
+#[allow(non_snake_case)]
+pub fn stextFromKleinKleinKleinBefehl(
+    promptMode2: PromptModus,
+    stext: &[String],
+    _textDazu: Vec<String>,
+) -> (bool, Vec<String>) {
+    crate::prompt::python_like::expand_kurz_kurz_befehl(promptMode2, stext)
+}
+
+#[cfg(test)]
+mod rust_libreta_prompt_tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn direct_python_module_wrappers_expose_splitters_and_short_command_expansion() {
+        assert_eq!(custom_split(" a  b (c d)"), strings(&["", "a", "", "b", "(c d)"]));
+        assert_eq!(custom_split2("a, b,(c,d),,e", ','), strings(&["a", " b", "(c,d)", "", "e"]));
+
+        let (had_short, expanded) = stextFromKleinKleinKleinBefehl(
+            PromptModus::Normal,
+            &strings(&["12at"]),
+            Vec::new(),
+        );
+        assert!(had_short);
+        assert_eq!(expanded, strings(&["a", "t", "12"]));
+    }
+
+    #[test]
+    fn direct_python_module_wrappers_expose_parameter_and_fraction_helpers() {
+        assert!(is15or16command("15_2"));
+        assert!(isReTaParameter("--zeit=heute"));
+        let reduced = verkuerze_dict(&[
+            ("a".to_string(), "x".to_string()),
+            ("b".to_string(), "x".to_string()),
+            ("c".to_string(), "y".to_string()),
+        ]);
+        assert_eq!(reduced, vec![("a".to_string(), "x".to_string()), ("c".to_string(), "y".to_string())]);
+
+        let checked = verifyBruchNganzZahlBetweenCommas(
+            Vec::new(),
+            "1-3",
+            Vec::new(),
+            strings(&["1/2"]),
+            Vec::new(),
+            "x",
+            Vec::new(),
+        );
+        assert!(checked.bruchAndGanzZahlEtwaKorrekterBereichAllTrue);
+    }
+}

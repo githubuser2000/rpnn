@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 /*
 DIREKT-TRANSCOMPILATIONSFRONT FÜR libs/center.py
 Python-Quelle eingefroren für 1:1-Übernahme.
@@ -757,3 +758,657 @@ def moduloA(zahlen):
             mod = var - mod
             print(f"{mod} {classify(mod)}")
 "#;
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::shared::reta_program_types::Program;
+
+pub const kpattern: &str = r",(?![^\[\]\{\}\(\)]*[\]\}\)])";
+const V_PREFIX: char = 'v';
+
+fn split_kpattern_comma_here(tail_after_comma: &str) -> bool {
+    for ch in tail_after_comma.chars() {
+        if matches!(ch, ']' | '}' | ')') {
+            return false;
+        }
+        if matches!(ch, '[' | '{' | '(') {
+            return true;
+        }
+    }
+    true
+}
+
+pub fn split_kpattern_commas(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let mut i = 0usize;
+    while i < chars.len() {
+        let (byte_idx, ch) = chars[i];
+        if ch == ',' && split_kpattern_comma_here(&text[byte_idx + ch.len_utf8()..]) {
+            out.push(std::mem::take(&mut current));
+        } else {
+            current.push(ch);
+        }
+        i += 1;
+    }
+    out.push(current);
+    out
+}
+
+fn is_ascii_decimal(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|ch| ch.is_ascii_digit())
+}
+
+fn is_signed_ascii_decimal(text: &str) -> bool {
+    if let Some(rest) = text.strip_prefix('-') {
+        is_ascii_decimal(rest)
+    } else {
+        is_ascii_decimal(text)
+    }
+}
+
+fn parse_i64_literal(text: &str) -> Option<i64> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let rest = trimmed.strip_prefix('+').unwrap_or(trimmed);
+    if let Some(rest2) = rest.strip_prefix('-') {
+        if is_ascii_decimal(rest2) {
+            return trimmed.parse::<i64>().ok();
+        }
+        None
+    } else if is_ascii_decimal(rest) {
+        trimmed.parse::<i64>().ok()
+    } else {
+        None
+    }
+}
+
+/// Python center.py::strAsGeneratorToListOfNumStrs.
+///
+/// Keep Python's outer-shape check byte-for-byte strict, then reuse the
+/// already-ported Python-like integer expression parser from the active reta
+/// core for the literal contents.
+pub fn strAsGeneratorToListOfNumStrs(text: &str) -> Option<BTreeSet<i64>> {
+    if text.is_empty() {
+        return None;
+    }
+
+    let owned_storage;
+    let literal: &str = if text.starts_with('(') && text.ends_with(')') && text.len() >= 2 {
+        owned_storage = Some(format!("[{}]", &text[1..text.len() - 1]));
+        owned_storage.as_deref().unwrap_or(text)
+    } else {
+        owned_storage = None;
+        text
+    };
+
+    if !((literal.starts_with('[') && literal.ends_with(']'))
+        || (literal.starts_with('{') && literal.ends_with('}')))
+    {
+        return None;
+    }
+
+    Program::parse_python_like_int_set_expr_py(literal)
+}
+
+pub fn isZeilenAngabe_betweenKommas(g: &str) -> bool {
+    if strAsGeneratorToListOfNumStrs(g).is_some() {
+        return true;
+    }
+    if g.len() > 1 && g.starts_with('-') && strAsGeneratorToListOfNumStrs(&g[1..]).is_some() {
+        return true;
+    }
+
+    let rest = g.strip_prefix(V_PREFIX).unwrap_or(g);
+    if rest.is_empty() {
+        return false;
+    }
+    let mut plus_parts = rest.split('+');
+    let Some(first) = plus_parts.next() else {
+        return false;
+    };
+    let range_ok = if let Some((left, right)) = first.rsplit_once('-') {
+        if left.is_empty() {
+            is_signed_ascii_decimal(first)
+        } else {
+            is_signed_ascii_decimal(left) && is_ascii_decimal(right)
+        }
+    } else {
+        is_signed_ascii_decimal(first)
+    };
+    range_ok && plus_parts.all(is_ascii_decimal)
+}
+
+pub fn isZeilenAngabe(text: &str) -> bool {
+    let parts = split_kpattern_commas(text);
+    let any_at_all = parts.iter().any(|part| !part.is_empty());
+    parts
+        .iter()
+        .all(|part| isZeilenAngabe_betweenKommas(part) || (part.is_empty() && any_at_all))
+}
+
+pub fn isZeilenBruchAngabe_betweenKommas(g: &str) -> bool {
+    let rest = g.strip_prefix(V_PREFIX).unwrap_or(g);
+    let mut plus_parts = rest.split('+');
+    let Some(first) = plus_parts.next() else {
+        return false;
+    };
+
+    fn fraction(text: &str, signed: bool) -> bool {
+        let body = if signed {
+            text.strip_prefix('-').unwrap_or(text)
+        } else {
+            text
+        };
+        let Some((left, right)) = body.split_once('/') else {
+            return false;
+        };
+        is_ascii_decimal(left) && is_ascii_decimal(right)
+    }
+
+    let range_ok = if let Some((left, right)) = first.rsplit_once('-') {
+        if left.is_empty() {
+            fraction(first, true)
+        } else {
+            fraction(left, true) && fraction(right, false)
+        }
+    } else {
+        fraction(first, true)
+    };
+
+    range_ok && plus_parts.all(|part| fraction(part, false))
+}
+
+pub fn isZeilenBruchOrGanzZahlAngabe(text: &str) -> bool {
+    text.split(',')
+        .all(|part| isZeilenBruchAngabe_betweenKommas(part) || isZeilenAngabe_betweenKommas(part))
+}
+
+pub fn isZeilenBruchAngabe(text: &str) -> bool {
+    let parts: Vec<&str> = text.split(',').collect();
+    let any_at_all = parts.iter().any(|part| !part.is_empty());
+    parts
+        .iter()
+        .all(|part| isZeilenBruchAngabe_betweenKommas(part) || (part.is_empty() && any_at_all))
+}
+
+pub fn BereichToNumbers2(
+    MehrereBereiche: &str,
+    vielfache: bool,
+    maxZahl: i64,
+    allowLessEqZero: bool,
+) -> BTreeSet<i64> {
+    let mehrere_bereiche = split_kpattern_commas(MehrereBereiche)
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    if !isZeilenAngabe(&mehrere_bereiche) {
+        return BTreeSet::new();
+    }
+
+    let max_is_inf = !vielfache && maxZahl == 0;
+    let bereiche = split_kpattern_commas(&mehrere_bereiche);
+    let mut dazu = BTreeSet::new();
+    let mut hinfort = BTreeSet::new();
+
+    for mut ein_bereich in bereiche {
+        if ein_bereich.len() > 1 && ein_bereich.starts_with('-') {
+            if let Some(generated) = strAsGeneratorToListOfNumStrs(&ein_bereich[1..]) {
+                hinfort.extend(generated);
+                continue;
+            }
+        } else if !ein_bereich.is_empty() && !ein_bereich.starts_with('-') {
+            if let Some(generated) = strAsGeneratorToListOfNumStrs(&ein_bereich) {
+                dazu.extend(generated);
+                continue;
+            }
+        }
+
+        let vielfache2 = if ein_bereich.starts_with(V_PREFIX) {
+            ein_bereich.remove(0);
+            true
+        } else {
+            false
+        };
+        let max_for_branch = if (vielfache || vielfache2) && max_is_inf {
+            Some(1028)
+        } else if max_is_inf {
+            None
+        } else {
+            Some(maxZahl)
+        };
+        BereichToNumbers2_EinBereich(
+            &ein_bereich,
+            &mut dazu,
+            &mut hinfort,
+            max_for_branch,
+            vielfache || vielfache2,
+        );
+    }
+
+    dazu.retain(|value| !hinfort.contains(value));
+    if !allowLessEqZero {
+        dazu.retain(|value| *value > 0);
+    }
+    dazu
+}
+
+fn less_than_max(value: i64, maxZahl: Option<i64>) -> bool {
+    maxZahl.map(|max| value < max).unwrap_or(true)
+}
+
+fn less_or_equal_max(value: i64, maxZahl: Option<i64>) -> bool {
+    maxZahl.map(|max| value <= max).unwrap_or(true)
+}
+
+fn BereichToNumbers2_EinBereich(
+    EinBereich: &str,
+    dazu: &mut BTreeSet<i64>,
+    hinfort: &mut BTreeSet<i64>,
+    maxZahl: Option<i64>,
+    vielfache: bool,
+) {
+    let (target, mut ein_bereich): (&mut BTreeSet<i64>, String) = if EinBereich.len() > 1 && EinBereich.starts_with('-') {
+        (hinfort, EinBereich[1..].to_string())
+    } else if !EinBereich.is_empty() && !EinBereich.starts_with('-') {
+        (dazu, EinBereich.to_string())
+    } else {
+        return;
+    };
+
+    let parts = ein_bereich.split('+').map(|s| s.to_string()).collect::<Vec<_>>();
+    if is_ascii_decimal(&ein_bereich) {
+        ein_bereich = format!("{0}-{0}", ein_bereich);
+    } else if !parts.is_empty() && is_ascii_decimal(&parts[0]) {
+        ein_bereich = format!("{0}-{0}", parts[0]);
+        if parts.len() > 1 {
+            ein_bereich.push('+');
+            ein_bereich.push_str(&parts[1..].join("+"));
+        }
+    }
+
+    let BereichCouple = ein_bereich.split('-').map(|s| s.to_string()).collect::<Vec<_>>();
+    BereichToNumbers2_EinBereich_Menge(&BereichCouple, maxZahl, target, vielfache);
+}
+
+fn BereichToNumbers2_EinBereich_Menge(
+    BereichCouple: &[String],
+    maxZahl: Option<i64>,
+    menge: &mut BTreeSet<i64>,
+    vielfache: bool,
+) {
+    if BereichCouple.len() != 2 || !is_ascii_decimal(&BereichCouple[0]) || BereichCouple[0] == "0" {
+        return;
+    }
+
+    let mut around = Vec::new();
+    let mut right = BereichCouple[1].clone();
+    let plus = right.split('+').map(|s| s.to_string()).collect::<Vec<_>>();
+    if plus.len() < 2 {
+        around.push(0);
+    } else {
+        let mut nums = Vec::new();
+        for part in &plus {
+            let Some(value) = parse_i64_literal(part) else {
+                return;
+            };
+            if value < 0 {
+                return;
+            }
+            nums.push(value);
+        }
+        if !nums.is_empty() {
+            around = nums[1..].to_vec();
+            right = nums[0].to_string();
+        }
+    }
+
+    if !is_ascii_decimal(&right) {
+        return;
+    }
+    let start = BereichCouple[0].parse::<i64>().unwrap_or(0);
+    let end = right.parse::<i64>().unwrap_or(0);
+    if vielfache {
+        BereichToNumbers2_EinBereich_Menge_vielfache(start, end, &around, maxZahl, menge);
+    } else {
+        BereichToNumbers2_EinBereich_Menge_nichtVielfache(start, end, &around, maxZahl, menge);
+    }
+}
+
+fn BereichToNumbers2_EinBereich_Menge_nichtVielfache(
+    start: i64,
+    end: i64,
+    around: &[i64],
+    maxZahl: Option<i64>,
+    menge: &mut BTreeSet<i64>,
+) {
+    for number in start..=end {
+        for a in around {
+            let c = number + *a;
+            if less_than_max(c, maxZahl) {
+                menge.insert(c);
+            }
+            let d = number - *a;
+            if d > 0 && less_than_max(d, maxZahl) {
+                menge.insert(d);
+            }
+        }
+    }
+}
+
+fn BereichToNumbers2_EinBereich_Menge_vielfache(
+    start: i64,
+    end: i64,
+    around: &[i64],
+    maxZahl: Option<i64>,
+    menge: &mut BTreeSet<i64>,
+) {
+    let mut i = 0i64;
+    let only_zero_around = around.is_empty() || around.iter().all(|value| *value == 0);
+    loop {
+        let keep_going = around.iter().all(|a| {
+            let limit = maxZahl.map(|max| max - *a);
+            limit.map(|limit| start * i < limit).unwrap_or(true)
+        });
+        if !keep_going {
+            break;
+        }
+        i += 1;
+        for number in start..=end {
+            if only_zero_around {
+                let c = number * i;
+                if less_or_equal_max(c, maxZahl) {
+                    menge.insert(c);
+                }
+            } else {
+                for a in around {
+                    let c = (number * i) + *a;
+                    if less_or_equal_max(c, maxZahl) {
+                        menge.insert(c);
+                    }
+                    let d = (number * i) - *a;
+                    if d > 0 && less_than_max(d, maxZahl) {
+                        menge.insert(d);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/// Python `center.chunks`: return successive `n` sized chunks.
+///
+/// The Python version is a generator.  The Rust port materializes the chunks so
+/// callers get a simple, ownership-safe value while keeping the same partition
+/// boundaries.
+pub fn chunks<T: Clone>(lst: &[T], n: usize) -> Vec<Vec<T>> {
+    if n == 0 {
+        panic!("range() arg 3 must not be zero");
+    }
+    lst.chunks(n).map(|chunk| chunk.to_vec()).collect()
+}
+
+#[allow(non_snake_case)]
+pub fn textHatZiffer(text: &str) -> bool {
+    text.chars().any(|ch| ch.is_numeric())
+}
+
+/// Python `center.multiples(a, mul1=True)`.
+///
+/// Python stores the divisor pairs in a `set` and then turns that set into a
+/// list.  This Rust port keeps the mathematical content deterministic by using
+/// a sorted set, and appends `(a, 1)` after the set exactly like Python does.
+pub fn multiples(a: i64, mul1: bool) -> Vec<(i64, i64)> {
+    if a < 0 {
+        panic!("math domain error");
+    }
+    let mut menge: BTreeSet<(i64, i64)> = BTreeSet::new();
+    let upper = ((a as f64).sqrt() + 1.0).floor() as i64;
+    for b in 2..upper {
+        let c = ((a as f64 / b as f64) * 1000.0).round() / 1000.0;
+        if c == c.round() {
+            menge.insert((c as i64, b));
+        }
+    }
+    let mut out = menge.into_iter().collect::<Vec<_>>();
+    if mul1 {
+        out.push((a, 1));
+    }
+    out
+}
+
+pub fn teiler(zahlenBereichsAngabe: &str) -> (Vec<String>, BTreeSet<i64>) {
+    let zahlen_bereich_menge = BereichToNumbers2(zahlenBereichsAngabe, false, 0, false);
+    let mut zahlen_wbereich_menge: BTreeSet<i64> = BTreeSet::new();
+    for each1 in zahlen_bereich_menge {
+        for (left, right) in multiples(each1, true) {
+            zahlen_wbereich_menge.insert(left);
+            zahlen_wbereich_menge.insert(right);
+        }
+    }
+    if zahlen_wbereich_menge != BTreeSet::from([1]) {
+        zahlen_wbereich_menge.remove(&1);
+    }
+    let zahlen_wbereich_string_liste = zahlen_wbereich_menge
+        .iter()
+        .map(|each2| each2.to_string())
+        .collect::<Vec<_>>();
+    (zahlen_wbereich_string_liste, zahlen_wbereich_menge)
+}
+
+#[allow(non_snake_case)]
+pub fn invert_dict_B<K, V>(d: &BTreeMap<K, Vec<V>>) -> BTreeMap<i64, Vec<String>>
+where
+    K: Ord + ToString,
+    V: ToString,
+{
+    let mut new_dict: BTreeMap<i64, Vec<String>> = BTreeMap::new();
+    for (key, value_list) in d {
+        for value in value_list {
+            let int_val = value
+                .to_string()
+                .parse::<i64>()
+                .expect("invalid literal for int() in invert_dict_B");
+            let str_key = key.to_string();
+            let entry = new_dict.entry(int_val).or_default();
+            if !entry.iter().any(|existing| existing == &str_key) {
+                entry.push(str_key);
+            }
+        }
+    }
+    new_dict
+}
+
+pub fn primfaktoren(n: i64, modulo: bool) -> Vec<i64> {
+    let mut faktoren = Vec::new();
+    let mut z = n;
+    while z > 1 {
+        let mut i = 2i64;
+        let mut gefunden = false;
+        let mut p = z;
+        while i * i <= n && !gefunden {
+            if z % i == 0 {
+                gefunden = true;
+                p = i;
+            } else {
+                i += 1;
+            }
+        }
+        if !gefunden {
+            p = z;
+        }
+        if modulo {
+            faktoren.push(p % 24);
+        } else {
+            faktoren.push(p);
+        }
+        z /= p;
+    }
+    faktoren
+}
+
+#[allow(non_snake_case)]
+pub fn primRepeat(mut n: Vec<i64>) -> Vec<String> {
+    n.reverse();
+    let mut c = 1i64;
+    let mut b: Option<i64> = None;
+    let mut d: Vec<(i64, i64)> = Vec::new();
+    for a in n {
+        if b == Some(a) {
+            c += 1;
+        } else {
+            c = 1;
+        }
+        d.push((a, c));
+        b = Some(a);
+    }
+    d.reverse();
+    b = None;
+    let mut f = Vec::new();
+    for (e, g) in d {
+        if b != Some(e) {
+            if g == 1 {
+                f.push(e.to_string());
+            } else {
+                f.push(format!("{e}^{g}"));
+            }
+        }
+        b = Some(e);
+    }
+    f
+}
+
+#[allow(non_snake_case)]
+pub fn primRepeat2(mut n: Vec<i64>) -> Vec<(i64, i64)> {
+    n.reverse();
+    let mut c = 1i64;
+    let mut b: Option<i64> = None;
+    let mut d: Vec<(i64, i64)> = Vec::new();
+    for a in n {
+        if b == Some(a) {
+            c += 1;
+        } else {
+            c = 1;
+        }
+        d.push((a, c));
+        b = Some(a);
+    }
+    d.reverse();
+    b = None;
+    let mut f = Vec::new();
+    for (e, g) in d {
+        if b != Some(e) {
+            if g == 1 {
+                f.push((e, 1));
+            } else {
+                f.push((e, g));
+            }
+        }
+        b = Some(e);
+    }
+    f
+}
+
+pub fn classify(mod_value: i64) -> Option<&'static str> {
+    match mod_value {
+        0 => Some("ja"),
+        1 => Some("Gegenteil"),
+        2 => Some("ähnlich"),
+        3 => Some("entferntes Gegenteil"),
+        4 => Some("entfernt ähnlich"),
+        _ => None,
+    }
+}
+
+fn classify_for_f_string(mod_value: i64) -> &'static str {
+    classify(mod_value).unwrap_or("None")
+}
+
+#[allow(non_snake_case)]
+pub fn moduloA_text<T: ToString>(zahlen: &[T]) -> String {
+    let mut out = String::new();
+    for arg in zahlen {
+        let arg_text = arg.to_string();
+        let arg_int = arg_text
+            .parse::<i64>()
+            .expect("invalid literal for int() in moduloA");
+        for var in 2..26 {
+            let mod_value = arg_int % var;
+            let complement = var - mod_value;
+            out.push_str(&format!(
+                "{arg_text} % {var} = {mod_value} {}, {complement} {}\n",
+                classify_for_f_string(mod_value),
+                classify_for_f_string(complement)
+            ));
+        }
+    }
+    out
+}
+
+#[allow(non_snake_case)]
+pub fn moduloA<T: ToString>(zahlen: &[T]) {
+    print!("{}", moduloA_text(zahlen));
+}
+
+#[cfg(test)]
+mod rust_center_tests {
+    use super::*;
+
+    #[test]
+    fn generator_literals_match_python_shape() {
+        assert_eq!(strAsGeneratorToListOfNumStrs("[1,2,2]"), Some(BTreeSet::from([1, 2])));
+        assert_eq!(strAsGeneratorToListOfNumStrs("(3,4)"), Some(BTreeSet::from([3, 4])));
+        assert_eq!(strAsGeneratorToListOfNumStrs("{}"), Some(BTreeSet::new()));
+        assert_eq!(strAsGeneratorToListOfNumStrs(" [1]"), None);
+    }
+
+    #[test]
+    fn zeilen_validation_uses_python_comma_rule() {
+        assert!(isZeilenAngabe("1-3,[5,6],"));
+        assert!(isZeilenAngabe("v2,3+1"));
+        assert!(!isZeilenAngabe(""));
+        assert!(isZeilenBruchAngabe("1/2,3/4,"));
+        assert!(isZeilenBruchOrGanzZahlAngabe("1/2,3"));
+    }
+
+    #[test]
+    fn bereich_to_numbers_core_cases_follow_python() {
+        assert_eq!(BereichToNumbers2("1-3", false, 1028, false), BTreeSet::from([1, 2, 3]));
+        assert_eq!(BereichToNumbers2("5+1", false, 1028, false), BTreeSet::from([4, 6]));
+        assert_eq!(BereichToNumbers2("1-3,-2", false, 1028, false), BTreeSet::from([1, 3]));
+        assert_eq!(BereichToNumbers2("v2", false, 10, false), BTreeSet::from([2, 4, 6, 8, 10]));
+    }
+
+    #[test]
+    fn remaining_center_number_helpers_follow_python_shapes() {
+        assert_eq!(chunks(&[1, 2, 3, 4, 5], 2), vec![vec![1, 2], vec![3, 4], vec![5]]);
+        assert!(textHatZiffer("abc2"));
+        assert_eq!(multiples(12, true), vec![(4, 3), (6, 2), (12, 1)]);
+        assert_eq!(teiler("12").1, BTreeSet::from([2, 3, 4, 6, 12]));
+        assert_eq!(primfaktoren(24, false), vec![2, 2, 2, 3]);
+        assert_eq!(primfaktoren(24, true), vec![2, 2, 2, 3]);
+        assert_eq!(primRepeat(vec![2, 2, 2, 3]), vec!["2^3".to_string(), "3".to_string()]);
+        assert_eq!(primRepeat2(vec![2, 2, 2, 3]), vec![(2, 3), (3, 1)]);
+    }
+
+    #[test]
+    fn invert_dict_b_and_modulo_text_keep_python_display_contract() {
+        let mut source = BTreeMap::new();
+        source.insert("a".to_string(), vec![1, 2]);
+        source.insert("b".to_string(), vec![1]);
+        let mut expected = BTreeMap::new();
+        expected.insert(1, vec!["a".to_string(), "b".to_string()]);
+        expected.insert(2, vec!["a".to_string()]);
+        assert_eq!(invert_dict_B(&source), expected);
+
+        let text = moduloA_text(&["5"]);
+        assert!(text.starts_with("5 % 2 = 1 Gegenteil, 1 Gegenteil\n"));
+        assert!(text.contains("5 % 5 = 0 ja, 5 None\n"));
+    }
+}

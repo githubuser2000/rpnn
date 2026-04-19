@@ -1497,12 +1497,10 @@ pub fn verifyBruchNganzZahlCommaList(
     commaListe: &str,
     mut zahlenAngaben_1: Vec<String>,
 ) -> VerifyBruchGanzZahlCommaListResult {
-    let mut bruchAndGanzZahlEtwaKorrekterBereich = Vec::new();
-    let mut bruchBereichsAngaben = Vec::new();
-    let mut bruchRanges = Vec::new();
-    let mut zahlenAngaben_ = Vec::new();
+    let mut split_count = 0usize;
 
     for etwaBruch in libreta_prompt_split_kpattern_commas_py(commaListe) {
+        split_count += 1;
         let verified = verifyBruchNganzZahlBetweenCommas(
             bruchAndGanzZahlEtwaKorrekterBereich1,
             bruchBereichsAngabe,
@@ -1517,13 +1515,16 @@ pub fn verifyBruchNganzZahlCommaList(
         bruchBereichsAngaben1 = verified.bruchBereichsAngaben;
         bruchRanges1 = verified.bruchRanges;
         zahlenAngaben_1 = verified.zahlenAngaben_;
-
-        bruchAndGanzZahlEtwaKorrekterBereich
-            .push(bruchAndGanzZahlEtwaKorrekterBereich1.clone());
-        bruchBereichsAngaben.push(bruchBereichsAngaben1.clone());
-        bruchRanges.push(bruchRanges1.clone());
-        zahlenAngaben_.push(zahlenAngaben_1.clone());
     }
+
+    // Python appends the *same mutated list objects* into the outer result on
+    // every iteration.  After the loop all outer slots therefore render as the
+    // final accumulated inner list, not as incremental snapshots.
+    let bruchAndGanzZahlEtwaKorrekterBereich =
+        vec![bruchAndGanzZahlEtwaKorrekterBereich1.clone(); split_count];
+    let bruchBereichsAngaben = vec![bruchBereichsAngaben1.clone(); split_count];
+    let bruchRanges = vec![bruchRanges1.clone(); split_count];
+    let zahlenAngaben_ = vec![zahlenAngaben_1.clone(); split_count];
 
     // Python calls `all()` on a list of lists here.  Non-empty inner lists are
     // truthy even when they contain `False`, so this deliberately does not fold
@@ -7604,13 +7605,31 @@ mod tests {
         );
         assert_eq!(
             comma_result.bruchAndGanzZahlEtwaKorrekterBereich,
-            vec![vec![true], vec![true, true]]
+            vec![vec![true, true], vec![true, true]]
         );
         assert_eq!(
             comma_result.zahlenAngaben_,
-            vec![strings(&["4"]), strings(&["4", "5"])]
+            vec![strings(&["4", "5"]), strings(&["4", "5"])]
         );
         assert!(comma_result.fullBlockIsZahlenbereichAndBruch_Z);
+
+        let python_shared_mutation_shape = verifyBruchNganzZahlCommaList(
+            Vec::new(),
+            "x",
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            "4,x",
+            Vec::new(),
+        );
+        assert_eq!(
+            python_shared_mutation_shape.bruchAndGanzZahlEtwaKorrekterBereich,
+            vec![vec![true, false], vec![true, false]]
+        );
+        assert_eq!(
+            python_shared_mutation_shape.zahlenAngaben_,
+            vec![strings(&["4"]), strings(&["4"])]
+        );
 
         let python_truthy_bug = verifyBruchNganzZahlCommaList(
             Vec::new(),
