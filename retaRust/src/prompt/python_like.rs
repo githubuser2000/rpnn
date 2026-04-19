@@ -2156,6 +2156,56 @@ fn expand_python_row_numbers_vielfache(
 }
 
 
+fn checked_python_floor_div(left: i64, right: i64) -> Option<i64> {
+    if right == 0 {
+        return None;
+    }
+    let quotient = left.checked_div(right)?;
+    let remainder = left.checked_rem(right)?;
+    if remainder != 0 && ((remainder > 0) != (right > 0)) {
+        quotient.checked_sub(1)
+    } else {
+        Some(quotient)
+    }
+}
+
+fn checked_python_mod(left: i64, right: i64) -> Option<i64> {
+    if right == 0 {
+        return None;
+    }
+    let quotient = checked_python_floor_div(left, right)?;
+    let product = quotient.checked_mul(right)?;
+    left.checked_sub(product)
+}
+
+fn checked_python_shift_left(left: i64, right: i64) -> Option<i64> {
+    if !(0..=62).contains(&right) {
+        return None;
+    }
+    left.checked_shl(right as u32)
+}
+
+fn checked_python_shift_right(left: i64, right: i64) -> Option<i64> {
+    if !(0..=62).contains(&right) {
+        return None;
+    }
+    left.checked_shr(right as u32)
+}
+
+fn parse_python_int_literal(raw: &str, radix: u32, allow_prefix_underscore: bool) -> Option<i64> {
+    if raw.is_empty() || raw.ends_with('_') || raw.contains("__") {
+        return None;
+    }
+    if !allow_prefix_underscore && raw.starts_with('_') {
+        return None;
+    }
+    let cleaned = raw.replace('_', "");
+    if cleaned.is_empty() {
+        return None;
+    }
+    i64::from_str_radix(&cleaned, radix).ok()
+}
+
 #[derive(Clone, Copy)]
 struct PythonRowExprVar<'a> {
     name: &'a str,
@@ -2226,7 +2276,57 @@ impl<'a> PythonRowExprParser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<i64> {
-        self.parse_add_sub()
+        self.parse_bit_or()
+    }
+
+    fn parse_bit_or(&mut self) -> Option<i64> {
+        let mut value = self.parse_bit_xor()?;
+        loop {
+            if self.consume_text("|") {
+                value |= self.parse_bit_xor()?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_bit_xor(&mut self) -> Option<i64> {
+        let mut value = self.parse_bit_and()?;
+        loop {
+            if self.consume_text("^") {
+                value ^= self.parse_bit_and()?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_bit_and(&mut self) -> Option<i64> {
+        let mut value = self.parse_shift()?;
+        loop {
+            if self.consume_text("&") {
+                value &= self.parse_shift()?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_shift(&mut self) -> Option<i64> {
+        let mut value = self.parse_add_sub()?;
+        loop {
+            if self.consume_text("<<") {
+                value = checked_python_shift_left(value, self.parse_add_sub()?)?;
+            } else if self.consume_text(">>") {
+                value = checked_python_shift_right(value, self.parse_add_sub()?)?;
+            } else {
+                break;
+            }
+        }
+        Some(value)
     }
 
     fn parse_add_sub(&mut self) -> Option<i64> {
@@ -2244,20 +2344,12 @@ impl<'a> PythonRowExprParser<'a> {
     }
 
     fn parse_mul_div(&mut self) -> Option<i64> {
-        let mut value = self.parse_power()?;
+        let mut value = self.parse_unary()?;
         loop {
             if self.consume_text("//") {
-                let rhs = self.parse_power()?;
-                if rhs == 0 {
-                    return None;
-                }
-                value = value.checked_div(rhs)?;
+                value = checked_python_floor_div(value, self.parse_unary()?)?;
             } else if self.consume_text("%") {
-                let rhs = self.parse_power()?;
-                if rhs == 0 {
-                    return None;
-                }
-                value = value.checked_rem(rhs)?;
+                value = checked_python_mod(value, self.parse_unary()?)?;
             } else if self.consume_text("/") {
                 // Python eval() keeps `/` as floating point division.  The
                 // original retaPrompt accepts generated row collections only
@@ -2267,7 +2359,7 @@ impl<'a> PythonRowExprParser<'a> {
                 // subset instead of silently turning it into integer division.
                 return None;
             } else if self.consume_text("*") {
-                value = value.checked_mul(self.parse_power()?)?;
+                value = value.checked_mul(self.parse_unary()?)?;
             } else {
                 break;
             }
@@ -2275,26 +2367,28 @@ impl<'a> PythonRowExprParser<'a> {
         Some(value)
     }
 
+    fn parse_unary(&mut self) -> Option<i64> {
+        if self.consume_text("+") {
+            self.parse_unary()
+        } else if self.consume_text("-") {
+            self.parse_unary()?.checked_neg()
+        } else if self.consume_text("~") {
+            Some(!self.parse_unary()?)
+        } else {
+            self.parse_power()
+        }
+    }
+
     fn parse_power(&mut self) -> Option<i64> {
-        let base = self.parse_unary()?;
+        let base = self.parse_primary()?;
         if self.consume_text("**") {
-            let exp = self.parse_power()?;
+            let exp = self.parse_unary()?;
             if !(0..=31).contains(&exp) {
                 return None;
             }
             base.checked_pow(exp as u32)
         } else {
             Some(base)
-        }
-    }
-
-    fn parse_unary(&mut self) -> Option<i64> {
-        if self.consume_text("+") {
-            self.parse_unary()
-        } else if self.consume_text("-") {
-            self.parse_unary()?.checked_neg()
-        } else {
-            self.parse_primary()
         }
     }
 
@@ -2411,17 +2505,52 @@ impl<'a> PythonRowExprParser<'a> {
     fn parse_number(&mut self) -> Option<i64> {
         self.skip_ws();
         let start = self.pos;
-        while !self.finished() && self.chars[self.pos].is_ascii_digit() {
-            self.pos += 1;
-        }
-        if self.pos == start {
+        if self.finished() || !self.chars[self.pos].is_ascii_digit() {
             return None;
         }
-        self.chars[start..self.pos]
-            .iter()
-            .collect::<String>()
-            .parse::<i64>()
-            .ok()
+
+        if self.chars[self.pos] == '0' {
+            if let Some(prefix) = self.chars.get(self.pos + 1).copied() {
+                let radix = match prefix {
+                    'b' | 'B' => Some(2),
+                    'o' | 'O' => Some(8),
+                    'x' | 'X' => Some(16),
+                    _ => None,
+                };
+                if let Some(radix) = radix {
+                    self.pos += 2;
+                    let digits_start = self.pos;
+                    while !self.finished()
+                        && (self.chars[self.pos] == '_'
+                            || self.chars[self.pos].is_digit(radix))
+                    {
+                        self.pos += 1;
+                    }
+                    if self.pos == digits_start {
+                        self.pos = start;
+                        return None;
+                    }
+                    let raw = self.chars[digits_start..self.pos]
+                        .iter()
+                        .collect::<String>();
+                    return parse_python_int_literal(&raw, radix, true).or_else(|| {
+                        self.pos = start;
+                        None
+                    });
+                }
+            }
+        }
+
+        while !self.finished()
+            && (self.chars[self.pos] == '_' || self.chars[self.pos].is_ascii_digit())
+        {
+            self.pos += 1;
+        }
+        let raw = self.chars[start..self.pos].iter().collect::<String>();
+        parse_python_int_literal(&raw, 10, false).or_else(|| {
+            self.pos = start;
+            None
+        })
     }
 
     fn parse_identifier(&mut self) -> Option<String> {
@@ -2449,6 +2578,13 @@ fn eval_python_row_expr_with_vars(text: &str, vars: &BTreeMap<String, i64>) -> O
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return None;
+    }
+    if let Some((true_expr, condition, false_expr)) = split_top_level_conditional_expr(trimmed) {
+        return if eval_python_row_condition_with_vars(condition, vars)? {
+            eval_python_row_expr_with_vars(true_expr, vars)
+        } else {
+            eval_python_row_expr_with_vars(false_expr, vars)
+        };
     }
     let mut parser = if vars.is_empty() {
         PythonRowExprParser::new(trimmed, None)
@@ -2556,6 +2692,19 @@ fn find_first_top_level_keyword<'a>(
     best
 }
 
+fn split_top_level_conditional_expr(text: &str) -> Option<(&str, &str, &str)> {
+    let if_index = find_top_level_keyword(text, " if ")?;
+    let true_expr = text[..if_index].trim();
+    let after_if = &text[if_index + " if ".len()..];
+    let else_index = find_top_level_keyword(after_if, " else ")?;
+    let condition = after_if[..else_index].trim();
+    let false_expr = after_if[else_index + " else ".len()..].trim();
+    if true_expr.is_empty() || condition.is_empty() || false_expr.is_empty() {
+        return None;
+    }
+    Some((true_expr, condition, false_expr))
+}
+
 fn split_top_level_comparison_chain<'a>(text: &'a str) -> Option<(Vec<&'a str>, Vec<&'a str>)> {
     let mut round = 0i32;
     let mut square = 0i32;
@@ -2624,8 +2773,21 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>)
     if trimmed.is_empty() {
         return None;
     }
+    match trimmed {
+        "True" => return Some(true),
+        "False" | "None" => return Some(false),
+        _ => {}
+    }
     if let Some(inner) = strip_top_level_wrapping_parens(trimmed) {
         return eval_python_row_condition_with_vars(inner, vars);
+    }
+    if let Some(inner) = parse_python_call_inner(trimmed, "all") {
+        let values = parse_python_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().all(|value| value != 0));
+    }
+    if let Some(inner) = parse_python_call_inner(trimmed, "any") {
+        let values = parse_python_iterable_values_with_vars(inner, vars)?;
+        return Some(values.into_iter().any(|value| value != 0));
     }
     if let Some(index) = find_top_level_keyword(trimmed, " or ") {
         return Some(
@@ -2728,6 +2890,41 @@ fn split_top_level_iterable_binary<'a>(text: &'a str, operator: char) -> Option<
     None
 }
 
+fn split_top_level_iterable_binary_rightmost<'a>(
+    text: &'a str,
+    operator: char,
+) -> Option<(&'a str, &'a str)> {
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+    let mut last_match: Option<usize> = None;
+
+    for (index, ch) in text.char_indices() {
+        if ch == operator && index > 0 && round == 0 && square == 0 && curly == 0 {
+            let left = text[..index].trim();
+            let right = text[index + ch.len_utf8()..].trim();
+            if !left.is_empty() && !right.is_empty() {
+                last_match = Some(index);
+            }
+        }
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+    }
+
+    let index = last_match?;
+    Some((
+        text[..index].trim(),
+        text[index + operator.len_utf8()..].trim(),
+    ))
+}
+
 fn split_top_level_dict_key_value(text: &str) -> Option<(&str, &str)> {
     let mut round = 0i32;
     let mut square = 0i32;
@@ -2803,8 +3000,9 @@ fn parse_python_iterable_values_with_vars(
 
     if trimmed.starts_with('(') && trimmed.ends_with(')') {
         let inner = &trimmed[1..trimmed.len() - 1];
-        if split_top_level_iterable_binary(inner, '|').is_some()
-            || split_top_level_iterable_binary(inner, '+').is_some()
+        if ['|', '^', '&', '-', '+']
+            .iter()
+            .any(|operator| split_top_level_iterable_binary(inner, *operator).is_some())
         {
             return parse_python_iterable_values_with_vars(inner, vars);
         }
@@ -2814,6 +3012,47 @@ fn parse_python_iterable_values_with_vars(
         let mut out = parse_python_iterable_values_with_vars(left, vars)?;
         out.extend(parse_python_iterable_values_with_vars(right, vars)?);
         return Some(out.into_iter().collect::<BTreeSet<_>>().into_iter().collect());
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '^') {
+        let left_values = parse_python_iterable_values_with_vars(left, vars)?;
+        let right_values = parse_python_iterable_values_with_vars(right, vars)?;
+        let left_set = left_values.into_iter().collect::<BTreeSet<_>>();
+        let right_set = right_values.into_iter().collect::<BTreeSet<_>>();
+        return Some(
+            left_set
+                .symmetric_difference(&right_set)
+                .copied()
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '&') {
+        let left_values = parse_python_iterable_values_with_vars(left, vars)?;
+        let right_values = parse_python_iterable_values_with_vars(right, vars)?;
+        let right_set = right_values.into_iter().collect::<BTreeSet<_>>();
+        return Some(
+            left_values
+                .into_iter()
+                .filter(|value| right_set.contains(value))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        );
+    }
+
+    if let Some((left, right)) = split_top_level_iterable_binary_rightmost(trimmed, '-') {
+        let left_values = parse_python_iterable_values_with_vars(left, vars)?;
+        let right_values = parse_python_iterable_values_with_vars(right, vars)?;
+        let right_set = right_values.into_iter().collect::<BTreeSet<_>>();
+        return Some(
+            left_values
+                .into_iter()
+                .filter(|value| !right_set.contains(value))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        );
     }
 
     if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '+') {
@@ -6679,6 +6918,23 @@ mod tests {
             python_row_spec_to_numbers("{n: n * n for n in range(4) if n >= 2}"),
             Some(vec![2, 3])
         );
+    }
+
+    #[test]
+    fn python_eval_style_rows_follow_python_integer_operator_semantics() {
+        assert_eq!(python_row_spec_to_numbers("[-7//3, -7%3, 7//3, 7%3]"), Some(vec![1, 2]));
+        assert_eq!(python_row_spec_to_numbers("[-2**2, (-2)**2]"), Some(vec![4]));
+        assert_eq!(python_row_spec_to_numbers("[0b1010 & 0x6, 1_2 << 1, ~-3]"), Some(vec![2, 24]));
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_conditional_expressions_and_set_ops() {
+        assert_eq!(
+            python_row_spec_to_numbers("[n if n & 1 else 10 for n in range(5) if True]"),
+            Some(vec![1, 3, 10])
+        );
+        assert_eq!(python_row_spec_to_numbers("({1,2,3} - {2}) & {1,3,4}"), Some(vec![1, 3]));
+        assert_eq!(python_row_spec_to_numbers("{1,2,3} ^ {3,4}"), Some(vec![1, 2, 4]));
     }
 
 }
