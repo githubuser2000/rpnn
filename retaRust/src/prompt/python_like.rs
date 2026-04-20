@@ -1,4 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
+
+use indexmap::IndexMap;
 use std::sync::OnceLock;
 
 use crate::shared::words_py::PyValue;
@@ -5281,6 +5283,340 @@ fn create_ranges_for_python_bruch_list(bruch_list: &[Vec<String>]) -> Option<Pyt
     })
 }
 
+
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TXT {
+    text: String,
+    platzhalter: String,
+    stext: Vec<String>,
+    stextS: Vec<String>,
+    e: Vec<String>,
+    befehlDavor: String,
+}
+
+#[allow(non_snake_case)]
+impl TXT {
+    pub fn new(txt: &str) -> Self {
+        let mut out = Self::default();
+        out.set_text(txt);
+        out
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn platzhalter(&self) -> &str {
+        &self.platzhalter
+    }
+
+    pub fn liste(&self) -> &[String] {
+        &self.stext
+    }
+
+    pub fn listeS(&self) -> &[String] {
+        &self.stextS
+    }
+
+    pub fn e(&self) -> &[String] {
+        &self.e
+    }
+
+    pub fn listeE(&self) -> Vec<String> {
+        self.stext.iter().chain(self.e.iter()).cloned().collect()
+    }
+
+    pub fn menge(&self) -> BTreeSet<String> {
+        self.stext.iter().cloned().collect()
+    }
+
+    pub fn mengeE(&self) -> BTreeSet<String> {
+        self.stext.iter().chain(self.e.iter()).cloned().collect()
+    }
+
+    pub fn befehlDavor(&self) -> &str {
+        &self.befehlDavor
+    }
+
+    pub fn set_befehlDavor(&mut self, value: &str) {
+        self.befehlDavor = value.to_string();
+    }
+
+    pub fn set_platzhalter(&mut self, value: &str) {
+        self.platzhalter = value.trim().to_string();
+    }
+
+    pub fn set_text(&mut self, value: &str) {
+        let trimmed = value.trim().to_string();
+        self.text = trimmed.clone();
+        if trimmed.starts_with("reta") {
+            self.stext = trimmed
+                .split_whitespace()
+                .filter(|part| !part.trim().is_empty())
+                .map(|part| part.trim().to_string())
+                .collect();
+            self.stextS = trimmed.split_whitespace().map(|part| part.to_string()).collect();
+        } else {
+            self.stext = libreta_prompt_custom_split(&trimmed);
+            self.stextS = self.stext.clone();
+        }
+    }
+
+    pub fn set_liste(&mut self, value: &[String]) {
+        self.stext = value
+            .iter()
+            .map(|entry| entry.trim().to_string())
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        self.stextS = value
+            .iter()
+            .flat_map(|entry| libreta_prompt_custom_split(entry))
+            .collect();
+    }
+
+    pub fn set_e(&mut self, value: Vec<String>) {
+        self.e = value;
+    }
+
+    pub fn has(&self, hasSet: &BTreeSet<String>) -> bool {
+        let menge = self.menge();
+        hasSet.iter().any(|entry| menge.contains(entry))
+    }
+
+    pub fn hasWithoutABC(&self, hasSet: &BTreeSet<String>) -> bool {
+        let menge = self.menge();
+        hasSet.iter().any(|entry| menge.contains(entry))
+            && !menge.contains("abc")
+            && !menge.contains("abcd")
+    }
+}
+
+/// Python `retaPrompt.dictToList`: return values in insertion order.
+#[allow(non_snake_case)]
+pub fn dictToList<V: Clone>(dict_: &IndexMap<String, V>) -> Vec<V> {
+    dict_.values().cloned().collect()
+}
+
+/// Python `retaPrompt.getDictLimtedByKeyList`: OrderedDict over the requested key order.
+#[allow(non_snake_case)]
+pub fn getDictLimtedByKeyList<V: Clone>(d: &IndexMap<String, V>, keys: &[String]) -> IndexMap<String, V> {
+    let mut out = IndexMap::new();
+    for key in keys {
+        if let Some(value) = d.get(key) {
+            out.insert(key.clone(), value.clone());
+        }
+    }
+    out
+}
+
+/// Python `retaPrompt.grKl`.
+///
+/// Returns the elements of `a` greater than `max(b)` and the elements of `a`
+/// smaller than `min(b)`.  `BTreeSet` gives the deterministic, set-shaped Rust
+/// equivalent while preserving Python's visible membership semantics.
+#[allow(non_snake_case)]
+pub fn grKl(a: &BTreeSet<i64>, b: &BTreeSet<i64>) -> (BTreeSet<i64>, BTreeSet<i64>) {
+    if b.is_empty() {
+        return (a.clone(), a.clone());
+    }
+    let min_b = *b.iter().next().expect("non-empty set has a minimum");
+    let max_b = *b.iter().next_back().expect("non-empty set has a maximum");
+    let greater = a.iter().copied().filter(|value| *value > max_b).collect();
+    let smaller = a.iter().copied().filter(|value| *value < min_b).collect();
+    (greater, smaller)
+}
+
+/// Python `retaPrompt.returnOnlyParasAsList`.
+#[allow(non_snake_case)]
+pub fn returnOnlyParasAsList(textList: &[String]) -> Vec<String> {
+    textList
+        .iter()
+        .filter(|token| isReTaParameter(token))
+        .cloned()
+        .collect()
+}
+
+/// Python `retaPrompt.bruchSpalt`.
+///
+/// The Python function returns `[]` for non-string/invalid input.  Rust callers
+/// pass a string slice, so invalid input maps to an empty vector.
+#[allow(non_snake_case)]
+pub fn bruchSpalt(text: &str) -> Vec<Vec<String>> {
+    python_bruch_spalt(text).unwrap_or_default()
+}
+
+/// Python `retaPrompt.createRangesForBruchLists`.
+///
+/// Python returns either `(listenRange, ergebnis2)` or `[]` for illegal shapes.
+/// Rust exposes that as `Some((range_values, denominator_spec))` or `None`.
+#[allow(non_snake_case)]
+pub fn createRangesForBruchLists(bruchList: &[Vec<String>]) -> Option<(Vec<i64>, String)> {
+    create_ranges_for_python_bruch_list(bruchList)
+        .map(|ranges| (ranges.numerators, ranges.denominator_spec))
+}
+
+fn row_numbers_like_python_BereichToNumbers2(text: &str) -> Vec<i64> {
+    python_row_spec_to_numbers(text).unwrap_or_default()
+}
+
+fn row_numbers_like_python_BereichToNumbers2_unbounded(text: &str) -> Vec<i64> {
+    python_row_spec_to_numbers_with_options(text, false, None).unwrap_or_default()
+}
+
+/// Python `retaPrompt.findEqualNennerZaehler`.
+#[allow(non_snake_case)]
+pub fn findEqualNennerZaehler(
+    hierBereich: &str,
+    nenner: &str,
+    mut nennerZaehlerGleich: Vec<String>,
+) -> Vec<String> {
+    let hier_bereich = row_numbers_like_python_BereichToNumbers2(hierBereich);
+    let nenner_values = row_numbers_like_python_BereichToNumbers2(nenner);
+    for nn3 in nenner_values {
+        for h_b3 in &hier_bereich {
+            if nn3 == *h_b3 && nn3 != 0 && nn3 != 1 {
+                nennerZaehlerGleich.push(nn3.to_string());
+            }
+        }
+    }
+    nennerZaehlerGleich
+}
+
+/// Python `retaPrompt.findNennerZaehlerMakesWholeNum` for positive row specs.
+#[allow(non_snake_case)]
+pub fn findNennerZaehlerMakesWholeNum(
+    zaehler: &str,
+    nenner: &str,
+    mut wholeNumList: Vec<String>,
+    mut wholeNumListReziproke: Vec<String>,
+) -> (Vec<String>, Vec<String>) {
+    let zaehler_values = row_numbers_like_python_BereichToNumbers2(zaehler);
+    let nenner_values = row_numbers_like_python_BereichToNumbers2(nenner);
+    for nn3 in nenner_values {
+        for zz3 in &zaehler_values {
+            if *zz3 == 0 || nn3 == 0 {
+                continue;
+            }
+            if nn3 % *zz3 == 0 {
+                wholeNumList.push((nn3 / *zz3).to_string());
+            }
+            if *zz3 % nn3 == 0 {
+                wholeNumListReziproke.push((*zz3 / nn3).to_string());
+            }
+        }
+    }
+    (wholeNumList, wholeNumListReziproke)
+}
+
+/// Python `retaPrompt.anotherOberesMaximum`, parameterized with the Python
+/// `tables.hoechsteZeile[1024]` fallback so callers can stay side-effect free.
+#[allow(non_snake_case)]
+pub fn anotherOberesMaximum(zahlenBereichC: &str, maxNum: i64, max1024: i64) -> String {
+    let max_num2 = row_numbers_like_python_BereichToNumbers2_unbounded(zahlenBereichC)
+        .into_iter()
+        .max()
+        .unwrap_or(maxNum);
+    format!(
+        "--oberesmaximum={}",
+        std::cmp::max(std::cmp::max(maxNum, max_num2), max1024) + 1
+    )
+}
+
+/// Python `retaPrompt.verdreheWoReTaBefehl`.
+#[allow(non_snake_case)]
+pub fn verdreheWoReTaBefehl(
+    text1: &str,
+    text2: &str,
+    text3: &[String],
+    _PromptMode: PromptModus,
+) -> (String, String, Vec<String>) {
+    if text2.starts_with("reta") && !text1.starts_with("reta") && !text3.is_empty() {
+        return (
+            text2.to_string(),
+            text1.to_string(),
+            libreta_prompt_custom_split(text2),
+        );
+    }
+    (text1.to_string(), text2.to_string(), text3.to_vec())
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromptLoescheVorSpeicherungResult {
+    pub platzhalter: String,
+    pub promptMode: PromptModus,
+    pub text: String,
+}
+
+fn txt_liste_like_python_retaPrompt(text: &str) -> Vec<String> {
+    TXT::new(text).liste().to_vec()
+}
+
+fn isZeilenAngabe_like_python_retaPrompt(text: &str) -> bool {
+    let parts = custom_split_delim_parenthesized(text, ',');
+    let any_at_all = parts.iter().any(|part| !part.is_empty());
+    parts
+        .iter()
+        .all(|part| isZeilenAngabe_betweenKommas(part) || (part.is_empty() && any_at_all))
+}
+
+/// Python `retaPrompt.PromptLoescheVorSpeicherungBefehle` without prompt-toolkit side effects.
+#[allow(non_snake_case)]
+pub fn PromptLoescheVorSpeicherungBefehle(
+    platzhalter: &str,
+    _promptMode: PromptModus,
+    text: &str,
+) -> PromptLoescheVorSpeicherungResult {
+    let text_trimmed = text.trim().to_string();
+    let delete_tokens = txt_liste_like_python_retaPrompt(&text_trimmed);
+    let mut placeholder_tokens = txt_liste_like_python_retaPrompt(platzhalter)
+        .into_iter()
+        .map(Some)
+        .collect::<Vec<Option<String>>>();
+
+    let mut remove_by_word = true;
+    if isZeilenAngabe_like_python_retaPrompt(&text_trimmed) {
+        let placeholder_has_text = placeholder_tokens
+            .iter()
+            .flatten()
+            .any(|token| token == &text_trimmed);
+        if !placeholder_has_text || !text_trimmed.chars().all(|ch| ch.is_ascii_digit()) {
+            remove_by_word = false;
+            for todel in row_numbers_like_python_BereichToNumbers2(&text_trimmed) {
+                if todel > 0 {
+                    let index = (todel - 1) as usize;
+                    if index < placeholder_tokens.len() {
+                        placeholder_tokens[index] = None;
+                    }
+                }
+            }
+        }
+    }
+
+    let (platzhalter_out, text_out) = if remove_by_word {
+        let delete_set = delete_tokens.into_iter().collect::<BTreeSet<_>>();
+        let kept = placeholder_tokens
+            .into_iter()
+            .flatten()
+            .filter(|token| !delete_set.contains(token))
+            .collect::<Vec<_>>();
+        (kept.join(" "), String::new())
+    } else {
+        (
+            placeholder_tokens.into_iter().flatten().collect::<Vec<_>>().join(" "),
+            text_trimmed,
+        )
+    };
+
+    PromptLoescheVorSpeicherungResult {
+        platzhalter: platzhalter_out,
+        promptMode: PromptModus::Normal,
+        text: text_out,
+    }
+}
+
 fn parse_python_bruch_spalt_group_piece(piece: &str) -> Option<PythonFractionGroup> {
     let inner = strip_matching_row_wrappers(piece.trim());
     let bruch_list = python_bruch_spalt(inner)?;
@@ -7499,8 +7835,14 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    use indexmap::IndexMap;
+    use std::collections::BTreeSet;
+
     use super::{
-        build_reta_calls_from_prompt_tokens, expand_kurz_kurz_befehl,
+        anotherOberesMaximum, bruchSpalt, build_reta_calls_from_prompt_tokens,
+        createRangesForBruchLists, dictToList, expand_kurz_kurz_befehl,
+        findEqualNennerZaehler, findNennerZaehlerMakesWholeNum, getDictLimtedByKeyList, grKl,
+        PromptLoescheVorSpeicherungBefehle, TXT,
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, is_15or16_command,
@@ -7513,6 +7855,90 @@ mod tests {
 
     fn strings(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    fn string_set(values: &[&str]) -> BTreeSet<String> {
+        strings(values).into_iter().collect()
+    }
+
+    #[test]
+    fn reta_prompt_txt_state_matches_python_property_updates() {
+        let mut txt = TXT::new(" a  b (c d) ");
+        assert_eq!(txt.text(), "a  b (c d)");
+        assert_eq!(txt.liste(), &strings(&["a", "", "b", "(c d)"]));
+        assert_eq!(txt.listeS(), txt.liste());
+        assert_eq!(txt.menge(), string_set(&["", "a", "b", "(c d)"]));
+
+        txt.set_liste(&strings(&["  x  ", "y z"]));
+        assert_eq!(txt.liste(), &strings(&["x", "y z"]));
+        assert_eq!(txt.listeS(), &strings(&["x", "y", "z"]));
+
+        txt.set_e(strings(&["ee"]));
+        assert_eq!(txt.listeE(), strings(&["x", "y z", "ee"]));
+        assert!(txt.has(&string_set(&["x"])));
+        assert!(txt.hasWithoutABC(&string_set(&["x"])));
+        txt.set_liste(&strings(&["abc", "x"]));
+        assert!(!txt.hasWithoutABC(&string_set(&["x"])));
+    }
+
+    #[test]
+    fn reta_prompt_exact_helpers_keep_python_shapes() {
+        let mut dict = IndexMap::new();
+        dict.insert("a".to_string(), 1);
+        dict.insert("b".to_string(), 2);
+        dict.insert("c".to_string(), 3);
+        assert_eq!(dictToList(&dict), vec![1, 2, 3]);
+        let limited = getDictLimtedByKeyList(&dict, &strings(&["c", "a", "x"]));
+        assert_eq!(limited.keys().cloned().collect::<Vec<_>>(), strings(&["c", "a"]));
+        assert_eq!(limited.values().copied().collect::<Vec<_>>(), vec![3, 1]);
+
+        let a = BTreeSet::from([1, 5, 9]);
+        let b = BTreeSet::from([3, 7]);
+        assert_eq!(grKl(&a, &b), (BTreeSet::from([9]), BTreeSet::from([1])));
+        assert_eq!(grKl(&a, &BTreeSet::new()), (a.clone(), a));
+    }
+
+    #[test]
+    fn reta_prompt_fraction_helpers_expose_python_names() {
+        let bruch = bruchSpalt("1/2");
+        assert_eq!(bruch, vec![vec![], strings(&["1", "2"]), vec![]]);
+        assert_eq!(createRangesForBruchLists(&bruch), Some((vec![1], "2".to_string())));
+
+        let bruch_range = bruchSpalt("1/2-3/3");
+        assert_eq!(createRangesForBruchLists(&bruch_range), Some((vec![1, 2, 3], "2-3".to_string())));
+    }
+
+    #[test]
+    fn reta_prompt_number_relation_helpers_follow_python_results() {
+        assert_eq!(findEqualNennerZaehler("1-5", "3-7", Vec::new()), strings(&["3", "4", "5"]));
+        assert_eq!(
+            findNennerZaehlerMakesWholeNum("2-4", "2-8", Vec::new(), Vec::new()),
+            (strings(&["1", "1", "2", "1", "3", "2", "4", "2"]), strings(&["1", "2", "1", "1"]))
+        );
+        assert_eq!(anotherOberesMaximum("3-5", 9, 1024), "--oberesmaximum=1025");
+        assert_eq!(anotherOberesMaximum("3-1050", 9, 1024), "--oberesmaximum=1051");
+    }
+
+
+    #[test]
+    fn reta_prompt_delete_before_storage_matches_python_cases() {
+        let by_index = PromptLoescheVorSpeicherungBefehle(
+            "a b c d",
+            PromptModus::Speichern,
+            "2-3",
+        );
+        assert_eq!(by_index.platzhalter, "a d");
+        assert_eq!(by_index.promptMode, PromptModus::Normal);
+        assert_eq!(by_index.text, "2-3");
+
+        let by_word = PromptLoescheVorSpeicherungBefehle(
+            "a b c d",
+            PromptModus::Speichern,
+            "b d",
+        );
+        assert_eq!(by_word.platzhalter, "a c");
+        assert_eq!(by_word.promptMode, PromptModus::Normal);
+        assert_eq!(by_word.text, "");
     }
 
     #[test]
