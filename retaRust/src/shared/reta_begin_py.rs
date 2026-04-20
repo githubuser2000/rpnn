@@ -1041,7 +1041,7 @@ impl Program {
     }
 
     pub fn oberesMaximum2(&mut self, argv2: Vec<String>) -> Option<i64> {
-        let mut werte: Vec<i64> = vec![];
+        let mut werte: Vec<i64> = vec![self.hoechsteZeile];
         for arg in argv2 {
             werte.extend(self.oberesMaximumArg(&arg).0);
         }
@@ -1053,8 +1053,10 @@ impl Program {
         if liste.len() == 0 || !wahrheitswert {
             return false;
         }
-        let max_ = *liste.iter().max().unwrap_or(&self.hoechsteZeile);
-        self.hoechsteZeile = max_;
+        // Python never lowers Tables.hoechsteZeile here:
+        //   max(liste + [self.tables.hoechsteZeile[1024]])
+        let requested = *liste.iter().max().unwrap_or(&self.hoechsteZeile);
+        self.hoechsteZeile = std::cmp::max(requested, self.hoechsteZeile);
         true
     }
 
@@ -1094,6 +1096,14 @@ mod tests {
 
         assert_eq!(program.finallyDisplayLines, expected_lines);
         assert!(program.finallyDisplayLines.iter().any(|line| line.contains("## -zeilen")));
+    }
+
+    #[test]
+    fn oberes_maximum_never_lowers_python_default_limit() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        assert!(program.oberesMaximum("--oberesmaximum=10"));
+        assert_eq!(program.hoechsteZeile, 1024);
+        assert_eq!(program.oberesMaximum2(vec![]), Some(1024));
     }
 
     #[test]

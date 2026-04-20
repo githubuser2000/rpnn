@@ -713,6 +713,15 @@ fn html_exact_header_attrs_py(
     }
 
 
+    fn hoechste_zeile_114_py(&self, max_row_1024: i64) -> i64 {
+        // Python Tables(None) starts with hoechsteZeile = {1024: 1024, 114: 163}.
+        // The setter later writes both entries to the same explicit maximum.
+        // Rust stores only the 1024 side as `hoechsteZeile`, so derive the
+        // historical 114-side default here instead of widening the struct.
+        let py_114 = if self.hoechsteZeile == 1024 { 163 } else { self.hoechsteZeile };
+        std::cmp::min(max_row_1024, py_114)
+    }
+
     fn selected_rows_from_param_lines_py(
         &self,
         param_lines: &[String],
@@ -1206,7 +1215,16 @@ fn html_exact_header_attrs_py(
             let joined = mehrere.join(",");
             num_range.extend(Self::bereich_to_numbers2_py(&joined, false, max_row + 1, false));
             if if_teiler {
-                num_range.extend(Self::teiler_py(&joined));
+                // Python calls teiler() with the current selected row set, not
+                // with the raw --vorhervonausschnitt argument.  That matters
+                // when the range was already combined with `all` or other row
+                // filters before --vorhervonausschnittteiler is applied.
+                let current_rows_as_range = num_range
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                num_range.extend(Self::teiler_py(&current_rows_as_range));
             }
             if !num_range.is_empty() {
                 for eins in joined.split(',') {
@@ -1237,11 +1255,12 @@ fn html_exact_header_attrs_py(
             }
         }
         if if_b_at_all {
+            let max_row_114 = self.hoechste_zeile_114_py(max_row);
             if num_range.is_empty() && !if_a_at_all && !param_lines.iter().any(|p| p == "all") {
-                num_range = (1..=max_row).collect();
+                num_range = (1..=max_row_114).collect();
             }
             let joined = mehrere.join(",");
-            num_range_yes_z.extend(Self::bereich_to_numbers2_py(&joined, true, max_row + 1, false));
+            num_range_yes_z.extend(Self::bereich_to_numbers2_py(&joined, true, max_row_114 + 1, false));
             if !num_range_yes_z.is_empty() {
                 num_range = num_range.intersection(&num_range_yes_z).copied().collect();
             }
@@ -1435,7 +1454,10 @@ fn html_exact_header_attrs_py(
         }
 
         let mut if_power_at_all = false;
-        mehrere.clear();
+        // Python intentionally reuses `mehrere` here instead of clearing it
+        // after the zaehlung block.  This means combined _n_ and _^_ filters
+        // feed both ranges into the power-base list.  Keep that quirk for
+        // stdout parity.
         for condition in param_lines {
             if condition.starts_with("_^_") && condition.len() > 3 {
                 if_power_at_all = true;
@@ -1490,9 +1512,10 @@ fn html_exact_header_attrs_py(
             num_range = Self::cutset_py(if_multiples_from_any_at_all, &num_range, &num_range_yes_z);
         }
 
+        let max_row_114 = self.hoechste_zeile_114_py(max_row);
         let current_rows: Vec<i64> = num_range.iter().copied().collect();
         for n in current_rows {
-            if !Self::moon_number_is_py(n) && n > max_row {
+            if !Self::moon_number_is_py(n) && n > max_row_114 {
                 num_range.remove(&n);
             }
         }
@@ -2371,6 +2394,32 @@ mod tests {
     fn bereich_to_numbers2_outer_vielfache_zero_max_stays_python_empty() {
         let values = Program::bereich_to_numbers2_py("2", true, 0, false);
         assert!(values.is_empty());
+    }
+
+    #[test]
+    fn filter_original_lines_uses_python_114_default_for_multiples() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.ifZeilenSetted = true;
+        let values = program.filter_original_lines_py(
+            std::collections::BTreeSet::new(),
+            &["_b_2".to_string()],
+            1024,
+        );
+        assert!(values.contains(&162));
+        assert!(!values.contains(&164));
+    }
+
+    #[test]
+    fn filter_original_lines_uses_raised_max_for_multiples_after_python_setter() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.ifZeilenSetted = true;
+        program.hoechsteZeile = 200;
+        let values = program.filter_original_lines_py(
+            std::collections::BTreeSet::new(),
+            &["_b_2".to_string()],
+            200,
+        );
+        assert!(values.contains(&200));
     }
 
 
