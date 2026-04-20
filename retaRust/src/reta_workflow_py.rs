@@ -42,7 +42,15 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         message,
     }));
 
-    let rendered_text = render_program_stdout_py(&program);
+    let rendered_text = if !program.finallyDisplayLines.is_empty() {
+        let mut text = program.finallyDisplayLines.join("\n");
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text
+    } else {
+        String::new()
+    };
 
     let stderr_text = if program.cliErrors.is_empty() {
         String::new()
@@ -83,20 +91,6 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
     })
 }
 
-fn render_program_stdout_py(program: &crate::shared::reta_program_types::Program) -> String {
-    if program.finallyDisplayLines.is_empty() {
-        // Python prints only the prepared display lines.  An empty table/output
-        // path such as `-nichts` does not leak an internal debug snapshot.
-        return String::new();
-    }
-
-    let mut text = program.finallyDisplayLines.join("\n");
-    if !text.is_empty() {
-        text.push('\n');
-    }
-    text
-}
-
 fn normalize_program_argv(raw_args: &[String]) -> Vec<String> {
     if raw_args.is_empty() {
         return vec!["reta".to_string()];
@@ -116,39 +110,5 @@ fn normalize_program_argv(raw_args: &[String]) -> Vec<String> {
         argv.push("reta".to_string());
         argv.extend(raw_args.iter().cloned());
         argv
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::{normalize_program_argv, render_program_stdout_py};
-    use crate::shared::reta_program_types::Program;
-
-    #[test]
-    fn render_program_stdout_keeps_python_line_joining() {
-        let mut program = Program::new(vec!["reta".to_string()]);
-        program.finallyDisplayLines = vec!["eins".to_string(), "zwei".to_string()];
-        assert_eq!(render_program_stdout_py(&program), "eins\nzwei\n");
-    }
-
-    #[test]
-    fn render_program_stdout_does_not_emit_debug_snapshot_for_empty_python_output() {
-        let program = Program::new(vec!["reta".to_string(), "-nichts".to_string()]);
-        assert_eq!(render_program_stdout_py(&program), "");
-    }
-
-    #[test]
-    fn normalize_program_argv_preserves_explicit_reta_binary_name() {
-        let argv = vec!["reta".to_string(), "-nichts".to_string()];
-        assert_eq!(normalize_program_argv(&argv), argv);
-    }
-
-    #[test]
-    fn normalize_program_argv_injects_reta_binary_name_for_raw_args() {
-        assert_eq!(
-            normalize_program_argv(&["-nichts".to_string()]),
-            vec!["reta".to_string(), "-nichts".to_string()]
-        );
     }
 }

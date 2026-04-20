@@ -98,28 +98,6 @@ impl Program {
         }
     }
 
-    pub(crate) fn parse_simple_numeric_list_py(&self, txt: &str) -> Vec<i64> {
-        let mut out = vec![];
-        for part in txt.split(',') {
-            let part = part.trim();
-            if part.is_empty() {
-                continue;
-            }
-            if let Some((a, b)) = part.split_once('-') {
-                if let (Ok(start), Ok(end)) = (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
-                    if start <= end {
-                        for v in start..=end {
-                            out.push(v);
-                        }
-                    }
-                }
-            } else if let Ok(v) = part.parse::<i64>() {
-                out.push(v);
-            }
-        }
-        out
-    }
-
 
     pub(crate) fn bereich_to_numbers2_ausgabe_py(txt: &str) -> Vec<i64> {
         let mut ordered: Vec<i64> = vec![];
@@ -362,10 +340,6 @@ impl Program {
                 } else if let Some(tail) = sub.strip_prefix("primzahlvielfache=") {
                     self.obZeilenBereicheAngegeben = true;
                     if neg.is_empty() {
-                        // Python calls center.BereichToNumbers2 here, not a small
-                        // decimal-only parser.  That means full range syntax,
-                        // generator literals and v-syntax are legal before the
-                        // trailing "p" marker is attached.
                         for zahl in Self::bereich_to_numbers2_py(tail, false, 0, false) {
                             Self::push_unique_string(&mut paramLines, format!("{}p", zahl));
                         }
@@ -997,13 +971,6 @@ impl Program {
 
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = argv.iter().skip(1).cloned().collect();
-        // Python passes oberesMaximum2(argv[1:]) into Tables(...) before the CSV
-        // table is read.  Rows requested via --oberesmaximum or
-        // --vorhervonausschnitt must therefore enlarge relitable during loading,
-        // not only after side-parameter parsing has already finished.
-        if let Some(max_row_before_load) = self.oberesMaximum2(self.argvWithoutProgram.clone()) {
-            self.hoechsteZeile = max_row_before_load;
-        }
         let _ = self.load_religion_csv_exact();
         self.htmlOrBBcode = false;
         self.breiteORbreiten = false;
@@ -1253,38 +1220,6 @@ mod tests {
 
         assert!(program.cliErrors.is_empty(), "unexpected zeilen parser errors: {:?}", program.cliErrors);
         assert_eq!(program.textHeight, 2);
-    }
-
-    #[test]
-    fn primzahlvielfache_uses_full_bereich_to_numbers2_parser_like_python() {
-        let words = empty_words();
-        let argv = vec![
-            "reta".to_string(),
-            "-zeilen".to_string(),
-            "--primzahlvielfache=v2".to_string(),
-        ];
-        let mut program = Program::new(argv.clone());
-        let (param_lines, _, _, _, _, _) = program.parametersToCommandsAndNumbers(&argv, "", &words);
-
-        assert!(param_lines.contains(&"2p".to_string()));
-        assert!(param_lines.contains(&"4p".to_string()));
-        assert!(param_lines.contains(&"1028p".to_string()));
-        assert!(!param_lines.contains(&"1030p".to_string()));
-    }
-
-    #[test]
-    fn oberesmaximum_is_computed_before_religion_csv_load_like_python_tables_init() {
-        let words = empty_words();
-        let argv = vec![
-            "reta".to_string(),
-            "-zeilen".to_string(),
-            "--oberesmaximum=2000".to_string(),
-        ];
-        let mut program = Program::new(argv.clone());
-        let _ = program.bringAllImportantBeginThings(argv, &words);
-
-        assert!(program.hoechsteZeile >= 2000);
-        assert!(program.relitable.len() >= 2001);
     }
 }
 

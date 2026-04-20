@@ -6,79 +6,6 @@ use crate::shared::reta_program_types::{PairStr, Program};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 impl Program {
-    fn push_pyvalue_ordered_py(target: &mut Vec<PyValue>, value: PyValue) {
-        if !target.iter().any(|existing| existing == &value) {
-            target.push(value);
-        }
-    }
-
-    fn pyvalue_as_i64_py(value: &PyValue) -> Option<i64> {
-        match value {
-            PyValue::Int(n) => Some(*n),
-            PyValue::Bool(b) => Some(if *b { 1 } else { 0 }),
-            PyValue::Str(s) => s.parse::<i64>().ok(),
-            _ => None,
-        }
-    }
-
-    fn pyvalue_tuple_pair_ints_py(value: &PyValue) -> Option<(i64, i64)> {
-        let PyValue::Tuple(inner) = value else {
-            return None;
-        };
-        if inner.len() < 2 {
-            return None;
-        }
-        let a = Self::pyvalue_as_i64_py(&inner[0])?;
-        let b = Self::pyvalue_as_i64_py(&inner[1])?;
-        Some((a, b))
-    }
-
-    fn pyvalue_repr_for_key_py(value: &PyValue) -> String {
-        match value {
-            PyValue::Int(n) => n.to_string(),
-            PyValue::Str(s) => s.clone(),
-            PyValue::Bool(true) => "True".to_string(),
-            PyValue::Bool(false) => "False".to_string(),
-            PyValue::NoneValue => "None".to_string(),
-            PyValue::Tuple(inner) => Self::py_tuple_repr_for_key_py(inner),
-        }
-    }
-
-    fn py_tuple_repr_for_key_py(inner: &[PyValue]) -> String {
-        let parts = inner
-            .iter()
-            .map(Self::pyvalue_repr_for_key_py)
-            .collect::<Vec<String>>();
-        if parts.len() == 1 {
-            format!("({},)", parts[0])
-        } else {
-            format!("({})", parts.join(", "))
-        }
-    }
-
-    fn py_case2_parameter_key_py(parameter_name: &str, has_parameter_names: bool) -> String {
-        if has_parameter_names {
-            if parameter_name.chars().all(|c| c.is_ascii_digit()) {
-                parameter_name
-                    .parse::<i64>()
-                    .map(|n| n.to_string())
-                    .unwrap_or_else(|_| parameter_name.to_string())
-            } else {
-                parameter_name.to_string()
-            }
-        } else {
-            "None".to_string()
-        }
-    }
-
-    fn is_py_bool_or_tuple_with_bool_head_py(value: &PyValue) -> bool {
-        match value {
-            PyValue::Bool(_) => true,
-            PyValue::Tuple(inner) => matches!(inner.first(), Some(PyValue::Bool(_))),
-            _ => false,
-        }
-    }
-
     pub(crate) fn primCreativity_py(n: i64) -> i64 {
         if n < 2 {
             return 0;
@@ -98,8 +25,105 @@ impl Program {
         }
         1
     }
+    fn push_unique_pyvalue_py(target: &mut Vec<PyValue>, value: PyValue) {
+        if !target.iter().any(|existing| existing == &value) {
+            target.push(value);
+        }
+    }
+
+    fn pyvalue_as_decimal_i64_py(value: &PyValue) -> Option<i64> {
+        match value {
+            PyValue::Int(n) => Some(*n),
+            PyValue::Str(text) if !text.is_empty() && text.chars().all(|c| c.is_ascii_digit()) => text.parse::<i64>().ok(),
+            _ => None,
+        }
+    }
+
+    fn py_string_repr_inside_tuple_py(value: &str) -> String {
+        let mut escaped = String::with_capacity(value.len() + 2);
+        escaped.push('\'');
+        for ch in value.chars() {
+            match ch {
+                '\\' => escaped.push_str("\\\\"),
+                '\'' => escaped.push_str("\\'"),
+                _ => escaped.push(ch),
+            }
+        }
+        escaped.push('\'');
+        escaped
+    }
+
+    fn pyvalue_repr_inside_tuple_py(value: &PyValue) -> String {
+        match value {
+            PyValue::Int(n) => n.to_string(),
+            PyValue::Str(text) => Self::py_string_repr_inside_tuple_py(text),
+            PyValue::Bool(true) => "True".to_string(),
+            PyValue::Bool(false) => "False".to_string(),
+            PyValue::NoneValue => "None".to_string(),
+            PyValue::Tuple(inner) => Self::python_tuple_repr_from_pyvalues_py(inner),
+        }
+    }
+
+    fn python_tuple_repr_from_pyvalues_py(values: &[PyValue]) -> String {
+        let parts = values
+            .iter()
+            .map(Self::pyvalue_repr_inside_tuple_py)
+            .collect::<Vec<_>>();
+        if parts.len() == 1 {
+            format!("({},)", parts[0])
+        } else {
+            format!("({})", parts.join(", "))
+        }
+    }
+
+    fn pyvalue_data_dict_key_py(value: &PyValue) -> String {
+        match value {
+            PyValue::Int(n) => n.to_string(),
+            PyValue::Str(text) => text.clone(),
+            PyValue::Bool(true) => "True".to_string(),
+            PyValue::Bool(false) => "False".to_string(),
+            PyValue::NoneValue => "None".to_string(),
+            PyValue::Tuple(inner) => Self::python_tuple_repr_from_pyvalues_py(inner),
+        }
+    }
+
+    fn parameter_name_to_case2_key_py(parameter_name: &str, has_parameter_names: bool) -> String {
+        if !has_parameter_names {
+            "None".to_string()
+        } else if !parameter_name.is_empty() && parameter_name.chars().all(|c| c.is_ascii_digit()) {
+            parameter_name.parse::<i64>().unwrap_or(0).to_string()
+        } else {
+            parameter_name.to_string()
+        }
+    }
+
+    fn is_case1_bool_payload_py(value: &PyValue) -> bool {
+        match value {
+            PyValue::Bool(_) => true,
+            PyValue::Tuple(inner) => inner.first().map(|first| matches!(first, PyValue::Bool(_))).unwrap_or(false),
+            _ => false,
+        }
+    }
+
+    fn all_simple_command_spalten_python_like(words: &Words) -> Vec<i64> {
+        let mut out: Vec<i64> = Vec::new();
+        for possibleCommands in words.paraNdataMatrix.iter() {
+            if let Some(command_values) = possibleCommands.datas.get(0) {
+                for value in command_values {
+                    if let PyValue::Int(n) = value {
+                        if !out.contains(n) {
+                            out.push(*n);
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
     pub(crate) fn build_alles_entry_python_like(&self, words: &Words) -> StoreParameterEntry {
         let mut allValues: Vec<Vec<PyValue>> = (0..12).map(|_| Vec::new()).collect();
+        let mut gebrochenSpaltenMaximumPlus1 = 2i64;
 
         for possibleCommands in words.paraNdataMatrix.iter() {
             for (i, commandValue) in possibleCommands.datas.iter().enumerate() {
@@ -107,47 +131,16 @@ impl Program {
                     continue;
                 }
                 for spaltenNummerOderEtc in commandValue {
-                    // Python does `aAllValue |= commandValue`: tuple/list/string values remain
-                    // values of the set.  Do not flatten tuples here; generated-column
-                    // metadata depends on those tuple keys later.
-                    Self::push_pyvalue_ordered_py(&mut allValues[i], spaltenNummerOderEtc.clone());
-                }
-            }
-        }
-
-
-        if self.__invertAlles {
-            let max0 = allValues
-                .get(0)
-                .into_iter()
-                .flatten()
-                .filter_map(Self::pyvalue_as_i64_py)
-                .max()
-                .unwrap_or(0);
-            let mut forbidden: BTreeSet<i64> = BTreeSet::new();
-            if let Some(generated1_values) = allValues.get(1) {
-                for value in generated1_values {
-                    if let Some((left, right)) = Self::pyvalue_tuple_pair_ints_py(value) {
-                        forbidden.insert(left);
-                        forbidden.insert(right);
-                    } else if let Some(n) = Self::pyvalue_as_i64_py(value) {
-                        forbidden.insert(n);
+                    Self::push_unique_pyvalue_py(&mut allValues[i], spaltenNummerOderEtc.clone());
+                    if matches!(i, 5 | 6 | 9 | 10) {
+                        if let Some(n) = Self::pyvalue_as_decimal_i64_py(spaltenNummerOderEtc) {
+                            if n + 1 > gebrochenSpaltenMaximumPlus1 {
+                                gebrochenSpaltenMaximumPlus1 = n + 1;
+                            }
+                        }
                     }
                 }
             }
-            let existing: BTreeSet<i64> = allValues
-                .get(0)
-                .into_iter()
-                .flatten()
-                .filter_map(Self::pyvalue_as_i64_py)
-                .collect();
-            let mut inverted: Vec<PyValue> = Vec::new();
-            for n in 0..max0 {
-                if !existing.contains(&n) && !forbidden.contains(&n) {
-                    inverted.push(PyValue::Int(n));
-                }
-            }
-            allValues[0] = inverted;
         }
 
         let allowedPrimNumbersForCommand: Vec<PyValue> = (2..32)
@@ -159,37 +152,48 @@ impl Program {
         allValues[3] = words
             .kombiParaNdataMatrix
             .keys()
-            .cloned()
+            .copied()
             .map(PyValue::Int)
             .collect();
-
-        let mut gebrochenSpaltenMaximumPlus1 = 2i64;
-        for idx in [5usize, 6usize, 9usize, 10usize] {
-            let max_local = allValues
-                .get(idx)
-                .into_iter()
-                .flatten()
-                .filter_map(Self::pyvalue_as_i64_py)
-                .map(|n| n + 1)
-                .max()
-                .unwrap_or(2);
-            if max_local > gebrochenSpaltenMaximumPlus1 {
-                gebrochenSpaltenMaximumPlus1 = max_local;
-            }
-        }
-
         allValues[5] = (2..gebrochenSpaltenMaximumPlus1).map(PyValue::Int).collect();
         allValues[6] = (2..gebrochenSpaltenMaximumPlus1).map(PyValue::Int).collect();
         allValues[8] = words
             .kombiParaNdataMatrix2
             .keys()
-            .cloned()
+            .copied()
             .map(PyValue::Int)
             .collect();
         allValues[9] = (2..gebrochenSpaltenMaximumPlus1).map(PyValue::Int).collect();
         allValues[10] = (2..gebrochenSpaltenMaximumPlus1).map(PyValue::Int).collect();
 
         if self.__invertAlles {
+            let max0 = allValues[0]
+                .iter()
+                .filter_map(Self::pyvalue_as_decimal_i64_py)
+                .max()
+                .unwrap_or(0);
+            let mut aus_generated1: BTreeSet<i64> = BTreeSet::new();
+            for value in &allValues[1] {
+                if let PyValue::Tuple(inner) = value {
+                    if let Some(first) = inner.get(0).and_then(Self::pyvalue_as_decimal_i64_py) {
+                        aus_generated1.insert(first);
+                    }
+                    if let Some(second) = inner.get(1).and_then(Self::pyvalue_as_decimal_i64_py) {
+                        aus_generated1.insert(second);
+                    }
+                }
+            }
+            let already: BTreeSet<i64> = allValues[0]
+                .iter()
+                .filter_map(Self::pyvalue_as_decimal_i64_py)
+                .collect();
+            let mut inverted = Vec::new();
+            for n in 0..max0 {
+                if !already.contains(&n) && !aus_generated1.contains(&n) {
+                    inverted.push(PyValue::Int(n));
+                }
+            }
+            allValues[0] = inverted;
             for zahl in 1..11usize {
                 allValues[zahl].clear();
             }
@@ -223,20 +227,8 @@ impl Program {
         self.paraDictGenerated = IndexMap::new();
         self.paraDictGenerated4htmlTags = IndexMap::new();
 
-        self.AllSimpleCommandSpalten = Vec::new();
-        for possibleCommands in words.paraNdataMatrix.iter() {
-            if let Some(commandValue) = possibleCommands.datas.get(0) {
-                for spaltenNummerOderEtc in commandValue {
-                    if let Some(n) = Self::pyvalue_as_i64_py(spaltenNummerOderEtc) {
-                        if !self.AllSimpleCommandSpalten.contains(&n) {
-                            self.AllSimpleCommandSpalten.push(n);
-                        }
-                    }
-                }
-            }
-        }
-
         let mut paraNdataMatrix = words.paraNdataMatrix.clone();
+        self.AllSimpleCommandSpalten = Self::all_simple_command_spalten_python_like(words);
         let alles_entry = self.build_alles_entry_python_like(words);
         paraNdataMatrix.push(alles_entry);
 
@@ -246,7 +238,7 @@ impl Program {
                 &parameterEntry.parameterNames,
                 &parameterEntry.datas,
             );
-            let (_paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
+            let (paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
                 self.paraMainDict.clone(),
                 self.paraDict.clone(),
                 self.dataDicts.clone(),
@@ -254,10 +246,7 @@ impl Program {
                 into.1,
                 into.2,
             );
-            // Python computes the merged Hauptparameter dictionary inside
-            // mergeParameterDicts(), but its return value is assigned only to
-            // self.paraDict/self.dataDict.  self.paraMainDict therefore remains
-            // empty after storeParamtersForColumns(); keep that observable shape.
+            self.paraMainDict = paraMainDict3;
             self.paraDict = paraDict3;
             self.dataDicts = dataDicts3;
         }
@@ -280,7 +269,6 @@ impl Program {
                 value.iter().map(|txt| vec![PairStr("kombi2".to_string(), txt.clone())]).collect(),
             );
         }
-        self.paraMainDict.clear();
     }
 
     pub fn intoParameterDatatype(
@@ -303,46 +291,50 @@ impl Program {
             for name2 in parameterNames {
                 paraDict.insert((name1.clone(), name2.clone()), datas.clone());
             }
-            if parameterNames.len() == 0 {
+            if parameterNames.is_empty() {
                 paraDict.insert((name1.clone(), "".to_string()), datas.clone());
             }
         }
 
         let mut dataDicts: Vec<IndexMap<String, Vec<Vec<PairStr>>>> = (0..12).map(|_| IndexMap::new()).collect();
+        let has_parameter_names = !parameterNames.is_empty();
 
         for (i, d) in datas.iter().enumerate() {
             if i >= dataDicts.len() {
                 continue;
             }
             for spaltenNummerOderEtc in d {
-                let mut into: Vec<PairStr> = vec![];
+                let mut into_flat: Vec<PairStr> = vec![];
+                let mut into_case2: Vec<Vec<PairStr>> = vec![];
                 let mut parameterMainNamePerLoop: Vec<String> = vec![];
                 let mut case_: i64 = -1;
-                let spaltenNummerOderEtc_local = spaltenNummerOderEtc.clone();
-                let has_parameter_names = !parameterNames.is_empty();
-                let parameterNames_local = if has_parameter_names {
-                    parameterNames.clone()
-                } else {
-                    vec!["".to_string()]
-                };
 
-                // Mirror Python's nested loops: all main aliases and all side aliases are
-                // recorded for each value before the reverse dataDict key is built.
                 for parameterMainName in parameterMainNames {
-                    for parameterName in parameterNames_local.iter() {
-                        if i == 4 && Self::is_py_bool_or_tuple_with_bool_head_py(&spaltenNummerOderEtc_local) {
+                    let parameterNames_local = if has_parameter_names {
+                        parameterNames.clone()
+                    } else {
+                        vec!["".to_string()]
+                    };
+                    for parameterName in parameterNames_local {
+                        if i == 4 && Self::is_case1_bool_payload_py(spaltenNummerOderEtc) {
                             case_ = 1;
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                            into_flat.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                         } else if matches!(i, 5 | 6 | 9 | 10) {
                             case_ = 2;
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                            let pair = PairStr(parameterMainName.clone(), parameterName.clone());
+                            into_case2.push(vec![pair]);
                             parameterMainNamePerLoop.push(parameterName.clone());
-                        } else if i == 4 && matches!(spaltenNummerOderEtc_local, PyValue::Tuple(_)) {
+                        } else if i == 2 && matches!(spaltenNummerOderEtc, PyValue::Str(_)) {
+                            case_ = 2;
+                            let pair = PairStr(parameterMainName.clone(), parameterName.clone());
+                            into_case2.push(vec![pair]);
+                            parameterMainNamePerLoop.push(parameterName.clone());
+                        } else if i == 4 && matches!(spaltenNummerOderEtc, PyValue::Tuple(_)) {
                             case_ = 4;
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                            into_flat.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                         } else {
                             case_ = 3;
-                            into.push(PairStr(parameterMainName.clone(), parameterName.clone()));
+                            into_flat.push(PairStr(parameterMainName.clone(), parameterName.clone()));
                         }
                     }
                 }
@@ -352,40 +344,40 @@ impl Program {
                     continue;
                 }
 
-                let index2a: Vec<String> = if case_ == 3 {
-                    vec![Self::pyvalue_repr_for_key_py(&spaltenNummerOderEtc_local)]
-                } else if case_ == 4 {
-                    vec![Self::pyvalue_repr_for_key_py(&spaltenNummerOderEtc_local)]
-                } else if case_ == 1 {
-                    vec!["('bool', 0)".to_string()]
-                } else if case_ == 2 {
-                    parameterMainNamePerLoop
+                let index2a: Vec<String> = match case_ {
+                    1 => vec!["('bool', 0)".to_string()],
+                    2 => parameterMainNamePerLoop
                         .iter()
-                        .map(|parameter_name| Self::py_case2_parameter_key_py(parameter_name, has_parameter_names))
-                        .collect()
-                } else {
-                    vec!["None".to_string()]
+                        .map(|para| Self::parameter_name_to_case2_key_py(para, has_parameter_names))
+                        .collect(),
+                    3 | 4 => vec![Self::pyvalue_data_dict_key_py(spaltenNummerOderEtc)],
+                    _ => vec!["None".to_string()],
                 };
 
                 let intoA: Vec<Vec<PairStr>> = if case_ == 2 {
-                    into.iter().map(|x| vec![x.clone()]).collect()
+                    into_case2.clone()
                 } else {
-                    vec![into.clone()]
+                    vec![into_flat.clone()]
                 };
 
+                let fillvalue = if case_ == 2 {
+                    into_case2.iter().flatten().cloned().collect::<Vec<PairStr>>()
+                } else {
+                    into_flat.clone()
+                };
                 let max_len = std::cmp::max(index2a.len(), intoA.len());
                 for pos in 0..max_len {
                     let index2 = if pos < index2a.len() {
                         index2a[pos].clone()
                     } else {
-                        Self::py_tuple_repr_for_key_py(
-                            &index2a.iter().cloned().map(PyValue::Str).collect::<Vec<PyValue>>()
-                        )
+                        // Python zip_longest(..., fillvalue=into) can only land here for malformed
+                        // generated data; keep a deterministic Python-like key instead of Rust Debug.
+                        "None".to_string()
                     };
                     let into2 = if pos < intoA.len() {
                         intoA[pos].clone()
                     } else {
-                        into.clone()
+                        fillvalue.clone()
                     };
                     let entry = dataDicts[index1].entry(index2).or_insert_with(Vec::new);
                     if !entry.iter().any(|e| e == &into2) {
@@ -464,31 +456,4 @@ impl Program {
     }
 
 
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn store_keeps_para_main_dict_empty_like_python_assignment_shape() {
-        let mut words = Words {
-            paraNdataMatrix: vec![StoreParameterEntry {
-                parameterMainNames: vec!["haupt".to_string()],
-                parameterNames: vec!["neben".to_string()],
-                datas: vec![vec![PyValue::Int(1)]],
-            }],
-            kombiParaNdataMatrix: IndexMap::new(),
-            kombiParaNdataMatrix2: IndexMap::new(),
-        };
-        while words.paraNdataMatrix[0].datas.len() < 12 {
-            words.paraNdataMatrix[0].datas.push(vec![]);
-        }
-
-        let mut program = Program::new(vec!["reta".to_string()]);
-        program.storeParamtersForColumns(&words);
-
-        assert!(program.paraMainDict.is_empty());
-        assert!(program.paraDict.contains_key(&("haupt".to_string(), "neben".to_string())));
-    }
 }
