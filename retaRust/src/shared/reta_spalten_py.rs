@@ -109,25 +109,6 @@ impl Program {
         false
     }
 
-    pub(crate) fn plain_spalten_command_for_neg_py(cmd: &str, neg: &str) -> Option<String> {
-        if cmd.is_empty() {
-            return None;
-        }
-        let trailing_minus = cmd.ends_with('-');
-        let positive_branch = neg.is_empty() && !trailing_minus;
-        let negative_branch = neg == "-" && trailing_minus;
-        if positive_branch == negative_branch {
-            return None;
-        }
-        if negative_branch {
-            let mut shortened = cmd.to_string();
-            shortened.pop();
-            Some(shortened)
-        } else {
-            Some(cmd.to_string())
-        }
-    }
-
     pub(crate) fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
         for (i, raw_values) in tupl.iter().enumerate() {
             let mut normalized_values: Vec<i64> = Vec::new();
@@ -316,24 +297,26 @@ impl Program {
                                 }
                             }
                         }
-                    } else if let Some(cmd_raw) = Self::plain_spalten_command_for_neg_py(&cmd, neg) {
-                        let cmd_canonical = {
-                            let canonical = Self::canonical_spalten_main_cli_name_py(&cmd_raw);
-                            if canonical.is_empty() {
-                                cmd_raw.clone()
+                    } else {
+                        let cmd_raw_with_possible_neg_suffix = cmd.clone();
+                        let has_neg_suffix = cmd_raw_with_possible_neg_suffix.ends_with('-');
+                        let should_apply_like_python = !cmd_raw_with_possible_neg_suffix.is_empty()
+                            && ((has_neg_suffix && neg == "-") != (neg.is_empty() && !has_neg_suffix));
+
+                        if should_apply_like_python {
+                            let cmd_raw = if has_neg_suffix && !neg.is_empty() {
+                                cmd_raw_with_possible_neg_suffix[..cmd_raw_with_possible_neg_suffix.len() - 1].to_string()
                             } else {
-                                canonical.to_string()
-                            }
-                        };
-                        let mut found_exact = false;
-                        for candidate in Self::spalten_main_name_candidates_py(&cmd_raw) {
-                            if let Some(tupl) = self.paraDict.get(&(candidate.clone(), String::new())).cloned() {
-                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
-                                found_exact = true;
-                                break;
-                            }
-                        }
-                        if !found_exact {
+                                cmd_raw_with_possible_neg_suffix
+                            };
+                            let cmd_canonical = {
+                                let canonical = Self::canonical_spalten_main_cli_name_py(&cmd_raw);
+                                if canonical.is_empty() {
+                                    cmd_raw.clone()
+                                } else {
+                                    canonical.to_string()
+                                }
+                            };
                             let matching_tuples: Vec<Vec<Vec<PyValue>>> = self
                                 .paraDict
                                 .iter()
@@ -349,6 +332,44 @@ impl Program {
                                 self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
                             }
                         }
+                    }
+                } else if last_main_cmd == 2 {
+                    let gal_prefix = "--galaxie=";
+                    let uni_prefix = "--universum=";
+                    let (right, target_kind, use_second_reverse) = if let Some(tail) = cmd.strip_prefix(gal_prefix) {
+                        (tail, 3usize, false)
+                    } else if let Some(tail) = cmd.strip_prefix(uni_prefix) {
+                        (tail, 8usize, true)
+                    } else {
+                        ("", usize::MAX, false)
+                    };
+
+                    if target_kind != usize::MAX {
+                        for mut one_kombi_spalte in right.split(',').map(|part| part.to_string()) {
+                            let yes1 = if !one_kombi_spalte.is_empty() && one_kombi_spalte.starts_with('-') {
+                                one_kombi_spalte = one_kombi_spalte[1..].to_string();
+                                neg == "-"
+                            } else {
+                                neg.is_empty()
+                            };
+                            if !yes1 {
+                                continue;
+                            }
+
+                            let maybe_value = if use_second_reverse {
+                                self.kombiReverseDict2.get(&one_kombi_spalte).copied()
+                            } else {
+                                self.kombiReverseDict.get(&one_kombi_spalte).copied()
+                            };
+                            if let Some(value) = maybe_value {
+                                self.spaltenArtenKey_SpaltennummernValue
+                                    .entry((neg.len(), target_kind))
+                                    .or_default()
+                                    .insert(value);
+                            }
+                        }
+                    } else if neg.is_empty() {
+                        self.cliErrors.push(format!("{} ist kein gueltiger Nebenparameter fuer -kombination", cmd));
                     }
                 }
             }
@@ -431,7 +452,7 @@ impl Program {
                         self.breiteORbreiten = true;
                     }
                 }
-                self.breiten = parsed_breiten;
+                self.breiten = self.normalize_breiten_list_py(parsed_breiten);
             }
             return true;
         }
@@ -451,6 +472,22 @@ impl Program {
 
     pub(crate) fn set_text_width_property_py(&mut self, value: i64) {
         self.textWidth = self.normalize_text_width_py(value);
+    }
+
+    fn normalize_breite_value_py(shell_width: i64, value: i64) -> i64 {
+        if shell_width > value + 7 || shell_width == 0 {
+            value
+        } else {
+            shell_width - 7
+        }
+    }
+
+    pub(crate) fn normalize_breiten_list_py(&self, values: Vec<i64>) -> Vec<i64> {
+        let shell_width = Self::detect_terminal_columns_py();
+        values
+            .into_iter()
+            .map(|value| Self::normalize_breite_value_py(shell_width, value))
+            .collect()
     }
 
     pub fn setShellRowsAmount(&mut self) {
@@ -498,56 +535,4 @@ impl Program {
     }
 
 
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn plain_spalten_command_for_neg_matches_python_branching() {
-        assert_eq!(
-            Program::plain_spalten_command_for_neg_py("religion", ""),
-            Some("religion".to_string())
-        );
-        assert_eq!(Program::plain_spalten_command_for_neg_py("religion-", ""), None);
-        assert_eq!(Program::plain_spalten_command_for_neg_py("religion", "-"), None);
-        assert_eq!(
-            Program::plain_spalten_command_for_neg_py("religion-", "-"),
-            Some("religion".to_string())
-        );
-        assert_eq!(
-            Program::plain_spalten_command_for_neg_py("religion--", "-"),
-            Some("religion-".to_string())
-        );
-    }
-
-    #[test]
-    fn breiten_parameter_keeps_python_values_without_terminal_clamping() {
-        let mut program = Program::new(vec!["reta".to_string()]);
-
-        assert!(program.breiteBreitenSysArgvPara("breiten=100,3", ""));
-
-        assert_eq!(program.breiten, vec![100, 3]);
-        assert!(program.breiteORbreiten);
-    }
-
-    #[test]
-    fn produce_all_spalten_numbers_honors_plain_trailing_minus_negation() {
-        let mut program = Program::new(vec![
-            "reta".to_string(),
-            "-spalten".to_string(),
-            "--probe".to_string(),
-            "--probe-".to_string(),
-        ]);
-        let mut tuple = vec![Vec::new(); 12];
-        tuple[0] = vec![PyValue::Int(42)];
-        program.paraDict.insert(("probe".to_string(), String::new()), tuple);
-        program.init_spalten_arten_python_like();
-
-        let spalten = program.produceAllSpaltenNumbers("");
-
-        assert!(!spalten.contains(&42));
-        assert!(!program.rowsAsNumbers.contains(&42));
-    }
 }

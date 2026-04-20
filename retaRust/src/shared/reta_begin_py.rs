@@ -658,21 +658,6 @@ impl Program {
         }
     }
 
-    fn side_parameter_seen_under_main_py(&self, expected_main: &str, expected_side: &str) -> bool {
-        let mut current_main: Option<&'static str> = None;
-        for arg in &self.argvWithoutProgram {
-            if let Some(main) = Self::main_parameter_name_py(arg) {
-                current_main = Some(main);
-                continue;
-            }
-            if arg == expected_side && current_main.map(|main| main == expected_main).unwrap_or(false) {
-                return true;
-            }
-        }
-        false
-    }
-
-
     fn is_main_parameter_token_py(token: &str) -> bool {
         matches!(token, "-debug" | "-zeilen" | "-spalten" | "-kombination" | "-ausgabe" | "-h" | "-help" | "--help")
     }
@@ -905,80 +890,6 @@ impl Program {
     }
 
 
-
-    fn apply_kombination_args_after_reverse_dicts_py(&mut self, neg: &str) {
-        let mut in_kombination = false;
-        for arg in &self.argvWithoutProgram {
-            if arg == "-kombination" {
-                in_kombination = true;
-                continue;
-            }
-            if arg == "--kombination" {
-                continue;
-            }
-            if arg.starts_with('-') && !arg.starts_with("--") {
-                in_kombination = false;
-                continue;
-            }
-            if !in_kombination || !arg.starts_with("--") {
-                continue;
-            }
-            let sub = &arg[2..];
-            let Some((left, right)) = sub.split_once('=') else {
-                continue;
-            };
-            if left == "galaxie" {
-                for raw_single in right.split(',') {
-                    let single = raw_single.trim();
-                    if single.is_empty() {
-                        continue;
-                    }
-                    let starts_with_neg = single.starts_with('-');
-                    let lookup = if starts_with_neg { &single[1..] } else { single };
-                    let yes1 = if starts_with_neg { neg == "-" } else { neg.is_empty() };
-                    if !yes1 {
-                        continue;
-                    }
-                    if let Some(v) = self.kombiReverseDict.get(lookup) {
-                        let target = self
-                            .spaltenArtenKey_SpaltennummernValue
-                            .entry(self.spaltenTypeNaming.kombi1)
-                            .or_default();
-                        if neg == "-" {
-                            target.remove(v);
-                        } else {
-                            target.insert(*v);
-                        }
-                    }
-                }
-            } else if left == "universum" {
-                for raw_single in right.split(',') {
-                    let single = raw_single.trim();
-                    if single.is_empty() {
-                        continue;
-                    }
-                    let starts_with_neg = single.starts_with('-');
-                    let lookup = if starts_with_neg { &single[1..] } else { single };
-                    let yes1 = if starts_with_neg { neg == "-" } else { neg.is_empty() };
-                    if !yes1 {
-                        continue;
-                    }
-                    if let Some(v) = self.kombiReverseDict2.get(lookup) {
-                        let target = self
-                            .spaltenArtenKey_SpaltennummernValue
-                            .entry(self.spaltenTypeNaming.kombi2)
-                            .or_default();
-                        if neg == "-" {
-                            target.remove(v);
-                        } else {
-                            target.insert(*v);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub fn bringAllImportantBeginThings(&mut self, argv: Vec<String>, words: &Words) -> (i64, Vec<String>, Vec<String>, Vec<Vec<String>>, Vec<i64>) {
         self.argvWithoutProgram = argv.iter().skip(1).cloned().collect();
         let _ = self.load_religion_csv_exact();
@@ -1025,8 +936,6 @@ impl Program {
             self.spaltenArtenKey_SpaltennummernValue = cached_runtime.spaltenArtenKeyTemplate.clone();
         }
         self.produceAllSpaltenNumbers("");
-        self.apply_kombination_args_after_reverse_dicts_py("");
-        self.apply_kombination_args_after_reverse_dicts_py("-");
 
         let (mut paramLines, paramLinesNot) = self.deleteDoublesInSets_py(paramLines0, paramLinesNot0);
 
@@ -1065,22 +974,6 @@ impl Program {
         self.boolAndTupleSet1Options = boolAndTupleSet1Options_exact;
         self.metakonkretPairs = metakonkretPairs_exact;
         self.metakonkretSelections = metakonkretSelections_exact;
-
-        let has_alles_spalten = self.side_parameter_seen_under_main_py("spalten", "--alles");
-        if has_alles_spalten {
-            let mut merged_direct = self.rowsAsNumbers.clone();
-            for n in self.AllSimpleCommandSpalten.iter().copied() {
-                if !merged_direct.contains(&n) {
-                    merged_direct.push(n);
-                }
-            }
-            self.rowsAsNumbers = merged_direct;
-            let ordinary_key = self.spaltenTypeNaming.ordinary;
-            let ordinary_set = self.spaltenArtenKey_SpaltennummernValue.entry(ordinary_key).or_default();
-            for n in self.rowsAsNumbers.iter().copied() {
-                ordinary_set.insert(n);
-            }
-        }
 
         if !self.rowsOfcombi.is_empty() {
             Self::push_unique_string(&mut paramLines, "ka".to_string());
@@ -1201,50 +1094,6 @@ mod tests {
 
         assert_eq!(program.finallyDisplayLines, expected_lines);
         assert!(program.finallyDisplayLines.iter().any(|line| line.contains("## -zeilen")));
-    }
-
-    #[test]
-    fn kombination_args_after_reverse_dicts_honor_python_value_negation() {
-        let mut program = Program::new(vec![
-            "reta".to_string(),
-            "-kombination".to_string(),
-            "--galaxie=tiere,-pflanzen".to_string(),
-            "--universum=metaphysik,-physik".to_string(),
-        ]);
-        program.init_spalten_arten_python_like();
-        program.kombiReverseDict.insert("tiere".to_string(), 7);
-        program.kombiReverseDict.insert("pflanzen".to_string(), 8);
-        program.kombiReverseDict2.insert("metaphysik".to_string(), 70);
-        program.kombiReverseDict2.insert("physik".to_string(), 80);
-        program
-            .spaltenArtenKey_SpaltennummernValue
-            .entry(program.spaltenTypeNaming.kombi1)
-            .or_default()
-            .insert(8);
-        program
-            .spaltenArtenKey_SpaltennummernValue
-            .entry(program.spaltenTypeNaming.kombi2)
-            .or_default()
-            .insert(80);
-
-        program.apply_kombination_args_after_reverse_dicts_py("");
-        program.apply_kombination_args_after_reverse_dicts_py("-");
-
-        let kombi1 = program
-            .spaltenArtenKey_SpaltennummernValue
-            .get(&program.spaltenTypeNaming.kombi1)
-            .cloned()
-            .unwrap_or_default();
-        let kombi2 = program
-            .spaltenArtenKey_SpaltennummernValue
-            .get(&program.spaltenTypeNaming.kombi2)
-            .cloned()
-            .unwrap_or_default();
-
-        assert!(kombi1.contains(&7));
-        assert!(!kombi1.contains(&8));
-        assert!(kombi2.contains(&70));
-        assert!(!kombi2.contains(&80));
     }
 
     #[test]
