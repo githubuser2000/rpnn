@@ -323,7 +323,6 @@ impl OutputSyntax {
 
     pub fn beginZeile(&self) -> &'static str {
         match self.kind {
-            OutputSyntaxKind::Markdown | OutputSyntaxKind::Emacs => "|",
             OutputSyntaxKind::BbCode => "[tr]",
             _ => "",
         }
@@ -564,16 +563,34 @@ impl htmlSyntax {
 impl csvSyntax {
     pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { String::new() }
     pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { String::new() }
+    pub fn beginTable(&self) -> &'static str { "" }
+    pub fn endTable(&self) -> &'static str { "" }
+    pub fn beginCell(&self) -> &'static str { "" }
+    pub fn endCell(&self) -> &'static str { "" }
+    pub fn beginZeile(&self) -> &'static str { "" }
+    pub fn endZeile(&self) -> &'static str { "" }
 }
 
 impl markdownSyntax {
-    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { "|".to_string() }
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { String::new() }
     pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { "|".to_string() }
+    pub fn beginTable(&self) -> &'static str { "" }
+    pub fn endTable(&self) -> &'static str { "" }
+    pub fn beginCell(&self) -> &'static str { "|" }
+    pub fn endCell(&self) -> &'static str { "" }
+    pub fn beginZeile(&self) -> &'static str { "" }
+    pub fn endZeile(&self) -> &'static str { "|" }
 }
 
 impl emacsSyntax {
-    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { "|".to_string() }
+    pub fn coloredBeginCol<T: ToString>(&self, _num: T, _rest: bool) -> String { String::new() }
     pub fn generateCell<T>(&self, _num: i64, _dataDict: &T, _content: Option<&str>, _zeile: Option<&str>) -> String { "|".to_string() }
+    pub fn beginTable(&self) -> &'static str { "" }
+    pub fn endTable(&self) -> &'static str { "" }
+    pub fn beginCell(&self) -> &'static str { "|" }
+    pub fn endCell(&self) -> &'static str { "" }
+    pub fn beginZeile(&self) -> &'static str { "" }
+    pub fn endZeile(&self) -> &'static str { "|" }
 }
 
 impl From<NichtsSyntax> for OutputSyntax {
@@ -644,6 +661,27 @@ mod syntax_tests {
             bbcode.generateCell(1, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None),
             "[td=\"\"]"
         );
+    }
+
+    #[test]
+    fn markdown_and_emacs_syntax_match_python_boundaries() {
+        let markdown = markdownSyntax::default();
+        let emacs = emacsSyntax::default();
+        let facade_markdown = OutputSyntax::markdown();
+        let facade_emacs = OutputSyntax::emacs();
+
+        assert_eq!(markdown.coloredBeginCol("7", false), "");
+        assert_eq!(markdown.generateCell(7, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None), "|");
+        assert_eq!(markdown.beginZeile(), "");
+        assert_eq!(markdown.endZeile(), "|");
+        assert_eq!(emacs.coloredBeginCol("7", false), "");
+        assert_eq!(emacs.generateCell(7, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None), "|");
+        assert_eq!(emacs.beginZeile(), "");
+        assert_eq!(emacs.endZeile(), "|");
+        assert_eq!(facade_markdown.coloredBeginCol("7", false), "");
+        assert_eq!(facade_markdown.generateCell(7, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None), "|");
+        assert_eq!(facade_emacs.coloredBeginCol("7", false), "");
+        assert_eq!(facade_emacs.generateCell(7, &BTreeMap::<i64, Vec<Vec<PairStr>>>::new(), None, None), "|");
     }
 
     #[test]

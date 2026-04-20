@@ -910,7 +910,7 @@ impl Program {
         let mut in_kombination = false;
         for arg in &self.argvWithoutProgram {
             if arg == "-kombination" {
-                in_kombination = neg.is_empty();
+                in_kombination = true;
                 continue;
             }
             if arg == "--kombination" {
@@ -940,10 +940,15 @@ impl Program {
                         continue;
                     }
                     if let Some(v) = self.kombiReverseDict.get(lookup) {
-                        self.spaltenArtenKey_SpaltennummernValue
+                        let target = self
+                            .spaltenArtenKey_SpaltennummernValue
                             .entry(self.spaltenTypeNaming.kombi1)
-                            .or_default()
-                            .insert(*v);
+                            .or_default();
+                        if neg == "-" {
+                            target.remove(v);
+                        } else {
+                            target.insert(*v);
+                        }
                     }
                 }
             } else if left == "universum" {
@@ -959,10 +964,15 @@ impl Program {
                         continue;
                     }
                     if let Some(v) = self.kombiReverseDict2.get(lookup) {
-                        self.spaltenArtenKey_SpaltennummernValue
+                        let target = self
+                            .spaltenArtenKey_SpaltennummernValue
                             .entry(self.spaltenTypeNaming.kombi2)
-                            .or_default()
-                            .insert(*v);
+                            .or_default();
+                        if neg == "-" {
+                            target.remove(v);
+                        } else {
+                            target.insert(*v);
+                        }
                     }
                 }
             }
@@ -1191,6 +1201,50 @@ mod tests {
 
         assert_eq!(program.finallyDisplayLines, expected_lines);
         assert!(program.finallyDisplayLines.iter().any(|line| line.contains("## -zeilen")));
+    }
+
+    #[test]
+    fn kombination_args_after_reverse_dicts_honor_python_value_negation() {
+        let mut program = Program::new(vec![
+            "reta".to_string(),
+            "-kombination".to_string(),
+            "--galaxie=tiere,-pflanzen".to_string(),
+            "--universum=metaphysik,-physik".to_string(),
+        ]);
+        program.init_spalten_arten_python_like();
+        program.kombiReverseDict.insert("tiere".to_string(), 7);
+        program.kombiReverseDict.insert("pflanzen".to_string(), 8);
+        program.kombiReverseDict2.insert("metaphysik".to_string(), 70);
+        program.kombiReverseDict2.insert("physik".to_string(), 80);
+        program
+            .spaltenArtenKey_SpaltennummernValue
+            .entry(program.spaltenTypeNaming.kombi1)
+            .or_default()
+            .insert(8);
+        program
+            .spaltenArtenKey_SpaltennummernValue
+            .entry(program.spaltenTypeNaming.kombi2)
+            .or_default()
+            .insert(80);
+
+        program.apply_kombination_args_after_reverse_dicts_py("");
+        program.apply_kombination_args_after_reverse_dicts_py("-");
+
+        let kombi1 = program
+            .spaltenArtenKey_SpaltennummernValue
+            .get(&program.spaltenTypeNaming.kombi1)
+            .cloned()
+            .unwrap_or_default();
+        let kombi2 = program
+            .spaltenArtenKey_SpaltennummernValue
+            .get(&program.spaltenTypeNaming.kombi2)
+            .cloned()
+            .unwrap_or_default();
+
+        assert!(kombi1.contains(&7));
+        assert!(!kombi1.contains(&8));
+        assert!(kombi2.contains(&70));
+        assert!(!kombi2.contains(&80));
     }
 
     #[test]
