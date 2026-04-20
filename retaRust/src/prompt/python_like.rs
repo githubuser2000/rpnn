@@ -1650,7 +1650,7 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
     }
 
     let xtext = tokens.join(" ");
-    let stext2 = custom_split_whitespace_parenthesized(&xtext);
+    let stext2 = libreta_prompt_custom_split(&xtext);
     let mut stext3: Vec<String> = Vec::new();
     let mut if_kurz_kurz = false;
     let words = prompt_words();

@@ -3,13 +3,12 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    custom_split_whitespace_parenthesized, expand_kurz_kurz_befehl,
+    libreta_prompt_custom_split, expand_kurz_kurz_befehl,
     finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
     prepare_prompt_big_output_for_stored_reta, python_row_spec_to_numbers,
     prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
 };
-use super::tokenize::split_shell_like;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EditModeKind {
@@ -43,7 +42,7 @@ pub enum PromptCommand {
     PrintHistory,
     SwitchMode(EditModeKind),
     ToggleLogging(bool),
-    Shell(String),
+    Shell(Vec<String>),
     Python(String),
     Math(String),
     Immediate(PromptOutput),
@@ -101,6 +100,47 @@ impl SessionState {
     }
 }
 
+fn raw_prompt_tokens_like_python(text: &str) -> Vec<String> {
+    libreta_prompt_custom_split(text)
+}
+
+fn compile_python_process_command_from_raw_text(text: &str) -> Option<PromptCommand> {
+    let tokens = raw_prompt_tokens_like_python(text);
+    let first = tokens.first()?.clone();
+    let args = tokens.into_iter().skip(1).collect::<Vec<_>>();
+    match first.as_str() {
+        "shell" => Some(PromptCommand::Shell(args)),
+        "python" => Some(PromptCommand::Python(args.join(" "))),
+        "math" => Some(PromptCommand::Math(args.join(" "))),
+        _ => None,
+    }
+}
+
+fn compile_normalized_control_command(tokens: &[String]) -> Option<PromptCommand> {
+    match tokens {
+        [single] => match single.as_str() {
+            "q" | ":q" | "exit" | "quit" | "ende" => Some(PromptCommand::Exit),
+            "help" | "hilfe" => Some(PromptCommand::PrintHelp),
+            "befehle" | "kurzbefehle" => Some(PromptCommand::PrintCommands),
+            "BefehlSpeichernDavor" => Some(PromptCommand::SaveBefore),
+            "BefehlSpeichernDanach" => Some(PromptCommand::SaveAfter),
+            "BefehlSpeicherungLöschen" => Some(PromptCommand::DeleteStoredStart),
+            "BefehlSpeicherungAusgeben" => Some(PromptCommand::EnterStoredOutputMode(None)),
+            "leeren" | "clear" => Some(PromptCommand::Clear),
+            "loggen" => Some(PromptCommand::ToggleLogging(true)),
+            "nichtloggen" => Some(PromptCommand::ToggleLogging(false)),
+            _ => None,
+        },
+        [mode, value] if mode == ":mode" && value == "vi" => {
+            Some(PromptCommand::SwitchMode(EditModeKind::Vi))
+        }
+        [mode, value] if mode == ":mode" && value == "emacs" => {
+            Some(PromptCommand::SwitchMode(EditModeKind::Emacs))
+        }
+        _ => None,
+    }
+}
+
 fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -127,14 +167,18 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         _ => {}
     }
 
-    let tokenized = split_shell_like(trimmed)?;
-    if tokenized.tokens.is_empty() {
+    if let Some(command) = compile_python_process_command_from_raw_text(trimmed) {
+        return Ok(command);
+    }
+
+    let tokens = raw_prompt_tokens_like_python(trimmed);
+    if tokens.is_empty() {
         return Ok(PromptCommand::Noop);
     }
 
-    let (_, expanded) = expand_kurz_kurz_befehl(prompt_mode, &tokenized.tokens);
+    let (_, expanded) = expand_kurz_kurz_befehl(prompt_mode, &tokens);
     let mut effective_tokens = if expanded.is_empty() {
-        tokenized.tokens.clone()
+        tokens.clone()
     } else {
         expanded
     };
@@ -145,29 +189,23 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         effective_tokens = finalize_prompt_tokens_for_execution(&effective_tokens);
     }
 
+    if let Some(command) = compile_normalized_control_command(&effective_tokens) {
+        return Ok(command);
+    }
     if effective_tokens[0] == "shell" {
-        let shell_text = trimmed
-            .strip_prefix("shell")
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        return Ok(PromptCommand::Shell(shell_text));
+        return Ok(PromptCommand::Shell(
+            effective_tokens.into_iter().skip(1).collect(),
+        ));
     }
     if effective_tokens[0] == "python" {
-        let command_text = trimmed
-            .strip_prefix("python")
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        return Ok(PromptCommand::Python(command_text));
+        return Ok(PromptCommand::Python(
+            effective_tokens.into_iter().skip(1).collect::<Vec<_>>().join(" "),
+        ));
     }
     if effective_tokens[0] == "math" {
-        let command_text = trimmed
-            .strip_prefix("math")
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        return Ok(PromptCommand::Math(command_text));
+        return Ok(PromptCommand::Math(
+            effective_tokens.into_iter().skip(1).collect::<Vec<_>>().join(" "),
+        ));
     }
     let direct_number_output = compile_direct_number_command(&effective_tokens);
     if let Some(output) = compile_abc_abcd_command(&effective_tokens) {
@@ -232,40 +270,42 @@ pub fn compile_command_with_state(
         return Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string()));
     }
 
-    let tokenized = split_shell_like(trimmed)?;
-    if tokenized.tokens.is_empty() {
+    if let Some(command) = compile_python_process_command_from_raw_text(trimmed) {
+        return Ok(command);
+    }
+
+    let tokens = raw_prompt_tokens_like_python(trimmed);
+    if tokens.is_empty() {
         return Ok(PromptCommand::Noop);
     }
 
-    if let Some(command) = compile_inline_storage_command(&tokenized.tokens) {
+    if let Some(command) = compile_inline_storage_command(&tokens) {
         return Ok(command);
     }
 
     if let Some(prepared) =
-        prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, &tokenized.tokens)
+        prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, &tokens)
     {
         return Ok(PromptCommand::Reta(prepared.tokens));
     }
     if let Some(prepared) =
-        prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, &tokenized.tokens)
+        prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, &tokens)
     {
         return Ok(PromptCommand::Reta(prepared.tokens));
     }
     if let Some(calls) = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
         &state.stored_expanded_tokens,
-        &tokenized.tokens,
+        &tokens,
     ) {
         return Ok(prompt_command_from_reta_calls(calls));
     }
 
-    if raw_input_bypasses_stored_merge(trimmed, &tokenized.tokens)
-        || !state.has_stored_placeholder()
-    {
+    if raw_input_bypasses_stored_merge(trimmed, &tokens) || !state.has_stored_placeholder() {
         return compile_command_inner(trimmed, state.prompt_mode);
     }
 
     let effective_input =
-        compose_input_with_stored_placeholder(&state.stored_expanded_tokens, &tokenized.tokens);
+        compose_input_with_stored_placeholder(&state.stored_expanded_tokens, &tokens);
 
     compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
 }
@@ -386,10 +426,10 @@ pub fn take_auto_prompt_command(state: &mut SessionState) -> Option<PromptComman
 }
 
 fn nested_input_starts_with_reta(input: &str) -> bool {
-    match split_shell_like(input.trim()) {
-        Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
-        Err(_) => false,
-    }
+    matches!(
+        raw_prompt_tokens_like_python(input.trim()).first(),
+        Some(token) if token == "reta"
+    )
 }
 
 fn rpe_output_group_for_nested_execution() -> Vec<String> {
@@ -504,10 +544,7 @@ fn split_storage_text(text: &str) -> Vec<String> {
         return Vec::new();
     }
 
-    match split_shell_like(trimmed) {
-        Ok(tokenized) if !tokenized.tokens.is_empty() => tokenized.tokens,
-        _ => custom_split_whitespace_parenthesized(trimmed),
-    }
+    raw_prompt_tokens_like_python(trimmed)
 }
 
 fn prepare_stored_prefix_tokens_from_text(text: &str) -> Vec<String> {
@@ -909,13 +946,12 @@ pub fn execute_command(
                 exit_code: 0,
             }))
         }
-        PromptCommand::Shell(command_text) => {
-            if command_text.is_empty() {
+        PromptCommand::Shell(args) => {
+            let Some((program, rest)) = args.split_first() else {
                 return Err("Nach 'shell' fehlt der eigentliche Shell-Befehl".to_string());
-            }
-            let output = std::process::Command::new("sh")
-                .arg("-lc")
-                .arg(&command_text)
+            };
+            let output = std::process::Command::new(program)
+                .args(rest)
                 .output()
                 .map_err(|err| format!("Shell-Befehl konnte nicht ausgeführt werden: {err}"))?;
 
@@ -1664,8 +1700,8 @@ fn compile_abc_abcd_command(tokens: &[String]) -> Option<PromptOutput> {
     };
     let converted = buchstaben
         .chars()
-        .filter(|ch| ch.is_ascii_alphabetic())
-        .map(|ch| ((ch.to_ascii_lowercase() as u8) - b'a' + 1).to_string())
+        .flat_map(|ch| ch.to_lowercase())
+        .map(|ch| ((ch as i64) - 96).to_string())
         .collect::<Vec<_>>()
         .join(" ");
     Some(PromptOutput {
@@ -2164,6 +2200,49 @@ mod tests {
         let state = SessionState::new("rp".to_string(), false, false);
         let command = compile_command_with_state("modulo 7", &state).unwrap();
         assert!(matches!(command, PromptCommand::Immediate(_)));
+    }
+
+    #[test]
+    fn one_letter_help_alias_is_control_after_python_alias_expansion() {
+        let command = compile_command("h", PromptModus::Normal).unwrap();
+        assert!(matches!(command, PromptCommand::PrintHelp));
+    }
+
+    #[test]
+    fn abc_abcd_uses_python_ord_for_every_character() {
+        let command = compile_command("abc a1!", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => assert_eq!(output.text, "1 -47 -63"),
+            other => panic!("expected immediate abc output, got {other:?}"),
+        }
+    }
+
+
+    #[test]
+    fn prompt_tokenizer_keeps_quotes_like_python_custom_split() {
+        let command = compile_command("abc \"az\"", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => assert_eq!(output.text, "-62 1 26 -62"),
+            other => panic!("expected immediate abc output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn shell_command_keeps_python_argv_instead_of_sh_lc_string() {
+        let command = compile_command("shell echo hi", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Shell(args) => assert_eq!(args, vec!["echo", "hi"]),
+            other => panic!("expected shell argv command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn python_process_command_uses_prompt_custom_split_joining() {
+        let command = compile_command("python print(\"a b\")", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Python(code) => assert_eq!(code, "print(\"a b\")"),
+            other => panic!("expected python command, got {other:?}"),
+        }
     }
 
 }

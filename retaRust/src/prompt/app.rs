@@ -17,6 +17,7 @@ use super::completion::{
     set_completion_runtime_context, CompletionRuntimeHandle,
 };
 use super::history::{default_history_path, default_log_path};
+use super::python_like::libreta_prompt_custom_split;
 use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
@@ -177,10 +178,10 @@ fn apply_exact_mode_to_input(input: &str) -> String {
 }
 
 fn input_starts_with_reta(input: &str) -> bool {
-    match super::tokenize::split_shell_like(input.trim()) {
-        Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
-        Err(_) => false,
-    }
+    matches!(
+        libreta_prompt_custom_split(input.trim()).first(),
+        Some(token) if token == "reta"
+    )
 }
 
 fn rpe_output_group() -> Vec<String> {
@@ -236,16 +237,13 @@ fn apply_rpe_emacs_output_to_command(command: PromptCommand, input: &str) -> Pro
 }
 
 fn should_append_exact_suffix(input: &str) -> bool {
-    let tokenized = match super::tokenize::split_shell_like(input) {
-        Ok(tokens) => tokens,
-        Err(_) => return false,
-    };
+    let tokens = libreta_prompt_custom_split(input);
 
-    if tokenized.tokens.is_empty() {
+    if tokens.is_empty() {
         return false;
     }
 
-    let first = tokenized.tokens[0].as_str();
+    let first = tokens[0].as_str();
 
     if first == "reta" {
         return false;
@@ -257,7 +255,7 @@ fn should_append_exact_suffix(input: &str) -> bool {
         return false;
     }
 
-    if tokenized.tokens.iter().any(|token| {
+    if tokens.iter().any(|token| {
         matches!(
             token.as_str(),
             "s"

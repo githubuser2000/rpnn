@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::{IndexMap, IndexSet};
@@ -10,7 +11,7 @@ use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelect
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
 
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 struct PyFrac {
     numerator: i64,
     denominator: i64,
@@ -25,6 +26,21 @@ fn gcd_i64_py(mut a: i64, mut b: i64) -> i64 {
         b = t;
     }
     if a == 0 { 1 } else { a }
+}
+
+
+impl Ord for PyFrac {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let left = self.numerator as i128 * other.denominator as i128;
+        let right = other.numerator as i128 * self.denominator as i128;
+        left.cmp(&right)
+    }
+}
+
+impl PartialOrd for PyFrac {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl PyFrac {
@@ -1086,10 +1102,10 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     fn csv_fraction_table_name_py(&self, concatTable: i64) -> Option<&'static str> {
         match concatTable {
             1 => Some("primenumbers.csv"),
-            2 => Some("gebrochen-rational-universum.csv"),
-            3 => Some("gebrochen-rational-galaxie.csv"),
-            4 => Some("gebrochen-rational-universum.csv"),
-            5 => Some("gebrochen-rational-galaxie.csv"),
+            2 | 3 => Some("gebrochen-rational-galaxie.csv"),
+            4 | 5 => Some("gebrochen-rational-universum.csv"),
+            6 | 7 => Some("gebrochen-rational-emotionen.csv"),
+            8 | 9 => Some("gebrochen-rational-strukturgroesse.csv"),
             _ => None,
         }
     }
@@ -1319,18 +1335,18 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         &self,
         limit: usize,
     ) -> IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<usize, Vec<(PyFrac, PyFrac)>>>>> {
-        let uni_name = self.csv_fraction_table_name_py(2).unwrap();
-        let gal_name = self.csv_fraction_table_name_py(3).unwrap();
-        let uni_table = self.load_csv_rows_semicolon_exact_path(uni_name).unwrap_or_default();
+        let gal_name = self.csv_fraction_table_name_py(2).unwrap();
+        let uni_name = self.csv_fraction_table_name_py(4).unwrap();
         let gal_table = self.load_csv_rows_semicolon_exact_path(gal_name).unwrap_or_default();
-        let brueche_uni_set = self.get_all_brueche_py(&uni_table);
+        let uni_table = self.load_csv_rows_semicolon_exact_path(uni_name).unwrap_or_default();
         let brueche_gal_set = self.get_all_brueche_py(&gal_table);
-        let brueche_uni_original = brueche_uni_set.iter().copied().collect::<Vec<_>>();
+        let brueche_uni_set = self.get_all_brueche_py(&uni_table);
         let brueche_gal_original = brueche_gal_set.iter().copied().collect::<Vec<_>>();
-        let mut brueche_uni_sorted = brueche_uni_original.clone();
+        let brueche_uni_original = brueche_uni_set.iter().copied().collect::<Vec<_>>();
         let mut brueche_gal_sorted = brueche_gal_original.clone();
-        brueche_uni_sorted.sort();
+        let mut brueche_uni_sorted = brueche_uni_original.clone();
         brueche_gal_sorted.sort();
+        brueche_uni_sorted.sort();
 
         let mut gebr_rat_all_combis: IndexMap<String, IndexMap<String, IndexMap<String, IndexSet<(PyFrac, PyFrac)>>>> = IndexMap::new();
         for k in ["UniUni", "UniGal", "GalUni", "GalGal"] {
@@ -2767,11 +2783,11 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             (transzendentalien_nrezi, transzendentalien_nrezi),
         ];
         let uni_csv = self
-            .csv_fraction_table_name_py(2)
+            .csv_fraction_table_name_py(4)
             .and_then(|n| self.load_csv_rows_semicolon_exact_path(n).ok())
             .unwrap_or_default();
         let gal_csv = self
-            .csv_fraction_table_name_py(3)
+            .csv_fraction_table_name_py(2)
             .and_then(|n| self.load_csv_rows_semicolon_exact_path(n).ok())
             .unwrap_or_default();
 
