@@ -1161,7 +1161,7 @@ fn html_exact_header_attrs_py(
         false
     }
 
-    fn filter_original_lines_py(
+    pub(crate) fn filter_original_lines_py(
         &self,
         mut num_range: BTreeSet<i64>,
         param_lines: &[String],
@@ -1676,13 +1676,28 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
 
 
-    fn moon_number_is_py(n: i64) -> bool {
+    fn py_round_positive_i64(value: f64) -> i64 {
+        let floor = value.floor();
+        let frac = value - floor;
+        if frac < 0.5 {
+            floor as i64
+        } else if frac > 0.5 {
+            floor as i64 + 1
+        } else {
+            let floor_i = floor as i64;
+            if floor_i % 2 == 0 { floor_i } else { floor_i + 1 }
+        }
+    }
+
+    pub(crate) fn moon_number_is_py(n: i64) -> bool {
         if n < 2 {
             return false;
         }
         for i in 2..n {
             let one_result = (n as f64).powf(1.0 / i as f64);
-            if (one_result.round() * 100000.0).round() == (one_result * 100000.0).round() {
+            if Self::py_round_positive_i64(one_result) * 100000
+                == Self::py_round_positive_i64(one_result * 100000.0)
+            {
                 return true;
             }
         }
@@ -1713,7 +1728,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         faktoren.len()
     }
 
-    fn zeile_which_zaehlung_py(zeile: i64) -> i64 {
+    pub(crate) fn zeile_which_zaehlung_py(zeile: i64) -> i64 {
         if zeile <= 0 {
             return 0;
         }
@@ -1773,6 +1788,29 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         "[100m[37m"
     }
 
+    fn shell_reset_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
+        if is_header {
+            return "[0m";
+        }
+        let n = row_number.unwrap_or(0);
+        if n <= 0 {
+            return "";
+        }
+        if rest {
+            return "[0m[0m";
+        }
+        if Self::moon_number_is_py(n) {
+            return "[0m[0m";
+        }
+        if Self::prim_fak_len_py(n) == 1 {
+            if n % 2 == 0 {
+                return "[0m";
+            }
+            return "[0m[0m";
+        }
+        "[0m[0m"
+    }
+
     pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, rest: bool, nocolor: bool) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
@@ -1781,7 +1819,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         if style.is_empty() {
             text.to_string()
         } else {
-            format!("{}{}[0m[0m", style, text)
+            format!("{}{}{}", style, text, Self::shell_reset_py(row_number, is_header, rest))
         }
     }
 

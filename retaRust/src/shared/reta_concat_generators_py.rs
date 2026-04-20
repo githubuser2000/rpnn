@@ -3,6 +3,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use indexmap::{IndexMap, IndexSet};
+
 use crate::shared::lib4tables_enum_py::ST;
 use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program};
 use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
@@ -1056,8 +1058,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         }
     }
 
-    fn get_all_brueche_py(&self, table: &Vec<Vec<String>>) -> BTreeSet<PyFrac> {
-        let mut menge = BTreeSet::new();
+    fn get_all_brueche_py(&self, table: &Vec<Vec<String>>) -> IndexSet<PyFrac> {
+        let mut menge = IndexSet::new();
         for (i, row) in table.iter().enumerate().skip(1) {
             for (k, cell) in row.iter().enumerate().skip(1) {
                 if cell.trim().len() > 3 {
@@ -1072,25 +1074,84 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         menge
     }
 
+    fn py_round_float_for_concat_py(value: f64) -> f64 {
+        let floor = value.floor();
+        let frac = value - floor;
+        if frac < 0.5 {
+            floor
+        } else if frac > 0.5 {
+            floor + 1.0
+        } else if (floor as i64).rem_euclid(2) == 0 {
+            floor
+        } else {
+            floor + 1.0
+        }
+    }
+
+    fn round_to_thousand_for_concat_py(value: f64) -> f64 {
+        Self::py_round_float_for_concat_py(value * 1000.0) / 1000.0
+    }
+
+    fn pyfrac_to_float_for_concat_py(frac: PyFrac) -> f64 {
+        frac.numerator as f64 / frac.denominator as f64
+    }
+
+    fn pyfrac_pair_product_float_py(pair: (PyFrac, PyFrac)) -> Option<f64> {
+        pair.0.mul(pair.1).map(Self::pyfrac_to_float_for_concat_py)
+    }
+
+    fn insert_pyfrac_pair_py(
+        result: &mut IndexMap<usize, IndexSet<(PyFrac, PyFrac)>>,
+        key: usize,
+        pair: (PyFrac, PyFrac),
+    ) {
+        result.entry(key).or_default().insert(pair);
+    }
+
     fn convert_set_of_paaren_to_dict_mul_py(
         &self,
-        paare_set: &BTreeSet<(PyFrac, PyFrac)>,
+        paare_set: &IndexSet<(PyFrac, PyFrac)>,
         gleichf: bool,
         limit: usize,
-    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
-        let mut result: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+    ) -> IndexMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut result: IndexMap<usize, IndexSet<(PyFrac, PyFrac)>> = IndexMap::new();
         for paar in paare_set.iter().copied() {
-            let Some(prod) = paar.0.mul(paar.1) else { continue; };
-            let key = if gleichf {
-                let Some(inv) = prod.recip() else { continue; };
-                if !inv.is_integer() { continue; }
-                inv.numerator as usize
-            } else {
-                if !prod.is_integer() { continue; }
-                prod.numerator as usize
-            };
+            let Some(mut mul) = Self::pyfrac_pair_product_float_py(paar) else { continue; };
+            if gleichf {
+                if mul == 0.0 {
+                    continue;
+                }
+                mul = 1.0 / mul;
+            }
+            let mulr = Self::py_round_float_for_concat_py(mul);
+            let rounded = Self::round_to_thousand_for_concat_py(mul);
+            assert_eq!(rounded, mulr);
+            let key = mulr as usize;
             if key <= limit {
-                result.entry(key).or_default().insert(paar);
+                Self::insert_pyfrac_pair_py(&mut result, key, paar);
+            }
+        }
+        result.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
+    }
+
+    fn convert_set_of_paaren_to_dict_div_py(
+        &self,
+        paare_set: &IndexSet<(PyFrac, PyFrac)>,
+        gleichf: bool,
+        limit: usize,
+    ) -> IndexMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut result: IndexMap<usize, IndexSet<(PyFrac, PyFrac)>> = IndexMap::new();
+        for paar in paare_set.iter().copied() {
+            let Some(div_frac) = (if !gleichf { paar.0.div(paar.1) } else { paar.1.div(paar.0) }) else {
+                continue;
+            };
+            let div = Self::pyfrac_to_float_for_concat_py(div_frac);
+            let divr = Self::py_round_float_for_concat_py(div);
+            let rounded = Self::round_to_thousand_for_concat_py(div);
+            assert_eq!(rounded, divr);
+            let key = divr as usize;
+            if key <= limit {
+                Self::insert_pyfrac_pair_py(&mut result, key, paar);
             }
         }
         result.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
@@ -1098,34 +1159,39 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
 
     fn convert_fractions_to_dict_mul_py(
         &self,
-        fracs: &BTreeSet<PyFrac>,
-        fracs2: &BTreeSet<PyFrac>,
+        fracs: &[PyFrac],
+        fracs2: &[PyFrac],
         gleichf: bool,
         limit: usize,
-    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
-        let mut result: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+    ) -> IndexMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let fracs2_set: IndexSet<PyFrac> = fracs2.iter().copied().collect();
+        let mut result: IndexMap<usize, IndexSet<(PyFrac, PyFrac)>> = IndexMap::new();
         if !gleichf {
             for frac in fracs.iter().copied() {
                 for zusatz_mul in 1..=limit {
                     let Some(f2) = PyFrac::new(frac.denominator * zusatz_mul as i64, 1) else { continue; };
                     let paar = (frac, f2);
                     let Some(prod) = paar.0.mul(paar.1) else { continue; };
-                    if !prod.is_integer() { continue; }
-                    let key = prod.numerator as usize;
-                    if key > limit { break; }
-                    result.entry(key).or_default().insert(paar);
+                    let product_float = Self::pyfrac_to_float_for_concat_py(prod);
+                    let mulr = Self::py_round_float_for_concat_py(product_float);
+                    let mul = Self::round_to_thousand_for_concat_py(product_float);
+                    assert_eq!(mulr, mul);
+                    if mul > limit as f64 { break; }
+                    Self::insert_pyfrac_pair_py(&mut result, mul as usize, paar);
                 }
             }
             for frac in fracs.iter().copied() {
                 for zusatz_mul in (1..=limit).rev() {
                     let Some(faktor) = PyFrac::new(frac.denominator, zusatz_mul as i64) else { continue; };
-                    if fracs2.contains(&faktor) || faktor.numerator == 1 {
+                    if fracs2_set.contains(&faktor) || faktor.numerator == 1 {
                         let paar = (frac, faktor);
                         let Some(prod) = paar.0.mul(paar.1) else { continue; };
-                        if !prod.is_integer() { continue; }
-                        let key = prod.numerator as usize;
-                        if key > limit { break; }
-                        result.entry(key).or_default().insert(paar);
+                        let product_float = Self::pyfrac_to_float_for_concat_py(prod);
+                        let mulr = Self::py_round_float_for_concat_py(product_float);
+                        if product_float > limit as f64 { break; }
+                        if mulr == product_float {
+                            Self::insert_pyfrac_pair_py(&mut result, mulr as usize, paar);
+                        }
                     }
                 }
             }
@@ -1136,24 +1202,28 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                     let paar = (frac, f2);
                     let Some(prod) = paar.0.mul(paar.1) else { continue; };
                     let Some(inv) = prod.recip() else { continue; };
-                    if !inv.is_integer() { continue; }
-                    let key = inv.numerator as usize;
-                    if key > limit { break; }
-                    result.entry(key).or_default().insert(paar);
+                    let inv_float = Self::pyfrac_to_float_for_concat_py(inv);
+                    let divr = Self::py_round_float_for_concat_py(inv_float);
+                    let div = Self::round_to_thousand_for_concat_py(inv_float);
+                    assert_eq!(divr, div);
+                    if div > limit as f64 { break; }
+                    Self::insert_pyfrac_pair_py(&mut result, divr as usize, paar);
                 }
             }
             for frac in fracs.iter().copied() {
                 for zusatz_div in 1..=limit {
                     let Some(recip) = frac.recip() else { continue; };
                     let Some(faktor) = recip.div(PyFrac::new(zusatz_div as i64, 1).unwrap()) else { continue; };
-                    if fracs2.contains(&faktor) || faktor.numerator == 1 {
+                    if fracs2_set.contains(&faktor) || faktor.numerator == 1 {
                         let paar = (frac, faktor);
                         let Some(prod) = paar.0.mul(paar.1) else { continue; };
                         let Some(inv) = prod.recip() else { continue; };
-                        if !inv.is_integer() { continue; }
-                        let key = inv.numerator as usize;
-                        if key > limit { break; }
-                        result.entry(key).or_default().insert(paar);
+                        let inv_float = Self::pyfrac_to_float_for_concat_py(inv);
+                        let mulr = Self::py_round_float_for_concat_py(inv_float);
+                        let mul = Self::round_to_thousand_for_concat_py(inv_float);
+                        assert_eq!(mulr, mul);
+                        if mul != 0.0 && 1.0 / mul > limit as f64 { break; }
+                        Self::insert_pyfrac_pair_py(&mut result, mulr as usize, paar);
                     }
                 }
             }
@@ -1163,93 +1233,140 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
 
     fn combine_dicts_pairs_py(
         &self,
-        a: BTreeMap<usize, Vec<(PyFrac, PyFrac)>>,
-        b: BTreeMap<usize, Vec<(PyFrac, PyFrac)>>,
-    ) -> BTreeMap<usize, Vec<(PyFrac, PyFrac)>> {
-        let mut e: BTreeMap<usize, BTreeSet<(PyFrac, PyFrac)>> = BTreeMap::new();
+        a: IndexMap<usize, Vec<(PyFrac, PyFrac)>>,
+        b: IndexMap<usize, Vec<(PyFrac, PyFrac)>>,
+    ) -> IndexMap<usize, Vec<(PyFrac, PyFrac)>> {
+        let mut e: IndexMap<usize, IndexSet<(PyFrac, PyFrac)>> = IndexMap::new();
         for (k, vals) in a.into_iter().chain(b.into_iter()) {
-            for mut v in vals {
-                if v.1 < v.0 {
-                    v = (v.1, v.0);
-                }
+            for v in vals {
                 e.entry(k).or_default().insert(v);
             }
         }
         e.into_iter().map(|(k, v)| (k, v.into_iter().collect())).collect()
     }
 
+    fn empty_fraction_combo_leaf_py() -> IndexMap<String, IndexMap<String, IndexSet<(PyFrac, PyFrac)>>> {
+        let mut poly = IndexMap::new();
+        for poly_key in ["stern", "gleichf"] {
+            let mut md = IndexMap::new();
+            md.insert("mul".to_string(), IndexSet::new());
+            md.insert("div".to_string(), IndexSet::new());
+            poly.insert(poly_key.to_string(), md);
+        }
+        poly
+    }
+
+    fn insert_fraction_combo_py(
+        target: &mut IndexMap<String, IndexMap<String, IndexMap<String, IndexSet<(PyFrac, PyFrac)>>>>,
+        outer: &str,
+        poly: &str,
+        op: &str,
+        pair: (PyFrac, PyFrac),
+    ) {
+        target
+            .get_mut(outer)
+            .and_then(|inner| inner.get_mut(poly))
+            .and_then(|ops| ops.get_mut(op))
+            .expect("fraction-combination bucket must exist")
+            .insert(pair);
+    }
+
+    fn python_rounded_integer_condition_py(value: f64) -> bool {
+        Self::py_round_float_for_concat_py(value) == Self::round_to_thousand_for_concat_py(value)
+    }
+
+    fn python_div_condition_bug_compatible_py(value: f64) -> bool {
+        Self::py_round_float_for_concat_py(value) == Self::py_round_float_for_concat_py(value * 1000.0)
+    }
+
     fn find_all_brueche_and_their_combinations_py(
         &self,
         limit: usize,
-    ) -> BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeMap<usize, Vec<(PyFrac, PyFrac)>>>>> {
+    ) -> IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<usize, Vec<(PyFrac, PyFrac)>>>>> {
         let uni_name = self.csv_fraction_table_name_py(2).unwrap();
         let gal_name = self.csv_fraction_table_name_py(3).unwrap();
         let uni_table = self.load_csv_rows_semicolon_exact_path(uni_name).unwrap_or_default();
         let gal_table = self.load_csv_rows_semicolon_exact_path(gal_name).unwrap_or_default();
-        let brueche_uni = self.get_all_brueche_py(&uni_table);
-        let brueche_gal = self.get_all_brueche_py(&gal_table);
-        let mut gebr_rat_all_combis: BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeSet<(PyFrac, PyFrac)>>>> = BTreeMap::new();
+        let brueche_uni_set = self.get_all_brueche_py(&uni_table);
+        let brueche_gal_set = self.get_all_brueche_py(&gal_table);
+        let brueche_uni_original = brueche_uni_set.iter().copied().collect::<Vec<_>>();
+        let brueche_gal_original = brueche_gal_set.iter().copied().collect::<Vec<_>>();
+        let mut brueche_uni_sorted = brueche_uni_original.clone();
+        let mut brueche_gal_sorted = brueche_gal_original.clone();
+        brueche_uni_sorted.sort();
+        brueche_gal_sorted.sort();
+
+        let mut gebr_rat_all_combis: IndexMap<String, IndexMap<String, IndexMap<String, IndexSet<(PyFrac, PyFrac)>>>> = IndexMap::new();
         for k in ["UniUni", "UniGal", "GalUni", "GalGal"] {
-            let mut poly = BTreeMap::new();
-            for p in ["stern", "gleichf"] {
-                let mut md = BTreeMap::new();
-                md.insert("mul".to_string(), BTreeSet::new());
-                md.insert("div".to_string(), BTreeSet::new());
-                poly.insert(p.to_string(), md);
-            }
-            gebr_rat_all_combis.insert(k.to_string(), poly);
+            gebr_rat_all_combis.insert(k.to_string(), Self::empty_fraction_combo_leaf_py());
         }
+
         let combos = [
-            (&brueche_gal, &brueche_gal, "GalGal"),
-            (&brueche_gal, &brueche_uni, "GalUni"),
-            (&brueche_uni, &brueche_gal, "UniGal"),
-            (&brueche_uni, &brueche_uni, "UniUni"),
+            (brueche_gal_sorted.as_slice(), brueche_gal_sorted.as_slice(), "Gal", "Gal"),
+            (brueche_gal_sorted.as_slice(), brueche_uni_sorted.as_slice(), "Gal", "Uni"),
+            (brueche_uni_sorted.as_slice(), brueche_gal_sorted.as_slice(), "Uni", "Gal"),
+            (brueche_uni_sorted.as_slice(), brueche_uni_sorted.as_slice(), "Uni", "Uni"),
         ];
-        for (br1, br2, key) in combos {
-            for &f1 in br1 {
-                for &f2 in br2 {
+        for (br1, br2, gal_or_uni1, gal_or_uni2) in combos {
+            let key = format!("{}{}", gal_or_uni1, gal_or_uni2);
+            for f1 in br1.iter().copied() {
+                for f2 in br2.iter().copied() {
                     if f1 == f2 { continue; }
+                    let pair = (f1, f2);
                     if let Some(prod) = f1.mul(f2) {
-                        if prod.is_integer() {
-                            gebr_rat_all_combis.get_mut(key).unwrap().get_mut("stern").unwrap().get_mut("mul").unwrap().insert((f1, f2));
+                        let prod_float = Self::pyfrac_to_float_for_concat_py(prod);
+                        if Self::python_rounded_integer_condition_py(prod_float) {
+                            Self::insert_fraction_combo_py(&mut gebr_rat_all_combis, &key, "stern", "mul", pair);
                         }
-                        if let Some(inv) = prod.recip() {
-                            if inv.is_integer() {
-                                gebr_rat_all_combis.get_mut(key).unwrap().get_mut("gleichf").unwrap().get_mut("mul").unwrap().insert((f1, f2));
-                            }
+                        if prod_float != 0.0 && Self::python_rounded_integer_condition_py(1.0 / prod_float) {
+                            Self::insert_fraction_combo_py(&mut gebr_rat_all_combis, &key, "gleichf", "mul", pair);
                         }
                     }
                     if let Some(div) = f1.div(f2) {
-                        if div.is_integer() {
-                            gebr_rat_all_combis.get_mut(key).unwrap().get_mut("stern").unwrap().get_mut("div").unwrap().insert((f1, f2));
+                        let div_float = Self::pyfrac_to_float_for_concat_py(div);
+                        if Self::python_div_condition_bug_compatible_py(div_float) {
+                            Self::insert_fraction_combo_py(&mut gebr_rat_all_combis, &key, "stern", "div", pair);
                         }
-                        if let Some(inv_div) = div.recip() {
-                            if inv_div.is_integer() {
-                                gebr_rat_all_combis.get_mut(key).unwrap().get_mut("gleichf").unwrap().get_mut("div").unwrap().insert((f1, f2));
-                            }
+                        if div_float != 0.0 && Self::python_rounded_integer_condition_py(1.0 / div_float) {
+                            Self::insert_fraction_combo_py(&mut gebr_rat_all_combis, &key, "gleichf", "div", pair);
                         }
                     }
                 }
             }
         }
-        let mut alle: BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeMap<usize, Vec<(PyFrac, PyFrac)>>>>> = BTreeMap::new();
+
+        let mut alle: IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<usize, Vec<(PyFrac, PyFrac)>>>>> = IndexMap::new();
         for key in ["UniUni", "UniGal", "GalUni", "GalGal"] {
-            let mut poly_map = BTreeMap::new();
+            let mut poly_map = IndexMap::new();
             for poly in ["stern", "gleichf"] {
                 let gleichf = poly == "gleichf";
-                let set_mul = gebr_rat_all_combis[key][poly]["mul"].clone();
-                let mut md = BTreeMap::new();
-                let (fr1, fr2) = match key {
-                    "UniUni" => (&brueche_uni, &brueche_uni),
-                    "UniGal" => (&brueche_uni, &brueche_gal),
-                    "GalUni" => (&brueche_gal, &brueche_uni),
-                    _ => (&brueche_gal, &brueche_gal),
+                let (fr1, fr2): (&[PyFrac], &[PyFrac]) = match key {
+                    "UniUni" => (brueche_uni_original.as_slice(), brueche_uni_original.as_slice()),
+                    "UniGal" => (brueche_uni_original.as_slice(), brueche_gal_original.as_slice()),
+                    "GalUni" => (brueche_gal_original.as_slice(), brueche_uni_original.as_slice()),
+                    _ => (brueche_gal_original.as_slice(), brueche_gal_original.as_slice()),
                 };
-                md.insert("mul".to_string(), self.combine_dicts_pairs_py(
-                    self.convert_set_of_paaren_to_dict_mul_py(&set_mul, gleichf, limit),
-                    self.convert_fractions_to_dict_mul_py(fr1, fr2, gleichf, limit),
-                ));
-                md.insert("div".to_string(), BTreeMap::new());
+                let mut md = IndexMap::new();
+                for op in ["mul", "div"] {
+                    let couples = gebr_rat_all_combis
+                        .get(key)
+                        .and_then(|a| a.get(poly))
+                        .and_then(|a| a.get(op))
+                        .cloned()
+                        .unwrap_or_default();
+                    let converted = if op == "mul" {
+                        self.combine_dicts_pairs_py(
+                            self.convert_set_of_paaren_to_dict_mul_py(&couples, gleichf, limit),
+                            self.convert_fractions_to_dict_mul_py(fr1, fr2, gleichf, limit),
+                        )
+                    } else {
+                        self.combine_dicts_pairs_py(
+                            self.convert_set_of_paaren_to_dict_div_py(&couples, gleichf, limit),
+                            IndexMap::new(),
+                        )
+                    };
+                    md.insert(op.to_string(), converted);
+                }
                 poly_map.insert(poly.to_string(), md);
             }
             alle.insert(key.to_string(), poly_map);

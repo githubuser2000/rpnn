@@ -1293,6 +1293,100 @@ impl TablesPrepare {
             .parametersCmdWithSomeBereich_py(txt, suffix, neg, keineNegBeruecksichtigung)
     }
 
+    pub fn setZaehlungen(&self, _num: i64) {
+        // Python füllt hier Cache-Dicts. Die Rust-Program-Schicht berechnet die
+        // Zählung deterministisch aus derselben moonNumber-Regel; der Aufruf
+        // bleibt als Architektur-Haken erhalten.
+        let max_row = self.state.borrow().program.hoechsteZeile.max(0);
+        let _ = Program::zeile_which_zaehlung_py(max_row);
+    }
+
+    pub fn zeileWhichZaehlung(&self, zeile: i64) -> i64 {
+        Program::zeile_which_zaehlung_py(zeile)
+    }
+
+    pub fn moonsun(
+        &self,
+        MoonNotSun: bool,
+        numRangeYesZ: Vec<i64>,
+        numRange: Vec<i64>,
+        _ifZaehlungenAtAll: bool,
+    ) -> Vec<i64> {
+        let mut out: BTreeSet<i64> = numRangeYesZ.into_iter().collect();
+        for n in numRange {
+            if Program::moon_number_is_py(n) == MoonNotSun {
+                out.insert(n);
+            }
+        }
+        out.into_iter().collect()
+    }
+
+    pub fn FilterOriginalLines(&self, numRange: Vec<i64>, paramLines: Vec<String>) -> Vec<i64> {
+        let mut state = self.state.borrow_mut();
+        sync_program_runtime_fields(&mut state);
+        let max_row = state.program.hoechsteZeile.max(0);
+        state
+            .program
+            .filter_original_lines_py(numRange.into_iter().collect(), &paramLines, max_row)
+            .into_iter()
+            .collect()
+    }
+
+    pub fn wrapping(&self, text: &str, length: i64) -> Option<Vec<String>> {
+        if length != 0 && text.chars().count() > length.max(0) as usize {
+            Some(Program::wrap_text_py(text, length.max(0) as usize))
+        } else {
+            None
+        }
+    }
+
+    pub fn setWidth(&self, rowToDisplay: i64, combiRows1: i64) -> i64 {
+        let state = self.state.borrow();
+        if state.program.shellRowsAmount == 0 {
+            return 0;
+        }
+        let combiRows = if combiRows1 != 0 {
+            combiRows1
+        } else {
+            state.program.rowsAsNumbers.len() as i64
+        };
+        let offset = state.program.rowsAsNumbers.len() as i64 - combiRows;
+        let breiten: Vec<i64> = if offset < state.program.breiten.len() as i64 {
+            state.program.breiten.iter().skip(offset.max(0) as usize).copied().collect()
+        } else {
+            Vec::new()
+        };
+        let idx = rowToDisplay - 1;
+        if idx >= 0 && (idx as usize) < breiten.len() {
+            breiten[idx as usize]
+        } else {
+            state.program.textWidth
+        }
+    }
+
+    pub fn fromUntil(&self, a: Vec<String>) -> (i64, i64) {
+        if a.first().map(|v| python_isdecimal_ascii(v)).unwrap_or(false) {
+            let first = a[0].parse::<i64>().unwrap_or(1);
+            if a.len() == 2 && python_isdecimal_ascii(&a[1]) {
+                return (first, a[1].parse::<i64>().unwrap_or(1));
+            }
+            if a.len() == 1 {
+                return (1, first);
+            }
+            return (1, 1);
+        }
+        (1, 1)
+    }
+
+    pub fn cellWork(&self, cell: &str, certaintextwidth: i64) -> Vec<String> {
+        let cell = cell.trim().to_string();
+        if certaintextwidth == 0 {
+            return vec![cell];
+        }
+        let width = certaintextwidth.max(0) as usize;
+        Program::wrap_text_py(&cell, width)
+    }
+
     pub fn prepare4out_beforeForLoop_SpaltenZeilenBestimmen(
         &self,
         relitable: Vec<Vec<String>>,
