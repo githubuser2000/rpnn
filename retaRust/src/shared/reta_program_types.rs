@@ -208,7 +208,10 @@ impl Program {
             newTable: false,
             allImportantBeginThingsDone: false,
             runDone: false,
-            hoechsteZeile: 0,
+            // Python Tables(None) initializes hoechsteZeile[1024] to 1024.
+            // Keep the same default limit even though religion.csv currently
+            // contains a few physical rows beyond that limit.
+            hoechsteZeile: 1024,
             tableGenerated: false,
             relitable: vec![],
             RowsLen: 0,

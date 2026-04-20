@@ -246,7 +246,7 @@ impl Program {
                 &parameterEntry.parameterNames,
                 &parameterEntry.datas,
             );
-            let (paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
+            let (_paraMainDict3, paraDict3, dataDicts3) = self.mergeParameterDicts(
                 self.paraMainDict.clone(),
                 self.paraDict.clone(),
                 self.dataDicts.clone(),
@@ -254,7 +254,10 @@ impl Program {
                 into.1,
                 into.2,
             );
-            self.paraMainDict = paraMainDict3;
+            // Python computes the merged Hauptparameter dictionary inside
+            // mergeParameterDicts(), but its return value is assigned only to
+            // self.paraDict/self.dataDict.  self.paraMainDict therefore remains
+            // empty after storeParamtersForColumns(); keep that observable shape.
             self.paraDict = paraDict3;
             self.dataDicts = dataDicts3;
         }
@@ -277,6 +280,7 @@ impl Program {
                 value.iter().map(|txt| vec![PairStr("kombi2".to_string(), txt.clone())]).collect(),
             );
         }
+        self.paraMainDict.clear();
     }
 
     pub fn intoParameterDatatype(
@@ -460,4 +464,31 @@ impl Program {
     }
 
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn store_keeps_para_main_dict_empty_like_python_assignment_shape() {
+        let mut words = Words {
+            paraNdataMatrix: vec![StoreParameterEntry {
+                parameterMainNames: vec!["haupt".to_string()],
+                parameterNames: vec!["neben".to_string()],
+                datas: vec![vec![PyValue::Int(1)]],
+            }],
+            kombiParaNdataMatrix: IndexMap::new(),
+            kombiParaNdataMatrix2: IndexMap::new(),
+        };
+        while words.paraNdataMatrix[0].datas.len() < 12 {
+            words.paraNdataMatrix[0].datas.push(vec![]);
+        }
+
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.storeParamtersForColumns(&words);
+
+        assert!(program.paraMainDict.is_empty());
+        assert!(program.paraDict.contains_key(&("haupt".to_string(), "neben".to_string())));
+    }
 }

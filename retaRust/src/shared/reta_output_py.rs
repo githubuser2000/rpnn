@@ -644,7 +644,16 @@ fn html_exact_header_attrs_py(
             return (finallyDisplayLines, newTable, 0, vec![], old2newTable);
         }
 
-        let max_row = relitable.len().saturating_sub(1) as i64;
+        let physical_max_row = relitable.len().saturating_sub(1) as i64;
+        // Python Prepare uses tables.hoechsteZeile[1024] as the default upper
+        // row boundary.  The CSV may contain physical rows after 1024, but
+        // --alles and generated row filters must not include them unless
+        // --oberesmaximum/--vorhervonausschnitt raised the table limit.
+        let max_row = if self.hoechsteZeile > 0 {
+            std::cmp::min(physical_max_row, self.hoechsteZeile)
+        } else {
+            physical_max_row
+        };
         let mut selected_rows: Vec<i64> = self.selected_rows_from_param_lines_py(
             &paramLines,
             &paramLinesNot,
@@ -2362,6 +2371,46 @@ mod tests {
     fn bereich_to_numbers2_outer_vielfache_zero_max_stays_python_empty() {
         let values = Program::bereich_to_numbers2_py("2", true, 0, false);
         assert!(values.is_empty());
+    }
+
+
+    #[test]
+    fn prepare4out_all_respects_python_default_1024_row_limit() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.ifZeilenSetted = true;
+        let relitable: Vec<Vec<String>> = (0..1043)
+            .map(|row| vec![row.to_string()])
+            .collect();
+
+        let (_, _, _, _, old2new) = program.prepare4out_py(
+            vec!["all".to_string()],
+            vec![],
+            relitable,
+            vec![0],
+        );
+
+        assert_eq!(old2new.last().copied(), Some(1024));
+        assert!(!old2new.contains(&1025));
+    }
+
+    #[test]
+    fn prepare4out_all_honors_raised_python_row_limit() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.ifZeilenSetted = true;
+        program.hoechsteZeile = 1040;
+        let relitable: Vec<Vec<String>> = (0..1043)
+            .map(|row| vec![row.to_string()])
+            .collect();
+
+        let (_, _, _, _, old2new) = program.prepare4out_py(
+            vec!["all".to_string()],
+            vec![],
+            relitable,
+            vec![0],
+        );
+
+        assert_eq!(old2new.last().copied(), Some(1040));
+        assert!(!old2new.contains(&1041));
     }
 
     #[test]
