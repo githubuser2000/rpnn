@@ -1159,24 +1159,160 @@ pub fn textHatZiffer(text: &str) -> bool {
     text.chars().any(|ch| ch.is_numeric())
 }
 
+const PY_SET_LINEAR_PROBES: usize = 9;
+const PY_SET_PERTURB_SHIFT: u32 = 5;
+const PY_HASH_XXPRIME_1: u64 = 11_400_714_785_074_694_791;
+const PY_HASH_XXPRIME_2: u64 = 14_029_467_366_897_019_727;
+const PY_HASH_XXPRIME_5: u64 = 2_870_177_450_012_600_261;
+
+fn python_int_hash_bits(value: i64) -> u64 {
+    // CPython hashes compact integers as the integer itself.  A result of -1 is
+    // reserved as an error sentinel and is therefore remapped to -2.
+    if value == -1 {
+        (-2i64) as u64
+    } else {
+        value as u64
+    }
+}
+
+fn python_pair_hash_bits(pair: (i64, i64)) -> u64 {
+    // CPython tuplehash (3.8+): xxHash primes, wrapping arithmetic, and the
+    // final signed -1 remap.  `center.multiples` exposes this through
+    // `list(set(...))`, so reproducing the hash is observable output.
+    let mut acc = PY_HASH_XXPRIME_5;
+    for value in [pair.0, pair.1] {
+        let lane = python_int_hash_bits(value);
+        acc = acc.wrapping_add(lane.wrapping_mul(PY_HASH_XXPRIME_2));
+        acc = acc.rotate_left(31);
+        acc = acc.wrapping_mul(PY_HASH_XXPRIME_1);
+    }
+    acc = acc.wrapping_add(2u64 ^ (PY_HASH_XXPRIME_5 ^ 3_527_539));
+    if acc == u64::MAX {
+        1_546_275_796
+    } else {
+        acc
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PythonPairSet {
+    table: Vec<Option<(i64, i64)>>,
+    used: usize,
+    fill: usize,
+}
+
+impl PythonPairSet {
+    fn new() -> Self {
+        Self {
+            table: vec![None; 8],
+            used: 0,
+            fill: 0,
+        }
+    }
+
+    fn items(&self) -> Vec<(i64, i64)> {
+        self.table.iter().filter_map(|entry| *entry).collect()
+    }
+
+    fn insert_clean(&mut self, item: (i64, i64)) -> bool {
+        let hash = python_pair_hash_bits(item);
+        let mask = self.table.len() - 1;
+        let mut index = (hash as usize) & mask;
+        let mut perturb = hash;
+
+        loop {
+            let mut probes = if index + PY_SET_LINEAR_PROBES <= mask {
+                PY_SET_LINEAR_PROBES
+            } else {
+                0
+            };
+
+            loop {
+                match self.table[index] {
+                    None => {
+                        self.table[index] = Some(item);
+                        return false;
+                    }
+                    Some(existing) if existing == item => return true,
+                    Some(_) => {}
+                }
+
+                if probes == 0 {
+                    break;
+                }
+                index += 1;
+                probes -= 1;
+            }
+
+            perturb >>= PY_SET_PERTURB_SHIFT;
+            index = index
+                .wrapping_mul(5)
+                .wrapping_add(1)
+                .wrapping_add(perturb as usize)
+                & mask;
+        }
+    }
+
+    fn resize(&mut self, min_used: usize) {
+        let old = self.items();
+        let mut new_size = 8usize;
+        while new_size <= min_used {
+            new_size = new_size.saturating_mul(2);
+        }
+        self.table = vec![None; new_size];
+        self.fill = self.used;
+        for item in old {
+            let _ = self.insert_clean(item);
+        }
+    }
+
+    fn update_like_set_merge<I>(&mut self, source_order: I)
+    where
+        I: IntoIterator<Item = (i64, i64)>,
+    {
+        let source = source_order.into_iter().collect::<Vec<_>>();
+        if source.is_empty() {
+            return;
+        }
+
+        let mask = self.table.len() - 1;
+        if self
+            .fill
+            .saturating_add(source.len())
+            .saturating_mul(5)
+            >= mask.saturating_mul(3)
+        {
+            self.resize(self.used.saturating_add(source.len()).saturating_mul(2));
+        }
+
+        for item in source {
+            if !self.insert_clean(item) {
+                self.used += 1;
+                self.fill += 1;
+            }
+        }
+    }
+}
+
 /// Python `center.multiples(a, mul1=True)`.
 ///
-/// Python stores the divisor pairs in a `set` and then turns that set into a
-/// list.  This Rust port keeps the mathematical content deterministic by using
-/// a sorted set, and appends `(a, 1)` after the set exactly like Python does.
+/// The Python version builds a `set` with `menge |= {(int(c), b)}` and exposes
+/// the table order through `list(menge)`.  This keeps that CPython-visible order
+/// instead of sorting the divisor pairs, then appends `(a, 1)` exactly like
+/// Python.
 pub fn multiples(a: i64, mul1: bool) -> Vec<(i64, i64)> {
     if a < 0 {
         panic!("math domain error");
     }
-    let mut menge: BTreeSet<(i64, i64)> = BTreeSet::new();
+    let mut menge = PythonPairSet::new();
     let upper = ((a as f64).sqrt() + 1.0).floor() as i64;
     for b in 2..upper {
         let c = ((a as f64 / b as f64) * 1000.0).round() / 1000.0;
         if c == c.round() {
-            menge.insert((c as i64, b));
+            menge.update_like_set_merge(std::iter::once((c as i64, b)));
         }
     }
-    let mut out = menge.into_iter().collect::<Vec<_>>();
+    let mut out = menge.items();
     if mul1 {
         out.push((a, 1));
     }

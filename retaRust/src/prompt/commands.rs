@@ -1160,20 +1160,206 @@ fn render_primfaktorenvergleich_like_python(numbers: &[i64]) -> Vec<String> {
     lines
 }
 
-fn factor_pairs(a: i64) -> Vec<(i64, i64)> {
-    let mut pairs = Vec::new();
-    if a <= 0 {
-        return pairs;
+
+const PY_SET_LINEAR_PROBES: usize = 9;
+const PY_SET_PERTURB_SHIFT: u32 = 5;
+const PY_HASH_XXPRIME_1: u64 = 11_400_714_785_074_694_791;
+const PY_HASH_XXPRIME_2: u64 = 14_029_467_366_897_019_727;
+const PY_HASH_XXPRIME_5: u64 = 2_870_177_450_012_600_261;
+
+fn python_int_hash_bits(value: i64) -> u64 {
+    // CPython hashes small/medium ints as their integer value, except -1 is
+    // remapped to -2 because -1 is the C-level error sentinel.
+    if value == -1 {
+        (-2i64) as u64
+    } else {
+        value as u64
     }
-    let mut b = 2i64;
-    while b <= (a as f64).sqrt().floor() as i64 {
-        if a % b == 0 {
-            pairs.push((a / b, b));
+}
+
+fn python_tuple_hash_bits<const N: usize>(values: &[i64; N]) -> u64 {
+    // CPython tuplehash in 3.8+ (still true for the bundled Python 3.13
+    // reference): xxHash primes, unsigned overflow, then signed -1 remap.
+    let mut acc = PY_HASH_XXPRIME_5;
+    for value in values {
+        let lane = python_int_hash_bits(*value);
+        acc = acc.wrapping_add(lane.wrapping_mul(PY_HASH_XXPRIME_2));
+        acc = acc.rotate_left(31);
+        acc = acc.wrapping_mul(PY_HASH_XXPRIME_1);
+    }
+    acc = acc.wrapping_add((N as u64) ^ (PY_HASH_XXPRIME_5 ^ 3_527_539));
+    if acc == u64::MAX {
+        1_546_275_796
+    } else {
+        acc
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PythonIntTupleSet<const N: usize> {
+    table: Vec<Option<[i64; N]>>,
+    used: usize,
+    fill: usize,
+}
+
+impl<const N: usize> PythonIntTupleSet<N> {
+    fn new() -> Self {
+        Self {
+            table: vec![None; 8],
+            used: 0,
+            fill: 0,
         }
-        b += 1;
     }
-    pairs.push((a, 1));
-    pairs
+
+    fn items(&self) -> Vec<[i64; N]> {
+        self.table.iter().filter_map(|entry| *entry).collect()
+    }
+
+    fn insert_clean(&mut self, item: [i64; N]) -> bool {
+        let hash = python_tuple_hash_bits(&item);
+        let mask = self.table.len() - 1;
+        let mut index = (hash as usize) & mask;
+        let mut perturb = hash;
+
+        loop {
+            let mut probes = if index + PY_SET_LINEAR_PROBES <= mask {
+                PY_SET_LINEAR_PROBES
+            } else {
+                0
+            };
+
+            loop {
+                match self.table[index] {
+                    None => {
+                        self.table[index] = Some(item);
+                        return false;
+                    }
+                    Some(existing) if existing == item => return true,
+                    Some(_) => {}
+                }
+
+                if probes == 0 {
+                    break;
+                }
+                index += 1;
+                probes -= 1;
+            }
+
+            perturb >>= PY_SET_PERTURB_SHIFT;
+            index = index
+                .wrapping_mul(5)
+                .wrapping_add(1)
+                .wrapping_add(perturb as usize)
+                & mask;
+        }
+    }
+
+    fn resize(&mut self, min_used: usize) {
+        let old = self.items();
+        let mut new_size = 8usize;
+        while new_size <= min_used {
+            new_size = new_size.saturating_mul(2);
+        }
+        self.table = vec![None; new_size];
+        self.fill = self.used;
+        for item in old {
+            let _ = self.insert_clean(item);
+        }
+    }
+
+    fn add_like_set_add(&mut self, item: [i64; N]) {
+        if self.insert_clean(item) {
+            return;
+        }
+        self.used += 1;
+        self.fill += 1;
+        let mask = self.table.len() - 1;
+        if self.fill.saturating_mul(5) >= mask.saturating_mul(3) {
+            let factor = if self.used > 50_000 { 2 } else { 4 };
+            self.resize(self.used.saturating_mul(factor));
+        }
+    }
+
+    fn update_like_set_merge<I>(&mut self, source_order: I)
+    where
+        I: IntoIterator<Item = [i64; N]>,
+    {
+        let source = source_order.into_iter().collect::<Vec<_>>();
+        if source.is_empty() {
+            return;
+        }
+
+        let mask = self.table.len() - 1;
+        if self
+            .fill
+            .saturating_add(source.len())
+            .saturating_mul(5)
+            >= mask.saturating_mul(3)
+        {
+            self.resize(self.used.saturating_add(source.len()).saturating_mul(2));
+        }
+
+        for item in source {
+            if !self.insert_clean(item) {
+                self.used += 1;
+                self.fill += 1;
+            }
+        }
+    }
+
+    fn from_add_order<I>(source_order: I) -> Self
+    where
+        I: IntoIterator<Item = [i64; N]>,
+    {
+        let mut out = Self::new();
+        for item in source_order {
+            out.add_like_set_add(item);
+        }
+        out
+    }
+
+    fn from_set_copy_order<I>(source_order: I) -> Self
+    where
+        I: IntoIterator<Item = [i64; N]>,
+    {
+        let mut out = Self::new();
+        out.update_like_set_merge(source_order);
+        out
+    }
+}
+
+fn raw_factor_pairs_like_python(a: i64) -> Vec<[i64; 2]> {
+    if a < 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let upper = ((a as f64).sqrt() + 1.0).floor() as i64;
+    for b in 2..upper {
+        let c = ((a as f64 / b as f64) * 1000.0).round() / 1000.0;
+        if c == c.round() {
+            out.push([c as i64, b]);
+        }
+    }
+    out
+}
+
+fn factor_pairs(a: i64) -> Vec<(i64, i64)> {
+    let mut menge = PythonIntTupleSet::<2>::new();
+    for pair in raw_factor_pairs_like_python(a) {
+        // Python center.multiples uses `menge |= {(int(c), b)}`.  That goes
+        // through set-merge, not plain set.add, and it resizes before the
+        // singleton is inserted.  The distinction changes visible list order.
+        menge.update_like_set_merge(std::iter::once(pair));
+    }
+    let mut out = menge
+        .items()
+        .into_iter()
+        .map(|[left, right]| (left, right))
+        .collect::<Vec<_>>();
+    if a >= 0 {
+        out.push((a, 1));
+    }
+    out
 }
 
 fn factor_pairs_without_ones(a: i64) -> Vec<(i64, i64)> {
@@ -1184,18 +1370,37 @@ fn factor_pairs_without_ones(a: i64) -> Vec<(i64, i64)> {
 }
 
 fn factor_triples(a: i64) -> Vec<(i64, i64, i64)> {
-    let mut set = std::collections::BTreeSet::new();
+    let mut m3 = PythonIntTupleSet::<3>::new();
+    let mut o3 = PythonIntTupleSet::<3>::new();
+
     for (m0, m1) in factor_pairs(a) {
         let (o, n) = if m0 > m1 { (m0, m1) } else { (m1, m0) };
-        for (a1, b1) in factor_pairs(o) {
-            let mut v = [n, a1, b1];
-            v.sort();
-            if !v.contains(&1) {
-                set.insert((v[0], v[1], v[2]));
-            }
+        let o2 = PythonIntTupleSet::<2>::from_add_order(
+            factor_pairs(o)
+                .into_iter()
+                .map(|(left, right)| [left, right]),
+        );
+
+        for [left, right] in o2.items() {
+            let mut triple = [n, left, right];
+            triple.sort();
+            o3.update_like_set_merge(std::iter::once(triple));
         }
+
+        let o3_copy = PythonIntTupleSet::<3>::from_set_copy_order(o3.items());
+        let o6 = o3_copy
+            .items()
+            .into_iter()
+            .filter(|triple| !triple.contains(&1))
+            .collect::<Vec<_>>();
+        let set_o6 = PythonIntTupleSet::<3>::from_add_order(o6);
+        m3.update_like_set_merge(set_o6.items());
     }
-    set.into_iter().collect()
+
+    m3.items()
+        .into_iter()
+        .map(|[a, b, c]| (a, b, c))
+        .collect()
 }
 
 fn modulo_classification_text(value: i64) -> &'static str {
@@ -1394,7 +1599,10 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
     }
     if token_set.contains("multis3") {
         matched = true;
-        for n in &numbers {
+        // Python `multis3.mult3()` returns from inside its first numeric loop.
+        // retaPrompt therefore prints only the first computed number, even if
+        // the row parser produced several numbers.
+        if let Some(n) = numbers.first() {
             lines.push(format!("{}: {:?}", n, factor_triples(*n)));
         }
     }
@@ -1640,9 +1848,9 @@ pub fn render_history_text(history: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_command, compile_command_with_state, execute_command, merge_stored_placeholder,
-        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand, PromptModus,
-        SessionState,
+        compile_command, compile_command_with_state, execute_command, factor_pairs_without_ones,
+        factor_triples, merge_stored_placeholder, refresh_stored_placeholder_cache,
+        take_auto_prompt_command, PromptCommand, PromptModus, SessionState,
     };
 
     #[test]
@@ -1707,6 +1915,61 @@ mod tests {
         assert!(output.text.contains("2:"));
         assert!(output.text.contains("3:"));
         assert!(output.text.contains("4:"));
+    }
+
+    #[test]
+    fn multis_pairs_keep_cpython_set_order_from_center_multiples() {
+        assert_eq!(
+            factor_pairs_without_ones(60),
+            vec![(10, 6), (20, 3), (15, 4), (30, 2), (12, 5)]
+        );
+        assert_eq!(
+            factor_pairs_without_ones(360),
+            vec![
+                (90, 4),
+                (72, 5),
+                (120, 3),
+                (36, 10),
+                (30, 12),
+                (40, 9),
+                (180, 2),
+                (60, 6),
+                (24, 15),
+                (20, 18),
+                (45, 8),
+            ]
+        );
+    }
+
+    #[test]
+    fn multis3_triples_follow_python_mult3_visible_list_order() {
+        assert_eq!(
+            factor_triples(60),
+            vec![(3, 4, 5), (2, 2, 15), (2, 3, 10), (2, 5, 6)]
+        );
+        assert_eq!(
+            factor_triples(120),
+            vec![
+                (2, 4, 15),
+                (3, 4, 10),
+                (2, 6, 10),
+                (2, 2, 30),
+                (3, 5, 8),
+                (4, 5, 6),
+                (2, 3, 20),
+                (2, 5, 12),
+            ]
+        );
+    }
+
+    #[test]
+    fn multis3_prompt_keeps_python_first_number_only_bug() {
+        let output = compile_command("multis3 12,18", PromptModus::Normal)
+            .expect("multis3 should compile");
+        let PromptCommand::Immediate(output) = output else {
+            panic!("expected immediate multis3 output");
+        };
+        assert_eq!(output.text.lines().count(), 1);
     }
 
     #[test]
