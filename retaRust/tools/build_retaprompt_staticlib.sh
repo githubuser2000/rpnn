@@ -4,13 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PROFILE="${1:-debug}"
+PROFILE="${1:-release}"
 case "$PROFILE" in
-  debug)
-    CARGO_FLAGS=()
-    ;;
-  release)
-    CARGO_FLAGS=(--release)
+  debug|release)
     ;;
   *)
     echo "usage: $0 [debug|release]" >&2
@@ -18,10 +14,16 @@ case "$PROFILE" in
     ;;
 esac
 
-cargo build "${CARGO_FLAGS[@]}" -p reta --lib
-cargo build "${CARGO_FLAGS[@]}" -p retaprompt_input --lib
-cargo build "${CARGO_FLAGS[@]}" -p retaprompt_commands --lib
-cargo build "${CARGO_FLAGS[@]}" -p retaprompt_frontends --bins
+cat >&2 <<MESSAGE
+retaprompt staticlib builds are intentionally disabled.
 
-echo "built split prompt layers on top of libreta"
-echo "note: there is no mixed retaprompt staticlib in this layout"
+Use the dynamic shared-library build instead:
+  ./tools/build_prompt_split_sharedlibs.sh $PROFILE
+
+The active ABI artifacts are:
+  target/$PROFILE/libreta.so
+  target/$PROFILE/libretaprompt_commands.so
+  target/$PROFILE/libretaprompt_input.so
+MESSAGE
+
+exec ./tools/build_prompt_split_sharedlibs.sh "$PROFILE"
