@@ -741,7 +741,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                     let parts: Vec<&str> = cell.split('|').collect();
                     if parts.len() == 2 {
                         if parts[0].trim().parse::<i64>().ok() == Some(num) {
-                            let rhs = parts[1].trim();
+                            let rhs = parts[1];
                             if !rhs.is_empty() {
                                 hints.push(rhs.to_string());
                             }
@@ -754,76 +754,99 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     fn concat1_reverse_cell_exact_py(&self, num: i64, pro2: Vec<i64>, contra2: Vec<i64>, dreli: &Vec<Vec<String>>) -> String {
+        const HINEINVERSETZEN_SATZ: &str = " - Die Zahlen, die für oder gegen diese Zahlen hier sind, können sich in diese am Besten gedanklich hineinversetzen.";
+
         if num == 0 {
             return self.generated2_code_heading_py("primzahlkreuzprocontra");
         }
         if pro2.is_empty() && contra2.is_empty() {
             return "-".to_string();
         }
+
         let dahinter1 = self.concat1_reverse_hints_exact_py(dreli, num, &pro2, " , ");
         let dahinter2 = self.concat1_reverse_hints_exact_py(dreli, num, &contra2, ", ");
+        let has_dahinter1 = !dahinter1.is_empty();
+        let has_dahinter2 = !dahinter2.is_empty();
+        let pro_values = pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
+        let contra_values = contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
         let pro_text = if pro2.len() > 1 {
-            format!("pro dieser Zahl sind: {}", pro2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+            format!("pro dieser Zahl sind: {pro_values}")
         } else if pro2.len() == 1 {
-            format!("pro dieser Zahl ist {}", pro2[0])
+            format!("pro dieser Zahl ist {pro_values}")
         } else {
             String::new()
         };
         let contra_text = if contra2.len() > 1 {
-            format!(" contra dieser Zahl sind: {}", contra2.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", "))
+            format!(" contra dieser Zahl sind: {contra_values}")
         } else if contra2.len() == 1 {
-            format!(" contra dieser Zahl ist {}", contra2[0])
+            format!(" contra dieser Zahl ist {contra_values}")
         } else {
             String::new()
         };
-        let parts: Vec<String> = if self.outType == "bbcode" {
-            vec![
+
+        if self.outType == "bbcode" {
+            let parts = vec![
                 "[list]".to_string(),
                 if !pro2.is_empty() { "[*]".to_string() } else { String::new() },
                 pro_text,
-                if !dahinter1.is_empty() { "[*]".to_string() } else { String::new() },
+                if has_dahinter1 { "[*]".to_string() } else { String::new() },
                 dahinter1,
                 if !contra2.is_empty() { "[*]".to_string() } else { String::new() },
                 contra_text,
-                if !dahinter2.is_empty() { "[*]".to_string() } else { String::new() },
+                if has_dahinter2 { "[*]".to_string() } else { String::new() },
                 dahinter2,
                 "[/list]".to_string(),
-                "hineinversetzen/empathisch dazu sein".to_string(),
-            ]
-        } else if self.outType == "html" {
-            vec![
+                HINEINVERSETZEN_SATZ.to_string(),
+            ];
+            return parts.into_iter().filter(|item| !item.is_empty()).collect::<Vec<_>>().join("");
+        }
+
+        if self.outType == "html" {
+            let parts = vec![
                 "<ul>".to_string(),
                 if !pro2.is_empty() { "<li>".to_string() } else { String::new() },
                 pro_text,
                 if !pro2.is_empty() { "</li>".to_string() } else { String::new() },
-                if !dahinter1.is_empty() { "<li>".to_string() } else { String::new() },
-                dahinter1.clone(),
-                if !dahinter1.is_empty() { "</li>".to_string() } else { String::new() },
+                if has_dahinter1 { "<li>".to_string() } else { String::new() },
+                dahinter1,
+                if has_dahinter1 { "</li>".to_string() } else { String::new() },
                 if !contra2.is_empty() { "<li>".to_string() } else { String::new() },
                 contra_text,
                 if !contra2.is_empty() { "</li>".to_string() } else { String::new() },
-                if !dahinter2.is_empty() { "<li>".to_string() } else { String::new() },
-                dahinter2.clone(),
-                if !dahinter2.is_empty() { "</li>".to_string() } else { String::new() },
+                if has_dahinter2 { "<li>".to_string() } else { String::new() },
+                dahinter2,
+                if has_dahinter2 { "</li>".to_string() } else { String::new() },
                 "</ul>".to_string(),
-                "hineinversetzen/empathisch dazu sein".to_string(),
-            ]
-        } else {
-            let mut shell: Vec<String> = Vec::new();
-            if !pro_text.is_empty() { shell.push(pro_text); }
-            if !dahinter1.is_empty() { shell.push(format!("({})", dahinter1)); }
-            if !contra_text.is_empty() { shell.push(contra_text); }
-            if !dahinter2.is_empty() { shell.push(format!("({})", dahinter2)); }
-            shell.push("hineinversetzen/empathisch dazu sein".to_string());
-            return shell.join(" | ");
-        };
-        let mut filtered: Vec<String> = Vec::new();
-        for item in parts {
-            if !item.is_empty() {
-                filtered.push(item);
+                HINEINVERSETZEN_SATZ.to_string(),
+            ];
+            return parts.into_iter().filter(|item| !item.is_empty()).collect::<Vec<_>>().join("");
+        }
+
+        // Python baut die Shell-Variante mit `"".join(kette2)`, nicht mit
+        // einem Separator zwischen allen Teilen. Nur zwischen pro- und
+        // contra-Block steht explizit `" | "`, falls beide existieren.
+        let mut parts = Vec::new();
+        if !pro2.is_empty() {
+            parts.push(pro_text);
+            if has_dahinter1 {
+                parts.push(" (".to_string());
+                parts.push(dahinter1);
+                parts.push(")".to_string());
             }
         }
-        filtered.join("")
+        if !pro2.is_empty() && !contra2.is_empty() {
+            parts.push(" | ".to_string());
+        }
+        if !contra2.is_empty() {
+            parts.push(contra_text);
+            if has_dahinter2 {
+                parts.push(" (".to_string());
+                parts.push(dahinter2);
+                parts.push(")".to_string());
+            }
+        }
+        parts.push(HINEINVERSETZEN_SATZ.to_string());
+        parts.join("")
     }
 
     fn register_generated2_spalte_exact_py(&mut self, code: &str, spalte: i64) {
@@ -2908,8 +2931,8 @@ for couple_a in paare {
                 .cloned()
                 .unwrap_or_default();
             if let Some((_, rhs)) = text206.split_once('|') {
-                if !rhs.trim().is_empty() {
-                    into.push(rhs.trim().to_string());
+                if !rhs.is_empty() {
+                    into.push(rhs.to_string());
                 }
             }
             into1 = Self::dedup_preserve_order_strings_py(into1);
