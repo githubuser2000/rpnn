@@ -2,7 +2,13 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::shared::lib4tables_enum_py::ST;
+
 pub use crate::libs::tableHandling::{getShellRowsAmount, setShellRowsAmount, TablesPrepare as Prepare};
+
+pub const PYTHON_SOURCE__LIB4TABLES_PREPARE: &str = include_str!("../../python_reference/lib4tables_prepare.py");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Wraptype {
@@ -116,9 +122,58 @@ pub fn cellWork(cell: &str, certaintextwidth: usize) -> Vec<String> {
     cell2
 }
 
+
+/// Python `Prepare.prepare4out_beforeForLoop_SpaltenZeilenBestimmen` as a
+/// module-level facade for callers that imported `lib4tables_prepare` directly
+/// instead of going through `Tables.getPrepare`.
+#[allow(non_snake_case)]
+pub fn prepare4out_beforeForLoop_SpaltenZeilenBestimmen(
+    prepare: &Prepare,
+    relitable: Vec<Vec<String>>,
+    paramLines: Vec<String>,
+    paramLinesNot: Vec<String>,
+) -> (Vec<String>, i64, Vec<Vec<String>>, i64, Vec<i64>) {
+    prepare.prepare4out_beforeForLoop_SpaltenZeilenBestimmen(relitable, paramLines, paramLinesNot)
+}
+
+/// Python `Prepare.prepare4out_LoopBody` facade.
+#[allow(non_snake_case)]
+pub fn prepare4out_LoopBody(
+    prepare: &Prepare,
+    combiRows: i64,
+    headingsAmount: i64,
+    line: Vec<String>,
+    rowsAsNumbers: Vec<i64>,
+    u: i64,
+) -> Vec<Vec<String>> {
+    prepare.prepare4out_LoopBody(combiRows, headingsAmount, line, rowsAsNumbers, u)
+}
+
+/// Python `Prepare.prepare4out_Tagging` facade.
+#[allow(non_snake_case)]
+pub fn prepare4out_Tagging(
+    prepare: &Prepare,
+    rowsRange: Vec<i64>,
+) -> BTreeMap<i64, BTreeSet<ST>> {
+    prepare.prepare4out_Tagging(rowsRange)
+}
+
+/// Python `Prepare.prepare4out` facade.
+#[allow(non_snake_case)]
+pub fn prepare4out(
+    prepare: &Prepare,
+    paramLines: Vec<String>,
+    paramLinesNot: Vec<String>,
+    relitable: Vec<Vec<String>>,
+    rowsAsNumbers: Vec<i64>,
+) -> (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) {
+    prepare.prepare4out(paramLines, paramLinesNot, relitable, rowsAsNumbers, None, None, None, None, None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::libs::tableHandling::Tables;
 
     #[test]
     fn split_more_only_splits_when_any_entry_is_too_long() {
@@ -131,5 +186,31 @@ mod tests {
         assert_eq!(fromUntil(vec!["7".into()]), (1, 7));
         assert_eq!(fromUntil(vec!["7".into(), "9".into()]), (7, 9));
         assert_eq!(fromUntil(vec!["x".into()]), (1, 1));
+    }
+
+    #[test]
+    fn prepare_module_facades_call_table_prepare_methods() {
+        let tables = Tables::new(Some(20), None);
+        tables.getPrepare.set_shellRowsAmount(80);
+        tables.getPrepare.set_textWidth(3);
+        let row = vec!["zero".to_string(), "abcdef".to_string()];
+        assert_eq!(
+            prepare4out_LoopBody(&tables.getPrepare, 0, 2, row, vec![1], 1),
+            vec![vec!["abc".to_string(), "def".to_string()]]
+        );
+
+        let relitable = vec![
+            vec!["h0".to_string(), "h1".to_string()],
+            vec!["r1c0".to_string(), "r1c1".to_string()],
+        ];
+        let (_display, headings, _newer, _numlen, rows_range) =
+            prepare4out_beforeForLoop_SpaltenZeilenBestimmen(
+                &tables.getPrepare,
+                relitable,
+                vec!["all".to_string()],
+                vec![],
+            );
+        assert_eq!(headings, 2);
+        assert_eq!(rows_range, vec![0, 1]);
     }
 }

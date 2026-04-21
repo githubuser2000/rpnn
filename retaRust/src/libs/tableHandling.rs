@@ -771,6 +771,12 @@ struct TablesState {
     ifprimmultis: bool,
     concat_ones: Vec<i64>,
     sumOfAllCombiRowsAmount: usize,
+    zaehlungen_bis: i64,
+    zaehlung_starts: BTreeMap<i64, i64>,
+    zeile_to_transition_zaehlung: BTreeMap<i64, i64>,
+    zeile_to_zaehlung: BTreeMap<i64, i64>,
+    zeile_to_moon: BTreeMap<i64, bool>,
+    gezaehlt: bool,
 }
 
 impl TablesState {
@@ -791,6 +797,12 @@ impl TablesState {
             ifprimmultis: false,
             concat_ones: vec![],
             sumOfAllCombiRowsAmount: 0,
+            zaehlungen_bis: 0,
+            zaehlung_starts: BTreeMap::new(),
+            zeile_to_transition_zaehlung: BTreeMap::new(),
+            zeile_to_zaehlung: BTreeMap::new(),
+            zeile_to_moon: BTreeMap::new(),
+            gezaehlt: false,
         }
     }
 }
@@ -1314,6 +1326,14 @@ impl TablesPrepare {
         self.state.borrow_mut().program.rowsAsNumbers = dedup_preserve_order_i64(value);
     }
 
+    pub fn shellRowsAmount(&self) -> i64 {
+        self.state.borrow().program.shellRowsAmount
+    }
+
+    pub fn set_shellRowsAmount(&self, value: i64) {
+        self.state.borrow_mut().program.shellRowsAmount = value.max(0);
+    }
+
     pub fn deleteDoublesInSets(&self, pos: Vec<String>, neg: Vec<String>) -> (Vec<String>, Vec<String>) {
         self.state.borrow().program.deleteDoublesInSets_py(pos, neg)
     }
@@ -1332,15 +1352,71 @@ impl TablesPrepare {
     }
 
     pub fn setZaehlungen(&self, _num: i64) {
-        // Python füllt hier Cache-Dicts. Die Rust-Program-Schicht berechnet die
-        // Zählung deterministisch aus derselben moonNumber-Regel; der Aufruf
-        // bleibt als Architektur-Haken erhalten.
-        let max_row = self.state.borrow().program.hoechsteZeile.max(0);
-        let _ = Program::zeile_which_zaehlung_py(max_row);
+        // Python `Prepare.setZaehlungen()` ignores the caller's `num` and fills
+        // the cache once up to `originalLinesRange[-1]`, i.e. hoechsteZeile[1024]
+        // plus the four Python sentinel rows.  Keep the same side-effect shape
+        // instead of only calling the stateless Program helper: later Prepare
+        // methods read `zaehlungen[3]` and `zaehlungen[4]` directly.
+        let mut state = self.state.borrow_mut();
+        sync_program_runtime_fields(&mut state);
+        if state.gezaehlt {
+            return;
+        }
+        state.gezaehlt = true;
+
+        let max_row = state
+            .hoechsteZeile
+            .get(&1024)
+            .copied()
+            .unwrap_or(state.program.hoechsteZeile)
+            .max(0)
+            + 3;
+        let zaehlungen_bis = state.zaehlungen_bis;
+        let mut is_moon = if zaehlungen_bis == 0 {
+            true
+        } else {
+            state
+                .zeile_to_moon
+                .get(&zaehlungen_bis)
+                .copied()
+                .unwrap_or_else(|| Program::moon_number_is_py(zaehlungen_bis))
+        };
+
+        let start = state.zaehlungen_bis + 1;
+        for i in start..=max_row {
+            let was_moon = is_moon;
+            let moon_now = Program::moon_number_is_py(i);
+            is_moon = moon_now;
+            if was_moon && !is_moon {
+                let next = state.zaehlung_starts.len() as i64 + 1;
+                state.zaehlung_starts.insert(next, i);
+                let transition = state.zeile_to_transition_zaehlung.len() as i64 + 1;
+                state.zeile_to_transition_zaehlung.insert(i, transition);
+            }
+            let zaehlung = state.zeile_to_transition_zaehlung.len() as i64;
+            state.zeile_to_zaehlung.insert(i, zaehlung);
+            state.zeile_to_moon.insert(i, moon_now);
+            state.zaehlungen_bis = i;
+        }
     }
 
     pub fn zeileWhichZaehlung(&self, zeile: i64) -> i64 {
-        Program::zeile_which_zaehlung_py(zeile)
+        if zeile <= 0 {
+            return 0;
+        }
+        let needs_cache = {
+            let state = self.state.borrow();
+            !state.gezaehlt || !state.zeile_to_zaehlung.contains_key(&zeile)
+        };
+        if needs_cache {
+            self.setZaehlungen(zeile);
+        }
+        self.state
+            .borrow()
+            .zeile_to_zaehlung
+            .get(&zeile)
+            .copied()
+            .unwrap_or_else(|| Program::zeile_which_zaehlung_py(zeile))
     }
 
     pub fn moonsun(
@@ -1348,11 +1424,26 @@ impl TablesPrepare {
         MoonNotSun: bool,
         numRangeYesZ: Vec<i64>,
         numRange: Vec<i64>,
-        _ifZaehlungenAtAll: bool,
+        ifZaehlungenAtAll: bool,
     ) -> Vec<i64> {
+        // Python calls `setZaehlungen()` when the caller has not already done so;
+        // keep that cache-visible behaviour.  If the caller did precompute it,
+        // this is a cheap no-op because `gezaehlt` is set.
+        if !ifZaehlungenAtAll {
+            self.setZaehlungen(0);
+        } else if !self.state.borrow().gezaehlt {
+            self.setZaehlungen(0);
+        }
+
+        let state = self.state.borrow();
         let mut out: BTreeSet<i64> = numRangeYesZ.into_iter().collect();
         for n in numRange {
-            if Program::moon_number_is_py(n) == MoonNotSun {
+            let is_moon = state
+                .zeile_to_moon
+                .get(&n)
+                .copied()
+                .unwrap_or_else(|| Program::moon_number_is_py(n));
+            if is_moon == MoonNotSun {
                 out.insert(n);
             }
         }
@@ -1423,6 +1514,46 @@ impl TablesPrepare {
         }
         let width = certaintextwidth.max(0) as usize;
         Program::wrap_text_py(&cell, width)
+    }
+
+    /// Python `Prepare.prepare4out_LoopBody`: build one displayed row by
+    /// selecting `rowsAsNumbers`, applying the Python width decision, and
+    /// turning each selected cell into wrapped line parts.  Python also mutates
+    /// `old2Rows` and tag maps when `u == 0`; those side effects are handled by
+    /// `prepare4out()`/`prepare4out_Tagging()` in this Rust facade, while this
+    /// method keeps the loop body independently testable.
+    #[allow(non_snake_case)]
+    pub fn prepare4out_LoopBody(
+        &self,
+        combiRows: i64,
+        headingsAmount: i64,
+        line: Vec<String>,
+        rowsAsNumbers: Vec<i64>,
+        u: i64,
+    ) -> Vec<Vec<String>> {
+        let should_track_religion = {
+            let state = self.state.borrow();
+            state.religionNumbers.is_empty() && u >= 0
+        };
+        if should_track_religion {
+            self.state.borrow_mut().religionNumbers.push(u);
+        }
+        let selected: BTreeSet<i64> = rowsAsNumbers.into_iter().collect();
+        let headings_limit = if headingsAmount <= 0 {
+            line.len()
+        } else {
+            headingsAmount as usize
+        };
+        let mut new2Lines = Vec::new();
+        let mut rowToDisplay = 0i64;
+        for (t, cell) in line.into_iter().enumerate().take(headings_limit) {
+            if selected.contains(&(t as i64)) {
+                rowToDisplay += 1;
+                let certaintextwidth = self.setWidth(rowToDisplay, combiRows);
+                new2Lines.push(self.cellWork(&cell, certaintextwidth));
+            }
+        }
+        new2Lines
     }
 
     pub fn prepare4out_beforeForLoop_SpaltenZeilenBestimmen(
@@ -2244,5 +2375,49 @@ impl TablesMaintable {
             |program, rows| program.createSpalteGestirn(rows),
         );
         (relitable, rows)
+    }
+}
+
+
+#[cfg(test)]
+mod prepare_facade_tests {
+    use super::*;
+
+    #[test]
+    fn prepare_set_zaehlungen_populates_python_cache_shape() {
+        let tables = Tables::new(Some(20), None);
+        tables.getPrepare.setZaehlungen(999);
+
+        assert_eq!(tables.getPrepare.zeileWhichZaehlung(1), 1);
+        assert_eq!(tables.getPrepare.zeileWhichZaehlung(4), 1);
+        assert_eq!(tables.getPrepare.zeileWhichZaehlung(5), 2);
+        assert_eq!(tables.getPrepare.zeileWhichZaehlung(10), 3);
+    }
+
+    #[test]
+    fn prepare_moonsun_uses_cached_moon_column_like_python() {
+        let tables = Tables::new(Some(20), None);
+        let moons = tables
+            .getPrepare
+            .moonsun(true, vec![], vec![4, 5, 8, 9], false);
+        let suns = tables
+            .getPrepare
+            .moonsun(false, vec![], vec![4, 5, 8, 9], true);
+
+        assert_eq!(moons, vec![4, 8, 9]);
+        assert_eq!(suns, vec![5]);
+    }
+
+    #[test]
+    fn prepare_loop_body_selects_and_wraps_cells_like_python_phase() {
+        let tables = Tables::new(Some(20), None);
+        tables.getPrepare.set_shellRowsAmount(80);
+        tables.getPrepare.set_textWidth(3);
+        let row = vec!["zero".to_string(), "abcdef".to_string(), "ghi".to_string()];
+        let wrapped = tables
+            .getPrepare
+            .prepare4out_LoopBody(0, 3, row, vec![1], 1);
+
+        assert_eq!(wrapped, vec![vec!["abc".to_string(), "def".to_string()]]);
     }
 }
