@@ -2,12 +2,11 @@ use crate::{run_reta_from_args, RetaRunResult};
 
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
-    build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
     libreta_prompt_custom_split,
-    prepare_prompt_big_output_for_stored_reta, promptVorbereitungGrosseAusgabe,
+    prepare_prompt_big_output_for_stored_reta,
     python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptLoescheVorSpeicherungBefehle,
-    PromptModus,
+    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptGrosseAusgabe,
+    PromptLoescheVorSpeicherungBefehle, PromptModus,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -176,7 +175,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         return Ok(PromptCommand::Noop);
     }
 
-    let prepared = promptVorbereitungGrosseAusgabe(
+    let grosse_ausgabe = PromptGrosseAusgabe(
         "",
         prompt_mode,
         prompt_mode,
@@ -184,7 +183,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         trimmed,
         &[],
     );
-    let effective_tokens = prepared.liste;
+    let effective_tokens = grosse_ausgabe.liste.clone();
     if effective_tokens.is_empty() {
         return Ok(PromptCommand::Noop);
     }
@@ -219,7 +218,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         argv.extend(effective_tokens);
         return Ok(PromptCommand::Reta(argv));
     }
-    let calls = build_reta_calls_from_prompt_tokens(&effective_tokens);
+    let calls = grosse_ausgabe.retaCalls.clone();
     if !calls.is_empty() {
         return Ok(append_direct_number_output_like_python(
             prompt_command_from_reta_calls(calls),
@@ -229,7 +228,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     if let Some(output) = direct_number_output {
         return Ok(PromptCommand::Immediate(output));
     }
-    if let Some(argv) = build_reta_argv_from_prompt_tokens(&effective_tokens) {
+    if let Some(argv) = grosse_ausgabe.retaArgv.clone() {
         return Ok(PromptCommand::Reta(argv));
     }
 
@@ -630,7 +629,7 @@ fn prepare_stored_prefix_tokens(tokens: &[String]) -> Vec<String> {
         return Vec::new();
     }
 
-    let prepared = promptVorbereitungGrosseAusgabe(
+    let prepared = PromptGrosseAusgabe(
         "",
         PromptModus::AusgabeSelektiv,
         PromptModus::AusgabeSelektiv,
@@ -1805,6 +1804,12 @@ pub fn help_text() -> String {
         "    wird automatisch als reta-Befehl behandelt.",
         "  - Kurzbefehle wie 'a1/2', 'u 3/4', 'G7', 'mond 12' werden Python-nah in reta-Argumente expandiert.",
         "  - ':ui' öffnet die ratatui-Ansicht mit Vorschau, History, Kandidaten und Status.",
+        "",
+        "Frontend-Profile:",
+        "  rp   interaktiv im Vi-Modus, ohne implizites Logging",
+        "  rpl  interaktiv im Vi-Modus, mit vollem implizitem Logging",
+        "  rpe  interaktiv im Emacs-Modus, mit Emacs-Ausgabeparametern",
+        "  rpb  One-Shot-Befehl mit Exact-Modus",
         "",
         "Startup-Argumente:",
         "  -vi                  startet im Vi-Modus",

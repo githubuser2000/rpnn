@@ -451,7 +451,13 @@ fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPres
         return run_one_shot(input, &log_path, preset.emacs_output_mode, &mut state);
     }
 
-    run_interactive_loop(history_path, log_path, startup.exact_mode, &mut state)
+    run_interactive_loop(
+        history_path,
+        log_path,
+        startup.exact_mode,
+        preset.emacs_output_mode,
+        &mut state,
+    )
 }
 
 pub fn run_rp(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
@@ -583,6 +589,7 @@ fn run_interactive_loop(
     history_path: PathBuf,
     log_path: PathBuf,
     exact_mode_enabled: bool,
+    emacs_output_mode: bool,
     state: &mut SessionState,
 ) -> i32 {
     let completion_runtime = new_completion_runtime_handle();
@@ -681,7 +688,7 @@ fn run_interactive_loop(
                 let previous_logging_enabled = state.logging_enabled;
                 let compiled = match compile_command_with_state(&compile_input, state) {
                     Ok(command) => {
-                        if state.program_name == "rpe" {
+                        if emacs_output_mode {
                             apply_rpe_emacs_output_to_command(command, &compile_input)
                         } else {
                             command
@@ -940,8 +947,10 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_exact_mode_to_input, should_append_exact_suffix, should_record_prompt_history,
+        apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, should_append_exact_suffix,
+        should_record_prompt_history,
     };
+    use super::PromptCommand;
 
     #[test]
     fn toggle_history_commands_are_filtered_like_python_togglehistory() {
@@ -987,5 +996,26 @@ mod tests {
             assert!(!should_append_exact_suffix(input), "{input} must not get exact suffix");
             assert_eq!(apply_exact_mode_to_input(input), input);
         }
+    }
+
+    #[test]
+    fn rpe_emacs_mode_adds_output_group_to_nested_reta_command() {
+        let command = PromptCommand::Reta(vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--zaehlung=12".to_string(),
+        ]);
+        let PromptCommand::Reta(argv) = apply_rpe_emacs_output_to_command(
+            command,
+            "reta -zeilen --zaehlung=12",
+        ) else {
+            panic!("rpe must preserve reta command kind");
+        };
+        assert_eq!(argv[0], "reta");
+        assert!(argv.ends_with(&[
+            "-ausgabe".to_string(),
+            "--art=emacs".to_string(),
+            "--keineueberschriften".to_string(),
+        ]));
     }
 }

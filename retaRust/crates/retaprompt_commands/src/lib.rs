@@ -589,6 +589,14 @@ impl PromptCommandFrontendKind {
         }
     }
 
+    const fn start_with_vi_mode(self) -> bool {
+        !matches!(self, Self::Rpe)
+    }
+
+    const fn implicit_logging(self) -> bool {
+        matches!(self, Self::Rpl)
+    }
+
     const fn emacs_output_mode(self) -> bool {
         matches!(self, Self::Rpe)
     }
@@ -752,11 +760,23 @@ fn run_command_one_shot_frontend(argv: Vec<String>, kind: PromptCommandFrontendK
         input = apply_exact_mode_to_input(&input);
     }
 
-    run_command_one_shot(input, program_name, kind.emacs_output_mode())
+    run_command_one_shot(
+        input,
+        program_name,
+        kind.emacs_output_mode(),
+        kind.start_with_vi_mode(),
+        kind.implicit_logging(),
+    )
 }
 
-fn run_command_one_shot(input: String, program_name: String, emacs_output_mode: bool) -> i32 {
-    let mut state = SessionState::new(program_name.clone(), true, false);
+fn run_command_one_shot(
+    input: String,
+    program_name: String,
+    emacs_output_mode: bool,
+    start_with_vi_mode: bool,
+    implicit_logging: bool,
+) -> i32 {
+    let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
 
     if input.trim().is_empty() {
         let output = PromptOutput {
@@ -1045,6 +1065,29 @@ mod tests {
             apply_exact_mode_to_input("12"),
             "12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
         );
+    }
+
+    #[test]
+    fn command_frontend_profiles_match_prompt_frontend_roles() {
+        assert!(!PromptCommandFrontendKind::Rp.default_exact_mode(&strings(&["rp"])));
+        assert!(PromptCommandFrontendKind::Rp.start_with_vi_mode());
+        assert!(!PromptCommandFrontendKind::Rp.implicit_logging());
+        assert!(!PromptCommandFrontendKind::Rp.emacs_output_mode());
+
+        assert!(PromptCommandFrontendKind::Rpl.default_exact_mode(&strings(&["rpl"])));
+        assert!(PromptCommandFrontendKind::Rpl.start_with_vi_mode());
+        assert!(PromptCommandFrontendKind::Rpl.implicit_logging());
+        assert!(!PromptCommandFrontendKind::Rpl.emacs_output_mode());
+
+        assert!(PromptCommandFrontendKind::Rpe.default_exact_mode(&strings(&["rpe"])));
+        assert!(!PromptCommandFrontendKind::Rpe.start_with_vi_mode());
+        assert!(!PromptCommandFrontendKind::Rpe.implicit_logging());
+        assert!(PromptCommandFrontendKind::Rpe.emacs_output_mode());
+
+        assert!(PromptCommandFrontendKind::Rpb.default_exact_mode(&strings(&["rpb"])));
+        assert!(PromptCommandFrontendKind::Rpb.start_with_vi_mode());
+        assert!(!PromptCommandFrontendKind::Rpb.implicit_logging());
+        assert!(!PromptCommandFrontendKind::Rpb.emacs_output_mode());
     }
 
     #[test]

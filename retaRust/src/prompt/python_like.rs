@@ -1200,6 +1200,60 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     }
 }
 
+
+/// Python `retaPrompt.findregEx`: return candidates matched by one prompt
+/// regex/glob fragment, preserving candidate order and Python-style matching.
+#[allow(non_snake_case)]
+pub fn findregEx(pattern: &str, candidates: &[String]) -> Vec<String> {
+    let Some(matcher) = parse_special_fragment_matcher(pattern) else {
+        let normalized_pattern = normalize_match_text(pattern);
+        return candidates
+            .iter()
+            .filter(|candidate| normalize_match_text(candidate).contains(&normalized_pattern))
+            .cloned()
+            .collect();
+    };
+
+    candidates
+        .iter()
+        .filter(|candidate| special_fragment_matches_candidate(candidate, &matcher))
+        .cloned()
+        .collect()
+}
+
+/// Python `retaPrompt.allEqSignAbarbeitung`: process `--x=r"..."`, `--=...`
+/// and split/merged equal-sign forms through the same expansion engine as the
+/// prompt execution path.
+#[allow(non_snake_case)]
+pub fn allEqSignAbarbeitung(tokens: &[String]) -> Vec<String> {
+    let mut merged = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if index + 2 < tokens.len() && tokens[index + 1] == "=" {
+            merged.push(format!("{}={}", tokens[index], tokens[index + 2]));
+            index += 3;
+        } else {
+            merged.push(tokens[index].clone());
+            index += 1;
+        }
+    }
+
+    collapse_python_style_equals_tokens(&expand_python_regex_like_tokens(&merged))
+}
+
+/// Python `retaPrompt.regExReplace`: expand prompt and `reta` regex/glob tokens.
+#[allow(non_snake_case)]
+pub fn regExReplace(tokens: &[String]) -> Vec<String> {
+    expand_python_regex_like_tokens(tokens)
+}
+
+/// Python `retaPrompt.aufloesen`: alias/macro expansion followed by regex and
+/// equal-sign expansion, matching the final prompt token preparation phase.
+#[allow(non_snake_case)]
+pub fn aufloesen(tokens: &[String]) -> Vec<String> {
+    allEqSignAbarbeitung(&expand_python_prompt_macros(tokens))
+}
+
 pub fn replace_prompt_alias(token: &str) -> String {
     match token {
         "e" => "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar".to_string(),
@@ -1246,8 +1300,7 @@ pub fn expand_python_prompt_macros(tokens: &[String]) -> Vec<String> {
 }
 
 pub fn finalize_prompt_tokens_for_execution(tokens: &[String]) -> Vec<String> {
-    let normalized = expand_python_prompt_macros(tokens);
-    expand_python_regex_like_tokens(&normalized)
+    aufloesen(tokens)
 }
 
 pub fn is_15or16_command(text: &str) -> bool {
@@ -7799,6 +7852,75 @@ pub fn promptVorbereitungGrosseAusgabe(
     }
 }
 
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PromptGrosseAusgabeResult {
+    pub vorbereitung: PromptVorbereitungGrosseAusgabeResult,
+    pub bruchManagement: BruchBereichsManagementResult,
+    pub zeiln1234: Zeiln1234CreateResult,
+    pub liste: Vec<String>,
+    pub retaCalls: Vec<Vec<String>>,
+    pub retaArgv: Option<Vec<String>>,
+}
+
+/// Python `retaPrompt.PromptGrosseAusgabe` as the central, side-effect-free
+/// prompt phase. It intentionally keeps the same order as the Python function:
+/// preparation, fraction/row management, row-section construction and final
+/// `reta` argv/call construction. Execution and printing stay outside this
+/// function, so tests can compare the produced command plan directly.
+#[allow(non_snake_case)]
+pub fn PromptGrosseAusgabe(
+    platzhalter: &str,
+    promptMode: PromptModus,
+    promptMode2: PromptModus,
+    promptModeLast: PromptModus,
+    text: &str,
+    textDazu0: &[String],
+) -> PromptGrosseAusgabeResult {
+    let vorbereitung = promptVorbereitungGrosseAusgabe(
+        platzhalter,
+        promptMode,
+        promptMode2,
+        promptModeLast,
+        text,
+        textDazu0,
+    );
+    let liste = vorbereitung.liste.clone();
+    let bruch_management = bruchBereichsManagementAndWbefehl(
+        &vorbereitung.zahlenBereichC,
+        &liste,
+        &vorbereitung.zahlenAngaben_,
+    );
+    let zeiln1234 = zeiln1234create(
+        &liste,
+        !bruch_management.rowSpecs.is_empty(),
+        &bruch_management.reciprocalRowSpecs,
+        &bruch_management.zahlenBereichC,
+        vorbereitung.maxNum,
+        &bruch_management.rowSpecs.join(","),
+    );
+
+    let reta_calls = if !vorbereitung.retaCalls.is_empty() {
+        vorbereitung.retaCalls.clone()
+    } else {
+        build_reta_calls_from_prompt_tokens(&liste)
+    };
+    let reta_argv = if liste.first().map(String::as_str) == Some("reta") {
+        Some(liste.clone())
+    } else {
+        build_reta_argv_from_prompt_tokens(&liste)
+    };
+
+    PromptGrosseAusgabeResult {
+        vorbereitung,
+        bruchManagement: bruch_management,
+        zeiln1234,
+        liste,
+        retaCalls: reta_calls,
+        retaArgv: reta_argv,
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PreparedPromptBigOutput {
     pub tokens: Vec<String>,
@@ -8362,9 +8484,9 @@ mod tests {
         build_reta_calls_from_prompt_tokens, createRangesForBruchLists, dictToList,
         expand_kurz_kurz_befehl, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
         getDictLimtedByKeyList, grKl, PromptLoescheVorSpeicherungBefehle, TXT,
-        expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
+        expand_python_regex_like_tokens, findregEx, regExReplace, allEqSignAbarbeitung, aufloesen, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe,
+        prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe, PromptGrosseAusgabe,
         is_15or16_command, is_zeilen_angabe_between_kommas_py, isReTaParameter,
         libreta_prompt_custom_split, libreta_prompt_custom_split2, retaExecuteNprint,
         zeiln1234create,
@@ -8654,6 +8776,47 @@ mod tests {
         assert!(argv.iter().any(|token| token == "--keineleereninhalte"));
         assert!(argv.iter().any(|token| token == "--keineueberschriften"));
         assert!(argv.iter().any(|token| token == "--nocolor"));
+    }
+
+    #[test]
+    fn prompt_grosse_ausgabe_facade_covers_bare_number_pipeline() {
+        let result = PromptGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "12",
+            &[],
+        );
+
+        assert!(result.vorbereitung.ifKurzKurz);
+        assert_eq!(result.liste[0], "12");
+        assert!(result.liste.contains(&"mulpri".to_string()));
+        assert!(result.bruchManagement.rowSpecs.contains(&"12".to_string()));
+        assert!(result
+            .zeiln1234
+            .zeilenTokens
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=12"));
+        assert!(!result.retaCalls.is_empty(), "{result:?}");
+    }
+
+    #[test]
+    fn prompt_grosse_ausgabe_facade_keeps_raw_reta_as_argv() {
+        let result = PromptGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "reta -zeilen --zaehlung=12",
+            &[],
+        );
+
+        assert!(result.vorbereitung.IsPureOnlyReTaCmd);
+        assert_eq!(
+            result.retaArgv,
+            Some(strings(&["reta", "-zeilen", "--zaehlung=12"]))
+        );
     }
 
     #[test]
@@ -9001,6 +9164,22 @@ mod tests {
         let expanded =
             expand_python_regex_like_tokens(&strings(&["reta", "-zeilen", "--zeit=r\"heu.*\""]));
         assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_supports_python_named_facades() {
+        assert_eq!(
+            findregEx("r\"^emo.*\"", &strings(&["emotion", "freiheit"])),
+            strings(&["emotion"])
+        );
+        assert_eq!(regExReplace(&strings(&["r\"emo.*\""])), strings(&["emotion"]));
+        assert_eq!(
+            allEqSignAbarbeitung(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
+            strings(&["reta", "-zeilen", "--zeit=heute"])
+        );
+        assert!(aufloesen(&strings(&["a", "r\"tho.*\""]))
+            .iter()
+            .any(|token| token == "thomas"));
     }
 
     #[test]

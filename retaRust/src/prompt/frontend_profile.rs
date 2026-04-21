@@ -22,7 +22,7 @@ impl PromptFrontendProfile {
             kind: PromptFrontendKind::Rp,
             program_name: "rp",
             start_with_vi_mode: true,
-            implicit_logging: true,
+            implicit_logging: false,
             one_shot: false,
         }
     }
@@ -32,7 +32,7 @@ impl PromptFrontendProfile {
             kind: PromptFrontendKind::Rpl,
             program_name: "rpl",
             start_with_vi_mode: true,
-            implicit_logging: false,
+            implicit_logging: true,
             one_shot: false,
         }
     }
@@ -51,9 +51,9 @@ impl PromptFrontendProfile {
         Self {
             kind: PromptFrontendKind::Rpe,
             program_name: "rpe",
-            start_with_vi_mode: true,
+            start_with_vi_mode: false,
             implicit_logging: false,
-            one_shot: true,
+            one_shot: false,
         }
     }
 
@@ -111,5 +111,54 @@ impl PromptFrontendProfile {
         } else {
             self.program_name
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PromptFrontendKind, PromptFrontendProfile};
+
+    #[test]
+    fn rp_profile_is_vi_without_implicit_logging() {
+        let profile = PromptFrontendProfile::rp();
+        assert_eq!(profile.kind, PromptFrontendKind::Rp);
+        assert!(profile.start_with_vi_mode);
+        assert!(!profile.implicit_logging);
+        assert!(!profile.one_shot);
+        assert!(!profile.default_exact_mode(&["rp".to_string()]));
+        assert!(!profile.emacs_output_mode());
+    }
+
+    #[test]
+    fn rpl_profile_is_vi_with_full_implicit_logging() {
+        let profile = PromptFrontendProfile::rpl();
+        assert_eq!(profile.kind, PromptFrontendKind::Rpl);
+        assert!(profile.start_with_vi_mode);
+        assert!(profile.implicit_logging);
+        assert!(!profile.one_shot);
+        assert!(profile.default_exact_mode(&["rpl".to_string()]));
+        assert!(!profile.emacs_output_mode());
+    }
+
+    #[test]
+    fn rpe_profile_is_interactive_emacs_output_mode() {
+        let profile = PromptFrontendProfile::rpe();
+        assert_eq!(profile.kind, PromptFrontendKind::Rpe);
+        assert!(!profile.start_with_vi_mode);
+        assert!(!profile.implicit_logging);
+        assert!(!profile.one_shot);
+        assert!(profile.default_exact_mode(&["rpe".to_string()]));
+        assert!(profile.emacs_output_mode());
+    }
+
+    #[test]
+    fn rpb_profile_stays_one_shot_exact_command_frontend() {
+        let profile = PromptFrontendProfile::rpb();
+        assert_eq!(profile.kind, PromptFrontendKind::Rpb);
+        assert!(profile.start_with_vi_mode);
+        assert!(!profile.implicit_logging);
+        assert!(profile.one_shot);
+        assert!(profile.default_exact_mode(&["rpb".to_string()]));
+        assert!(!profile.emacs_output_mode());
     }
 }
