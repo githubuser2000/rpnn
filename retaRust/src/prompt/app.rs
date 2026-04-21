@@ -881,3 +881,46 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
         println!("{}", output.text);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_exact_mode_to_input, should_append_exact_suffix};
+
+    #[test]
+    fn rpb_exact_mode_appends_suffix_to_prompt_numbers_not_raw_reta() {
+        assert_eq!(
+            apply_exact_mode_to_input("12"),
+            "12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        );
+        assert_eq!(
+            apply_exact_mode_to_input("2/3"),
+            "2/3 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        );
+        assert_eq!(
+            apply_exact_mode_to_input("reta -zeilen --zaehlung=12"),
+            "reta -zeilen --zaehlung=12"
+        );
+        assert_eq!(
+            apply_exact_mode_to_input("-zeilen --zaehlung=12"),
+            "-zeilen --zaehlung=12"
+        );
+    }
+
+    #[test]
+    fn rpb_exact_mode_keeps_control_storage_and_process_commands_unmodified() {
+        for input in [
+            "s",
+            "S",
+            "l",
+            "o",
+            "help",
+            "shell echo hi",
+            "python print(1)",
+            "math 1+1",
+            ":ui",
+        ] {
+            assert!(!should_append_exact_suffix(input), "{input} must not get exact suffix");
+            assert_eq!(apply_exact_mode_to_input(input), input);
+        }
+    }
+}

@@ -1644,6 +1644,50 @@ fn is_signed_integer(text: &str) -> bool {
     !body.is_empty() && body.chars().all(|c| c.is_ascii_digit())
 }
 
+
+fn python_short_default_has_single_effective_token(tokens: &[String]) -> bool {
+    let mut distinct = BTreeSet::new();
+    for token in tokens {
+        if token != "e"
+            && token != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        {
+            distinct.insert(token.as_str());
+        }
+    }
+    distinct.len() == 1
+}
+
+fn default_short_commands_for_bare_numeric_token(tokens: &[String]) -> Vec<String> {
+    let mut out = [
+        "mulpri",
+        "a",
+        "t",
+        "w",
+        "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+    ]
+    .into_iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<_>>();
+
+    if tokens.iter().any(|t| t.contains('/')) {
+        out.extend(
+            ["u", "B", "G", "E", "groesse"]
+                .into_iter()
+                .map(|s| s.to_string()),
+        );
+    }
+
+    if tokens
+        .iter()
+        .any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
+    {
+        out.push("-ausgabe".to_string());
+        out.push("--keineueberschriften".to_string());
+    }
+
+    out
+}
+
 pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (bool, Vec<String>) {
     if tokens.is_empty() {
         return (false, Vec::new());
@@ -1665,6 +1709,7 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
             is_15or16_command(&s) || words.befehle_set.contains(&s) || first_token_is_reta;
 
         if !known_direct {
+            let set_text_len_is_1 = python_short_default_has_single_effective_token(tokens);
             let parsed = parse_prefix_and_numeric_suffix(&s);
             if let Some((prefix, numeric)) = parsed {
                 if looks_like_numeric_or_fraction_range(&numeric) {
@@ -1673,14 +1718,6 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
                         .map(|c| c.to_string())
                         .filter(|c| words.one_char_commands.contains(c))
                         .collect::<Vec<_>>();
-                    let set_text_len_is_1 = tokens
-                        .iter()
-                        .filter(|t| {
-                            *t != "e"
-                                && *t != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
-                        })
-                        .count()
-                        == 1;
 
                     if buchst.len() == prefix.chars().count() && !buchst.is_empty() {
                         if_kurz_kurz = true;
@@ -1692,26 +1729,17 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
                         text_dazu.push(numeric.clone());
                     } else if set_text_len_is_1 && prompt_mode != PromptModus::AusgabeSelektiv {
                         if_kurz_kurz = true;
-                        text_dazu.extend(
-                            [
-                                "mulpri",
-                                "a",
-                                "t",
-                                "w",
-                                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
-                            ]
-                            .into_iter()
-                            .map(|s| s.to_string()),
-                        );
-                        if tokens.iter().any(|t| t.contains('/')) {
-                            text_dazu.extend(
-                                ["u", "B", "G", "E", "groesse"]
-                                    .into_iter()
-                                    .map(|s| s.to_string()),
-                            );
-                        }
+                        text_dazu.push(numeric.clone());
+                        text_dazu.extend(default_short_commands_for_bare_numeric_token(tokens));
                     }
                 }
+            } else if set_text_len_is_1
+                && prompt_mode != PromptModus::AusgabeSelektiv
+                && looks_like_numeric_or_fraction_range(&s)
+            {
+                if_kurz_kurz = true;
+                text_dazu.push(s.clone());
+                text_dazu.extend(default_short_commands_for_bare_numeric_token(tokens));
             }
         } else if s == "ee" {
             text_dazu.push("-ausgabe".to_string());
@@ -3593,6 +3621,12 @@ fn eval_python_map_function_with_vars(
         "math.gcd" => checked_python_gcd_many(args),
         "math.lcm" if args.is_empty() => Some(1),
         "math.lcm" => checked_python_lcm_many(args),
+        "math.factorial" if args.len() == 1 => checked_python_factorial(args[0]),
+        "math.isqrt" if args.len() == 1 => checked_python_isqrt(args[0]),
+        "math.floor" | "math.ceil" | "math.trunc" if args.len() == 1 => Some(args[0]),
+        "math.comb" if args.len() == 2 => checked_python_comb(args[0], args[1]),
+        "math.perm" if args.len() == 1 => checked_python_factorial(args[0]),
+        "math.perm" if args.len() == 2 => checked_python_perm(args[0], args[1]),
         _ => None,
     }
 }
@@ -3611,7 +3645,8 @@ fn eval_python_filter_predicate_with_vars(
     }
     match predicate {
         "bool" | "abs" | "int" | "round" => Some(value != 0),
-        _ => None,
+        _ => eval_python_map_function_with_vars(predicate, &[value], vars)
+            .map(|mapped| mapped != 0),
     }
 }
 
@@ -5643,6 +5678,8 @@ fn parse_python_bruch_spalt_group_piece(piece: &str) -> Option<PythonFractionGro
 }
 
 
+
+
 #[derive(Clone, Debug)]
 struct PythonFractionGroup {
     numerator_values: Vec<i64>,
@@ -6179,6 +6216,128 @@ fn build_python_row_buckets_with_global_vielfache(
     }
 
     buckets
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BruchBereichsManagementResult {
+    pub zahlenBereichC: String,
+    pub zahlenAngaben_: Vec<String>,
+    pub zahlenAngabenMehrere: Vec<String>,
+    pub rowSpecs: Vec<String>,
+    pub primaryRowSpecs: Vec<String>,
+    pub reciprocalRowSpecs: Vec<String>,
+    pub rawFractionSpecs: Vec<String>,
+    pub equalFractionRowSpecs: Vec<String>,
+    pub nonWholeFractionDenominatorGroups: BTreeMap<i64, Vec<String>>,
+    pub nonWholeFractionNumeratorGroups: BTreeMap<i64, Vec<String>>,
+    pub useRange: bool,
+    pub useTeiler: bool,
+    pub useVielfache: bool,
+    pub invertieren: bool,
+    pub suppressEmpty: bool,
+    pub noHeaders: bool,
+    pub extraParams: Vec<String>,
+}
+
+impl BruchBereichsManagementResult {
+    fn row_buckets(&self) -> PythonRowBuckets {
+        PythonRowBuckets {
+            primary_row_specs: self.primaryRowSpecs.clone(),
+            reciprocal_row_specs: self.reciprocalRowSpecs.clone(),
+            raw_fraction_specs: self.rawFractionSpecs.clone(),
+            equal_fraction_row_specs: self.equalFractionRowSpecs.clone(),
+            non_whole_fraction_denominator_groups: self.nonWholeFractionDenominatorGroups.clone(),
+            non_whole_fraction_numerator_groups: self.nonWholeFractionNumeratorGroups.clone(),
+        }
+    }
+}
+
+fn push_unique_many(target: &mut Vec<String>, values: impl IntoIterator<Item = String>) {
+    for value in values {
+        push_unique_string(target, value);
+    }
+}
+
+fn bruch_bereichs_management_from_normalized(
+    zahlen_bereich_c: &str,
+    normalized: &[String],
+    zahlen_angaben: &[String],
+) -> BruchBereichsManagementResult {
+    let row_specs = normalized
+        .iter()
+        .filter(|token| is_row_spec_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    let use_range = normalized.iter().any(|t| t == "range");
+    let invertieren = normalized.iter().any(|t| t == "invertieren");
+    let use_teiler = normalized.iter().any(|t| t == "teiler");
+    let einzeln = normalized.iter().any(|t| t == "einzeln");
+    let use_vielfache = !einzeln && normalized.iter().any(|t| t == "vielfache");
+    let suppress_empty = normalized
+        .iter()
+        .any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
+    let no_headers = normalized
+        .iter()
+        .any(|t| t == "ee" || t == "--keineueberschriften");
+    let extra_params = extract_passthrough_reta_parameters(normalized);
+    let row_buckets = build_python_row_buckets_with_global_vielfache(&row_specs, use_vielfache);
+
+    let mut zahlen_angaben_mehrere = zahlen_angaben.to_vec();
+    push_unique_many(&mut zahlen_angaben_mehrere, row_specs.iter().cloned());
+    push_unique_many(
+        &mut zahlen_angaben_mehrere,
+        row_buckets.primary_row_specs.iter().cloned(),
+    );
+    push_unique_many(
+        &mut zahlen_angaben_mehrere,
+        row_buckets.reciprocal_row_specs.iter().cloned(),
+    );
+    push_unique_many(
+        &mut zahlen_angaben_mehrere,
+        row_buckets.equal_fraction_row_specs.iter().cloned(),
+    );
+
+    let zahlen_bereich_c = if zahlen_bereich_c.trim().is_empty() {
+        row_specs.join(",")
+    } else {
+        zahlen_bereich_c.trim().to_string()
+    };
+
+    BruchBereichsManagementResult {
+        zahlenBereichC: zahlen_bereich_c,
+        zahlenAngaben_: zahlen_angaben.to_vec(),
+        zahlenAngabenMehrere: zahlen_angaben_mehrere,
+        rowSpecs: row_specs,
+        primaryRowSpecs: row_buckets.primary_row_specs,
+        reciprocalRowSpecs: row_buckets.reciprocal_row_specs,
+        rawFractionSpecs: row_buckets.raw_fraction_specs,
+        equalFractionRowSpecs: row_buckets.equal_fraction_row_specs,
+        nonWholeFractionDenominatorGroups: row_buckets.non_whole_fraction_denominator_groups,
+        nonWholeFractionNumeratorGroups: row_buckets.non_whole_fraction_numerator_groups,
+        useRange: use_range,
+        useTeiler: use_teiler,
+        useVielfache: use_vielfache,
+        invertieren,
+        suppressEmpty: suppress_empty,
+        noHeaders: no_headers,
+        extraParams: extra_params,
+    }
+}
+
+/// Python `retaPrompt.bruchBereichsManagementAndWbefehl` as a named,
+/// side-effect-free prompt phase.  It keeps the Python separation between raw
+/// row/fraction recognition and later `reta` argv rendering: numbers, reciprocal
+/// whole-number rows, equal fractions and non-whole fraction groups are collected
+/// here, while callers decide which semantic command uses which bucket.
+#[allow(non_snake_case)]
+pub fn bruchBereichsManagementAndWbefehl(
+    zahlenBereichC: &str,
+    stext: &[String],
+    zahlenAngaben_: &[String],
+) -> BruchBereichsManagementResult {
+    let normalized = finalize_prompt_tokens_for_execution(stext);
+    bruch_bereichs_management_from_normalized(zahlenBereichC, &normalized, zahlenAngaben_)
 }
 
 
@@ -6977,28 +7136,20 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
         return Vec::new();
     }
 
-    let row_specs = normalized
-        .iter()
-        .filter(|token| is_row_spec_token(token))
-        .cloned()
-        .collect::<Vec<_>>();
+    let bruch_management = bruch_bereichs_management_from_normalized("", &normalized, &[]);
+    let row_specs = &bruch_management.rowSpecs;
     if row_specs.is_empty() {
         return Vec::new();
     }
 
-    let suppress_empty = normalized
-        .iter()
-        .any(|t| t == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
-    let no_headers = normalized
-        .iter()
-        .any(|t| t == "ee" || t == "--keineueberschriften");
-    let use_range = normalized.iter().any(|t| t == "range");
-    let invert = normalized.iter().any(|t| t == "invertieren");
-    let teiler = normalized.iter().any(|t| t == "teiler");
-    let einzeln = normalized.iter().any(|t| t == "einzeln");
-    let vielfache = !einzeln && normalized.iter().any(|t| t == "vielfache");
-    let row_buckets = build_python_row_buckets_with_global_vielfache(&row_specs, vielfache);
-    let extra_params = extract_passthrough_reta_parameters(&normalized);
+    let suppress_empty = bruch_management.suppressEmpty;
+    let no_headers = bruch_management.noHeaders;
+    let use_range = bruch_management.useRange;
+    let invert = bruch_management.invertieren;
+    let teiler = bruch_management.useTeiler;
+    let vielfache = bruch_management.useVielfache;
+    let row_buckets = bruch_management.row_buckets();
+    let extra_params = bruch_management.extraParams.clone();
     let mut calls: Vec<Vec<String>> = Vec::new();
     let mut seen_labels = BTreeSet::new();
 
@@ -7202,7 +7353,9 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         return None;
     }
 
-    let passthrough_params = extract_passthrough_reta_parameters(&normalized);
+    let bruch_management = bruch_bereichs_management_from_normalized("", &normalized, &[]);
+    let row_buckets = bruch_management.row_buckets();
+    let passthrough_params = bruch_management.extraParams.clone();
     let has_explicit_spalten_parameter = passthrough_params
         .iter()
         .any(|token| is_spalten_parameter_token(token));
@@ -7223,12 +7376,10 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         }
     }
 
-    let use_range = normalized.iter().any(|t| t == "range");
-    let invert = normalized.iter().any(|t| t == "invertieren");
-    let teiler = normalized.iter().any(|t| t == "teiler");
-    let einzeln = normalized.iter().any(|t| t == "einzeln");
-    let vielfache = !einzeln && normalized.iter().any(|t| t == "vielfache");
-    let row_buckets = build_python_row_buckets_with_global_vielfache(&row_specs, vielfache);
+    let use_range = bruch_management.useRange;
+    let invert = bruch_management.invertieren;
+    let teiler = bruch_management.useTeiler;
+    let vielfache = bruch_management.useVielfache;
     let generic_rows = if !row_buckets.primary_row_specs.is_empty() {
         row_buckets.primary_row_specs.clone()
     } else {
@@ -7272,6 +7423,98 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
     append_passthrough_params_to_reta_argv(&mut argv, &passthrough_params);
 
     Some(argv)
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PromptVorbereitungGrosseAusgabeResult {
+    pub IsPureOnlyReTaCmd: bool,
+    pub brueche: Vec<String>,
+    pub zahlenBereichC: String,
+    pub ketten: Vec<String>,
+    pub maxNum: i64,
+    pub liste: Vec<String>,
+    pub zahlenAngaben_: Vec<String>,
+    pub ifKurzKurz: bool,
+}
+
+fn prompt_preparation_max_num(tokens: &[String]) -> i64 {
+    tokens
+        .iter()
+        .filter(|token| token.chars().all(|ch| ch.is_ascii_digit()))
+        .filter_map(|token| token.parse::<i64>().ok())
+        .max()
+        .unwrap_or(PYTHON_DEFAULT_OBERESMAXIMUM_FALLBACK)
+}
+
+/// Python `retaPrompt.promptVorbereitungGrosseAusgabe` as a testable,
+/// side-effect-free phase.  It performs the same high-value prompt preparation
+/// steps that feed the big output loop: `TXT` tokenisation, Kurz-Kurz expansion,
+/// optional output-mode prefixing, stored-`reta` row overlays, alias/macro
+/// replacement and Python-like regex expansion.  The actual row-section rewrite
+/// is shared with the dedicated `prepare_prompt_big_output_for_stored_*` helpers
+/// below so the interactive and testable paths stay identical.
+#[allow(non_snake_case)]
+pub fn promptVorbereitungGrosseAusgabe(
+    platzhalter: &str,
+    promptMode: PromptModus,
+    promptMode2: PromptModus,
+    promptModeLast: PromptModus,
+    text: &str,
+    textDazu0: &[String],
+) -> PromptVorbereitungGrosseAusgabeResult {
+    let raw_txt = TXT::new(text);
+    let raw_input_tokens = raw_txt.liste().to_vec();
+    let mut txt = raw_txt;
+    txt.set_platzhalter(platzhalter);
+
+    let mut if_kurz_kurz = false;
+    if !txt.liste().is_empty() {
+        let (had_kurz_kurz, expanded) = expand_kurz_kurz_befehl(promptMode2, txt.liste());
+        if_kurz_kurz = had_kurz_kurz;
+        txt.set_liste(&expanded);
+    }
+
+    let mut liste = txt.liste().to_vec();
+    if promptMode2 == PromptModus::AusgabeSelektiv && promptModeLast == PromptModus::Normal {
+        let mut merged = textDazu0.to_vec();
+        merged.extend(liste);
+        liste = merged;
+        txt.set_liste(&liste);
+    }
+
+    if promptMode == PromptModus::Normal && !platzhalter.trim().is_empty() {
+        let stored_tokens = libreta_prompt_custom_split(platzhalter.trim());
+        if let Some(prepared) =
+            prepare_prompt_big_output_for_stored_reta(&stored_tokens, &raw_input_tokens)
+        {
+            if_kurz_kurz |= prepared.had_kurz_kurz;
+            liste = prepared.tokens;
+        }
+    }
+
+    let max_num = prompt_preparation_max_num(&liste);
+
+    if !matches!(
+        liste.first().map(String::as_str),
+        Some("shell" | "python" | "abstand")
+    ) {
+        liste = finalize_prompt_tokens_for_execution(&liste);
+    }
+
+    let is_pure_only_reta_cmd = matches!(liste.first().map(String::as_str), Some("reta"));
+    let bruch_management = bruch_bereichs_management_from_normalized("", &liste, &[]);
+
+    PromptVorbereitungGrosseAusgabeResult {
+        IsPureOnlyReTaCmd: is_pure_only_reta_cmd,
+        brueche: bruch_management.rawFractionSpecs.clone(),
+        zahlenBereichC: bruch_management.zahlenBereichC.clone(),
+        ketten: Vec::new(),
+        maxNum: max_num,
+        liste,
+        zahlenAngaben_: bruch_management.zahlenAngabenMehrere,
+        ifKurzKurz: if_kurz_kurz,
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -7818,19 +8061,13 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
     }
 
     let mut split_at = split_at?;
-    if split_at == 0 {
-        return None;
-    }
     if split_at > 0 && chars[split_at - 1] == '-' {
         split_at -= 1;
-    }
-    if split_at == 0 {
-        return None;
     }
 
     let prefix = chars[..split_at].iter().collect::<String>();
     let suffix = chars[split_at..].iter().collect::<String>();
-    Some((prefix, suffix))
+    (!suffix.is_empty()).then_some((prefix, suffix))
 }
 
 #[cfg(test)]
@@ -7839,14 +8076,14 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::{
-        anotherOberesMaximum, bruchSpalt, build_reta_calls_from_prompt_tokens,
-        createRangesForBruchLists, dictToList, expand_kurz_kurz_befehl,
-        findEqualNennerZaehler, findNennerZaehlerMakesWholeNum, getDictLimtedByKeyList, grKl,
-        PromptLoescheVorSpeicherungBefehle, TXT,
+        anotherOberesMaximum, bruchBereichsManagementAndWbefehl, bruchSpalt,
+        build_reta_calls_from_prompt_tokens, createRangesForBruchLists, dictToList,
+        expand_kurz_kurz_befehl, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
+        getDictLimtedByKeyList, grKl, PromptLoescheVorSpeicherungBefehle, TXT,
         expand_python_regex_like_tokens, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows, is_15or16_command,
-        is_zeilen_angabe_between_kommas_py, isReTaParameter,
+        prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe,
+        is_15or16_command, is_zeilen_angabe_between_kommas_py, isReTaParameter,
         libreta_prompt_custom_split, libreta_prompt_custom_split2,
         libreta_prompt_split_kpattern_commas_py, looks_like_numeric_or_fraction_range,
         python_row_spec_to_numbers, verifyBruchNganzZahlBetweenCommas,
@@ -7919,6 +8156,125 @@ mod tests {
         assert_eq!(anotherOberesMaximum("3-1050", 9, 1024), "--oberesmaximum=1051");
     }
 
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_expands_bare_number_defaults() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "12",
+            &[],
+        );
+
+        assert!(prepared.ifKurzKurz);
+        assert_eq!(prepared.maxNum, 12);
+        assert_eq!(prepared.zahlenBereichC, "12".to_string());
+        assert_eq!(prepared.zahlenAngaben_, strings(&["12"]));
+        assert!(prepared.liste.contains(&"12".to_string()));
+        assert!(prepared.liste.contains(&"mulpri".to_string()));
+        assert!(prepared.liste.contains(&"multis".to_string()));
+        assert!(prepared.liste.contains(&"prim".to_string()));
+        assert!(prepared
+            .liste
+            .contains(&"primfaktorenvergleich".to_string()));
+        assert!(prepared.liste.contains(&"absicht".to_string()));
+        assert!(prepared.liste.contains(&"thomas".to_string()));
+        assert!(prepared.liste.contains(&"teiler".to_string()));
+        assert!(prepared
+            .liste
+            .contains(&"keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar".to_string()));
+    }
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_exact_suffix_adds_no_headers() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+            &[],
+        );
+
+        assert!(prepared.ifKurzKurz);
+        assert!(prepared.liste.contains(&"-ausgabe".to_string()));
+        assert!(prepared.liste.contains(&"--keineueberschriften".to_string()));
+    }
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_rewrites_stored_reta_row_overlay() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "reta -zeilen --zeit=heute -spalten --thomas",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "12-15",
+            &[],
+        );
+
+        assert!(prepared.IsPureOnlyReTaCmd);
+        assert_eq!(
+            prepared.liste,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
+                "-spalten",
+                "--thomas",
+            ])
+        );
+    }
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_expands_prompt_regex() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            r#"r"absi" 12"#,
+            &[],
+        );
+
+        assert!(prepared.liste.contains(&"absicht".to_string()));
+        assert!(prepared.liste.contains(&"12".to_string()));
+        assert_eq!(prepared.zahlenBereichC, "12".to_string());
+    }
+
+    #[test]
+    fn bruch_bereichs_management_names_python_fraction_buckets() {
+        let normal = bruchBereichsManagementAndWbefehl("", &strings(&["2/3"]), &[]);
+        assert_eq!(normal.rowSpecs, strings(&["2/3"]));
+        assert_eq!(normal.zahlenBereichC, "2/3".to_string());
+        assert_eq!(
+            normal.nonWholeFractionDenominatorGroups.get(&2),
+            Some(&strings(&["3"]))
+        );
+        assert!(normal.nonWholeFractionNumeratorGroups.is_empty());
+
+        let reverse = bruchBereichsManagementAndWbefehl("", &strings(&["2/5-3/5"]), &[]);
+        assert_eq!(
+            reverse.nonWholeFractionNumeratorGroups.get(&5),
+            Some(&strings(&["2", "3"]))
+        );
+        assert!(reverse.nonWholeFractionDenominatorGroups.is_empty());
+    }
+
+    #[test]
+    fn bruch_bereichs_management_tracks_w_and_v_modifiers() {
+        let teiler = bruchBereichsManagementAndWbefehl("", &strings(&["12", "w"]), &[]);
+        assert_eq!(teiler.rowSpecs, strings(&["12"]));
+        assert!(teiler.useTeiler);
+        assert!(!teiler.useVielfache);
+
+        let vielfache = bruchBereichsManagementAndWbefehl("", &strings(&["12", "v"]), &[]);
+        assert_eq!(vielfache.rowSpecs, strings(&["12"]));
+        assert!(vielfache.useVielfache);
+        assert!(!vielfache.useTeiler);
+    }
 
     #[test]
     fn reta_prompt_delete_before_storage_matches_python_cases() {
@@ -8784,6 +9140,68 @@ mod tests {
     }
 
     #[test]
+    fn bare_numeric_row_expands_to_python_default_short_commands() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["12"]));
+        assert_eq!(
+            expanded,
+            strings(&[
+                "12",
+                "mulpri",
+                "a",
+                "t",
+                "w",
+                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+            ])
+        );
+
+        let calls = build_reta_calls_from_prompt_tokens(&expanded);
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--menschliches=motivation")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--galaxie=thomas")));
+        assert!(calls.iter().all(|call| call
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,3,4,6,12")));
+    }
+
+    #[test]
+    fn bare_fraction_row_expands_to_python_default_fraction_commands() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["2/3"]));
+        for expected in ["2/3", "mulpri", "a", "t", "w", "u", "B", "G", "E", "groesse"] {
+            assert!(expanded.contains(&expected.to_string()), "missing {expected} in {expanded:?}");
+        }
+
+        let calls = build_reta_calls_from_prompt_tokens(&expanded);
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenuniversum=2")));
+        assert!(calls
+            .iter()
+            .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
+    }
+
+    #[test]
+    fn exact_mode_single_row_kurz_kurz_adds_python_no_headers_output() {
+        let (_, expanded) = expand_kurz_kurz_befehl(
+            PromptModus::Normal,
+            &strings(&[
+                "12",
+                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+            ]),
+        );
+        assert!(expanded.iter().any(|token| token == "-ausgabe"));
+        assert!(expanded.iter().any(|token| token == "--keineueberschriften"));
+
+        let calls = build_reta_calls_from_prompt_tokens(&expanded);
+        assert!(!calls.is_empty());
+        assert!(calls
+            .iter()
+            .all(|call| call.iter().any(|token| token == "--keineueberschriften")));
+    }
+
+    #[test]
     fn trailing_short_commands_after_rows_are_rotated_like_python() {
         let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["12at"]));
         assert_eq!(expanded, strings(&["a", "t", "12"]));
@@ -9120,6 +9538,26 @@ mod tests {
         assert_eq!(
             python_row_spec_to_numbers("[7 if all(map(bool, [1,2,3])) else 9]"),
             Some(vec![7])
+        );
+    }
+
+    #[test]
+    fn python_eval_style_rows_accept_math_callables_in_map_filter_deeper() {
+        assert_eq!(
+            python_row_spec_to_numbers("[*map(math.isqrt, [1,4,9,16])]"),
+            Some(vec![1, 2, 3, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[*map(math.comb, [5,6], [2,3])]"),
+            Some(vec![10, 20])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[n for n in filter(math.isqrt, [0,1,4,9])]"),
+            Some(vec![1, 4, 9])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[*map(math.factorial, [0,3,4])]"),
+            Some(vec![1, 6, 24])
         );
     }
 

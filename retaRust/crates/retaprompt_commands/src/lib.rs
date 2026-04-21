@@ -1014,3 +1014,31 @@ pub extern "C" fn retaprompt_commands_run_rpe_from_env() -> i32 {
 pub extern "C" fn retaprompt_commands_input_run_kind_from_env(kind: i32) -> i32 {
     run_input_kind_from_abi_value(kind)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn rpb_frontend_defaults_to_exact_mode_for_befehl_payloads() {
+        assert!(PromptCommandFrontendKind::Rpb.default_exact_mode(&strings(&["rpb", "12"])));
+        assert_eq!(
+            apply_exact_mode_to_input("12"),
+            "12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        );
+    }
+
+    #[test]
+    fn rpb_exact_mode_leaves_literal_reta_and_control_commands_untouched() {
+        assert_eq!(
+            apply_exact_mode_to_input("reta -zeilen --zaehlung=12"),
+            "reta -zeilen --zaehlung=12"
+        );
+        assert_eq!(apply_exact_mode_to_input("help"), "help");
+        assert_eq!(apply_exact_mode_to_input("s"), "s");
+    }
+}

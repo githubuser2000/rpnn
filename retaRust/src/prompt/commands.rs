@@ -3,10 +3,9 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    libreta_prompt_custom_split, expand_kurz_kurz_befehl,
-    finalize_prompt_tokens_for_execution, looks_like_numeric_or_fraction_range,
-    prepare_prompt_big_output_for_stored_reta, python_row_spec_to_numbers,
-    prepare_prompt_big_output_for_stored_reta_prompt_overlay,
+    libreta_prompt_custom_split, looks_like_numeric_or_fraction_range,
+    prepare_prompt_big_output_for_stored_reta, promptVorbereitungGrosseAusgabe,
+    python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
 };
 
@@ -176,17 +175,17 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         return Ok(PromptCommand::Noop);
     }
 
-    let (_, expanded) = expand_kurz_kurz_befehl(prompt_mode, &tokens);
-    let mut effective_tokens = if expanded.is_empty() {
-        tokens.clone()
-    } else {
-        expanded
-    };
-    if !matches!(
-        effective_tokens.first().map(String::as_str),
-        Some("shell" | "python" | "abstand")
-    ) {
-        effective_tokens = finalize_prompt_tokens_for_execution(&effective_tokens);
+    let prepared = promptVorbereitungGrosseAusgabe(
+        "",
+        prompt_mode,
+        prompt_mode,
+        PromptModus::Normal,
+        trimmed,
+        &[],
+    );
+    let effective_tokens = prepared.liste;
+    if effective_tokens.is_empty() {
+        return Ok(PromptCommand::Noop);
     }
 
     if let Some(command) = compile_normalized_control_command(&effective_tokens) {
@@ -557,21 +556,15 @@ fn prepare_stored_prefix_tokens(tokens: &[String]) -> Vec<String> {
         return Vec::new();
     }
 
-    let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::AusgabeSelektiv, tokens);
-    let mut effective_tokens = if expanded.is_empty() {
-        tokens.to_vec()
-    } else {
-        expanded
-    };
-
-    if !matches!(
-        effective_tokens.first().map(String::as_str),
-        Some("shell" | "python" | "abstand")
-    ) {
-        effective_tokens = finalize_prompt_tokens_for_execution(&effective_tokens);
-    }
-
-    effective_tokens
+    let prepared = promptVorbereitungGrosseAusgabe(
+        "",
+        PromptModus::AusgabeSelektiv,
+        PromptModus::AusgabeSelektiv,
+        PromptModus::Normal,
+        &tokens.join(" "),
+        &[],
+    );
+    prepared.liste
 }
 
 fn merge_stored_placeholder(existing: &str, incoming: &str) -> String {
@@ -1889,6 +1882,144 @@ mod tests {
         take_auto_prompt_command, PromptCommand, PromptModus, SessionState,
     };
 
+    fn compile_rp(input: &str) -> PromptCommand {
+        let state = SessionState::new("rp".to_string(), true, false);
+        compile_command_with_state(input, &state).unwrap()
+    }
+
+    fn collect_reta_argvs(command: &PromptCommand, out: &mut Vec<Vec<String>>) {
+        match command {
+            PromptCommand::Reta(argv) => out.push(argv.clone()),
+            PromptCommand::RetaBatch(argvs) => out.extend(argvs.iter().cloned()),
+            PromptCommand::Sequence(commands) => {
+                for command in commands {
+                    collect_reta_argvs(command, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn reta_argvs(command: &PromptCommand) -> Vec<Vec<String>> {
+        let mut out = Vec::new();
+        collect_reta_argvs(command, &mut out);
+        out
+    }
+
+    fn has_immediate_output(command: &PromptCommand) -> bool {
+        match command {
+            PromptCommand::Immediate(_) => true,
+            PromptCommand::Sequence(commands) => commands.iter().any(has_immediate_output),
+            _ => false,
+        }
+    }
+
+    fn argv_has(argv: &[String], token: &str) -> bool {
+        argv.iter().any(|entry| entry == token)
+    }
+
+    #[test]
+    fn golden_rp_befehl_bare_number_uses_python_default_prompt_pipeline() {
+        let command = compile_rp("12");
+        let argvs = reta_argvs(&command);
+        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(has_immediate_output(&command));
+        assert!(argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--menschliches=motivation")));
+        assert!(argvs.iter().any(|argv| argv_has(argv, "--galaxie=thomas")));
+        assert!(argvs
+            .iter()
+            .all(|argv| argv_has(argv, "--vorhervonausschnitt=2,3,4,6,12")));
+        assert!(argvs
+            .iter()
+            .all(|argv| argv_has(argv, "--keineleereninhalte")));
+    }
+
+    #[test]
+    fn golden_rpb_exact_bare_number_adds_no_headers() {
+        let command = compile_rp("12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
+        let argvs = reta_argvs(&command);
+        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(argvs
+            .iter()
+            .all(|argv| argv_has(argv, "--keineueberschriften")));
+        assert!(argvs
+            .iter()
+            .all(|argv| argv_has(argv, "--keineleereninhalte")));
+    }
+
+    #[test]
+    fn golden_rp_befehl_fraction_defaults_cover_reciprocal_semantics() {
+        let command = compile_rp("2/3");
+        let argvs = reta_argvs(&command);
+        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--gebrochenuniversum=2")));
+        assert!(argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--gebrochenemotion=2")));
+        assert!(argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--strukturgroesse=strukturgroesse")));
+    }
+
+    #[test]
+    fn golden_rp_befehl_w_and_v_modifiers_rewrite_rows_python_like() {
+        let teiler = compile_rp("12 w");
+        let teiler_argvs = reta_argvs(&teiler);
+        assert!(teiler_argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--vorhervonausschnitt=2,3,4,6,12")));
+
+        let vielfache = compile_rp("12 v");
+        let vielfache_argvs = reta_argvs(&vielfache);
+        assert!(vielfache_argvs.iter().any(|argv| argv
+            .iter()
+            .any(|token| token == "--vielfachevonzahlen=12")));
+        assert!(vielfache_argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--vorhervonausschnitt=12,v12")));
+    }
+
+    #[test]
+    fn golden_rp_befehl_repeated_denominator_fraction_uses_reverse_bucket() {
+        let command = compile_rp("2/5-3/5");
+        let argvs = reta_argvs(&command);
+        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(argvs.iter().any(|argv| {
+            argv_has(argv, "--gebrochenuniversum=5")
+                && argv_has(argv, "--vorhervonausschnitt=2,3")
+                && argv_has(argv, "--spaltenreihenfolgeundnurdiese=1")
+        }));
+    }
+
+    #[test]
+    fn golden_rp_befehl_prompt_regex_expands_before_compilation() {
+        let command = compile_rp(r#"r"absi" 12"#);
+        let argvs = reta_argvs(&command);
+        assert!(argvs
+            .iter()
+            .any(|argv| argv_has(argv, "--menschliches=motivation")));
+    }
+
+    #[test]
+    fn golden_rp_befehl_literal_reta_command_is_not_rewritten() {
+        let command = compile_rp("reta -zeilen --zaehlung=12");
+        match command {
+            PromptCommand::Reta(argv) => assert_eq!(
+                argv,
+                vec![
+                    "reta".to_string(),
+                    "-zeilen".to_string(),
+                    "--zaehlung=12".to_string(),
+                ]
+            ),
+            other => panic!("expected literal reta command, got {other:?}"),
+        }
+    }
+
     #[test]
     fn empty_input_executes_stored_placeholder_like_python_prompt() {
         let mut state = SessionState::new("rp".to_string(), true, false);
@@ -2192,6 +2323,35 @@ mod tests {
                 assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
             }
             other => panic!("expected PromptCommand::Sequence, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_number_compiles_to_default_reta_calls_and_number_output() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("12", &state).unwrap();
+        match command {
+            PromptCommand::Sequence(commands) => {
+                assert!(commands.iter().any(|command| {
+                    matches!(command, PromptCommand::Reta(_) | PromptCommand::RetaBatch(_))
+                }));
+                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+            }
+            other => panic!("expected default bare-number sequence, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bare_fraction_compiles_to_default_fraction_prompt_batch() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("2/3", &state).unwrap();
+        match command {
+            PromptCommand::Sequence(commands) => {
+                assert!(commands.iter().any(|command| matches!(command, PromptCommand::RetaBatch(_))));
+                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+            }
+            PromptCommand::RetaBatch(_) => {}
+            other => panic!("expected default bare-fraction batch or sequence, got {other:?}"),
         }
     }
 
