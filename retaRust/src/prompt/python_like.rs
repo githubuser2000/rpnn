@@ -1154,7 +1154,7 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     }
 
     let input_is_reta = matches!(tokens.first().map(String::as_str), Some("reta"));
-    let mut current_section: Option<String> = None;
+    let mut current_section: Option<&str> = None;
     let mut out = Vec::new();
     let mut changed = false;
 
@@ -1164,19 +1164,19 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
             continue;
         }
         if input_is_reta && is_main_switch_token(token) {
-            current_section = Some(token.clone());
+            current_section = Some(token.as_str());
             out.push(token.clone());
             continue;
         }
 
         let expanded = if let Some((left, right)) = token.split_once('=') {
             if input_is_reta || left.starts_with("--") {
-                expand_reta_equals_regex_like_token(left, right, current_section.as_deref())
+                expand_reta_equals_regex_like_token(left, right, current_section)
             } else {
                 Vec::new()
             }
         } else if input_is_reta {
-            expand_reta_simple_regex_like_token(token, current_section.as_deref())
+            expand_reta_simple_regex_like_token(token, current_section)
         } else {
             expand_prompt_regex_like_token(token)
         };
@@ -1189,15 +1189,6 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
             out.push(token.clone());
         } else {
             changed = true;
-            if input_is_reta {
-                if let Some(section) = expanded
-                    .iter()
-                    .rev()
-                    .find(|candidate| is_main_switch_token(candidate.as_str()))
-                {
-                    current_section = Some(section.to_string());
-                }
-            }
             out.extend(expanded);
         }
     }
@@ -1253,7 +1244,11 @@ pub fn allEqSignAbarbeitung(tokens: &[String]) -> Vec<String> {
 /// Python `retaPrompt.regExReplace`: expand prompt and `reta` regex/glob tokens.
 #[allow(non_snake_case)]
 pub fn regExReplace(tokens: &[String]) -> Vec<String> {
-    allEqSignAbarbeitung(tokens)
+    if tokens.iter().any(|token| token_has_python_regex_or_glob(token)) {
+        allEqSignAbarbeitung(tokens)
+    } else {
+        tokens.to_vec()
+    }
 }
 
 /// Python `retaPrompt.aufloesen`: alias/macro expansion followed by regex and
@@ -1261,6 +1256,81 @@ pub fn regExReplace(tokens: &[String]) -> Vec<String> {
 #[allow(non_snake_case)]
 pub fn aufloesen(tokens: &[String]) -> Vec<String> {
     allEqSignAbarbeitung(&expand_python_prompt_macros(tokens))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PromptSonderBefehlAktion {
+    Shell(Vec<String>),
+    Python(String),
+    Math(String),
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PromptVonGrosserAusgabeSonderBefehlAusgabenResult {
+    pub loggingSwitch: bool,
+    pub cmdGaveOutput: bool,
+    pub aktion: Option<PromptSonderBefehlAktion>,
+    pub loggingCommand: Option<bool>,
+}
+
+/// Python `retaPrompt.PromptVonGrosserAusgabeSonderBefehlAusgaben` as a
+/// side-effect-free decision phase.  Python executes shell/python/math here and
+/// then toggles logging if `loggen`/`nichtloggen` occurs without `abc`/`abcd`.
+/// Rust returns the intended action so the caller can execute it in the normal
+/// command layer while keeping the Python `abc` escape rule: `shell abc` and
+/// `python abc` are not process commands when the token list has exactly two
+/// entries.
+#[allow(non_snake_case)]
+pub fn PromptVonGrosserAusgabeSonderBefehlAusgaben(
+    loggingSwitch: bool,
+    listeS: &[String],
+    cmd_gave_output: bool,
+) -> PromptVonGrosserAusgabeSonderBefehlAusgabenResult {
+    let mut result = PromptVonGrosserAusgabeSonderBefehlAusgabenResult {
+        loggingSwitch,
+        cmdGaveOutput: cmd_gave_output,
+        aktion: None,
+        loggingCommand: None,
+    };
+
+    let Some(first) = listeS.first().map(String::as_str) else {
+        return result;
+    };
+
+    let has_abc = listeS
+        .iter()
+        .any(|token| matches!(token.as_str(), "abc" | "abcd"));
+    let blocked_process_by_abc = has_abc && listeS.len() == 2;
+    let args = listeS.iter().skip(1).cloned().collect::<Vec<_>>();
+
+    match first {
+        "shell" if !blocked_process_by_abc => {
+            result.cmdGaveOutput = true;
+            result.aktion = Some(PromptSonderBefehlAktion::Shell(args));
+        }
+        "python" if !blocked_process_by_abc => {
+            result.cmdGaveOutput = true;
+            result.aktion = Some(PromptSonderBefehlAktion::Python(args.join(" ")));
+        }
+        "math" => {
+            result.cmdGaveOutput = true;
+            result.aktion = Some(PromptSonderBefehlAktion::Math(args.join(" ")));
+        }
+        _ => {}
+    }
+
+    if !has_abc && listeS.iter().any(|token| token == "loggen") {
+        result.cmdGaveOutput = true;
+        result.loggingSwitch = true;
+        result.loggingCommand = Some(true);
+    } else if !has_abc && listeS.iter().any(|token| token == "nichtloggen") {
+        result.cmdGaveOutput = true;
+        result.loggingSwitch = false;
+        result.loggingCommand = Some(false);
+    }
+
+    result
 }
 
 pub fn replace_prompt_alias(token: &str) -> String {
@@ -5980,27 +6050,177 @@ fn expand_python_fraction_groups_for_global_vielfache(
     expanded
 }
 
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AddMoreValsResult {
+    pub EsGabzahlenAngaben: bool,
+    pub bruch_GanzZahlReziprokeDazu: Vec<String>,
+    pub dazu: Vec<String>,
+    pub sdazu: Vec<String>,
+}
+
+fn gcd_abs_i64(mut a: i64, mut b: i64) -> i64 {
+    a = a.abs();
+    b = b.abs();
+    while b != 0 {
+        let r = a % b;
+        a = b;
+        b = r;
+    }
+    a.max(1)
+}
+
+fn normalize_fraction_like_python(mut numerator: i64, mut denominator: i64) -> Option<(i64, i64)> {
+    if denominator == 0 {
+        return None;
+    }
+    if denominator < 0 {
+        numerator = -numerator;
+        denominator = -denominator;
+    }
+    let gcd = gcd_abs_i64(numerator, denominator);
+    Some((numerator / gcd, denominator / gcd))
+}
+
+/// Python `retaPrompt.addMoreVals`: add integer and reciprocal side effects
+/// yielded by one normalized fraction.  This is the small helper used by the
+/// large fraction-management path before `zeiln1234create` receives its row
+/// buckets.
+#[allow(non_snake_case)]
+pub fn addMoreVals(
+    EsGabzahlenAngaben: bool,
+    bruch2_numerator: i64,
+    bruch2_denominator: i64,
+    mut bruch_GanzZahlReziprokeDazu: Vec<String>,
+    mut dazu: Vec<String>,
+    mut sdazu: Vec<String>,
+) -> AddMoreValsResult {
+    let mut es_gab_zahlen_angaben = EsGabzahlenAngaben;
+    let Some((numerator, denominator)) =
+        normalize_fraction_like_python(bruch2_numerator, bruch2_denominator)
+    else {
+        return AddMoreValsResult {
+            EsGabzahlenAngaben: es_gab_zahlen_angaben,
+            bruch_GanzZahlReziprokeDazu,
+            dazu,
+            sdazu,
+        };
+    };
+
+    if numerator != 0 && numerator % denominator == 0 {
+        let value = numerator / denominator;
+        dazu.push(value.to_string());
+        sdazu.push(value.to_string());
+        es_gab_zahlen_angaben = true;
+    }
+    if numerator != 0 && denominator % numerator == 0 {
+        let reciprocal = denominator / numerator;
+        dazu.push(format!("1/{reciprocal}"));
+        bruch_GanzZahlReziprokeDazu.push(reciprocal.to_string());
+    }
+
+    AddMoreValsResult {
+        EsGabzahlenAngaben: es_gab_zahlen_angaben,
+        bruch_GanzZahlReziprokeDazu,
+        dazu,
+        sdazu,
+    }
+}
+
+/// Python `retaPrompt.addMoreVals2`: walk a grouped fraction dictionary and
+/// feed every expanded numerator/denominator pair through `addMoreVals`.
+#[allow(non_snake_case)]
+pub fn addMoreVals2(
+    EsGabzahlenAngaben: bool,
+    mut bruch_GanzZahlReziprokeDazu: Vec<String>,
+    mut dazu: Vec<String>,
+    rangesBruecheOrReverseDict: &BTreeMap<i64, Vec<String>>,
+    mut sdazu: Vec<String>,
+    ifReverse: bool,
+) -> AddMoreValsResult {
+    let mut es_gab_zahlen_angaben = EsGabzahlenAngaben;
+
+    for (key, values) in rangesBruecheOrReverseDict {
+        if *key == 0 {
+            continue;
+        }
+        let joined = values.join(",");
+        let Some(expanded_values) = python_row_spec_to_numbers(&joined) else {
+            continue;
+        };
+        for value in expanded_values {
+            if value == 0 {
+                continue;
+            }
+            let (numerator, denominator) = if ifReverse {
+                (value, *key)
+            } else {
+                (*key, value)
+            };
+            let result = addMoreVals(
+                es_gab_zahlen_angaben,
+                numerator,
+                denominator,
+                bruch_GanzZahlReziprokeDazu,
+                dazu,
+                sdazu,
+            );
+            es_gab_zahlen_angaben = result.EsGabzahlenAngaben;
+            bruch_GanzZahlReziprokeDazu = result.bruch_GanzZahlReziprokeDazu;
+            dazu = result.dazu;
+            sdazu = result.sdazu;
+        }
+    }
+
+    AddMoreValsResult {
+        EsGabzahlenAngaben: es_gab_zahlen_angaben,
+        bruch_GanzZahlReziprokeDazu,
+        dazu,
+        sdazu,
+    }
+}
+
 fn add_python_fraction_integer_side_effects(
     groups: &BTreeMap<i64, BTreeSet<i64>>,
     primary_numbers: &mut BTreeSet<i64>,
     reciprocal_numbers: &mut BTreeSet<i64>,
     equal_fraction_numbers: &mut BTreeSet<i64>,
 ) {
+    let grouped_values = groups
+        .iter()
+        .map(|(key, values)| {
+            (
+                *key,
+                values
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let side_effects = addMoreVals2(false, Vec::new(), Vec::new(), &grouped_values, Vec::new(), false);
+
+    for value in side_effects.sdazu {
+        if let Ok(number) = value.parse::<i64>() {
+            if number > 0 {
+                primary_numbers.insert(number);
+            }
+        }
+    }
+    for value in side_effects.bruch_GanzZahlReziprokeDazu {
+        if let Ok(number) = value.parse::<i64>() {
+            if number > 0 {
+                reciprocal_numbers.insert(number);
+            }
+        }
+    }
+
     for (numerator, denominators) in groups {
         let numerator = (*numerator).abs();
         for denominator in denominators {
             let denominator = (*denominator).abs();
-            if numerator == 0 || denominator == 0 {
-                continue;
-            }
-            if numerator == denominator && numerator > 1 {
+            if numerator != 0 && denominator != 0 && numerator == denominator && numerator > 1 {
                 equal_fraction_numbers.insert(numerator);
-            }
-            if numerator % denominator == 0 {
-                primary_numbers.insert(numerator / denominator);
-            }
-            if denominator % numerator == 0 {
-                reciprocal_numbers.insert(denominator / numerator);
             }
         }
     }
@@ -7328,6 +7548,84 @@ fn build_single_semantic_call(
     ))
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct RetaCmdAbstractionNAnd1ProNResult {
+    was_n_1pro_n_cmd: bool,
+    cmd_gave_output: bool,
+    calls: Vec<Vec<String>>,
+}
+
+/// Python `retaPrompt.retaCmdAbstraction_n_and_1pron` for the normal
+/// semantic prompt commands. Python calls this helper for every command that
+/// may produce one table for `n` and another table for `1/n`; the Rust prompt
+/// used to spell the two branches inline in `build_reta_calls_from_prompt_tokens`.
+/// Keeping this phase named makes the control flow match `PromptGrosseAusgabe`:
+/// condition check, primary number rows, reciprocal rows, then final
+/// `retaExecuteNprint` argv construction.
+#[allow(non_snake_case)]
+fn retaCmdAbstraction_n_and_1pron(
+    condition: bool,
+    spec: &PromptSemanticSpec,
+    normalized: &[String],
+    row_buckets: &PythonRowBuckets,
+    use_range: bool,
+    invert: bool,
+    teiler: bool,
+    vielfache: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+    extra_params: &[String],
+    trailing_tokens: &[String],
+) -> RetaCmdAbstractionNAnd1ProNResult {
+    if !condition || normalized.iter().any(|token| matches!(token.as_str(), "abc" | "abcd")) {
+        return RetaCmdAbstractionNAnd1ProNResult::default();
+    }
+
+    let mut result = RetaCmdAbstractionNAnd1ProNResult {
+        was_n_1pro_n_cmd: true,
+        cmd_gave_output: false,
+        calls: Vec::new(),
+    };
+
+    if let Some(call) = build_single_semantic_call(
+        spec,
+        normalized,
+        &row_buckets.primary_row_specs,
+        false,
+        use_range,
+        invert,
+        teiler,
+        vielfache,
+        suppress_empty,
+        no_headers,
+        extra_params,
+        trailing_tokens,
+    ) {
+        result.cmd_gave_output = true;
+        result.calls.push(call);
+    }
+
+    if let Some(call) = build_single_semantic_call(
+        spec,
+        normalized,
+        &row_buckets.reciprocal_row_specs,
+        true,
+        use_range,
+        invert,
+        teiler,
+        vielfache,
+        suppress_empty,
+        no_headers,
+        extra_params,
+        trailing_tokens,
+    ) {
+        result.cmd_gave_output = true;
+        result.calls.push(call);
+    }
+
+    result
+}
+
 fn build_reciprocal_concept_call(
     reciprocal_row_specs: &[String],
     use_range: bool,
@@ -7455,8 +7753,6 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                 | "shell"
                 | "python"
                 | "math"
-                | "loggen"
-                | "nichtloggen"
         )
     }) {
         return Vec::new();
@@ -7484,27 +7780,11 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
             if spec.names.contains(&token.as_str()) {
                 let label = spec.names[0].to_string();
                 if seen_labels.insert(label) {
-                    if let Some(call) = build_single_semantic_call(
-                        spec,
-                        &normalized,
-                        &row_buckets.primary_row_specs,
-                        false,
-                        use_range,
-                        invert,
-                        teiler,
-                        vielfache,
-                        suppress_empty,
-                        no_headers,
-                        &extra_params,
-                        &[],
-                    ) {
-                        calls.push(call);
-                    }
-                    if let Some(call) = build_single_semantic_call(
-                        spec,
-                        &normalized,
-                        &row_buckets.reciprocal_row_specs,
+                    let abstraction = retaCmdAbstraction_n_and_1pron(
                         true,
+                        spec,
+                        &normalized,
+                        &row_buckets,
                         use_range,
                         invert,
                         teiler,
@@ -7513,9 +7793,9 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
                         no_headers,
                         &extra_params,
                         &[],
-                    ) {
-                        calls.push(call);
-                    }
+                    );
+                    let _ = (abstraction.was_n_1pro_n_cmd, abstraction.cmd_gave_output);
+                    calls.extend(abstraction.calls);
                     calls.extend(build_non_whole_fraction_semantic_calls(
                         spec,
                         &row_buckets,
@@ -7636,8 +7916,6 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
                 | "shell"
                 | "python"
                 | "math"
-                | "loggen"
-                | "nichtloggen"
         )
     }) {
         return None;
@@ -8486,16 +8764,18 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use super::{
-        anotherOberesMaximum, bruchBereichsManagementAndWbefehl, bruchSpalt,
+        addMoreVals, addMoreVals2, anotherOberesMaximum, bruchBereichsManagementAndWbefehl, bruchSpalt,
         build_reta_calls_from_prompt_tokens, createRangesForBruchLists, dictToList,
         expand_kurz_kurz_befehl, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
         getDictLimtedByKeyList, grKl, PromptLoescheVorSpeicherungBefehle, TXT,
         expand_python_regex_like_tokens, findregEx, regExReplace, allEqSignAbarbeitung, aufloesen, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-        prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe, PromptGrosseAusgabe,
+        prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe,
+        PromptGrosseAusgabe, PromptSonderBefehlAktion,
+        PromptVonGrosserAusgabeSonderBefehlAusgaben,
         is_15or16_command, is_zeilen_angabe_between_kommas_py, isReTaParameter,
         libreta_prompt_custom_split, libreta_prompt_custom_split2, retaExecuteNprint,
         zeiln1234create,
@@ -8557,6 +8837,66 @@ mod tests {
 
         let bruch_range = bruchSpalt("1/2-3/3");
         assert_eq!(createRangesForBruchLists(&bruch_range), Some((vec![1, 2, 3], "2-3".to_string())));
+    }
+
+    #[test]
+    fn reta_prompt_add_more_vals_helpers_match_python_side_effects() {
+        let one = addMoreVals(false, 4, 2, Vec::new(), Vec::new(), Vec::new());
+        assert!(one.EsGabzahlenAngaben);
+        assert_eq!(one.dazu, strings(&["2"]));
+        assert_eq!(one.sdazu, strings(&["2"]));
+        assert!(one.bruch_GanzZahlReziprokeDazu.is_empty());
+
+        let reciprocal = addMoreVals(false, 2, 8, Vec::new(), Vec::new(), Vec::new());
+        assert_eq!(reciprocal.dazu, strings(&["1/4"]));
+        assert_eq!(reciprocal.bruch_GanzZahlReziprokeDazu, strings(&["4"]));
+
+        let mut grouped = BTreeMap::new();
+        grouped.insert(2, strings(&["1", "4"]));
+        let many = addMoreVals2(false, Vec::new(), Vec::new(), &grouped, Vec::new(), false);
+        assert_eq!(many.dazu, strings(&["2", "1/2"]));
+        assert_eq!(many.sdazu, strings(&["2"]));
+        assert_eq!(many.bruch_GanzZahlReziprokeDazu, strings(&["2"]));
+    }
+
+    #[test]
+    fn reta_prompt_sonderbefehle_expose_python_process_and_logging_rules() {
+        let shell = PromptVonGrosserAusgabeSonderBefehlAusgaben(
+            false,
+            &strings(&["shell", "echo", "hi"]),
+            false,
+        );
+        assert!(shell.cmdGaveOutput);
+        assert_eq!(
+            shell.aktion,
+            Some(PromptSonderBefehlAktion::Shell(strings(&["echo", "hi"])))
+        );
+
+        let blocked = PromptVonGrosserAusgabeSonderBefehlAusgaben(
+            false,
+            &strings(&["shell", "abc"]),
+            false,
+        );
+        assert!(!blocked.cmdGaveOutput);
+        assert_eq!(blocked.aktion, None);
+
+        let logging = PromptVonGrosserAusgabeSonderBefehlAusgaben(
+            false,
+            &strings(&["12", "loggen"]),
+            false,
+        );
+        assert!(logging.cmdGaveOutput);
+        assert!(logging.loggingSwitch);
+        assert_eq!(logging.loggingCommand, Some(true));
+
+        let blocked_logging = PromptVonGrosserAusgabeSonderBefehlAusgaben(
+            false,
+            &strings(&["abc", "loggen"]),
+            false,
+        );
+        assert!(!blocked_logging.cmdGaveOutput);
+        assert!(!blocked_logging.loggingSwitch);
+        assert_eq!(blocked_logging.loggingCommand, None);
     }
 
     #[test]
@@ -8785,6 +9125,40 @@ mod tests {
         assert!(argv.iter().any(|token| token == "--keineleereninhalte"));
         assert!(argv.iter().any(|token| token == "--keineueberschriften"));
         assert!(argv.iter().any(|token| token == "--nocolor"));
+    }
+
+    #[test]
+    fn reta_cmd_abstraction_n_and_1pron_builds_primary_and_reciprocal_calls() {
+        let normalized = strings(&["emotion", "2", "1/2"]);
+        let bruch_management = super::bruch_bereichs_management_from_normalized("", &normalized, &[]);
+        let row_buckets = bruch_management.row_buckets();
+        let spec = super::semantic_specs()
+            .iter()
+            .find(|spec| spec.names.contains(&"emotion"))
+            .expect("emotion semantic spec");
+
+        let result = super::retaCmdAbstraction_n_and_1pron(
+            true,
+            spec,
+            &normalized,
+            &row_buckets,
+            bruch_management.useRange,
+            bruch_management.invertieren,
+            bruch_management.useTeiler,
+            bruch_management.useVielfache,
+            bruch_management.suppressEmpty,
+            bruch_management.noHeaders,
+            &bruch_management.extraParams,
+            &[],
+        );
+
+        assert!(result.was_n_1pro_n_cmd);
+        assert!(result.cmd_gave_output);
+        assert_eq!(result.calls.len(), 2, "{result:?}");
+        assert!(result.calls[0].iter().any(|token| token == "--grundstrukturen=emotion"));
+        assert!(result.calls[1].iter().any(|token| token == "--grundstrukturen=emotion"));
+        assert!(result.calls[0].iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=2,3"));
+        assert!(result.calls[1].iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=4,5"));
     }
 
     #[test]
@@ -9183,6 +9557,10 @@ mod tests {
         );
         assert_eq!(regExReplace(&strings(&["r\"emo.*\""])), strings(&["emotion"]));
         assert_eq!(
+            regExReplace(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
+            strings(&["reta", "-zeilen", "--zeit=heute"])
+        );
+        assert_eq!(
             allEqSignAbarbeitung(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
             strings(&["reta", "-zeilen", "--zeit=heute"])
         );
@@ -9238,40 +9616,6 @@ mod tests {
     fn prompt_execution_regex_at_reta_root_does_not_expand_section_flags() {
         let expanded = expand_python_regex_like_tokens(&strings(&["reta", "r\"^end.*\""]));
         assert_eq!(expanded, strings(&["reta"]));
-    }
-
-    #[test]
-    fn prompt_execution_regex_uses_expanded_reta_main_switch_as_context() {
-        let expanded = expand_python_regex_like_tokens(&strings(&[
-            "reta",
-            "r\"^zei.*\"",
-            "--zeit=r\"heu.*\"",
-        ]));
-        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
-    }
-
-    #[test]
-    fn reg_ex_replace_facade_handles_split_equals_like_python() {
-        assert_eq!(
-            regExReplace(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
-            strings(&["reta", "-zeilen", "--zeit=heute"])
-        );
-    }
-
-    #[test]
-    fn prompt_grosse_ausgabe_keeps_regex_expanded_raw_reta_argv() {
-        let result = PromptGrosseAusgabe(
-            "",
-            PromptModus::Normal,
-            PromptModus::Normal,
-            PromptModus::Normal,
-            "reta r\"^zei.*\" --zeit=r\"heu.*\"",
-            &[],
-        );
-        assert_eq!(
-            result.retaArgv,
-            Some(strings(&["reta", "-zeilen", "--zeit=heute"]))
-        );
     }
 
     #[test]

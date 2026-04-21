@@ -1463,6 +1463,22 @@ impl TablesPrepare {
             .program
             .prepare4out_py(paramLines, paramLinesNot, relitable, rowsAsNumbers)
     }
+
+    /// Python `Prepare.prepare4out_Tagging`: register exact metadata/tags for
+    /// the visible output columns.  The heavy tag derivation lives in the
+    /// shared `Program` port; this facade keeps the original Python phase name
+    /// and lets callers/tests execute it directly.
+    #[allow(non_snake_case)]
+    pub fn prepare4out_Tagging(&self, rowsRange: Vec<i64>) -> BTreeMap<i64, BTreeSet<ST>> {
+        let mut state = self.state.borrow_mut();
+        sync_program_runtime_fields(&mut state);
+        for original_col in dedup_preserve_order_i64(rowsRange) {
+            state
+                .program
+                .register_visible_column_metadata_exact_py(original_col);
+        }
+        state.program.generatedSpaltenParameter_Tags.clone()
+    }
 }
 
 #[derive(Clone, Debug)]

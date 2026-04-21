@@ -7,6 +7,7 @@ use super::python_like::{
     python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, PromptGrosseAusgabe,
     PromptLoescheVorSpeicherungBefehle, PromptModus,
+    PromptSonderBefehlAktion, PromptVonGrosserAusgabeSonderBefehlAusgaben,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -103,16 +104,19 @@ fn raw_prompt_tokens_like_python(text: &str) -> Vec<String> {
     libreta_prompt_custom_split(text)
 }
 
+fn compile_python_process_command_from_tokens(tokens: &[String]) -> Option<PromptCommand> {
+    let decision = PromptVonGrosserAusgabeSonderBefehlAusgaben(false, tokens, false);
+    let command = match decision.aktion? {
+        PromptSonderBefehlAktion::Shell(args) => PromptCommand::Shell(args),
+        PromptSonderBefehlAktion::Python(command_text) => PromptCommand::Python(command_text),
+        PromptSonderBefehlAktion::Math(command_text) => PromptCommand::Math(command_text),
+    };
+    Some(append_sonder_logging_toggle_like_python(command, tokens))
+}
+
 fn compile_python_process_command_from_raw_text(text: &str) -> Option<PromptCommand> {
     let tokens = raw_prompt_tokens_like_python(text);
-    let first = tokens.first()?.clone();
-    let args = tokens.into_iter().skip(1).collect::<Vec<_>>();
-    match first.as_str() {
-        "shell" => Some(PromptCommand::Shell(args)),
-        "python" => Some(PromptCommand::Python(args.join(" "))),
-        "math" => Some(PromptCommand::Math(args.join(" "))),
-        _ => None,
-    }
+    compile_python_process_command_from_tokens(&tokens)
 }
 
 fn compile_normalized_control_command(tokens: &[String]) -> Option<PromptCommand> {
@@ -191,45 +195,49 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
     if let Some(command) = compile_normalized_control_command(&effective_tokens) {
         return Ok(command);
     }
-    if effective_tokens[0] == "shell" {
-        return Ok(PromptCommand::Shell(
-            effective_tokens.into_iter().skip(1).collect(),
-        ));
-    }
-    if effective_tokens[0] == "python" {
-        return Ok(PromptCommand::Python(
-            effective_tokens.into_iter().skip(1).collect::<Vec<_>>().join(" "),
-        ));
-    }
-    if effective_tokens[0] == "math" {
-        return Ok(PromptCommand::Math(
-            effective_tokens.into_iter().skip(1).collect::<Vec<_>>().join(" "),
-        ));
+    if let Some(command) = compile_python_process_command_from_tokens(&effective_tokens) {
+        return Ok(command);
     }
     let direct_number_output = compile_direct_number_command(&effective_tokens);
     if let Some(output) = compile_abc_abcd_command(&effective_tokens) {
         return Ok(PromptCommand::Immediate(output));
     }
     if effective_tokens[0] == "reta" {
-        return Ok(PromptCommand::Reta(effective_tokens));
+        return Ok(append_sonder_logging_toggle_like_python(
+            PromptCommand::Reta(effective_tokens.clone()),
+            &effective_tokens,
+        ));
     }
     if effective_tokens[0].starts_with('-') {
         let mut argv = vec!["reta".to_string()];
-        argv.extend(effective_tokens);
-        return Ok(PromptCommand::Reta(argv));
+        argv.extend(effective_tokens.clone());
+        return Ok(append_sonder_logging_toggle_like_python(
+            PromptCommand::Reta(argv),
+            &effective_tokens,
+        ));
     }
     let calls = grosse_ausgabe.retaCalls.clone();
     if !calls.is_empty() {
-        return Ok(append_direct_number_output_like_python(
+        let command = append_direct_number_output_like_python(
             prompt_command_from_reta_calls(calls),
             direct_number_output,
-        ));
+        );
+        return Ok(append_sonder_logging_toggle_like_python(command, &effective_tokens));
     }
     if let Some(output) = direct_number_output {
-        return Ok(PromptCommand::Immediate(output));
+        return Ok(append_sonder_logging_toggle_like_python(
+            PromptCommand::Immediate(output),
+            &effective_tokens,
+        ));
     }
     if let Some(argv) = grosse_ausgabe.retaArgv.clone() {
-        return Ok(PromptCommand::Reta(argv));
+        return Ok(append_sonder_logging_toggle_like_python(
+            PromptCommand::Reta(argv),
+            &effective_tokens,
+        ));
+    }
+    if let Some(enabled) = PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &effective_tokens, false).loggingCommand {
+        return Ok(PromptCommand::ToggleLogging(enabled));
     }
 
     Err(format!(
@@ -288,10 +296,7 @@ fn PromptScope_route_for_input(
         return PromptScopeRoute::LoeschenInput;
     }
 
-    if matches!(
-        tokens.first().map(String::as_str),
-        Some("shell" | "python" | "math")
-    ) {
+    if compile_python_process_command_from_tokens(tokens).is_some() {
         return PromptScopeRoute::ProcessCommand;
     }
 
@@ -449,10 +454,8 @@ fn raw_input_bypasses_stored_merge(trimmed: &str, tokens: &[String]) -> bool {
         return true;
     }
 
-    matches!(
-        tokens.first().map(String::as_str),
-        Some("shell" | "python" | "math" | ":mode")
-    )
+    compile_python_process_command_from_tokens(tokens).is_some()
+        || matches!(tokens.first().map(String::as_str), Some(":mode"))
 }
 
 fn is_store_before_token(token: &str) -> bool {
@@ -581,6 +584,30 @@ fn append_direct_number_output_like_python(
     match direct_number_output {
         Some(output) => PromptCommand::Sequence(vec![command, PromptCommand::Immediate(output)]),
         None => command,
+    }
+}
+
+fn append_sonder_logging_toggle_like_python(
+    command: PromptCommand,
+    tokens: &[String],
+) -> PromptCommand {
+    let decision = PromptVonGrosserAusgabeSonderBefehlAusgaben(false, tokens, false);
+    let Some(enabled) = decision.loggingCommand else {
+        return command;
+    };
+
+    match command {
+        PromptCommand::ToggleLogging(_) => PromptCommand::ToggleLogging(enabled),
+        PromptCommand::Sequence(mut commands) => {
+            if !commands
+                .iter()
+                .any(|command| matches!(command, PromptCommand::ToggleLogging(_)))
+            {
+                commands.push(PromptCommand::ToggleLogging(enabled));
+            }
+            PromptCommand::Sequence(commands)
+        }
+        other => PromptCommand::Sequence(vec![other, PromptCommand::ToggleLogging(enabled)]),
     }
 }
 
@@ -1958,6 +1985,16 @@ mod tests {
         }
     }
 
+    fn has_logging_toggle(command: &PromptCommand, enabled: bool) -> bool {
+        match command {
+            PromptCommand::ToggleLogging(value) => *value == enabled,
+            PromptCommand::Sequence(commands) => {
+                commands.iter().any(|command| has_logging_toggle(command, enabled))
+            }
+            _ => false,
+        }
+    }
+
     fn argv_has(argv: &[String], token: &str) -> bool {
         argv.iter().any(|entry| entry == token)
     }
@@ -2507,6 +2544,38 @@ mod tests {
             PromptCommand::Python(code) => assert_eq!(code, "print(\"a b\")"),
             other => panic!("expected python command, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn shell_python_process_commands_respect_python_abc_escape_rule() {
+        let command = compile_command("shell abc", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.title, "abc");
+                assert_eq!(output.text, "19 8 5 12 12");
+            }
+            other => panic!("expected abc immediate command, got {other:?}"),
+        }
+
+        let command = compile_command("python abc", PromptModus::Normal).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.title, "abc");
+                assert_eq!(output.text, "16 25 20 8 15 14");
+            }
+            other => panic!("expected abc immediate command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_logging_token_appends_toggle_after_python_output_phase() {
+        let command = compile_command("12 a loggen", PromptModus::Normal).unwrap();
+        assert!(has_logging_toggle(&command, true), "{command:?}");
+        assert!(!reta_argvs(&command).is_empty(), "{command:?}");
+
+        let command = compile_command("12 a nichtloggen", PromptModus::Normal).unwrap();
+        assert!(has_logging_toggle(&command, false), "{command:?}");
+        assert!(!reta_argvs(&command).is_empty(), "{command:?}");
     }
 
 }

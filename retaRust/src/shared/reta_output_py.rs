@@ -608,7 +608,7 @@ fn html_exact_header_attrs_py(
         }
     }
 
-    fn register_visible_column_metadata_exact_py(&mut self, original_col: i64) {
+    pub(crate) fn register_visible_column_metadata_exact_py(&mut self, original_col: i64) {
         if original_col < 0 {
             return;
         }
