@@ -217,6 +217,38 @@ impl Program {
         out
     }
 
+    pub(crate) fn language_parameter_value_py(cmd_without_dash: &str) -> Option<&str> {
+        cmd_without_dash
+            .strip_prefix("language=")
+            .or_else(|| cmd_without_dash.strip_prefix("sprache="))
+    }
+
+    pub(crate) fn is_known_language_value_py(lang: &str) -> bool {
+        matches!(
+            lang,
+            "english"
+                | "englisch"
+                | "deutsch"
+                | "german"
+                | "vietnamesisch"
+                | "vietnamese"
+                | "tiếngviệt"
+                | "chinesisch"
+                | "chinese"
+                | "中國人"
+                | "koreanisch"
+                | "korean"
+                | "한국인"
+                // Keep the short Rust-era spellings accepted as aliases, but
+                // prefer the Python spellings above in generated tests.
+                | "de"
+                | "en"
+                | "cn"
+                | "kr"
+                | "vn"
+        )
+    }
+
     pub fn produceAllSpaltenNumbers(&mut self, neg: &str) -> Vec<i64> {
         if self.spaltenArtenKey_SpaltennummernValue.is_empty() {
             self.init_spalten_arten_python_like();
@@ -239,6 +271,10 @@ impl Program {
                 if let Some(v) = self.mainParaCmds.get(&plain) {
                     last_main_cmd = *v;
                 } else if plain == "nichts" || plain == "nothing" {
+                } else if let Some(lang) = Self::language_parameter_value_py(&plain) {
+                    if !Self::is_known_language_value_py(lang) && neg.is_empty() {
+                        self.cliErrors.push("wrongLangSentence".to_string());
+                    }
                 } else if neg.is_empty() {
                     self.cliErrors.push(format!(
                         "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein Nebenparameter, wie möglicherweise: \"{}\" ausgeführt werden kann. Hauptparameter sind: -zeilen -spalten -kombination -ausgabe -debug -h -help",
@@ -535,4 +571,23 @@ impl Program {
     }
 
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn produce_all_spalten_numbers_accepts_python_language_parameter() {
+        let mut program = Program::new(vec!["reta".to_string(), "-language=english".to_string()]);
+        program.produceAllSpaltenNumbers("");
+        assert!(program.cliErrors.is_empty(), "valid -language=english must be ignored like Python");
+    }
+
+    #[test]
+    fn produce_all_spalten_numbers_rejects_unknown_language_like_python() {
+        let mut program = Program::new(vec!["reta".to_string(), "-language=xx".to_string()]);
+        program.produceAllSpaltenNumbers("");
+        assert_eq!(program.cliErrors, vec!["wrongLangSentence".to_string()]);
+    }
 }

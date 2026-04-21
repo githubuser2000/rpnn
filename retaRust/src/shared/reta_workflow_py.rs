@@ -597,15 +597,72 @@ impl Program {
         self.tableGenerated = self.tableGenerated || self.newTable;
     }
 
+    /// Python `Program.__init__(..., runAlles=True)` runs the full workflow before
+    /// `run()` is ever called and then protects `run()` from doing the same work
+    /// again.  The Rust launcher calls this method first and then `run()`, so keep
+    /// the Python ordering explicit instead of leaving the constructor behaviour
+    /// split across unrelated calls.
+    pub fn runAllesLikePythonInit(&mut self, words: &Words) {
+        if self.__runAlles && self.allImportantBeginThingsDone {
+            return;
+        }
+        self.__runAlles = true;
+        self.__invertAlles = false;
+        self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
+    }
+
+    /// Python `Program.run()` only performs the workflow when the constructor was
+    /// created with `runAlles=False`.  It must not flip `__invertAlles`; that is a
+    /// separate Python method and changing it after the workflow makes subsequent
+    /// stateful calls diverge from the reference implementation.
     pub fn run(&mut self, words: &Words) {
         if !self.__runAlles {
             self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
         }
-        self.invertAlles();
         self.printOrStoreLines();
         self.runDone = true;
     }
+}
 
-    pub fn runAllesLikePythonInit(&mut self, _words: &Words) {
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    fn empty_words() -> Words {
+        Words {
+            paraNdataMatrix: vec![],
+            kombiParaNdataMatrix: IndexMap::new(),
+            kombiParaNdataMatrix2: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn run_alles_like_python_init_runs_constructor_workflow_once() {
+        let words = empty_words();
+        let mut program = Program::new(vec!["reta".to_string(), "-h".to_string()]);
+
+        program.runAllesLikePythonInit(&words);
+        assert!(program.__runAlles);
+        assert!(program.allImportantBeginThingsDone);
+        assert!(!program.__invertAlles);
+        let result_after_init = program.__resultingTable.clone();
+
+        program.run(&words);
+        assert_eq!(program.__resultingTable, result_after_init);
+        assert!(program.runDone);
+        assert!(!program.__invertAlles);
+    }
+
+    #[test]
+    fn run_without_constructor_guard_does_not_force_invert_alles() {
+        let words = empty_words();
+        let mut program = Program::new(vec!["reta".to_string(), "-h".to_string()]);
+
+        program.run(&words);
+        assert!(!program.__runAlles);
+        assert!(program.allImportantBeginThingsDone);
+        assert!(program.runDone);
+        assert!(!program.__invertAlles);
     }
 }

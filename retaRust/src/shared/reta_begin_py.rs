@@ -449,10 +449,8 @@ impl Program {
                     if neg.is_empty() {
                         self.helpPage();
                     }
-                } else if cmd.starts_with("sprache=") {
-                    let lang = cmd[8..].to_string();
-                    let known = ["de", "en", "cn", "kr", "vn"];
-                    if !known.contains(&lang.as_str()) && neg.is_empty() {
+                } else if let Some(lang) = Self::language_parameter_value_py(&cmd) {
+                    if !Self::is_known_language_value_py(lang) && neg.is_empty() {
                         self.cliErrors.push("wrongLangSentence".to_string());
                     }
                 } else if neg.is_empty() {
@@ -1112,6 +1110,15 @@ mod tests {
         assert!(program.oberesMaximum("--oberesmaximum=10"));
         assert_eq!(program.hoechsteZeile, 1024);
         assert_eq!(program.oberesMaximum2(vec![]), Some(1024));
+    }
+
+    #[test]
+    fn parameters_to_commands_accepts_python_language_parameter() {
+        let words = empty_words();
+        let argv = vec!["reta".to_string(), "-language=english".to_string()];
+        let mut program = Program::new(argv.clone());
+        let _ = program.parametersToCommandsAndNumbers(&argv, "", &words);
+        assert!(program.cliErrors.is_empty(), "valid Python -language=english must not be treated as an unknown main parameter");
     }
 
     #[test]
