@@ -291,6 +291,74 @@ fn should_append_exact_suffix(input: &str) -> bool {
     )
 }
 
+fn contains_python_history_toggle_token(input: &str) -> bool {
+    libreta_prompt_custom_split(input.trim())
+        .iter()
+        .any(|token| token == "loggen" || token == "nichtloggen")
+}
+
+fn should_record_prompt_history(input: &str) -> bool {
+    !input.trim().is_empty() && !contains_python_history_toggle_token(input)
+}
+
+fn record_prompt_input(state: &mut SessionState, input: &str) {
+    if should_record_prompt_history(input) {
+        state.history_lines.push(input.to_string());
+    }
+}
+
+fn append_prompt_input_log(path: &PathBuf, state: &SessionState, input: &str) {
+    if state.logging_enabled && should_record_prompt_history(input) {
+        append_log_line(path, "input", input);
+    }
+}
+
+fn scrub_prompt_history_toggle_line(history_path: &PathBuf, input: &str) {
+    if !contains_python_history_toggle_token(input) {
+        return;
+    }
+
+    let Ok(raw) = std::fs::read_to_string(history_path) else {
+        return;
+    };
+
+    let mut changed = false;
+    let kept = raw
+        .lines()
+        .filter(|line| {
+            let keep = line.trim() != input.trim();
+            if !keep {
+                changed = true;
+            }
+            keep
+        })
+        .collect::<Vec<_>>();
+
+    if changed {
+        let mut rebuilt = kept.join("\n");
+        if !rebuilt.is_empty() {
+            rebuilt.push('\n');
+        }
+        let _ = std::fs::write(history_path, rebuilt);
+    }
+}
+
+#[allow(non_snake_case)]
+fn promptInput(
+    state: &mut SessionState,
+    input: &str,
+    history_path: Option<&PathBuf>,
+    log_path: &PathBuf,
+) {
+    state.previous_input = state.last_input.clone();
+    state.last_input = input.to_string();
+    record_prompt_input(state, input);
+    if let Some(history_path) = history_path {
+        scrub_prompt_history_toggle_line(history_path, input);
+    }
+    append_prompt_input_log(log_path, state, input);
+}
+
 pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
     let program_name = program_name_from_argv(&argv);
     let profile = PromptFrontendProfile::from_program_name(&program_name, start_with_vi_mode);
@@ -416,13 +484,7 @@ fn run_one_shot(
         return output.exit_code;
     }
 
-    state.previous_input = state.last_input.clone();
-    state.last_input = input.clone();
-    state.history_lines.push(input.clone());
-
-    if state.logging_enabled {
-        append_log_line(log_path, "input", &input);
-    }
+    promptInput(state, &input, None, log_path);
 
     let compiled = match compile_command_with_state(&input, state) {
         Ok(command) => {
@@ -531,7 +593,7 @@ fn run_interactive_loop(
         &state.stored_commands,
     );
 
-    let mut editor = match build_editor(
+    let mut editor = match newSession(
         &history_path,
         state.current_mode(),
         state.logging_enabled,
@@ -576,7 +638,7 @@ fn run_interactive_loop(
                 || previous_logging_enabled != state.logging_enabled;
 
             if rebuild_editor {
-                editor = match build_editor(
+                editor = match newSession(
                     &history_path,
                     state.current_mode(),
                     state.logging_enabled,
@@ -607,15 +669,7 @@ fn run_interactive_loop(
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
-                state.previous_input = state.last_input.clone();
-                state.last_input = input.clone();
-                if !input.is_empty() {
-                    state.history_lines.push(input.clone());
-                }
-
-                if state.logging_enabled {
-                    append_log_line(&log_path, "input", &input);
-                }
+                promptInput(state, &input, Some(&history_path), &log_path);
 
                 let compile_input = if exact_mode_enabled {
                     apply_exact_mode_to_input(&input)
@@ -703,7 +757,7 @@ fn run_interactive_loop(
                     || previous_logging_enabled != state.logging_enabled;
 
                 if rebuild_editor {
-                    editor = match build_editor(
+                    editor = match newSession(
                         &history_path,
                         state.current_mode(),
                         state.logging_enabled,
@@ -803,7 +857,8 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
     );
 }
 
-fn build_editor(
+#[allow(non_snake_case)]
+fn newSession(
     history_path: &PathBuf,
     mode: EditModeKind,
     logging_enabled: bool,
@@ -884,7 +939,17 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_exact_mode_to_input, should_append_exact_suffix};
+    use super::{
+        apply_exact_mode_to_input, should_append_exact_suffix, should_record_prompt_history,
+    };
+
+    #[test]
+    fn toggle_history_commands_are_filtered_like_python_togglehistory() {
+        assert!(!should_record_prompt_history("loggen"));
+        assert!(!should_record_prompt_history("nichtloggen"));
+        assert!(!should_record_prompt_history("12 loggen"));
+        assert!(should_record_prompt_history("12 emotion"));
+    }
 
     #[test]
     fn rpb_exact_mode_appends_suffix_to_prompt_numbers_not_raw_reta() {

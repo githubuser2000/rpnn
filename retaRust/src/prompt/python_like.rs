@@ -6472,6 +6472,278 @@ fn build_python_row_section(
     )
 }
 
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Zeiln1234CreateResult {
+    pub zeiln1: String,
+    pub zeiln2: String,
+    pub zeiln3: String,
+    pub zeiln4: String,
+    pub zeilenTokens: Vec<String>,
+    pub bruchZeilenTokens: Vec<String>,
+}
+
+fn prompt_token_set(tokens: &[String]) -> BTreeSet<&str> {
+    tokens.iter().map(|token| token.as_str()).collect()
+}
+
+fn split_zeiln1234_tokens(tokens: &[String]) -> (String, String) {
+    let mut zeiln1 = String::new();
+    let mut zeiln2 = String::new();
+
+    for token in tokens {
+        if token.trim().is_empty() || token == "--invertieren" {
+            continue;
+        }
+
+        if token.starts_with("--vielfachevonzahlen=") {
+            if zeiln1.is_empty() {
+                zeiln1 = token.clone();
+            } else if zeiln2.is_empty() {
+                zeiln2 = token.clone();
+            }
+            continue;
+        }
+
+        if token.starts_with("--vorhervonausschnitt=") || token.starts_with("--zaehlung=") {
+            if zeiln1.is_empty() {
+                zeiln1 = token.clone();
+            } else if zeiln2.is_empty() {
+                zeiln2 = token.clone();
+            }
+            continue;
+        }
+
+        if token.starts_with("--oberesmaximum=") {
+            if zeiln2.is_empty() {
+                zeiln2 = token.clone();
+            }
+        }
+    }
+
+    (zeiln1, zeiln2)
+}
+
+fn row_specs_from_python_text(text: &str) -> Vec<String> {
+    let inner = strip_matching_row_wrappers(text.trim());
+    custom_split_delim_parenthesized(inner, ',')
+        .into_iter()
+        .map(|part| part.trim().to_string())
+        .filter(|part| !part.is_empty())
+        .collect()
+}
+
+fn prompt_flags_for_reta_execute(
+    invert: bool,
+    suppress_empty: bool,
+    no_headers: bool,
+) -> Vec<String> {
+    let mut flags = Vec::new();
+    if invert {
+        flags.push("invertieren".to_string());
+    }
+    if suppress_empty {
+        flags.push("keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar".to_string());
+    }
+    if no_headers {
+        flags.push("ee".to_string());
+    }
+    flags
+}
+
+fn zeiln1234create_from_row_options(
+    row_specs: &[String],
+    use_range: bool,
+    use_teiler: bool,
+    use_vielfache: bool,
+    invert: bool,
+    bruch_ganzzahl_reziproke: &[String],
+    max_num: i64,
+) -> Zeiln1234CreateResult {
+    let forced_seed = (max_num > prompt_python_default_oberesmaximum_seed()).then_some(max_num);
+    let zeilen_tokens = build_python_row_section_with_custom_oberesmaximum(
+        row_specs,
+        use_range,
+        use_teiler,
+        use_vielfache,
+        invert,
+        forced_seed,
+    )
+    .map(|section| section.tokens)
+    .unwrap_or_else(|| vec!["--vorhervonausschnitt=0".to_string()]);
+    let (zeiln1, zeiln2) = split_zeiln1234_tokens(&zeilen_tokens);
+
+    let bruch_zeilen_tokens = if bruch_ganzzahl_reziproke.is_empty() {
+        vec!["--vorhervonausschnitt=0".to_string()]
+    } else {
+        build_fractional_prompt_row_section(bruch_ganzzahl_reziproke, use_range, false)
+            .map(|section| section.tokens)
+            .unwrap_or_else(|| vec!["--vorhervonausschnitt=0".to_string()])
+    };
+    let (zeiln3, zeiln4) = split_zeiln1234_tokens(&bruch_zeilen_tokens);
+
+    Zeiln1234CreateResult {
+        zeiln1,
+        zeiln2,
+        zeiln3,
+        zeiln4,
+        zeilenTokens: zeilen_tokens,
+        bruchZeilenTokens: bruch_zeilen_tokens,
+    }
+}
+
+/// Python `retaPrompt.zeiln1234create` as a side-effect-free row-section phase.
+///
+/// The Python function returns four already formatted `-zeilen` parameters that
+/// `retaExecuteNprint()` later places into a `reta` argv.  Rust keeps the same
+/// visible pieces and additionally exposes the token vectors so the newer
+/// builders do not need to rediscover which branch produced the row selection.
+#[allow(non_snake_case)]
+pub fn zeiln1234create(
+    stextE: &[String],
+    bedingungZahl: bool,
+    bruch_GanzZahlReziproke: &[String],
+    zahlenBereichC: &str,
+    maxNum: i64,
+    zahlenReiheKeineWteiler: &str,
+) -> Zeiln1234CreateResult {
+    let token_set = prompt_token_set(stextE);
+    let source = if zahlenReiheKeineWteiler.trim().is_empty() {
+        zahlenBereichC
+    } else {
+        zahlenReiheKeineWteiler
+    };
+    let row_specs = if bedingungZahl {
+        row_specs_from_python_text(source)
+    } else {
+        Vec::new()
+    };
+    let use_range = token_set.contains("range");
+    let use_teiler = token_set.contains("teiler") || token_set.contains("w");
+    let einzeln = token_set.contains("einzeln");
+    let use_vielfache = !einzeln && (token_set.contains("vielfache") || token_set.contains("v"));
+    let invert = token_set.contains("invertieren") || token_set.contains("--invertieren");
+
+    if !bedingungZahl {
+        let bruch_zeilen_tokens = if bruch_GanzZahlReziproke.is_empty() {
+            vec!["--vorhervonausschnitt=0".to_string()]
+        } else {
+            build_fractional_prompt_row_section(bruch_GanzZahlReziproke, use_range, false)
+                .map(|section| section.tokens)
+                .unwrap_or_else(|| vec!["--vorhervonausschnitt=0".to_string()])
+        };
+        let (zeiln3, zeiln4) = split_zeiln1234_tokens(&bruch_zeilen_tokens);
+        return Zeiln1234CreateResult {
+            zeiln1: String::new(),
+            zeiln2: String::new(),
+            zeiln3,
+            zeiln4,
+            zeilenTokens: Vec::new(),
+            bruchZeilenTokens: bruch_zeilen_tokens,
+        };
+    }
+
+    zeiln1234create_from_row_options(
+        &row_specs,
+        use_range,
+        use_teiler,
+        use_vielfache,
+        invert,
+        bruch_GanzZahlReziproke,
+        maxNum,
+    )
+}
+
+fn push_reta_execute_token(argv: &mut Vec<String>, token: impl Into<String>) {
+    let token = token.into();
+    if !token.trim().is_empty() {
+        argv.push(token);
+    }
+}
+
+fn cleanup_python_vorhervonausschnitt_zero(argv: &mut Vec<String>) {
+    let count = argv
+        .iter()
+        .filter(|token| token.starts_with("--vorhervonausschnitt="))
+        .count();
+    if count <= 1 {
+        return;
+    }
+    if let Some(index) = argv
+        .iter()
+        .position(|token| token == "--vorhervonausschnitt=0")
+    {
+        argv.remove(index);
+    }
+}
+
+/// Python `retaPrompt.retaExecuteNprint` up to the point where Python calls
+/// `reta.Program(kette, Txt=Txt)`: build the exact `kette`/argv shape once and
+/// let the caller decide whether to execute it, batch it, or test it.
+#[allow(non_snake_case)]
+pub fn retaExecuteNprint(
+    ketten: &[String],
+    stextE: &[String],
+    zeiln1: &str,
+    zeiln2: &str,
+    welcheSpalten: &[String],
+    ErlaubteSpalten: Option<&str>,
+) -> Vec<String> {
+    let mut kette = vec!["reta".to_string(), "-zeilen".to_string()];
+    push_reta_execute_token(&mut kette, zeiln1.to_string());
+    push_reta_execute_token(&mut kette, zeiln2.to_string());
+
+    if stextE
+        .iter()
+        .any(|token| token == "invertieren" || token == "--invertieren")
+        && !kette.iter().any(|token| token == "--invertieren")
+    {
+        kette.push("--invertieren".to_string());
+    }
+
+    kette.push("-spalten".to_string());
+    push_reta_execute_token(&mut kette, welcheSpalten.join(""));
+    kette.push("-ausgabe".to_string());
+    kette.push("--breite=0".to_string());
+
+    if let Some(erlaubte_spalten) = ErlaubteSpalten {
+        if !erlaubte_spalten.trim().is_empty() {
+            kette.push(format!(
+                "--spaltenreihenfolgeundnurdiese={}",
+                erlaubte_spalten.trim()
+            ));
+        }
+    }
+
+    if stextE
+        .iter()
+        .any(|token| token == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
+        && !kette.iter().any(|token| token == "--keineleereninhalte")
+    {
+        kette.push("--keineleereninhalte".to_string());
+    }
+    if stextE
+        .iter()
+        .any(|token| token == "ee" || token == "--keineueberschriften")
+        && !kette.iter().any(|token| token == "--keineueberschriften")
+    {
+        kette.push("--keineueberschriften".to_string());
+    }
+
+    for parameter in returnOnlyParasAsList(stextE) {
+        if !kette.iter().any(|token| token == &parameter) {
+            kette.push(parameter);
+        }
+    }
+    for token in ketten {
+        push_reta_execute_token(&mut kette, token.clone());
+    }
+
+    cleanup_python_vorhervonausschnitt_zero(&mut kette);
+    kette
+}
+
 fn build_trailing_primary_zeilen_tokens(
     primary_row_specs: &[String],
     use_range: bool,
@@ -6612,27 +6884,28 @@ fn build_general_semantic_call(
     extra_params: &[String],
     trailing_tokens: &[String],
 ) -> Vec<String> {
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
-    if let Some(section) =
-        build_python_row_section(row_specs, use_range, use_teiler, use_vielfache, invert)
-    {
-        argv.extend(section.tokens);
-    }
-    argv.push("-spalten".to_string());
-    argv.push(para.to_string());
-    argv.push("-ausgabe".to_string());
-    argv.push("--breite=0".to_string());
-    if let Some(cols) = cols {
-        if !cols.trim().is_empty() {
-            argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
-        }
-    }
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
-    }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
-    }
+    let zeiln = if row_specs.is_empty() {
+        Zeiln1234CreateResult::default()
+    } else {
+        zeiln1234create_from_row_options(
+            row_specs,
+            use_range,
+            use_teiler,
+            use_vielfache,
+            invert,
+            &[],
+            prompt_python_default_oberesmaximum_seed(),
+        )
+    };
+    let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
+    let mut argv = retaExecuteNprint(
+        &[],
+        &stext_e,
+        &zeiln.zeiln1,
+        &zeiln.zeiln2,
+        &[para.to_string()],
+        cols,
+    );
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     for token in trailing_tokens {
         argv.push(token.clone());
@@ -6677,32 +6950,31 @@ fn build_primzahlkreuz_prompt_call(
     no_headers: bool,
     extra_params: &[String],
 ) -> Vec<String> {
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
-    if let Some(section) = build_python_row_section_with_custom_oberesmaximum(
+    let zeilen_tokens = build_python_row_section_with_custom_oberesmaximum(
         row_specs,
         use_range,
         use_teiler,
         use_vielfache,
         invert,
         Some(python_row_multiple_limit()),
-    ) {
-        argv.extend(section.tokens);
-    } else {
-        argv.push(another_oberesmaximum_from_row_specs_with_seed(
+    )
+    .map(|section| section.tokens)
+    .unwrap_or_else(|| {
+        vec![another_oberesmaximum_from_row_specs_with_seed(
             &[],
             python_row_multiple_limit(),
-        ));
-    }
-    argv.push("-spalten".to_string());
-    argv.push("--bedeutung=primzahlkreuz".to_string());
-    argv.push("-ausgabe".to_string());
-    argv.push("--breite=0".to_string());
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
-    }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
-    }
+        )]
+    });
+    let (zeiln1, zeiln2) = split_zeiln1234_tokens(&zeilen_tokens);
+    let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
+    let mut argv = retaExecuteNprint(
+        &[],
+        &stext_e,
+        &zeiln1,
+        &zeiln2,
+        &["--bedeutung=primzahlkreuz".to_string()],
+        None,
+    );
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     argv
 }
@@ -6843,20 +7115,17 @@ fn build_non_whole_fraction_semantic_call(
     cols: &str,
     extra_params: &[String],
 ) -> Option<Vec<String>> {
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
     let section = build_fractional_prompt_row_section(row_specs, use_range, invert)?;
-    argv.extend(section.tokens);
-    argv.push("-spalten".to_string());
-    argv.push(para.to_string());
-    argv.push("-ausgabe".to_string());
-    argv.push("--breite=0".to_string());
-    argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
-    }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
-    }
+    let (zeiln1, zeiln2) = split_zeiln1234_tokens(&section.tokens);
+    let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
+    let mut argv = retaExecuteNprint(
+        &[],
+        &stext_e,
+        &zeiln1,
+        &zeiln2,
+        &[para.to_string()],
+        Some(cols),
+    );
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     Some(argv)
 }
@@ -6932,24 +7201,21 @@ fn build_equal_fraction_semantic_call(
         return None;
     }
 
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
     let section = build_fractional_prompt_row_section(
         &row_buckets.equal_fraction_row_specs,
         use_range,
         invert,
     )?;
-    argv.extend(section.tokens);
-    argv.push("-spalten".to_string());
-    argv.push(para.to_string());
-    argv.push("-ausgabe".to_string());
-    argv.push("--breite=0".to_string());
-    argv.push(format!("--spaltenreihenfolgeundnurdiese={cols}"));
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
-    }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
-    }
+    let (zeiln1, zeiln2) = split_zeiln1234_tokens(&section.tokens);
+    let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
+    let mut argv = retaExecuteNprint(
+        &[],
+        &stext_e,
+        &zeiln1,
+        &zeiln2,
+        &[para.to_string()],
+        Some(cols),
+    );
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     Some(argv)
 }
@@ -7010,29 +7276,27 @@ fn build_reciprocal_concept_call(
     extra_params: &[String],
     trailing_tokens: &[String],
 ) -> Vec<String> {
-    let mut argv = vec!["reta".to_string(), "-zeilen".to_string()];
-
-    if reciprocal_row_specs.is_empty() {
-        argv.push("--vorhervonausschnitt=0".to_string());
+    let zeilen_tokens = if reciprocal_row_specs.is_empty() {
+        let mut tokens = vec!["--vorhervonausschnitt=0".to_string()];
         if invert {
-            argv.push("--invertieren".to_string());
+            tokens.push("--invertieren".to_string());
         }
-    } else if let Some(section) =
+        tokens
+    } else {
         build_fractional_prompt_row_section(reciprocal_row_specs, use_range, invert)
-    {
-        argv.extend(section.tokens);
-    }
-
-    argv.push("-spalten".to_string());
-    argv.push(para.to_string());
-    argv.push("-ausgabe".to_string());
-    argv.push("--breite=0".to_string());
-    if suppress_empty {
-        argv.push("--keineleereninhalte".to_string());
-    }
-    if no_headers {
-        argv.push("--keineueberschriften".to_string());
-    }
+            .map(|section| section.tokens)
+            .unwrap_or_else(|| vec!["--vorhervonausschnitt=0".to_string()])
+    };
+    let (zeiln1, zeiln2) = split_zeiln1234_tokens(&zeilen_tokens);
+    let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
+    let mut argv = retaExecuteNprint(
+        &[],
+        &stext_e,
+        &zeiln1,
+        &zeiln2,
+        &[para.to_string()],
+        None,
+    );
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     for token in trailing_tokens {
         argv.push(token.clone());
@@ -8102,7 +8366,8 @@ mod tests {
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe,
         is_15or16_command, is_zeilen_angabe_between_kommas_py, isReTaParameter,
-        libreta_prompt_custom_split, libreta_prompt_custom_split2,
+        libreta_prompt_custom_split, libreta_prompt_custom_split2, retaExecuteNprint,
+        zeiln1234create,
         libreta_prompt_split_kpattern_commas_py, looks_like_numeric_or_fraction_range,
         python_row_spec_to_numbers, verifyBruchNganzZahlBetweenCommas,
         verifyBruchNganzZahlCommaList, verkuerze_dict, PromptModus,
@@ -8339,6 +8604,56 @@ mod tests {
         assert_eq!(vielfache.rowSpecs, strings(&["12"]));
         assert!(vielfache.useVielfache);
         assert!(!vielfache.useTeiler);
+    }
+
+    #[test]
+    fn zeiln1234create_names_python_row_builder_for_plain_and_vielfache() {
+        let plain = zeiln1234create(
+            &strings(&[]),
+            true,
+            &[],
+            "12",
+            1024,
+            "12",
+        );
+        assert_eq!(plain.zeiln1, "--vorhervonausschnitt=12");
+        assert_eq!(plain.zeiln2, "--oberesmaximum=1025");
+        assert_eq!(plain.zeiln3, "--vorhervonausschnitt=0");
+
+        let vielfache = zeiln1234create(
+            &strings(&["vielfache"]),
+            true,
+            &[],
+            "12",
+            1024,
+            "12",
+        );
+        assert_eq!(vielfache.zeiln1, "--vielfachevonzahlen=12");
+        assert_eq!(vielfache.zeiln2, "--vorhervonausschnitt=12,v12");
+    }
+
+    #[test]
+    fn reta_execute_nprint_builds_python_kette_shape() {
+        let argv = retaExecuteNprint(
+            &strings(&["--nocolor"]),
+            &strings(&[
+                "invertieren",
+                "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+                "ee",
+            ]),
+            "--vorhervonausschnitt=12",
+            "--oberesmaximum=1025",
+            &strings(&["--grundstrukturen=emotion"]),
+            Some("1,2"),
+        );
+        assert_eq!(argv[0], "reta");
+        assert_eq!(argv[1], "-zeilen");
+        assert!(argv.iter().any(|token| token == "--invertieren"));
+        assert!(argv.iter().any(|token| token == "--grundstrukturen=emotion"));
+        assert!(argv.iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2"));
+        assert!(argv.iter().any(|token| token == "--keineleereninhalte"));
+        assert!(argv.iter().any(|token| token == "--keineueberschriften"));
+        assert!(argv.iter().any(|token| token == "--nocolor"));
     }
 
     #[test]

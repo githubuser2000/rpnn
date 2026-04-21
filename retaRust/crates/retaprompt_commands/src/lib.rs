@@ -772,7 +772,9 @@ fn run_command_one_shot(input: String, program_name: String, emacs_output_mode: 
 
     state.previous_input = state.last_input.clone();
     state.last_input = input.clone();
-    state.history_lines.push(input.clone());
+    if should_record_prompt_history(&input) {
+        state.history_lines.push(input.clone());
+    }
 
     let compiled = match compile_command_with_state(&input, &state) {
         Ok(command) => {
@@ -914,6 +916,19 @@ fn should_append_exact_suffix(input: &str) -> bool {
     )
 }
 
+fn should_record_prompt_history(input: &str) -> bool {
+    let tokenized = match tokenize::split_shell_like(input.trim()) {
+        Ok(tokens) => tokens,
+        Err(_) => return !input.trim().is_empty(),
+    };
+
+    !tokenized.tokens.is_empty()
+        && !tokenized
+            .tokens
+            .iter()
+            .any(|token| token == "loggen" || token == "nichtloggen")
+}
+
 fn input_starts_with_reta(input: &str) -> bool {
     match tokenize::split_shell_like(input.trim()) {
         Ok(tokenized) => matches!(tokenized.tokens.first(), Some(token) if token == "reta"),
@@ -1030,6 +1045,14 @@ mod tests {
             apply_exact_mode_to_input("12"),
             "12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
         );
+    }
+
+    #[test]
+    fn command_frontend_filters_toggle_history_tokens_like_python() {
+        assert!(!should_record_prompt_history("loggen"));
+        assert!(!should_record_prompt_history("nichtloggen"));
+        assert!(!should_record_prompt_history("12 loggen"));
+        assert!(should_record_prompt_history("12 emotion"));
     }
 
     #[test]
