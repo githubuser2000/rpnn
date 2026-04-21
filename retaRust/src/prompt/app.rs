@@ -16,7 +16,10 @@ use super::completion::{
     build_default_completer_with_runtime, new_completion_runtime_handle,
     set_completion_runtime_context, CompletionRuntimeHandle,
 };
-use super::history::{default_history_path, default_log_path};
+use super::history::{
+    contains_history_toggle_token_like_python, default_history_path, default_log_path,
+    should_append_history_string_like_python,
+};
 use super::python_like::libreta_prompt_custom_split;
 use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
@@ -292,17 +295,15 @@ fn should_append_exact_suffix(input: &str) -> bool {
 }
 
 fn contains_python_history_toggle_token(input: &str) -> bool {
-    libreta_prompt_custom_split(input.trim())
-        .iter()
-        .any(|token| token == "loggen" || token == "nichtloggen")
+    contains_history_toggle_token_like_python(input)
 }
 
 fn should_record_prompt_history(input: &str) -> bool {
-    !input.trim().is_empty() && !contains_python_history_toggle_token(input)
+    should_append_history_string_like_python(true, input)
 }
 
 fn record_prompt_input(state: &mut SessionState, input: &str) {
-    if should_record_prompt_history(input) {
+    if state.logging_enabled && should_record_prompt_history(input) {
         state.history_lines.push(input.to_string());
     }
 }
@@ -947,10 +948,9 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, should_append_exact_suffix,
-        should_record_prompt_history,
+        apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, record_prompt_input,
+        should_append_exact_suffix, should_record_prompt_history, PromptCommand, SessionState,
     };
-    use super::PromptCommand;
 
     #[test]
     fn toggle_history_commands_are_filtered_like_python_togglehistory() {
@@ -958,6 +958,18 @@ mod tests {
         assert!(!should_record_prompt_history("nichtloggen"));
         assert!(!should_record_prompt_history("12 loggen"));
         assert!(should_record_prompt_history("12 emotion"));
+    }
+
+    #[test]
+    fn prompt_input_history_respects_python_logging_switch() {
+        let mut rp_state = SessionState::new("rp".to_string(), true, false);
+        record_prompt_input(&mut rp_state, "12 emotion");
+        assert!(rp_state.history_lines.is_empty());
+
+        let mut rpl_state = SessionState::new("rpl".to_string(), true, true);
+        record_prompt_input(&mut rpl_state, "12 emotion");
+        record_prompt_input(&mut rpl_state, "nichtloggen");
+        assert_eq!(rpl_state.history_lines, vec!["12 emotion".to_string()]);
     }
 
     #[test]

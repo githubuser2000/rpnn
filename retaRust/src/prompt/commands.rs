@@ -296,16 +296,20 @@ fn PromptScope_route_for_input(
         return PromptScopeRoute::LoeschenInput;
     }
 
-    if compile_python_process_command_from_tokens(tokens).is_some() {
-        return PromptScopeRoute::ProcessCommand;
-    }
-
     if tokens.is_empty() {
         return PromptScopeRoute::EmptyNoop;
     }
 
+    // Python `PromptScope()` handles inline `s`/`S`/`o` storage commands
+    // before it reaches `PromptGrosseAusgabe()`, where shell/python/math are
+    // interpreted.  Therefore `shell echo hi s` stores `shell echo hi`; it must
+    // not execute the shell command first.
     if compile_inline_storage_command(tokens).is_some() {
         return PromptScopeRoute::InlineStorageCommand;
+    }
+
+    if compile_python_process_command_from_tokens(tokens).is_some() {
+        return PromptScopeRoute::ProcessCommand;
     }
 
     if prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, tokens).is_some() {
@@ -385,6 +389,16 @@ pub fn compile_command_with_state(
             compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
         }
     }
+}
+
+/// Python `retaPrompt.PromptScope` as a testable stateful dispatcher for one
+/// already-read prompt line.  The interactive loop owns terminal I/O; this
+/// function owns the same semantic ordering as Python `PromptScope()`: storage
+/// modes, inline storage commands, stored-placeholder overlays, process
+/// commands and finally the big output path.
+#[allow(non_snake_case)]
+pub fn PromptScope(input: &str, state: &SessionState) -> Result<PromptCommand, String> {
+    compile_command_with_state(input, state)
 }
 
 fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
@@ -1550,6 +1564,21 @@ fn format_python_dict_items(entries: Vec<(i64, String)>) -> String {
         .join(", ")
 }
 
+#[allow(non_snake_case)]
+fn maxMenge<T: Ord + Clone>(mengen: &[std::collections::BTreeSet<T>]) -> std::collections::BTreeSet<T> {
+    let Some(first) = mengen.first() else {
+        return std::collections::BTreeSet::new();
+    };
+
+    let mut max_menge = first.clone();
+    for menge in mengen.iter().skip(1) {
+        if max_menge.len() < menge.len() {
+            max_menge = menge.clone();
+        }
+    }
+    max_menge
+}
+
 fn render_abstand_like_python(
     tokens: &[String],
     render_distance: bool,
@@ -1575,12 +1604,12 @@ fn render_abstand_like_python(
     let all_are_single_numbers = groups
         .iter()
         .all(|(source, _)| source.chars().all(|ch| ch.is_ascii_digit()));
-    let largest_index = groups
-        .iter()
-        .enumerate()
-        .max_by_key(|(_, (_, group))| group.len())
-        .map(|(index, _)| index)
-        .unwrap_or(0);
+    let largest_group = maxMenge(
+        &groups
+            .iter()
+            .map(|(_, group)| group.clone())
+            .collect::<Vec<_>>(),
+    );
 
     let mut distance_rows: std::collections::BTreeMap<i64, String> =
         std::collections::BTreeMap::new();
@@ -1588,8 +1617,8 @@ fn render_abstand_like_python(
         std::collections::BTreeMap::new();
 
     for (_, target_group) in &groups {
-        for (source_index, (_, source_group)) in groups.iter().enumerate() {
-            if source_index == largest_index || source_group == target_group {
+        for (_, source_group) in groups.iter() {
+            if source_group == &largest_group || source_group == target_group {
                 continue;
             }
 
@@ -1950,7 +1979,7 @@ mod tests {
         compile_command, compile_command_with_state, execute_command, factor_pairs_without_ones,
         factor_triples, merge_stored_placeholder, promptSpeicherungB,
         refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand,
-        PromptModus, PromptScopeRoute, PromptScope_route_for_input, SessionState,
+        PromptModus, PromptScope, PromptScopeRoute, PromptScope_route_for_input, SessionState,
     };
 
     fn compile_rp(input: &str) -> PromptCommand {
@@ -2102,6 +2131,16 @@ mod tests {
     }
 
     #[test]
+    fn prompt_scope_facade_uses_stateful_python_dispatcher() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = PromptScope("12 s", &state).unwrap();
+        match command {
+            PromptCommand::StoreInline(text) => assert_eq!(text, "12"),
+            other => panic!("expected PromptScope facade to use inline storage route, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn prompt_scope_route_keeps_speichern_mode_before_process_commands() {
         let mut state = SessionState::new("rp".to_string(), true, false);
         state.prompt_mode = PromptModus::Speichern;
@@ -2131,6 +2170,22 @@ mod tests {
         match command {
             PromptCommand::StoreInline(text) => assert_eq!(text, "12"),
             other => panic!("expected StoreInline, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_scope_inline_storage_beats_process_commands_like_python() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let tokens = super::raw_prompt_tokens_like_python("shell echo hi s");
+        assert_eq!(
+            PromptScope_route_for_input("shell echo hi s", &tokens, &state),
+            PromptScopeRoute::InlineStorageCommand
+        );
+
+        let command = compile_command_with_state("shell echo hi s", &state).unwrap();
+        match command {
+            PromptCommand::StoreInline(text) => assert_eq!(text, "shell echo hi"),
+            other => panic!("expected StoreInline before Shell, got {other:?}"),
         }
     }
 
