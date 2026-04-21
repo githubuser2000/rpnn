@@ -1154,7 +1154,7 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     }
 
     let input_is_reta = matches!(tokens.first().map(String::as_str), Some("reta"));
-    let mut current_section: Option<&str> = None;
+    let mut current_section: Option<String> = None;
     let mut out = Vec::new();
     let mut changed = false;
 
@@ -1164,19 +1164,19 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
             continue;
         }
         if input_is_reta && is_main_switch_token(token) {
-            current_section = Some(token.as_str());
+            current_section = Some(token.clone());
             out.push(token.clone());
             continue;
         }
 
         let expanded = if let Some((left, right)) = token.split_once('=') {
             if input_is_reta || left.starts_with("--") {
-                expand_reta_equals_regex_like_token(left, right, current_section)
+                expand_reta_equals_regex_like_token(left, right, current_section.as_deref())
             } else {
                 Vec::new()
             }
         } else if input_is_reta {
-            expand_reta_simple_regex_like_token(token, current_section)
+            expand_reta_simple_regex_like_token(token, current_section.as_deref())
         } else {
             expand_prompt_regex_like_token(token)
         };
@@ -1189,6 +1189,15 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
             out.push(token.clone());
         } else {
             changed = true;
+            if input_is_reta {
+                if let Some(section) = expanded
+                    .iter()
+                    .rev()
+                    .find(|candidate| is_main_switch_token(candidate.as_str()))
+                {
+                    current_section = Some(section.to_string());
+                }
+            }
             out.extend(expanded);
         }
     }
@@ -1244,7 +1253,7 @@ pub fn allEqSignAbarbeitung(tokens: &[String]) -> Vec<String> {
 /// Python `retaPrompt.regExReplace`: expand prompt and `reta` regex/glob tokens.
 #[allow(non_snake_case)]
 pub fn regExReplace(tokens: &[String]) -> Vec<String> {
-    expand_python_regex_like_tokens(tokens)
+    allEqSignAbarbeitung(tokens)
 }
 
 /// Python `retaPrompt.aufloesen`: alias/macro expansion followed by regex and
@@ -9229,6 +9238,40 @@ mod tests {
     fn prompt_execution_regex_at_reta_root_does_not_expand_section_flags() {
         let expanded = expand_python_regex_like_tokens(&strings(&["reta", "r\"^end.*\""]));
         assert_eq!(expanded, strings(&["reta"]));
+    }
+
+    #[test]
+    fn prompt_execution_regex_uses_expanded_reta_main_switch_as_context() {
+        let expanded = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "r\"^zei.*\"",
+            "--zeit=r\"heu.*\"",
+        ]));
+        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute"]));
+    }
+
+    #[test]
+    fn reg_ex_replace_facade_handles_split_equals_like_python() {
+        assert_eq!(
+            regExReplace(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
+            strings(&["reta", "-zeilen", "--zeit=heute"])
+        );
+    }
+
+    #[test]
+    fn prompt_grosse_ausgabe_keeps_regex_expanded_raw_reta_argv() {
+        let result = PromptGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "reta r\"^zei.*\" --zeit=r\"heu.*\"",
+            &[],
+        );
+        assert_eq!(
+            result.retaArgv,
+            Some(strings(&["reta", "-zeilen", "--zeit=heute"]))
+        );
     }
 
     #[test]

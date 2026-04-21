@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use indexmap::{IndexMap, IndexSet};
 
@@ -10,7 +10,7 @@ pub use crate::libs::tableHandling::TablesConcat as Concat;
 
 
 pub type Pair = (i64, i64);
-pub type PairsByNumber = BTreeMap<i64, BTreeSet<Pair>>;
+pub type PairsByNumber = IndexMap<i64, IndexSet<Pair>>;
 
 /// Minimal, normalized stand-in for Python `fractions.Fraction` used by
 /// `libs/lib4tables_concat.py`.
@@ -117,7 +117,7 @@ fn int_key_from_python_float(value: f64) -> i64 {
 /// first the direct integer multiplier/divider scan, then the secondary scan
 /// using `fracs2` and `faktor.numerator == 1`.  The result therefore behaves
 /// like Python's `DefaultOrderedDict(OrderedSet)` instead of the previously
-/// available sorted `BTreeMap/BTreeSet` helpers.
+/// available sorted helpers.
 pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
     fracs: &[PyFraction],
     fracs2: &[PyFraction],
@@ -311,7 +311,7 @@ fn round_to_thousand(value: f64) -> f64 {
 }
 
 pub fn convertSetOfPaarenToDictOfNumToPaareDiv(paareSet: BTreeSet<Pair>, gleichf: bool) -> PairsByNumber {
-    let mut result: PairsByNumber = BTreeMap::new();
+    let mut result: PairsByNumber = IndexMap::new();
     for paar in paareSet {
         let div = if !gleichf {
             paar.0 as f64 / paar.1 as f64
@@ -326,7 +326,7 @@ pub fn convertSetOfPaarenToDictOfNumToPaareDiv(paareSet: BTreeSet<Pair>, gleichf
 }
 
 pub fn convertSetOfPaarenToDictOfNumToPaareMul(paareSet: BTreeSet<Pair>, gleichf: bool) -> PairsByNumber {
-    let mut result: PairsByNumber = BTreeMap::new();
+    let mut result: PairsByNumber = IndexMap::new();
     for paar in paareSet {
         let mut mul = paar.0 as f64 * paar.1 as f64;
         if gleichf {
@@ -341,7 +341,7 @@ pub fn convertSetOfPaarenToDictOfNumToPaareMul(paareSet: BTreeSet<Pair>, gleichf
 }
 
 pub fn combineDicts(a: PairsByNumber, b: PairsByNumber) -> PairsByNumber {
-    let mut e: PairsByNumber = BTreeMap::new();
+    let mut e: PairsByNumber = IndexMap::new();
     for (key, value) in a.into_iter().chain(b.into_iter()) {
         e.entry(key).or_default().extend(value.into_iter().map(|v| (v.0, v.1)));
     }
@@ -392,8 +392,32 @@ mod tests {
     fn pair_division_groups_by_exact_integer_ratio() {
         let input = BTreeSet::from([(6, 3), (9, 3)]);
         let grouped = convertSetOfPaarenToDictOfNumToPaareDiv(input, false);
-        assert_eq!(grouped.get(&2).unwrap(), &BTreeSet::from([(6, 3)]));
-        assert_eq!(grouped.get(&3).unwrap(), &BTreeSet::from([(9, 3)]));
+        assert_eq!(
+            grouped.get(&2).unwrap().iter().copied().collect::<Vec<_>>(),
+            vec![(6, 3)]
+        );
+        assert_eq!(
+            grouped.get(&3).unwrap().iter().copied().collect::<Vec<_>>(),
+            vec![(9, 3)]
+        );
+    }
+
+    #[test]
+    fn combine_dicts_keeps_python_ordered_dict_and_ordered_set_semantics() {
+        let mut a: PairsByNumber = IndexMap::new();
+        a.entry(3).or_default().insert((9, 3));
+        a.entry(2).or_default().insert((6, 3));
+
+        let mut b: PairsByNumber = IndexMap::new();
+        b.entry(4).or_default().insert((8, 2));
+        b.entry(2).or_default().insert((10, 5));
+
+        let combined = combineDicts(a, b);
+        assert_eq!(combined.keys().copied().collect::<Vec<_>>(), vec![3, 2, 4]);
+        assert_eq!(
+            combined.get(&2).unwrap().iter().copied().collect::<Vec<_>>(),
+            vec![(6, 3), (10, 5)]
+        );
     }
 
     #[test]
