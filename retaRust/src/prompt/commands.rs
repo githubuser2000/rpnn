@@ -3,10 +3,11 @@ use crate::{run_reta_from_args, RetaRunResult};
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
     build_reta_argv_from_prompt_tokens, build_reta_calls_from_prompt_tokens,
-    libreta_prompt_custom_split, looks_like_numeric_or_fraction_range,
+    libreta_prompt_custom_split,
     prepare_prompt_big_output_for_stored_reta, promptVorbereitungGrosseAusgabe,
     python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptModus,
+    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptLoescheVorSpeicherungBefehle,
+    PromptModus,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -241,11 +242,27 @@ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCo
     compile_command_inner(input, prompt_mode)
 }
 
-pub fn compile_command_with_state(
-    input: &str,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PromptScopeRoute {
+    EmptyRunsStored,
+    EmptyNoop,
+    SpeichernInput,
+    LoeschenInput,
+    ProcessCommand,
+    InlineStorageCommand,
+    StoredRetaRowRewrite,
+    StoredRowsIntoRawReta,
+    StoredRetaPromptOverlay,
+    BypassStoredMerge,
+    MergeWithStored,
+}
+
+#[allow(non_snake_case)]
+fn PromptScope_route_for_input(
+    trimmed: &str,
+    tokens: &[String],
     state: &SessionState,
-) -> Result<PromptCommand, String> {
-    let trimmed = input.trim();
+) -> PromptScopeRoute {
     if trimmed.is_empty() {
         if state.has_stored_placeholder()
             && matches!(
@@ -253,60 +270,117 @@ pub fn compile_command_with_state(
                 PromptModus::Normal | PromptModus::AusgabeSelektiv
             )
         {
-            return Ok(PromptCommand::ShowStored(None));
+            return PromptScopeRoute::EmptyRunsStored;
         }
-        return Ok(PromptCommand::Noop);
+        return PromptScopeRoute::EmptyNoop;
     }
 
+    // Python `PromptScope()` runs `promptSpeicherungA()` immediately after
+    // reading the next line while the prompt is in speichern-mode. Process,
+    // control and reta commands must therefore be stored as plain text here.
     if matches!(state.prompt_mode, PromptModus::Speichern) {
-        return Ok(PromptCommand::StoreCurrentInput(trimmed.to_string()));
+        return PromptScopeRoute::SpeichernInput;
     }
 
     if matches!(
         state.prompt_mode,
         PromptModus::LoeschenStart | PromptModus::LoeschenSelect
     ) {
-        return Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string()));
+        return PromptScopeRoute::LoeschenInput;
     }
 
-    if let Some(command) = compile_python_process_command_from_raw_text(trimmed) {
-        return Ok(command);
-    }
-
-    let tokens = raw_prompt_tokens_like_python(trimmed);
-    if tokens.is_empty() {
-        return Ok(PromptCommand::Noop);
-    }
-
-    if let Some(command) = compile_inline_storage_command(&tokens) {
-        return Ok(command);
-    }
-
-    if let Some(prepared) =
-        prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, &tokens)
-    {
-        return Ok(PromptCommand::Reta(prepared.tokens));
-    }
-    if let Some(prepared) =
-        prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, &tokens)
-    {
-        return Ok(PromptCommand::Reta(prepared.tokens));
-    }
-    if let Some(calls) = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
-        &state.stored_expanded_tokens,
-        &tokens,
+    if matches!(
+        tokens.first().map(String::as_str),
+        Some("shell" | "python" | "math")
     ) {
-        return Ok(prompt_command_from_reta_calls(calls));
+        return PromptScopeRoute::ProcessCommand;
     }
 
-    if raw_input_bypasses_stored_merge(trimmed, &tokens) || !state.has_stored_placeholder() {
-        return compile_command_inner(trimmed, state.prompt_mode);
+    if tokens.is_empty() {
+        return PromptScopeRoute::EmptyNoop;
     }
 
-    let effective_input =
-        compose_input_with_stored_placeholder(&state.stored_expanded_tokens, &tokens);
+    if compile_inline_storage_command(tokens).is_some() {
+        return PromptScopeRoute::InlineStorageCommand;
+    }
 
-    compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
+    if prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, tokens).is_some() {
+        return PromptScopeRoute::StoredRetaRowRewrite;
+    }
+    if prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, tokens).is_some() {
+        return PromptScopeRoute::StoredRowsIntoRawReta;
+    }
+    if prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+        &state.stored_expanded_tokens,
+        tokens,
+    )
+    .is_some()
+    {
+        return PromptScopeRoute::StoredRetaPromptOverlay;
+    }
+
+    if raw_input_bypasses_stored_merge(trimmed, tokens) || !state.has_stored_placeholder() {
+        return PromptScopeRoute::BypassStoredMerge;
+    }
+
+    PromptScopeRoute::MergeWithStored
+}
+
+pub fn compile_command_with_state(
+    input: &str,
+    state: &SessionState,
+) -> Result<PromptCommand, String> {
+    let trimmed = input.trim();
+    let tokens = if trimmed.is_empty() {
+        Vec::new()
+    } else {
+        raw_prompt_tokens_like_python(trimmed)
+    };
+
+    match PromptScope_route_for_input(trimmed, &tokens, state) {
+        PromptScopeRoute::EmptyRunsStored => Ok(PromptCommand::ShowStored(None)),
+        PromptScopeRoute::EmptyNoop => Ok(PromptCommand::Noop),
+        PromptScopeRoute::SpeichernInput => Ok(PromptCommand::StoreCurrentInput(trimmed.to_string())),
+        PromptScopeRoute::LoeschenInput => Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string())),
+        PromptScopeRoute::ProcessCommand => Ok(
+            compile_python_process_command_from_raw_text(trimmed)
+                .expect("PromptScope route checked process command"),
+        ),
+        PromptScopeRoute::InlineStorageCommand => Ok(
+            compile_inline_storage_command(&tokens)
+                .expect("PromptScope route checked inline storage command"),
+        ),
+        PromptScopeRoute::StoredRetaRowRewrite => {
+            let prepared = prepare_prompt_big_output_for_stored_reta(
+                &state.stored_expanded_tokens,
+                &tokens,
+            )
+            .expect("PromptScope route checked stored reta row rewrite");
+            Ok(PromptCommand::Reta(prepared.tokens))
+        }
+        PromptScopeRoute::StoredRowsIntoRawReta => {
+            let prepared = prepare_prompt_big_output_for_stored_rows(
+                &state.stored_expanded_tokens,
+                &tokens,
+            )
+            .expect("PromptScope route checked stored rows into raw reta");
+            Ok(PromptCommand::Reta(prepared.tokens))
+        }
+        PromptScopeRoute::StoredRetaPromptOverlay => {
+            let calls = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+                &state.stored_expanded_tokens,
+                &tokens,
+            )
+            .expect("PromptScope route checked stored reta prompt overlay");
+            Ok(prompt_command_from_reta_calls(calls))
+        }
+        PromptScopeRoute::BypassStoredMerge => compile_command_inner(trimmed, state.prompt_mode),
+        PromptScopeRoute::MergeWithStored => {
+            let effective_input =
+                compose_input_with_stored_placeholder(&state.stored_expanded_tokens, &tokens);
+            compile_command_inner(&effective_input, PromptModus::AusgabeSelektiv)
+        }
+    }
 }
 
 fn compile_inline_storage_command(tokens: &[String]) -> Option<PromptCommand> {
@@ -672,56 +746,63 @@ fn render_stored_placeholder_text(state: &SessionState) -> String {
 }
 
 fn delete_from_stored_placeholder(state: &mut SessionState, selection_text: &str) {
-    let mut tokens = split_storage_text(&state.stored_placeholder);
-    let trimmed = selection_text.trim();
-
-    if trimmed.is_empty() || tokens.is_empty() {
-        state.prompt_mode = PromptModus::Normal;
-        refresh_stored_placeholder_cache(state);
-        return;
-    }
-
-    let delete_by_index = should_delete_stored_by_index(trimmed, &tokens);
-    if delete_by_index {
-        if let Some(indexes) = parse_delete_selection_indexes(trimmed) {
-            let index_set = indexes
-                .into_iter()
-                .collect::<std::collections::BTreeSet<_>>();
-            tokens = tokens
-                .into_iter()
-                .enumerate()
-                .filter_map(|(index, token)| (!index_set.contains(&(index + 1))).then_some(token))
-                .collect();
-        }
-    } else {
-        let delete_tokens = split_storage_text(trimmed);
-        tokens.retain(|token| !delete_tokens.iter().any(|delete| delete == token));
-    }
-
-    state.stored_placeholder = tokens.join(" ");
-    state.prompt_mode = PromptModus::Normal;
+    let result = PromptLoescheVorSpeicherungBefehle(
+        &state.stored_placeholder,
+        state.prompt_mode,
+        selection_text,
+    );
+    state.stored_placeholder = result.platzhalter;
+    state.prompt_mode = result.promptMode;
     refresh_stored_placeholder_cache(state);
 }
 
-fn should_delete_stored_by_index(selection_text: &str, stored_tokens: &[String]) -> bool {
-    if selection_text.chars().all(|ch| ch.is_ascii_digit())
-        && stored_tokens.iter().any(|token| token == selection_text)
-    {
-        return false;
-    }
 
-    looks_like_numeric_or_fraction_range(selection_text)
+#[allow(non_snake_case)]
+fn speichern(state: &mut SessionState, text: &str) -> PromptOutput {
+    store_text_in_placeholder(state, text);
+    state.prompt_mode = PromptModus::Normal;
+    PromptOutput {
+        title: "speichern".to_string(),
+        text: format!(
+            "Gespeicherter Platzhalter:\n{}",
+            render_stored_placeholder_text(state)
+        ),
+        exit_code: 0,
+    }
 }
 
-fn parse_delete_selection_indexes(selection_text: &str) -> Option<Vec<usize>> {
-    let numbers = parse_row_numbers_from_tokens(&[selection_text.to_string()])?;
-    let mut out = Vec::new();
-    for number in numbers {
-        if number > 0 {
-            out.push(number as usize);
+#[allow(non_snake_case)]
+fn promptSpeicherungA(state: &mut SessionState, text: &str) -> PromptOutput {
+    speichern(state, text)
+}
+
+#[allow(non_snake_case)]
+fn promptSpeicherungB(state: &SessionState, additional_text: Option<String>) -> String {
+    match additional_text {
+        Some(text) => {
+            let additional_tokens = split_storage_text(&text);
+            if let Some(prepared) = prepare_prompt_big_output_for_stored_reta(
+                &state.stored_expanded_tokens,
+                &additional_tokens,
+            ) {
+                prepared.tokens.join(" ")
+            } else if let Some(prepared) = prepare_prompt_big_output_for_stored_rows(
+                &state.stored_expanded_tokens,
+                &additional_tokens,
+            ) {
+                prepared.tokens.join(" ")
+            } else if state.has_stored_placeholder() {
+                compose_input_with_stored_placeholder(
+                    &state.stored_expanded_tokens,
+                    &additional_tokens,
+                )
+            } else {
+                additional_tokens.join(" ")
+            }
         }
+        None if state.has_stored_placeholder() => state.stored_expanded_tokens.join(" "),
+        None => String::new(),
     }
-    (!out.is_empty()).then_some(out)
 }
 
 fn run_nested_prompt_input(
@@ -774,17 +855,7 @@ pub fn execute_command(
                 }));
             }
 
-            store_text_in_placeholder(state, &previous_input);
-            state.prompt_mode = PromptModus::Normal;
-
-            Ok(Some(PromptOutput {
-                title: "speichern".to_string(),
-                text: format!(
-                    "Gespeicherter Platzhalter:\n{}",
-                    render_stored_placeholder_text(state)
-                ),
-                exit_code: 0,
-            }))
+            Ok(Some(promptSpeicherungA(state, &previous_input)))
         }
         PromptCommand::SaveAfter => {
             state.prompt_mode = PromptModus::Speichern;
@@ -795,16 +866,7 @@ pub fn execute_command(
             }))
         }
         PromptCommand::StoreCurrentInput(text) | PromptCommand::StoreInline(text) => {
-            store_text_in_placeholder(state, &text);
-            state.prompt_mode = PromptModus::Normal;
-            Ok(Some(PromptOutput {
-                title: "speichern".to_string(),
-                text: format!(
-                    "Gespeicherter Platzhalter:\n{}",
-                    render_stored_placeholder_text(state)
-                ),
-                exit_code: 0,
-            }))
+            Ok(Some(promptSpeicherungA(state, &text)))
         }
         PromptCommand::DeleteStoredStart => {
             state.prompt_mode = PromptModus::LoeschenSelect;
@@ -853,31 +915,7 @@ pub fn execute_command(
                 }
             }
 
-            let effective_input = match additional_text {
-                Some(text) => {
-                    let additional_tokens = split_storage_text(&text);
-                    if let Some(prepared) = prepare_prompt_big_output_for_stored_reta(
-                        &state.stored_expanded_tokens,
-                        &additional_tokens,
-                    ) {
-                        prepared.tokens.join(" ")
-                    } else if let Some(prepared) = prepare_prompt_big_output_for_stored_rows(
-                        &state.stored_expanded_tokens,
-                        &additional_tokens,
-                    ) {
-                        prepared.tokens.join(" ")
-                    } else if state.has_stored_placeholder() {
-                        compose_input_with_stored_placeholder(
-                            &state.stored_expanded_tokens,
-                            &additional_tokens,
-                        )
-                    } else {
-                        additional_tokens.join(" ")
-                    }
-                }
-                None if state.has_stored_placeholder() => state.stored_expanded_tokens.join(" "),
-                None => String::new(),
-            };
+            let effective_input = promptSpeicherungB(state, additional_text);
 
             if effective_input.trim().is_empty() {
                 return Ok(Some(PromptOutput {
@@ -1878,8 +1916,9 @@ pub fn render_history_text(history: &[String]) -> String {
 mod tests {
     use super::{
         compile_command, compile_command_with_state, execute_command, factor_pairs_without_ones,
-        factor_triples, merge_stored_placeholder, refresh_stored_placeholder_cache,
-        take_auto_prompt_command, PromptCommand, PromptModus, SessionState,
+        factor_triples, merge_stored_placeholder, promptSpeicherungB,
+        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand,
+        PromptModus, PromptScopeRoute, PromptScope_route_for_input, SessionState,
     };
 
     fn compile_rp(input: &str) -> PromptCommand {
@@ -2018,6 +2057,66 @@ mod tests {
             ),
             other => panic!("expected literal reta command, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn prompt_scope_route_keeps_speichern_mode_before_process_commands() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.prompt_mode = PromptModus::Speichern;
+        let tokens = super::raw_prompt_tokens_like_python("shell echo hi");
+        assert_eq!(
+            PromptScope_route_for_input("shell echo hi", &tokens, &state),
+            PromptScopeRoute::SpeichernInput
+        );
+
+        let command = compile_command_with_state("shell echo hi", &state).unwrap();
+        match command {
+            PromptCommand::StoreCurrentInput(text) => assert_eq!(text, "shell echo hi"),
+            other => panic!("expected StoreCurrentInput, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_scope_route_prefers_inline_storage_before_execution() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let tokens = super::raw_prompt_tokens_like_python("12 s");
+        assert_eq!(
+            PromptScope_route_for_input("12 s", &tokens, &state),
+            PromptScopeRoute::InlineStorageCommand
+        );
+
+        let command = compile_command_with_state("12 s", &state).unwrap();
+        match command {
+            PromptCommand::StoreInline(text) => assert_eq!(text, "12"),
+            other => panic!("expected StoreInline, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_speicherung_b_composes_placeholder_and_suffix_like_python() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "reta -ausgabe --nocolor".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+
+        let effective = promptSpeicherungB(&state, Some("12 t".to_string()));
+        assert!(effective.starts_with("reta "), "{effective}");
+        assert!(effective.contains("--nocolor"), "{effective}");
+        assert!(effective.split_whitespace().any(|part| part == "12"), "{effective}");
+        assert!(effective.split_whitespace().any(|part| part == "t"), "{effective}");
+    }
+
+    #[test]
+    fn delete_stored_placeholder_uses_python_numeric_word_collision_rules() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.stored_placeholder = "1 2 3".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+        super::delete_from_stored_placeholder(&mut state, "2");
+        assert_eq!(state.stored_placeholder, "1 3");
+
+        state.stored_placeholder = "a b c d".to_string();
+        refresh_stored_placeholder_cache(&mut state);
+        super::delete_from_stored_placeholder(&mut state, "2");
+        assert_eq!(state.stored_placeholder, "a c d");
     }
 
     #[test]

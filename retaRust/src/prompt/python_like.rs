@@ -7436,6 +7436,7 @@ pub struct PromptVorbereitungGrosseAusgabeResult {
     pub liste: Vec<String>,
     pub zahlenAngaben_: Vec<String>,
     pub ifKurzKurz: bool,
+    pub retaCalls: Vec<Vec<String>>,
 }
 
 fn prompt_preparation_max_num(tokens: &[String]) -> i64 {
@@ -7465,6 +7466,7 @@ pub fn promptVorbereitungGrosseAusgabe(
 ) -> PromptVorbereitungGrosseAusgabeResult {
     let raw_txt = TXT::new(text);
     let raw_input_tokens = raw_txt.liste().to_vec();
+    let mut reta_calls: Vec<Vec<String>> = Vec::new();
     let mut txt = raw_txt;
     txt.set_platzhalter(platzhalter);
 
@@ -7490,6 +7492,21 @@ pub fn promptVorbereitungGrosseAusgabe(
         {
             if_kurz_kurz |= prepared.had_kurz_kurz;
             liste = prepared.tokens;
+            reta_calls = vec![liste.clone()];
+        } else if let Some(prepared) =
+            prepare_prompt_big_output_for_stored_rows(&stored_tokens, &raw_input_tokens)
+        {
+            if_kurz_kurz |= prepared.had_kurz_kurz;
+            liste = prepared.tokens;
+            reta_calls = vec![liste.clone()];
+        } else if let Some(calls) = prepare_prompt_big_output_for_stored_reta_prompt_overlay(
+            &stored_tokens,
+            &raw_input_tokens,
+        ) {
+            if let Some(first) = calls.first() {
+                liste = first.clone();
+            }
+            reta_calls = calls;
         }
     }
 
@@ -7514,6 +7531,7 @@ pub fn promptVorbereitungGrosseAusgabe(
         liste,
         zahlenAngaben_: bruch_management.zahlenAngabenMehrere,
         ifKurzKurz: if_kurz_kurz,
+        retaCalls: reta_calls,
     }
 }
 
@@ -8226,6 +8244,53 @@ mod tests {
                 "--thomas",
             ])
         );
+    }
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_rewrites_stored_rows_into_raw_reta() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "12-15 ee",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "reta -spalten --thomas",
+            &[],
+        );
+
+        assert!(prepared.IsPureOnlyReTaCmd);
+        assert_eq!(prepared.retaCalls.len(), 1);
+        assert_eq!(
+            prepared.liste,
+            strings(&[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=12-15",
+                "--oberesmaximum=1025",
+                "-spalten",
+                "--thomas",
+                "-ausgabe",
+                "--keineueberschriften",
+            ])
+        );
+    }
+
+    #[test]
+    fn prompt_vorbereitung_grosse_ausgabe_exposes_prompt_overlay_batches() {
+        let prepared = promptVorbereitungGrosseAusgabe(
+            "reta -ausgabe --nocolor",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "12 a t",
+            &[],
+        );
+
+        assert!(prepared.IsPureOnlyReTaCmd);
+        assert!(prepared.retaCalls.len() >= 2, "{prepared:?}");
+        assert!(prepared
+            .retaCalls
+            .iter()
+            .all(|argv| argv.contains(&"--nocolor".to_string())));
     }
 
     #[test]
