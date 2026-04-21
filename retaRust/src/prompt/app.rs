@@ -17,10 +17,10 @@ use super::completion::{
     set_completion_runtime_context, CompletionRuntimeHandle,
 };
 use super::history::{
-    contains_history_toggle_token_like_python, default_history_path, default_log_path,
-    should_append_history_string_like_python,
+    default_history_path, default_log_path, should_append_history_string_like_python,
+    should_scrub_history_string_after_reedline_append_like_python,
 };
-use super::python_like::libreta_prompt_custom_split;
+use super::python_like::{libreta_prompt_custom_split, PromptModus};
 use super::frontend_profile::PromptFrontendProfile;
 use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
@@ -89,18 +89,18 @@ fn prompt_placeholder_text(state: &SessionState) -> Option<String> {
 
 fn prompt_text_for_state(state: &SessionState) -> String {
     match state.prompt_mode {
-        super::python_like::PromptModus::Speichern => "was speichern> ".to_string(),
-        super::python_like::PromptModus::LoeschenStart
-        | super::python_like::PromptModus::LoeschenSelect => "was löschen> ".to_string(),
-        super::python_like::PromptModus::Normal | super::python_like::PromptModus::AusgabeSelektiv => {
+        PromptModus::Speichern => "was speichern> ".to_string(),
+        PromptModus::LoeschenStart | PromptModus::LoeschenSelect => "was löschen> ".to_string(),
+        PromptModus::Normal | PromptModus::AusgabeSelektiv => {
             if let Some(placeholder) = prompt_placeholder_text(state) {
                 format!("{placeholder} > ")
             } else {
                 "> ".to_string()
             }
         }
-        super::python_like::PromptModus::SpeicherungAusgaben
-        | super::python_like::PromptModus::SpeicherungAusgabenMitZusatz => "o> ".to_string(),
+        PromptModus::SpeicherungAusgaben | PromptModus::SpeicherungAusgabenMitZusatz => {
+            "o> ".to_string()
+        }
     }
 }
 
@@ -294,10 +294,6 @@ fn should_append_exact_suffix(input: &str) -> bool {
     )
 }
 
-fn contains_python_history_toggle_token(input: &str) -> bool {
-    contains_history_toggle_token_like_python(input)
-}
-
 fn should_record_prompt_history(input: &str) -> bool {
     should_append_history_string_like_python(true, input)
 }
@@ -314,34 +310,40 @@ fn append_prompt_input_log(path: &PathBuf, state: &SessionState, input: &str) {
     }
 }
 
-fn scrub_prompt_history_toggle_line(history_path: &PathBuf, input: &str) {
-    if !contains_python_history_toggle_token(input) {
-        return;
+fn scrub_prompt_history_line_if_python_togglehistory_would_skip(
+    history_path: &PathBuf,
+    logging_enabled: bool,
+    input: &str,
+) -> bool {
+    if !should_scrub_history_string_after_reedline_append_like_python(logging_enabled, input) {
+        return false;
     }
 
+    remove_last_history_line_matching(history_path, input)
+}
+
+fn remove_last_history_line_matching(history_path: &PathBuf, input: &str) -> bool {
     let Ok(raw) = std::fs::read_to_string(history_path) else {
-        return;
+        return false;
     };
 
-    let mut changed = false;
-    let kept = raw
-        .lines()
-        .filter(|line| {
-            let keep = line.trim() != input.trim();
-            if !keep {
-                changed = true;
-            }
-            keep
-        })
-        .collect::<Vec<_>>();
-
-    if changed {
-        let mut rebuilt = kept.join("\n");
-        if !rebuilt.is_empty() {
-            rebuilt.push('\n');
-        }
-        let _ = std::fs::write(history_path, rebuilt);
+    let wanted = input.trim();
+    if wanted.is_empty() {
+        return false;
     }
+
+    let had_trailing_newline = raw.ends_with('\n');
+    let mut lines = raw.lines().map(str::to_string).collect::<Vec<_>>();
+    let Some(index) = lines.iter().rposition(|line| line.trim() == wanted) else {
+        return false;
+    };
+    lines.remove(index);
+
+    let mut rebuilt = lines.join("\n");
+    if had_trailing_newline && !rebuilt.is_empty() {
+        rebuilt.push('\n');
+    }
+    std::fs::write(history_path, rebuilt).is_ok()
 }
 
 #[allow(non_snake_case)]
@@ -350,14 +352,21 @@ fn promptInput(
     input: &str,
     history_path: Option<&PathBuf>,
     log_path: &PathBuf,
-) {
+) -> bool {
     state.previous_input = state.last_input.clone();
     state.last_input = input.to_string();
     record_prompt_input(state, input);
-    if let Some(history_path) = history_path {
-        scrub_prompt_history_toggle_line(history_path, input);
-    }
+    let history_line_scrubbed = history_path
+        .map(|history_path| {
+            scrub_prompt_history_line_if_python_togglehistory_would_skip(
+                history_path,
+                state.logging_enabled,
+                input,
+            )
+        })
+        .unwrap_or(false);
     append_prompt_input_log(log_path, state, input);
+    history_line_scrubbed
 }
 
 pub fn run_rp_one_shot(argv: Vec<String>, start_with_vi_mode: bool) -> i32 {
@@ -491,7 +500,7 @@ fn run_one_shot(
         return output.exit_code;
     }
 
-    promptInput(state, &input, None, log_path);
+    let _ = promptInput(state, &input, None, log_path);
 
     let compiled = match compile_command_with_state(&input, state) {
         Ok(command) => {
@@ -605,6 +614,7 @@ fn run_interactive_loop(
         &history_path,
         state.current_mode(),
         state.logging_enabled,
+        state.prompt_mode,
         &completion_runtime,
     ) {
         Ok(editor) => editor,
@@ -618,6 +628,7 @@ fn run_interactive_loop(
         if let Some(auto_command) = take_auto_prompt_command(state) {
             let previous_editor_mode = state.current_mode();
             let previous_logging_enabled = state.logging_enabled;
+            let previous_prompt_mode = state.prompt_mode;
 
             match execute_command(auto_command, state) {
                 Ok(Some(output)) => {
@@ -643,13 +654,15 @@ fn run_interactive_loop(
             }
 
             let rebuild_editor = previous_editor_mode != state.current_mode()
-                || previous_logging_enabled != state.logging_enabled;
+                || previous_logging_enabled != state.logging_enabled
+                || previous_prompt_mode != state.prompt_mode;
 
             if rebuild_editor {
                 editor = match newSession(
                     &history_path,
                     state.current_mode(),
                     state.logging_enabled,
+                    state.prompt_mode,
                     &completion_runtime,
                 ) {
                     Ok(editor) => editor,
@@ -677,7 +690,7 @@ fn run_interactive_loop(
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
-                promptInput(state, &input, Some(&history_path), &log_path);
+                let history_line_scrubbed = promptInput(state, &input, Some(&history_path), &log_path);
 
                 let compile_input = if exact_mode_enabled {
                     apply_exact_mode_to_input(&input)
@@ -687,6 +700,7 @@ fn run_interactive_loop(
 
                 let previous_editor_mode = state.current_mode();
                 let previous_logging_enabled = state.logging_enabled;
+                let previous_prompt_mode = state.prompt_mode;
                 let compiled = match compile_command_with_state(&compile_input, state) {
                     Ok(command) => {
                         if emacs_output_mode {
@@ -708,6 +722,21 @@ fn run_interactive_loop(
                                 exit_code: 1,
                             },
                         );
+                        if history_line_scrubbed {
+                            editor = match newSession(
+                                &history_path,
+                                state.current_mode(),
+                                state.logging_enabled,
+                                state.prompt_mode,
+                                &completion_runtime,
+                            ) {
+                                Ok(editor) => editor,
+                                Err(err) => {
+                                    eprintln!("rp konnte reedline nicht neu initialisieren: {err}");
+                                    return 1;
+                                }
+                            };
+                        }
                         continue;
                     }
                 };
@@ -762,13 +791,16 @@ fn run_interactive_loop(
                 }
 
                 let rebuild_editor = previous_editor_mode != state.current_mode()
-                    || previous_logging_enabled != state.logging_enabled;
+                    || previous_logging_enabled != state.logging_enabled
+                    || previous_prompt_mode != state.prompt_mode
+                    || history_line_scrubbed;
 
                 if rebuild_editor {
                     editor = match newSession(
                         &history_path,
                         state.current_mode(),
                         state.logging_enabled,
+                        state.prompt_mode,
                         &completion_runtime,
                     ) {
                         Ok(editor) => editor,
@@ -869,42 +901,45 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
 fn newSession(
     history_path: &PathBuf,
     mode: EditModeKind,
-    logging_enabled: bool,
+    _logging_enabled: bool,
+    prompt_mode: PromptModus,
     completion_runtime: &CompletionRuntimeHandle,
 ) -> Result<Reedline, String> {
-    let effective_history_path = if logging_enabled {
-        history_path.clone()
-    } else {
-        PathBuf::from("/dev/null")
-    };
-
     let history = Box::new(
-        FileBackedHistory::with_file(2_000, effective_history_path)
+        FileBackedHistory::with_file(2_000, history_path.clone())
             .map_err(|err| format!("History-Datei konnte nicht geöffnet werden: {err}"))?,
     );
 
-    let completer = build_default_completer_with_runtime(completion_runtime.clone());
-    let completion_menu = Box::new(ColumnarMenu::default().with_name(COMPLETION_MENU_NAME));
-
+    let completion_enabled = !matches!(prompt_mode, PromptModus::LoeschenSelect);
     let mut editor = Reedline::create()
         .with_history(history)
         .with_hinter(Box::new(DefaultHinter::default()))
-        .with_validator(Box::new(DefaultValidator))
-        .with_completer(completer)
-        .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
+        .with_validator(Box::new(DefaultValidator));
+
+    if completion_enabled {
+        let completer = build_default_completer_with_runtime(completion_runtime.clone());
+        let completion_menu = Box::new(ColumnarMenu::default().with_name(COMPLETION_MENU_NAME));
+        editor = editor
+            .with_completer(completer)
+            .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
+    }
 
     editor = match mode {
         EditModeKind::Emacs => {
             let mut keybindings = default_emacs_keybindings();
-            add_completion_keybindings(&mut keybindings);
+            if completion_enabled {
+                add_completion_keybindings(&mut keybindings);
+            }
             let edit_mode = Box::new(Emacs::new(keybindings));
             editor.with_edit_mode(edit_mode)
         }
         EditModeKind::Vi => {
             let mut insert_keybindings = default_vi_insert_keybindings();
             let mut normal_keybindings = default_vi_normal_keybindings();
-            add_completion_keybindings(&mut insert_keybindings);
-            add_completion_keybindings(&mut normal_keybindings);
+            if completion_enabled {
+                add_completion_keybindings(&mut insert_keybindings);
+                add_completion_keybindings(&mut normal_keybindings);
+            }
             let edit_mode = Box::new(Vi::new(insert_keybindings, normal_keybindings));
             editor.with_edit_mode(edit_mode)
         }
@@ -949,6 +984,7 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 mod tests {
     use super::{
         apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, record_prompt_input,
+        remove_last_history_line_matching, scrub_prompt_history_line_if_python_togglehistory_would_skip,
         should_append_exact_suffix, should_record_prompt_history, PromptCommand, SessionState,
     };
 
@@ -970,6 +1006,34 @@ mod tests {
         record_prompt_input(&mut rpl_state, "12 emotion");
         record_prompt_input(&mut rpl_state, "nichtloggen");
         assert_eq!(rpl_state.history_lines, vec!["12 emotion".to_string()]);
+    }
+
+    #[test]
+    fn history_scrub_removes_only_the_just_appended_matching_line() {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "reta_prompt_history_scrub_{}_{}.txt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        std::fs::write(&path, "12 emotion\nnichtloggen\n12 emotion\n").unwrap();
+        assert!(scrub_prompt_history_line_if_python_togglehistory_would_skip(
+            &path,
+            false,
+            "12 emotion"
+        ));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "12 emotion\nnichtloggen\n"
+        );
+
+        assert!(remove_last_history_line_matching(&path, "nichtloggen"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "12 emotion\n");
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

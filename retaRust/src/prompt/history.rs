@@ -45,11 +45,24 @@ pub fn should_append_history_string_like_python(logging_enabled: bool, input: &s
     logging_enabled && !input.trim().is_empty() && !contains_history_toggle_token_like_python(input)
 }
 
+/// Reedline appends successful input to its file-backed history by itself.
+/// Python `ToggleHistory.append_string` would have refused the same line when
+/// logging is disabled or when the line contains `loggen`/`nichtloggen`.
+/// The interactive frontend uses this predicate to remove exactly that just
+/// appended line again while keeping the readable history file active.
+pub fn should_scrub_history_string_after_reedline_append_like_python(
+    logging_enabled: bool,
+    input: &str,
+) -> bool {
+    !input.trim().is_empty() && !should_append_history_string_like_python(logging_enabled, input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         contains_history_toggle_token_like_python, default_history_path,
         should_append_history_string_like_python,
+        should_scrub_history_string_after_reedline_append_like_python,
     };
 
     #[test]
@@ -66,5 +79,25 @@ mod tests {
         assert!(!should_append_history_string_like_python(true, "loggen"));
         assert!(!should_append_history_string_like_python(true, "12 nichtloggen"));
         assert!(contains_history_toggle_token_like_python("12 loggen"));
+    }
+
+    #[test]
+    fn reedline_scrub_predicate_matches_python_togglehistory_append_rules() {
+        assert!(!should_scrub_history_string_after_reedline_append_like_python(
+            true,
+            "12 emotion"
+        ));
+        assert!(should_scrub_history_string_after_reedline_append_like_python(
+            false,
+            "12 emotion"
+        ));
+        assert!(should_scrub_history_string_after_reedline_append_like_python(
+            true,
+            "nichtloggen"
+        ));
+        assert!(!should_scrub_history_string_after_reedline_append_like_python(
+            false,
+            ""
+        ));
     }
 }

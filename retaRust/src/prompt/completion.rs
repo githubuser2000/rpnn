@@ -328,7 +328,7 @@ fn completion_candidates_for_line_in_mode_with_context(
     before_cursor: &str,
     prompt_mode: PromptModus,
     stored_prefix_tokens: &[String],
-    stored_commands: &[String],
+    _stored_commands: &[String],
 ) -> Vec<CompletionCandidate> {
     let tokens = split_tokens_with_positions(before_cursor);
     let all_text_tokens = tokens
@@ -358,11 +358,11 @@ fn completion_candidates_for_line_in_mode_with_context(
         .map(|segment| segment.text.clone())
         .collect::<Vec<_>>();
 
-    if matches!(
-        prompt_mode,
-        PromptModus::LoeschenStart | PromptModus::LoeschenSelect
-    ) {
-        return delete_mode_completion_candidates(&current_token, current_start, stored_commands);
+    if matches!(prompt_mode, PromptModus::LoeschenSelect) {
+        // Python `promptInput()` passes `completer=None` in delete-selection
+        // mode.  Keep the pure candidate API empty too, so tests and reedline
+        // agree with the Python UI contract.
+        return Vec::new();
     }
 
     let contextual_previous_tokens = build_contextual_previous_tokens(
@@ -517,55 +517,6 @@ fn prompt_command_prefix_like_python_bypasses_context(tokens: &[String]) -> bool
                 .unwrap_or(false)
     })
 }
-fn delete_mode_completion_candidates(
-    current_token: &str,
-    current_start: usize,
-    stored_commands: &[String],
-) -> Vec<CompletionCandidate> {
-    if stored_commands.is_empty() {
-        return Vec::new();
-    }
-
-    let (fragment, replace_start) = parse_delete_selection_context(current_token, current_start);
-    let mut items = Vec::new();
-
-    for (index, command) in stored_commands.iter().enumerate() {
-        items.push((
-            delete_index_candidate_value(&fragment, index + 1),
-            Some(command.clone()),
-        ));
-    }
-    for command in stored_commands {
-        items.push((command.clone(), None));
-    }
-
-    build_completion_candidates_with_descriptions(items, &fragment, replace_start, false)
-}
-
-fn parse_delete_selection_context(current_token: &str, token_start: usize) -> (String, usize) {
-    let value_offset = last_top_level_comma_index(current_token)
-        .map(|idx| idx + 1)
-        .unwrap_or(0);
-    (
-        current_token[value_offset..].to_string(),
-        token_start + value_offset,
-    )
-}
-
-fn delete_index_candidate_value(fragment: &str, index: usize) -> String {
-    let trimmed = fragment.trim();
-    if let Some((left, right)) = trimmed.rsplit_once('-') {
-        if !left.is_empty()
-            && left.chars().all(|ch| ch.is_ascii_digit())
-            && (right.is_empty() || right.chars().all(|ch| ch.is_ascii_digit()))
-        {
-            return format!("{left}-{index}");
-        }
-    }
-
-    index.to_string()
-}
-
 fn consume_space_token(state: &mut PythonCompletionState, first_term: &str) {
     state.push_last_command(first_term);
 
@@ -1141,37 +1092,6 @@ fn prompt_command_sort_key(command: &str) -> (u8, String) {
     };
 
     (bucket, normalized)
-}
-
-fn build_completion_candidates_with_descriptions(
-    candidates: Vec<(String, Option<String>)>,
-    fragment: &str,
-    replace_start: usize,
-    append_whitespace: bool,
-) -> Vec<CompletionCandidate> {
-    let values = candidates
-        .iter()
-        .map(|(value, _)| value.clone())
-        .collect::<Vec<_>>();
-
-    filter_candidate_values(&values, fragment, true)
-        .into_iter()
-        .map(|value| {
-            let description = candidates
-                .iter()
-                .find(|(candidate, _)| {
-                    normalize_completion_text(candidate) == normalize_completion_text(&value)
-                })
-                .and_then(|(_, description)| description.clone())
-                .or_else(|| semantic_choice_completion_description(&value));
-            CompletionCandidate {
-                append_whitespace: append_whitespace && !value.ends_with('='),
-                description,
-                replace_start,
-                value,
-            }
-        })
-        .collect()
 }
 
 fn build_completion_candidates(
@@ -1775,10 +1695,22 @@ mod tests {
     }
 
     #[test]
-    fn delete_mode_disables_completion_candidates() {
+    fn delete_select_mode_disables_completion_candidates_like_python_promptinput() {
         let values = super::candidates_for_input_in_mode(
             "reta -zeilen --zeit=h",
             PromptModus::LoeschenSelect,
+        );
+        assert!(values.is_empty());
+
+        let values = candidates_for_input_in_mode_with_context(
+            "1-",
+            PromptModus::LoeschenSelect,
+            &[],
+            &[
+                "reta".to_string(),
+                "-zeilen".to_string(),
+                "--zeit=heute".to_string(),
+            ],
         );
         assert!(values.is_empty());
     }
@@ -1833,37 +1765,6 @@ mod tests {
         );
         assert!(contains_normalized(&values, "--zeit="));
         assert!(!contains_normalized(&values, "help"));
-    }
-
-    #[test]
-    fn delete_mode_with_stored_commands_suggests_indexes_and_tokens() {
-        let values = candidates_for_input_in_mode_with_context(
-            "",
-            PromptModus::LoeschenSelect,
-            &[],
-            &[
-                "reta".to_string(),
-                "-zeilen".to_string(),
-                "--zeit=heute".to_string(),
-            ],
-        );
-        assert!(contains_normalized(&values, "1"));
-        assert!(contains_normalized(&values, "--zeit=heute"));
-    }
-
-    #[test]
-    fn delete_mode_range_fragment_keeps_range_prefix() {
-        let values = candidates_for_input_in_mode_with_context(
-            "1-",
-            PromptModus::LoeschenSelect,
-            &[],
-            &[
-                "reta".to_string(),
-                "-zeilen".to_string(),
-                "--zeit=heute".to_string(),
-            ],
-        );
-        assert!(contains_normalized(&values, "1-2"));
     }
 
     #[test]
