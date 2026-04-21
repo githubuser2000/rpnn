@@ -172,6 +172,13 @@ impl Program {
         }
     }
 
+
+    /// Python `Program.resultingSpaltenFromTuple` facade.
+    #[allow(non_snake_case)]
+    pub(crate) fn resultingSpaltenFromTuple(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
+        self.resultingSpaltenFromTuple_py(tupl, neg, paraValue, befehlName);
+    }
+
     pub(crate) fn spalten_removeDoublesNthenRemoveOneFromAnother_py(&mut self) {
         let half_len = self.spaltenArtenKey_SpaltennummernValue.len() / 2;
         for el2_type in 0..half_len {
@@ -191,6 +198,13 @@ impl Program {
             }
             self.spaltenArtenKey_SpaltennummernValue.insert((0, el2_type), pos);
         }
+    }
+
+
+    /// Python `Program.spalten_removeDoublesNthenRemoveOneFromAnother` facade.
+    #[allow(non_snake_case)]
+    pub(crate) fn spalten_removeDoublesNthenRemoveOneFromAnother(&mut self) {
+        self.spalten_removeDoublesNthenRemoveOneFromAnother_py();
     }
 
     pub(crate) fn deleteDoublesInSets_py(&self, pos: Vec<String>, neg: Vec<String>) -> (Vec<String>, Vec<String>) {
@@ -310,7 +324,7 @@ impl Program {
                                 let mut found_exact = false;
                                 for candidate in Self::spalten_main_name_candidates_py(&left_raw) {
                                     if let Some(tupl) = self.paraDict.get(&(candidate.clone(), one.clone())).cloned() {
-                                        self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                        self.resultingSpaltenFromTuple(&tupl, neg, Some(&one), Some(&left));
                                         found_exact = true;
                                         break;
                                     }
@@ -328,7 +342,7 @@ impl Program {
                                         })
                                         .collect();
                                     for tupl in matching_tuples {
-                                        self.resultingSpaltenFromTuple_py(&tupl, neg, Some(&one), Some(&left));
+                                        self.resultingSpaltenFromTuple(&tupl, neg, Some(&one), Some(&left));
                                     }
                                 }
                             }
@@ -365,7 +379,7 @@ impl Program {
                                 })
                                 .collect();
                             for tupl in matching_tuples {
-                                self.resultingSpaltenFromTuple_py(&tupl, neg, None, Some(&cmd_canonical));
+                                self.resultingSpaltenFromTuple(&tupl, neg, None, Some(&cmd_canonical));
                             }
                         }
                     }
@@ -413,7 +427,7 @@ impl Program {
 
         if neg.is_empty() {
             self.produceAllSpaltenNumbers("-");
-            self.spalten_removeDoublesNthenRemoveOneFromAnother_py();
+            self.spalten_removeDoublesNthenRemoveOneFromAnother();
         }
 
         let spalten_numbers = Self::ordered_set_to_vec_i64(

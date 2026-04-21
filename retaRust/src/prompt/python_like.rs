@@ -1201,6 +1201,58 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
 }
 
 
+
+/// Python `retaPrompt.lastRetaHauptPara`: return the last main `reta`
+/// parameter token seen in a token stream.
+#[allow(non_snake_case)]
+pub fn lastRetaHauptPara(tokens: &[String]) -> Option<String> {
+    tokens
+        .iter()
+        .rev()
+        .find(|token| is_main_switch_token(token.as_str()))
+        .cloned()
+}
+
+/// Python `retaPrompt.vorherVonAusschnittOderZaehlung`: choose the row selector
+/// family that should be preferred for already prepared row fragments.
+#[allow(non_snake_case)]
+pub fn vorherVonAusschnittOderZaehlung(tokens: &[String]) -> &'static str {
+    if tokens.iter().any(|token| {
+        token == "--zaehlung"
+            || token.starts_with("--zaehlung=")
+            || token == "zählung"
+            || token == "zaehlung"
+            || token == "z"
+    }) {
+        "--zaehlung"
+    } else {
+        "--vorhervonausschnitt"
+    }
+}
+
+/// Python `retaPrompt.ifPrintCmdAgain`: decide whether the prompt should echo
+/// the command that produced the output.
+#[allow(non_snake_case)]
+pub fn ifPrintCmdAgain(tokens: &[String]) -> bool {
+    !tokens.iter().any(|token| {
+        token == "keineAusgabeWelcherBefehlEsWar"
+            || token == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+            || token == "--keineueberschriften"
+            || token == "ee"
+    })
+}
+
+/// Python `retaPrompt.immerHauptParaAbarbeitung`: always perform the final main
+/// parameter and equal-sign/regex normalization phase.
+#[allow(non_snake_case)]
+pub fn immerHauptParaAbarbeitung(tokens: &[String]) -> Vec<String> {
+    let mut out = tokens.to_vec();
+    if out.first().map(|token| token == "reta").unwrap_or(false) {
+        out = collapse_python_style_equals_tokens(&out);
+    }
+    allEqSignAbarbeitung(&out)
+}
+
 /// Python `retaPrompt.findregEx`: return candidates matched by one prompt
 /// regex/glob fragment, preserving candidate order and Python-style matching.
 #[allow(non_snake_case)]

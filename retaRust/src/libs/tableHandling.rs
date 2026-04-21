@@ -40,6 +40,26 @@ pub const PYTHON_SOURCE__TABLE_HANDLING: &str = include_str!("../../python_refer
 
 pub type TxtSink = Rc<RefCell<Vec<String>>>;
 
+/// Python `tableHandling.findMaxCellTextLen`: maximum visible cell width by
+/// character count across a rectangular or ragged text table.
+#[allow(non_snake_case)]
+pub fn findMaxCellTextLen(rows: &[Vec<String>]) -> usize {
+    rows.iter()
+        .flat_map(|row| row.iter())
+        .map(|cell| cell.chars().count())
+        .max()
+        .unwrap_or(0)
+}
+
+/// Python `tableHandling.determineRowWidth`: sum of cell widths plus one
+/// separator between neighboring cells.
+#[allow(non_snake_case)]
+pub fn determineRowWidth(row: &[String]) -> usize {
+    row.iter().map(|cell| cell.chars().count()).sum::<usize>()
+        + row.len().saturating_sub(1)
+}
+
+
 #[derive(Debug, Clone, Default)]
 pub struct BreakoutException;
 

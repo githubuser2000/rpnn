@@ -1319,6 +1319,44 @@ pub fn multiples(a: i64, mul1: bool) -> Vec<(i64, i64)> {
     out
 }
 
+
+/// Python `multis.mult`: render multiplication pairs for every decimal input.
+pub fn mult<T: ToString>(liste: &[T]) -> Vec<String> {
+    let mut ergebnis = Vec::new();
+    for arg in liste {
+        let text = arg.to_string();
+        if !is_ascii_decimal(&text) {
+            continue;
+        }
+        if let Ok(n) = text.parse::<i64>() {
+            ergebnis.push(format!("{}: {:?}", text, multiples(n, true)));
+        }
+    }
+    ergebnis
+}
+
+/// Python `multis.mult2`: return rendered multiplication pairs and the raw
+/// non-trivial pair lists for callers that need to keep working with factors.
+pub fn mult2<T: ToString>(liste: &[T]) -> (Vec<String>, Vec<Vec<(i64, i64)>>) {
+    let mut ergebnis1 = Vec::new();
+    let mut ergebnis2 = Vec::new();
+    for arg in liste {
+        let text = arg.to_string();
+        if !is_ascii_decimal(&text) {
+            continue;
+        }
+        if let Ok(n) = text.parse::<i64>() {
+            let couples: Vec<(i64, i64)> = multiples(n, true)
+                .into_iter()
+                .filter(|(a, b)| *a != 1 && *b != 1)
+                .collect();
+            ergebnis1.push(format!("{}: {:?}", text, couples));
+            ergebnis2.push(couples);
+        }
+    }
+    (ergebnis1, ergebnis2)
+}
+
 pub fn teiler(zahlenBereichsAngabe: &str) -> (Vec<String>, BTreeSet<i64>) {
     let zahlen_bereich_menge = BereichToNumbers2(zahlenBereichsAngabe, false, 0, false);
     let mut zahlen_wbereich_menge: BTreeSet<i64> = BTreeSet::new();

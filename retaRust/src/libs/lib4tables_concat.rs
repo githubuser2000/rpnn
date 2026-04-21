@@ -2,9 +2,11 @@
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::{IndexMap, IndexSet};
+
+use crate::shared::lib4tables_enum_py::ST;
 
 pub use crate::libs::tableHandling::TablesConcat as Concat;
 
@@ -383,6 +385,669 @@ fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
     }
     a.abs().max(1)
 }
+
+
+fn cell_at(relitable: &[Vec<String>], row: usize, col: usize) -> String {
+    relitable
+        .get(row)
+        .and_then(|line| line.get(col))
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn cell_len_gt(relitable: &[Vec<String>], row: usize, col: usize, min_chars: usize) -> bool {
+    cell_at(relitable, row, col).trim().chars().count() > min_chars
+}
+
+fn list_open(html_output_yes: bool, bbcode_output_yes: bool) -> &'static str {
+    if html_output_yes {
+        "<ul>"
+    } else if bbcode_output_yes {
+        "[list]"
+    } else {
+        ""
+    }
+}
+
+fn list_close(html_output_yes: bool, bbcode_output_yes: bool) -> &'static str {
+    if html_output_yes {
+        "</ul>"
+    } else if bbcode_output_yes {
+        "[/list]"
+    } else {
+        ""
+    }
+}
+
+fn list_item_prefix(html_output_yes: bool, bbcode_output_yes: bool) -> &'static str {
+    if html_output_yes {
+        "<li>"
+    } else if bbcode_output_yes {
+        "[*]"
+    } else {
+        ""
+    }
+}
+
+fn list_item_suffix(html_output_yes: bool, bbcode_output_yes: bool) -> &'static str {
+    if html_output_yes {
+        "</li>"
+    } else if bbcode_output_yes {
+        ""
+    } else {
+        " | "
+    }
+}
+
+fn modal_text_by_distance_concat(distance_from_line: i64) -> &'static str {
+    match distance_from_line.abs() {
+        2 => "mittelstark überdurchschnittlich: ",
+        1 => "überdurchschnittlich: ",
+        3 => "mittelleicht überdurchschnittlich: ",
+        0 => "sehr: ",
+        _ => "sehr leicht überdurchschnittlich: ",
+    }
+}
+
+fn modal_replace_zuerst_zweites(text: &str) -> String {
+    text.replace("intrinsisch", "zuerst")
+        .replace("extrinsisch", "als zweites")
+}
+
+/// Storage shape of Python `vorkommenVielfacher_B[i][distance]`.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ModalEntry {
+    pub i_origS: Vec<usize>,
+    pub modalS: Vec<Vec<String>>,
+    pub vervielfachter: Vec<usize>,
+}
+
+/// Python `getModaloperatorsPerLineCells` from `Concat.concatModallogik`.
+#[allow(non_snake_case)]
+pub fn getModaloperatorsPerLineCells(relitable: &[Vec<String>], lineWeAreAt: usize) -> Vec<String> {
+    let modal_main_operator_line = lineWeAreAt;
+    let amount_modaloperators = lineWeAreAt.saturating_sub(1);
+    let modal_else_begin = lineWeAreAt.saturating_add(1);
+    let modal_else_end = lineWeAreAt
+        .saturating_add(amount_modaloperators)
+        .saturating_add(1);
+
+    let mut modaloperators = Vec::new();
+    if let Some(row) = relitable.get(modal_main_operator_line) {
+        if let Some(value) = row.get(97) {
+            modaloperators.push(value.clone());
+        }
+        if let Some(value) = row.get(98) {
+            modaloperators.push(value.clone());
+        }
+    }
+    for coord in modal_else_begin..modal_else_end {
+        if let Some(value) = relitable.get(coord).and_then(|row| row.get(42)) {
+            modaloperators.push(value.clone());
+        }
+    }
+    modaloperators
+}
+
+/// Python `prepareModalIntoTable`: collect modal operators for all multiples at a
+/// relative distance and prepend them to the already known lists.
+#[allow(non_snake_case)]
+pub fn prepareModalIntoTable(
+    distanceFromLine: i64,
+    i: usize,
+    relitable: &[Vec<String>],
+    vorkommenVielfacher: &BTreeMap<usize, Vec<(usize, usize)>>,
+    vorkommenVielfacher_B: &mut BTreeMap<usize, BTreeMap<i64, ModalEntry>>,
+) {
+    let Some(i_with_distance) = (i as i64).checked_add(distanceFromLine) else {
+        return;
+    };
+    if i_with_distance < 0 {
+        return;
+    }
+    let Some(couples) = vorkommenVielfacher.get(&(i_with_distance as usize)) else {
+        return;
+    };
+
+    let mut modal_en = Vec::new();
+    let mut original_i = Vec::new();
+    let mut vervielfachter = Vec::new();
+    for (vorkommen, vielfacher) in couples.iter().copied() {
+        modal_en.push(getModaloperatorsPerLineCells(relitable, vielfacher));
+        vervielfachter.push(vorkommen);
+        original_i.push(i_with_distance as usize);
+    }
+
+    let by_distance = vorkommenVielfacher_B.entry(i).or_default();
+    let existing = by_distance.remove(&distanceFromLine).unwrap_or_default();
+    modal_en.extend(existing.modalS);
+    original_i.extend(existing.i_origS);
+    vervielfachter.extend(existing.vervielfachter);
+    by_distance.insert(
+        distanceFromLine,
+        ModalEntry {
+            i_origS: original_i,
+            modalS: modal_en,
+            vervielfachter,
+        },
+    );
+}
+
+/// Python `ModalLogikIntoTable`: append the modal text fragments generated for
+/// one concept column pair into the target row buffers.
+#[allow(non_snake_case)]
+pub fn ModalLogikIntoTable(
+    concept: (usize, usize),
+    distanceFromLine: i64,
+    i: usize,
+    relitable: &[Vec<String>],
+    into: &mut BTreeMap<usize, Vec<String>>,
+    vorkommenVielfacher_B: &BTreeMap<usize, BTreeMap<i64, ModalEntry>>,
+    htmlOutputYes: bool,
+    bbcodeOutputYes: bool,
+) {
+    let Some(entry) = vorkommenVielfacher_B
+        .get(&i)
+        .and_then(|by_distance| by_distance.get(&distanceFromLine))
+    else {
+        return;
+    };
+
+    for (modalOperatoren, vervielfachter) in entry.modalS.iter().zip(entry.vervielfachter.iter().copied()) {
+        if modalOperatoren.len() < 2 {
+            continue;
+        }
+        let content_col = if distanceFromLine.abs() % 2 == 0 { concept.0 } else { concept.1 };
+        let into_its_content = cell_at(relitable, vervielfachter, content_col);
+        if into_its_content.is_empty() {
+            continue;
+        }
+        let first_modal = modalOperatoren.get(0).cloned().unwrap_or_default();
+        let base_modal = cell_at(relitable, 1, 97);
+        let displayed_content = if first_modal == base_modal {
+            into_its_content.clone()
+        } else {
+            modal_replace_zuerst_zweites(&into_its_content)
+        };
+
+        let mut fragment = String::new();
+        fragment.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
+        fragment.push_str(modal_text_by_distance_concat(distanceFromLine));
+        fragment.push_str(&first_modal);
+        fragment.push(' ');
+        fragment.push_str(&displayed_content);
+        fragment.push(' ');
+        fragment.push_str(&modalOperatoren[1]);
+
+        if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
+            fragment.push_str(", nicht: ");
+            fragment.push_str(&modalOperatoren[2..].join(", "));
+            fragment.push_str(" (das alles nicht): ");
+            fragment.push_str(&modal_replace_zuerst_zweites(&cell_at(relitable, vervielfachter, concept.0)));
+        }
+        if !htmlOutputYes && !bbcodeOutputYes {
+            fragment.push_str(" | ");
+        }
+        if htmlOutputYes {
+            fragment.push_str("</li>");
+        }
+        into.entry(i).or_default().push(fragment);
+    }
+}
+
+/// Coordinate variant used by the Python meta/concrete table walkers: either a
+/// direct row index or a `fractions.Fraction` pointing into the Gebr/Universum
+/// helper matrix.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum MetaCoordinate {
+    Int(i64),
+    Fraction(PyFraction),
+}
+
+impl MetaCoordinate {
+    fn as_fraction(self) -> Option<PyFraction> {
+        match self {
+            Self::Int(value) => PyFraction::new(value, 1),
+            Self::Fraction(value) => Some(value),
+        }
+    }
+
+    fn as_index(self) -> Option<usize> {
+        match self {
+            Self::Int(value) if value >= 0 => Some(value as usize),
+            _ => None,
+        }
+    }
+
+    pub fn display(self) -> String {
+        match self {
+            Self::Int(value) => value.to_string(),
+            Self::Fraction(value) if value.denominator == 1 => value.numerator.to_string(),
+            Self::Fraction(value) => format!("{}/{}", value.numerator, value.denominator),
+        }
+    }
+}
+
+pub type MetaMoreAndLess = (Option<MetaCoordinate>, Option<MetaCoordinate>);
+
+fn spalteMetaKonkretAbstrakt_isGanzZahlig_fraction(value: PyFraction, spaltenWahl: bool) -> bool {
+    spalteMetaKonkretAbstrakt_isGanzZahlig(value.as_f64(), spaltenWahl)
+}
+
+/// Python `switching` nested in `spalteMetaKonkretTheorieAbstrakt_etc_1`.
+#[allow(non_snake_case)]
+pub fn switching(
+    newCol: usize,
+    moreAndLess: MetaMoreAndLess,
+    metavariable: i64,
+    ifInvers: usize,
+    transzendentalienSpalten: (usize, usize),
+    relitable_len: usize,
+    gebrRatEtwaSchonMalDabeiGewesen: &mut BTreeSet<PyFraction>,
+) -> (usize, MetaMoreAndLess) {
+    let (new_col, _spalten_wahl) = if newCol == transzendentalienSpalten.1 {
+        (transzendentalienSpalten.0, 0usize)
+    } else {
+        (transzendentalienSpalten.1, 1usize)
+    };
+
+    let a = moreAndLess.0.and_then(|coord| match coord {
+        MetaCoordinate::Int(value) => value.checked_mul(metavariable).and_then(|mul| {
+            if mul >= 0 && (mul as usize) < relitable_len {
+                Some(MetaCoordinate::Int(mul))
+            } else {
+                None
+            }
+        }),
+        MetaCoordinate::Fraction(value) => value.mul(PyFraction::from_int(metavariable)).and_then(|mul| {
+            if mul.is_integer() && mul.numerator >= 0 && (mul.numerator as usize) < relitable_len {
+                Some(MetaCoordinate::Int(mul.numerator))
+            } else {
+                None
+            }
+        }),
+    });
+
+    let b = moreAndLess.1.and_then(|coord| {
+        let mut right = coord.as_fraction()?;
+        let right_f = right.as_f64();
+        if !(right_f < 100.0 && right_f > 0.01) {
+            return None;
+        }
+        let inverse_col = if ifInvers == 0 {
+            transzendentalienSpalten.0
+        } else {
+            transzendentalienSpalten.1
+        };
+        if new_col == inverse_col {
+            if let MetaCoordinate::Int(value) = coord {
+                right = PyFraction::new(1, value)?;
+            }
+        }
+        let candidate = if spalteMetaKonkretAbstrakt_isGanzZahlig_fraction(right, false) {
+            PyFraction::new(metavariable, 1)?.div(right)?
+        } else {
+            right.recip()?.div(PyFraction::new(metavariable, 1)?)?
+        };
+        if gebrRatEtwaSchonMalDabeiGewesen.contains(&candidate) {
+            None
+        } else {
+            gebrRatEtwaSchonMalDabeiGewesen.insert(candidate);
+            Some(MetaCoordinate::Fraction(candidate))
+        }
+    });
+
+    (new_col, (a, b))
+}
+
+/// Python `spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie`.
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie(
+    koord: PyFraction,
+    n_and_invers_spalten: (usize, usize),
+    relitable: &[Vec<String>],
+    gebrTable4metaKonkretAndMore: &[Vec<String>],
+    isNotUniverse: bool,
+    htmlOutputYes: bool,
+) -> Option<String> {
+    let is_universe = !isNotUniverse;
+    if koord.denominator == 0 || koord.numerator == 0 {
+        return Some(String::new());
+    }
+    if koord.denominator > 100 || koord.numerator > 100 || koord.denominator < 0 || koord.numerator < 0 {
+        return None;
+    }
+    if koord.numerator == 1 {
+        let idx = koord.denominator as usize;
+        if cell_len_gt(relitable, idx, n_and_invers_spalten.1, 3) {
+            let base = cell_at(relitable, idx, n_and_invers_spalten.1);
+            if is_universe {
+                let extra = cell_at(relitable, idx, 201);
+                let sep = if extra.chars().count() > 2 {
+                    if htmlOutputYes { "<br>" } else { "; " }
+                } else {
+                    ""
+                };
+                Some(format!("{} (1/{}){}{}", base, koord.denominator, sep, extra))
+            } else {
+                Some(base)
+            }
+        } else {
+            Some(String::new())
+        }
+    } else if koord.denominator == 1 {
+        let idx = koord.numerator as usize;
+        if cell_len_gt(relitable, idx, n_and_invers_spalten.0, 3) {
+            let base = cell_at(relitable, idx, n_and_invers_spalten.0);
+            if is_universe {
+                let extra = cell_at(relitable, idx, 198);
+                let sep = if extra.chars().count() > 2 {
+                    if htmlOutputYes { "<br>" } else { "; " }
+                } else {
+                    ""
+                };
+                Some(format!("{} ({}){}{}", base, koord.numerator, sep, extra))
+            } else {
+                Some(base)
+            }
+        } else {
+            Some(String::new())
+        }
+    } else {
+        let row = koord.numerator.checked_sub(1)? as usize;
+        let col = koord.denominator.checked_sub(1)? as usize;
+        Some(
+            gebrTable4metaKonkretAndMore
+                .get(row)
+                .and_then(|line| line.get(col))
+                .cloned()
+                .unwrap_or_default(),
+        )
+    }
+}
+
+/// Python `spalteMetaKonkretAbstrakt_UeberschriftenUndTags` as a pure header
+/// and tag computation.
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretAbstrakt_UeberschriftenUndTags(
+    bothRows: i64,
+    ifInvers: usize,
+    metavariable: i64,
+    rowsAsNumbers: &BTreeSet<i64>,
+    current_header_len: i64,
+) -> (BTreeSet<i64>, String, BTreeSet<ST>) {
+    let mut rows = rowsAsNumbers.clone();
+    rows.insert(current_header_len);
+    let star_tag = if ifInvers == 0 { ST::sternPolygon } else { ST::gleichfoermigesPolygon };
+    let mut tags = BTreeSet::from([star_tag, ST::universum]);
+    if bothRows == 1 {
+        tags.insert(ST::gebrRat);
+    }
+    let mut heading = match (bothRows, metavariable) {
+        (0, 2) => "Meta",
+        (0, 3) => "Theorie",
+        (0, 4) => "Management",
+        (0, 5) => "ganzheitlich",
+        (0, 6) => "Verwertung, Unternehmung, Geschäft",
+        (0, 7) => "regieren, beherrschen",
+        (1, 2) => "Konkretes",
+        (1, 3) => "Praxis",
+        (1, 4) => "verändernd",
+        (1, 5) => "darüber hinaus gehend",
+        (1, 6) => "wertvoll",
+        (1, 7) => "Richtung",
+        _ => "",
+    }
+    .to_string();
+    heading.push_str(if ifInvers == 1 { " für 1/n statt n" } else { " für n" });
+    (rows, heading, tags)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MetaVorwortEntry {
+    pub moreAndLess: MetaMoreAndLess,
+    pub column: usize,
+    pub vorwort1: String,
+    pub vorwort2: String,
+}
+
+/// Python `spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta`.
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta(
+    metavariable: i64,
+    ifInvers: usize,
+    transzendentalienSpalten: (usize, usize),
+    relitable_len: usize,
+    make_vorwort_prefixes: (&str, &str),
+    mut newCol: usize,
+    mut moreAndLess: MetaMoreAndLess,
+    seen: &mut BTreeSet<PyFraction>,
+) -> Vec<MetaVorwortEntry> {
+    let mut entries = Vec::new();
+    while !(moreAndLess.0.is_none() && moreAndLess.1.is_none()) {
+        let switched = switching(
+            newCol,
+            moreAndLess,
+            metavariable,
+            ifInvers,
+            transzendentalienSpalten,
+            relitable_len,
+            seen,
+        );
+        newCol = switched.0;
+        moreAndLess = switched.1;
+        if moreAndLess.0.is_none() && moreAndLess.1.is_none() {
+            break;
+        }
+        let repetitions = entries.len() + 1;
+        let vorwort1 = make_vorwort_prefixes.0.repeat(repetitions.max(1));
+        let vorwort2 = make_vorwort_prefixes.1.repeat(repetitions.max(1));
+        entries.push(MetaVorwortEntry {
+            moreAndLess,
+            column: newCol,
+            vorwort1,
+            vorwort2,
+        });
+    }
+    entries
+}
+
+/// Python `spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText`, returned as
+/// the rendered side-column text instead of mutating `self.relitable[i]`.
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(
+    bothRows: i64,
+    _i: usize,
+    ifInvers: usize,
+    neue2KoordNeue2Vorwoerter: &[MetaVorwortEntry],
+    relitable: &[Vec<String>],
+    transzendentalienSpalten: (usize, usize),
+    gebrUnivTable4metaKonkret: &[Vec<String>],
+    htmlOutputYes: bool,
+    bbcodeOutputYes: bool,
+) -> String {
+    let mut into_list = String::new();
+    let mut thema = String::new();
+    for entry in neue2KoordNeue2Vorwoerter.iter() {
+        if bothRows == 0 {
+            if let Some(row) = entry.moreAndLess.0.and_then(|coord| coord.as_index()) {
+                let cell = cell_at(relitable, row, entry.column);
+                if cell.trim().chars().count() > 3 {
+                    let inverse_col = if ifInvers == 0 {
+                        transzendentalienSpalten.0
+                    } else {
+                        transzendentalienSpalten.1
+                    };
+                    let inverse_prefix = if entry.column != inverse_col && row != 1 { "1/" } else { "" };
+                    into_list.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
+                    into_list.push_str(&entry.vorwort1);
+                    into_list.push_str(&thema);
+                    into_list.push_str(&cell);
+                    into_list.push_str(" (");
+                    into_list.push_str(inverse_prefix);
+                    into_list.push_str(&row.to_string());
+                    into_list.push(')');
+                    into_list.push_str(list_item_suffix(htmlOutputYes, bbcodeOutputYes));
+                }
+            }
+        } else if bothRows == 1 {
+            match entry.moreAndLess.1 {
+                Some(MetaCoordinate::Int(row_i64)) if row_i64 >= 0 => {
+                    let row = row_i64 as usize;
+                    let cell = cell_at(relitable, row, entry.column);
+                    if cell.trim().chars().count() > 3 {
+                        let inverse_col = if ifInvers == 0 {
+                            transzendentalienSpalten.0
+                        } else {
+                            transzendentalienSpalten.1
+                        };
+                        let inverse_prefix = if entry.column != inverse_col && row != 1 { "1/" } else { "" };
+                        into_list.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
+                        into_list.push_str(&entry.vorwort2);
+                        into_list.push_str(&thema);
+                        into_list.push_str(&cell);
+                        into_list.push_str(" (");
+                        into_list.push_str(inverse_prefix);
+                        into_list.push_str(&row.to_string());
+                        into_list.push(')');
+                        into_list.push_str(list_item_suffix(htmlOutputYes, bbcodeOutputYes));
+                    }
+                }
+                Some(MetaCoordinate::Fraction(frac)) => {
+                    if let Some(gebr) = spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie(
+                        frac,
+                        transzendentalienSpalten,
+                        relitable,
+                        gebrUnivTable4metaKonkret,
+                        false,
+                        htmlOutputYes,
+                    ) {
+                        if gebr.trim().chars().count() > 3 {
+                            into_list.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
+                            into_list.push_str(&entry.vorwort2);
+                            into_list.push_str(&thema);
+                            into_list.push_str(&gebr);
+                            into_list.push('(');
+                            into_list.push_str(&frac.numerator.to_string());
+                            if frac.denominator > 1 {
+                                into_list.push('/');
+                                into_list.push_str(&frac.denominator.to_string());
+                            }
+                            into_list.push(')');
+                            into_list.push_str(list_item_suffix(htmlOutputYes, bbcodeOutputYes));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        thema = "Thema: ".to_string();
+    }
+
+    if into_list.is_empty() {
+        String::new()
+    } else {
+        format!("{}{}{}", list_open(htmlOutputYes, bbcodeOutputYes), into_list, list_close(htmlOutputYes, bbcodeOutputYes))
+    }
+}
+
+/// Python `spalteMetaKonkretTheorieAbstrakt_mainPart` as a deterministic,
+/// side-effect-light facade over the generated meta/concrete side columns.
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_mainPart(
+    bothRows: i64,
+    ifInvers: usize,
+    metavariable: i64,
+    relitable: &[Vec<String>],
+    transzendentalienSpalten: (usize, usize),
+    gebrUnivTable4metaKonkret: &[Vec<String>],
+    rowsAsNumbers: &BTreeSet<i64>,
+    htmlOutputYes: bool,
+    bbcodeOutputYes: bool,
+) -> (Vec<Vec<String>>, BTreeSet<i64>) {
+    let (rows, heading, _tags) = spalteMetaKonkretAbstrakt_UeberschriftenUndTags(
+        bothRows,
+        ifInvers,
+        metavariable,
+        rowsAsNumbers,
+        relitable.first().map(|row| row.len()).unwrap_or(0) as i64,
+    );
+    let mut out = relitable.to_vec();
+    if out.is_empty() {
+        return (out, rows);
+    }
+    if let Some(header) = out.get_mut(0) {
+        header.push(heading);
+    }
+    if let Some(second) = out.get_mut(1) {
+        second.push(String::new());
+    }
+
+    let mut seen = BTreeSet::new();
+    let prefixes = match metavariable {
+        2 => ("Meta-Thema: ", "Konkretes: "),
+        3 => ("Theorie-Thema: ", "Praxis: "),
+        4 => ("Planungs-Thema: ", "Umsetzungs-Thema: "),
+        5 => ("Anlass-Thema: ", "Wirkungs-Thema: "),
+        6 => ("Kraft-Gebung: ", "Verstärkungs-Thema: "),
+        7 => ("Beherrschung: ", "Richtung-Thema: "),
+        _ => ("", ""),
+    };
+
+    for i in 2..out.len() {
+        let start_coord = MetaCoordinate::Int(i as i64);
+        let entries = spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta(
+            metavariable,
+            ifInvers,
+            transzendentalienSpalten,
+            out.len(),
+            prefixes,
+            transzendentalienSpalten.0,
+            (Some(start_coord), Some(start_coord)),
+            &mut seen,
+        );
+        let rendered = spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(
+            bothRows,
+            i,
+            ifInvers,
+            &entries,
+            &out,
+            transzendentalienSpalten,
+            gebrUnivTable4metaKonkret,
+            htmlOutputYes,
+            bbcodeOutputYes,
+        );
+        if let Some(row) = out.get_mut(i) {
+            row.push(rendered);
+        }
+    }
+    (out, rows)
+}
+
+/// Python `readConcatCsv_LoopBody`: decide whether one concat CSV side-column is
+/// selected and return the column number that Python adds to both result sets.
+#[allow(non_snake_case)]
+pub fn readConcatCsv_LoopBody(
+    concatTableSelection: &BTreeSet<i64>,
+    concatTable: i64,
+    dazu_len: usize,
+    relitable_header_len: usize,
+    _generated_spalten_parameter_len: i64,
+    _spalten_vanilla_amount: i64,
+    u: usize,
+) -> Option<i64> {
+    let selected = (concatTableSelection.contains(&((u + 2) as i64)) && (2..10).contains(&concatTable))
+        || concatTable == 1;
+    if !selected {
+        return None;
+    }
+    if (2..10).contains(&concatTable) && u + 1 == dazu_len {
+        return None;
+    }
+    let delta = if (2..10).contains(&concatTable) { 1usize } else { 0usize };
+    Some((u + relitable_header_len).saturating_sub(dazu_len).saturating_add(delta) as i64)
+}
+
 
 #[cfg(test)]
 mod tests {

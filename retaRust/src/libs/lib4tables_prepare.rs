@@ -17,6 +17,18 @@ pub enum Wraptype {
     nohyphen = 3,
 }
 
+
+/// Python `lib4tables_prepare.cutset`: if `wether` is true return the set
+/// intersection, otherwise keep the first set unchanged.
+#[allow(non_snake_case)]
+pub fn cutset<T: Ord + Clone>(wether: bool, a: BTreeSet<T>, b: BTreeSet<T>) -> BTreeSet<T> {
+    if wether {
+        a.intersection(&b).cloned().collect()
+    } else {
+        a
+    }
+}
+
 pub fn chunks<T: Clone>(lst: &[T], n: usize) -> Vec<Vec<T>> {
     if n == 0 {
         panic!("range() arg 3 must not be zero");

@@ -100,6 +100,39 @@ impl SessionState {
     }
 }
 
+
+/// Python `PromptAllesVorGroesserSchleife`: initialize the prompt state before
+/// the main `>` loop starts.
+#[allow(non_snake_case)]
+pub fn PromptAllesVorGroesserSchleife(
+    program_name: String,
+    vi_mode: bool,
+    implicit_logging: bool,
+) -> SessionState {
+    SessionState::new(program_name, vi_mode, implicit_logging)
+}
+
+/// Python logging toggle helpers kept as explicit prompt-scope operations.
+pub fn enable_logging(state: &mut SessionState) {
+    state.logging_enabled = true;
+}
+
+pub fn disable_logging(state: &mut SessionState) {
+    state.logging_enabled = false;
+}
+
+/// Python `add_to_history`: do not store empty prompt lines.
+pub fn add_to_history(state: &mut SessionState, line: String) {
+    if !line.trim().is_empty() {
+        state.history_lines.push(line);
+    }
+}
+
+/// Python-style tuple access for output title/body.
+pub fn get_strings(output: &PromptOutput) -> (&str, &str) {
+    (&output.title, &output.text)
+}
+
 fn raw_prompt_tokens_like_python(text: &str) -> Vec<String> {
     libreta_prompt_custom_split(text)
 }
