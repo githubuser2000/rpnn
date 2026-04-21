@@ -3,7 +3,9 @@
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::shared::reta_exact_tags_py::{kombi13_table_tags_exact_py, kombi15_table_tags_exact_py};
+use crate::shared::lib4tables_enum_py::{
+    tableTags2_kombiTable2_for_column, tableTags2_kombiTable_for_column,
+};
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
 use crate::shared::words_py::Words;
 
@@ -224,13 +226,11 @@ impl Program {
         }
 
         let exact_tags = if csvFileName.contains("meta") {
-            kombi15_table_tags_exact_py(csv_col_number as usize)
+            tableTags2_kombiTable2_for_column(csv_col_number)
         } else {
-            kombi13_table_tags_exact_py(csv_col_number as usize)
+            tableTags2_kombiTable_for_column(csv_col_number)
         };
-        if let Some(tags) = exact_tags {
-            let mut collected = BTreeSet::new();
-            collected.extend(tags.iter().copied());
+        if let Some(collected) = exact_tags {
             if !collected.is_empty() {
                 self.generatedSpaltenParameter_Tags.insert(spalte, collected);
             }

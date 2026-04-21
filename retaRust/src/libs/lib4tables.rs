@@ -4,10 +4,19 @@
 
 use std::collections::BTreeSet;
 
+pub const PYTHON_SOURCE__LIB4TABLES: &str = include_str!("../../python_reference/lib4tables.py");
+
 pub use crate::libs::tableHandling::{
     bbCodeSyntax, csvSyntax, emacsSyntax, htmlSyntax, markdownSyntax, NichtsSyntax, OutputSyntax,
 };
 pub use crate::libs::tableHandling::primCreativity;
+pub use crate::shared::lib4tables_enum_py::{
+    dictViceversa, tableTags, tableTags2, tableTags2_for_column,
+    tableTags2_kombiTable, tableTags2_kombiTable2, tableTags2_kombiTable2_for_column,
+    tableTags2_kombiTable_for_column, tableTags_columns_for_tags, tableTags_kombiTable,
+    tableTags_kombiTable2, tableTags_kombiTable2_columns_for_tags,
+    tableTags_kombiTable_columns_for_tags, TableTags, TableTags2,
+};
 
 fn py_round_positive(value: f64) -> i64 {
     let floor = value.floor();
@@ -177,5 +186,17 @@ mod tests {
         assert_eq!(primMultiple(12), vec![(1, 12), (2, 6), (3, 4)]);
         assert_eq!(isPrimMultiple_bool(12, &[6]), true);
         assert_eq!(isPrimMultiple_bool(12, &[5]), false);
+    }
+
+    #[test]
+    fn lib4tables_module_exposes_python_source_and_tag_facade() {
+        use crate::shared::lib4tables_enum_py::ST;
+
+        assert!(PYTHON_SOURCE__LIB4TABLES.contains("def primCreativity"));
+        assert_eq!(
+            tableTags2_for_column(14),
+            Some([ST::sternPolygon, ST::galaxie].into_iter().collect())
+        );
+        assert!(tableTags_columns_for_tags([ST::sternPolygon, ST::galaxie]).contains(&14));
     }
 }

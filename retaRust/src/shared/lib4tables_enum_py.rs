@@ -1,7 +1,14 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+
+use crate::shared::reta_exact_tags_py::{
+    kombi13_table_tags_exact_py, kombi15_table_tags_exact_py, ordinary_table_tags_exact_py,
+};
+
+pub const PYTHON_SOURCE__LIB4TABLES_ENUM: &str = include_str!("../../python_reference/lib4tables_Enum.py");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ST {
@@ -76,9 +83,140 @@ impl fmt::Display for ST {
     }
 }
 
+
+pub type TableTags = BTreeMap<BTreeSet<ST>, BTreeSet<i64>>;
+pub type TableTags2 = BTreeMap<i64, BTreeSet<ST>>;
+
+fn tag_set_from_slice(tags: &[ST]) -> BTreeSet<ST> {
+    tags.iter().copied().collect()
+}
+
+fn group_reverse_tags(table_tags2: &TableTags2) -> TableTags {
+    let mut grouped: TableTags = BTreeMap::new();
+    for (column, tags) in table_tags2 {
+        grouped.entry(tags.clone()).or_default().insert(*column);
+    }
+    grouped
+}
+
+/// Python `dictViceversa(dic)`: turn `{frozenset(ST): {columns...}}` into
+/// `{column: frozenset(ST)}`.  Python overwrites earlier entries when a column
+/// appears in multiple tag groups; the ordered Rust map intentionally mirrors
+/// that final effective value.
+pub fn dictViceversa(dic: &TableTags) -> TableTags2 {
+    let mut new_dict = TableTags2::new();
+    for (key, value) in dic {
+        for number in value {
+            new_dict.insert(*number, key.clone());
+        }
+    }
+    new_dict
+}
+
+pub fn tableTags2_for_column(column_number: i64) -> Option<BTreeSet<ST>> {
+    if column_number < 0 {
+        return None;
+    }
+    ordinary_table_tags_exact_py(column_number as u32).map(tag_set_from_slice)
+}
+
+pub fn tableTags2() -> TableTags2 {
+    let mut out = TableTags2::new();
+    // Python's ordinary `tableTags` currently covers columns below 520.  The
+    // wider scan keeps this facade stable if the generated exact table grows.
+    for column in 0..=2048i64 {
+        if let Some(tags) = tableTags2_for_column(column) {
+            out.insert(column, tags);
+        }
+    }
+    out
+}
+
+/// Effective ordinary `tableTags` grouped back from `tableTags2`.  This is the
+/// representation active consumers need after Python's duplicate-column
+/// overwrite semantics have been applied by `dictViceversa`.
+pub fn tableTags() -> TableTags {
+    group_reverse_tags(&tableTags2())
+}
+
+pub fn tableTags_columns_for_tags<I>(tags: I) -> BTreeSet<i64>
+where
+    I: IntoIterator<Item = ST>,
+{
+    let wanted: BTreeSet<ST> = tags.into_iter().collect();
+    tableTags()
+        .get(&wanted)
+        .cloned()
+        .unwrap_or_default()
+}
+
+pub fn tableTags2_kombiTable_for_column(column_number: i64) -> Option<BTreeSet<ST>> {
+    if column_number < 0 {
+        return None;
+    }
+    kombi13_table_tags_exact_py(column_number as usize).map(tag_set_from_slice)
+}
+
+pub fn tableTags2_kombiTable() -> TableTags2 {
+    let mut out = TableTags2::new();
+    for column in 0..=256i64 {
+        if let Some(tags) = tableTags2_kombiTable_for_column(column) {
+            out.insert(column, tags);
+        }
+    }
+    out
+}
+
+pub fn tableTags_kombiTable() -> TableTags {
+    group_reverse_tags(&tableTags2_kombiTable())
+}
+
+pub fn tableTags_kombiTable_columns_for_tags<I>(tags: I) -> BTreeSet<i64>
+where
+    I: IntoIterator<Item = ST>,
+{
+    let wanted: BTreeSet<ST> = tags.into_iter().collect();
+    tableTags_kombiTable()
+        .get(&wanted)
+        .cloned()
+        .unwrap_or_default()
+}
+
+pub fn tableTags2_kombiTable2_for_column(column_number: i64) -> Option<BTreeSet<ST>> {
+    if column_number < 0 {
+        return None;
+    }
+    kombi15_table_tags_exact_py(column_number as usize).map(tag_set_from_slice)
+}
+
+pub fn tableTags2_kombiTable2() -> TableTags2 {
+    let mut out = TableTags2::new();
+    for column in 0..=256i64 {
+        if let Some(tags) = tableTags2_kombiTable2_for_column(column) {
+            out.insert(column, tags);
+        }
+    }
+    out
+}
+
+pub fn tableTags_kombiTable2() -> TableTags {
+    group_reverse_tags(&tableTags2_kombiTable2())
+}
+
+pub fn tableTags_kombiTable2_columns_for_tags<I>(tags: I) -> BTreeSet<i64>
+where
+    I: IntoIterator<Item = ST>,
+{
+    let wanted: BTreeSet<ST> = tags.into_iter().collect();
+    tableTags_kombiTable2()
+        .get(&wanted)
+        .cloned()
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ST;
+    use super::*;
 
     #[test]
     fn st_python_enum_values_match_lib4tables_enum_py() {
@@ -91,5 +229,72 @@ mod tests {
         assert_eq!(ST::gebrRat.py_value(), 6);
         assert_eq!(ST::from_py_value(2), Some(ST::keinPolygon));
         assert_eq!(ST::from_py_name("keinPolygon"), Some(ST::keinPolygon));
+        assert!(PYTHON_SOURCE__LIB4TABLES_ENUM.contains("tableTags2 = dictViceversa(tableTags)"));
+    }
+
+    fn set(tags: &[ST]) -> std::collections::BTreeSet<ST> {
+        tags.iter().copied().collect()
+    }
+
+    #[test]
+    fn ordinary_table_tags2_matches_python_effective_duplicate_overwrite() {
+        assert_eq!(
+            tableTags2_for_column(14),
+            Some(set(&[ST::sternPolygon, ST::galaxie]))
+        );
+        assert_eq!(
+            tableTags2_for_column(370),
+            Some(set(&[ST::keinParaOdMetaP, ST::sternPolygon, ST::galaxie]))
+        );
+
+        let star_galaxy_columns = tableTags_columns_for_tags([ST::sternPolygon, ST::galaxie]);
+        assert!(star_galaxy_columns.contains(&14));
+        assert!(star_galaxy_columns.contains(&0));
+        assert!(tableTags2().len() > 400);
+    }
+
+    #[test]
+    fn kombi_table_tags_match_python_kombi_reverse_maps() {
+        assert_eq!(
+            tableTags2_kombiTable_for_column(5),
+            Some(set(&[
+                ST::universum,
+                ST::gleichfoermigesPolygon,
+                ST::sternPolygon,
+                ST::galaxie,
+            ]))
+        );
+        assert_eq!(
+            tableTags2_kombiTable2_for_column(1),
+            Some(set(&[
+                ST::universum,
+                ST::gleichfoermigesPolygon,
+                ST::sternPolygon,
+            ]))
+        );
+        assert!(tableTags_kombiTable_columns_for_tags([
+            ST::gleichfoermigesPolygon,
+            ST::sternPolygon,
+            ST::galaxie,
+        ])
+        .contains(&1));
+        assert!(tableTags_kombiTable2_columns_for_tags([
+            ST::universum,
+            ST::gleichfoermigesPolygon,
+            ST::sternPolygon,
+        ])
+        .contains(&18));
+    }
+
+    #[test]
+    fn dict_viceversa_keeps_python_last_writer_semantics() {
+        let mut grouped = TableTags::new();
+        grouped.insert(set(&[ST::universum]), [7].into_iter().collect());
+        grouped.insert(set(&[ST::sternPolygon]), [7].into_iter().collect());
+
+        let reversed = dictViceversa(&grouped);
+        // BTreeMap iteration is deterministic.  Like Python's loop, the later
+        // visited tag group wins for duplicate columns.
+        assert_eq!(reversed.get(&7), Some(&set(&[ST::universum])));
     }
 }

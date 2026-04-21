@@ -4,8 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::domain::python_html_meta::{html_meta_for_column, HtmlDeclMeta};
 use crate::domain::python_source_of_truth::{all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main};
-use crate::shared::lib4tables_enum_py::ST;
-use crate::shared::reta_exact_tags_py::ordinary_table_tags_exact_py;
+use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
 use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
 
@@ -559,10 +558,8 @@ fn html_exact_header_attrs_py(
                 .unwrap_or(false)
         };
 
-        if original_col >= 0 {
-            if let Some(exact_tags) = ordinary_table_tags_exact_py(original_col as u32) {
-                tags.extend(exact_tags.iter().copied());
-            }
+        if let Some(exact_tags) = tableTags2_for_column(original_col) {
+            tags.extend(exact_tags);
         }
 
         if self.puniverseprims.contains(&original_col) {
