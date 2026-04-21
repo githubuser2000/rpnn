@@ -8,7 +8,9 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::shared::lib4tables_enum_py::ST;
 use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program};
-use crate::shared::reta_generators_inventory_py::{GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS};
+use crate::shared::reta_generators_inventory_py::{
+    GeneratorPairSpec, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS,
+};
 
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -244,9 +246,14 @@ impl Program {
         let mut groups: Vec<Vec<PairStr>> = Vec::new();
         let mut add_viertwichtigste = false;
         for selection in selections {
-            let (_, parameter_name) = self.generated2_raw_names_exact_py(selection);
+            let (main_name, parameter_name) = self.generated2_raw_names_exact_py(selection);
             if !parameter_name.trim().is_empty() {
-                groups.push(Self::pairstr_group_exact_py("Multiplikationen", parameter_name));
+                let main_name = if main_name.trim().is_empty() {
+                    "Multiplikationen".to_string()
+                } else {
+                    main_name
+                };
+                groups.push(Self::pairstr_group_exact_py(main_name, parameter_name));
             }
             if selection.code == "primMotivStern" {
                 add_viertwichtigste = true;
@@ -602,18 +609,37 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         zahl < 0.00001 || zahl > 0.99999
     }
 
+    fn generator_pair_selection_from_specs_exact_py(
+        pair: (i64, i64),
+        specs: &[GeneratorPairSpec],
+    ) -> GeneratorPairSelection {
+        if let Some(spec) = specs.iter().find(|spec| {
+            (spec.col_a == pair.0 && spec.col_b == pair.1)
+                || (spec.col_a == pair.1 && spec.col_b == pair.0)
+        }) {
+            return GeneratorPairSelection {
+                parameter_main_name: spec.main_name.to_string(),
+                parameter_name: spec.parameter_name.to_string(),
+                left: pair.0,
+                right: pair.1,
+            };
+        }
+
+        GeneratorPairSelection {
+            parameter_main_name: String::new(),
+            parameter_name: String::new(),
+            left: pair.0,
+            right: pair.1,
+        }
+    }
+
     fn generated1_selections_exact_py(&self) -> Vec<GeneratorPairSelection> {
         if !self.generated1Selections.is_empty() {
             return self.generated1Selections.clone();
         }
         self.generated1Pairs
             .iter()
-            .map(|pair| GeneratorPairSelection {
-                parameter_main_name: String::new(),
-                parameter_name: String::new(),
-                left: pair.0,
-                right: pair.1,
-            })
+            .map(|pair| Self::generator_pair_selection_from_specs_exact_py(*pair, GENERATED1_SPECS))
             .collect()
     }
 
@@ -623,12 +649,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         }
         self.metakonkretPairs
             .iter()
-            .map(|pair| GeneratorPairSelection {
-                parameter_main_name: String::new(),
-                parameter_name: String::new(),
-                left: pair.0,
-                right: pair.1,
-            })
+            .map(|pair| Self::generator_pair_selection_from_specs_exact_py(*pair, METAKONKRET_SPECS))
             .collect()
     }
 
@@ -2671,10 +2692,20 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         self.generated2Codes
             .iter()
             .cloned()
-            .map(|code| Generated2Selection {
-                parameter_main_name: String::new(),
-                parameter_name: self.generated2_code_heading_py(&code),
-                code,
+            .map(|code| {
+                if let Some(spec) = GENERATED2_SPECS.iter().find(|spec| spec.code == code) {
+                    Generated2Selection {
+                        parameter_main_name: spec.main_name.to_string(),
+                        parameter_name: spec.parameter_name.to_string(),
+                        code,
+                    }
+                } else {
+                    Generated2Selection {
+                        parameter_main_name: String::new(),
+                        parameter_name: self.generated2_code_heading_py(&code),
+                        code,
+                    }
+                }
             })
             .collect()
     }

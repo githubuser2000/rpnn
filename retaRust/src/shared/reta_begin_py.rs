@@ -855,7 +855,11 @@ impl Program {
                 let normalized_sub = sub_name.trim().to_ascii_lowercase();
                 let key = (normalized_main.clone(), normalized_sub.clone());
                 if let Some(found) = cached.generator_lookup.get(&key) {
-                    Self::merge_generator_family_from_cache_py(&mut merged, found);
+                    let found = found.with_requested_parameter_names_py(
+                        main_name_raw.trim(),
+                        sub_name.trim(),
+                    );
+                    Self::merge_generator_family_from_cache_py(&mut merged, &found);
                     continue;
                 }
 
@@ -874,6 +878,10 @@ impl Program {
                         );
                     }
                 }
+                let fallback = fallback.with_requested_parameter_names_py(
+                    main_name_raw.trim(),
+                    sub_name.trim(),
+                );
                 Self::merge_generator_family_from_cache_py(&mut merged, &fallback);
             }
         }

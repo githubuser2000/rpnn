@@ -26,6 +26,47 @@ pub struct GeneratorFamilyData {
 }
 
 impl GeneratorFamilyData {
+    pub fn with_requested_parameter_names_py(
+        &self,
+        parameter_main_name: &str,
+        parameter_name: &str,
+    ) -> Self {
+        let mut out = self.clone();
+        let parameter_main_name = parameter_main_name.trim();
+        let parameter_name = parameter_name.trim();
+
+        if parameter_main_name.is_empty() && parameter_name.is_empty() {
+            return out;
+        }
+
+        for selection in &mut out.generated1_selections {
+            if !parameter_main_name.is_empty() {
+                selection.parameter_main_name = parameter_main_name.to_string();
+            }
+            if !parameter_name.is_empty() {
+                selection.parameter_name = parameter_name.to_string();
+            }
+        }
+        for selection in &mut out.generated2_selections {
+            if !parameter_main_name.is_empty() {
+                selection.parameter_main_name = parameter_main_name.to_string();
+            }
+            if !parameter_name.is_empty() {
+                selection.parameter_name = parameter_name.to_string();
+            }
+        }
+        for selection in &mut out.metakonkret_selections {
+            if !parameter_main_name.is_empty() {
+                selection.parameter_main_name = parameter_main_name.to_string();
+            }
+            if !parameter_name.is_empty() {
+                selection.parameter_name = parameter_name.to_string();
+            }
+        }
+
+        out
+    }
+
     fn absorb_entry(&mut self, entry: &StoreParameterEntry, spalten: &SpaltenTyp) {
         for value in entry.datas.get(spalten.generated1.1).into_iter().flatten() {
             if let PyValue::Tuple(inner) = value {
@@ -164,10 +205,14 @@ fn build_static_data(words: &Words) -> RetaStaticData {
             let normalized_main = normalize_main_name(main_name);
             for sub_name in &entry.parameterNames {
                 let key = (normalized_main.clone(), sub_name.trim().to_ascii_lowercase());
+                let named_entry_data = entry_data.with_requested_parameter_names_py(
+                    main_name.trim(),
+                    sub_name.trim(),
+                );
                 generator_lookup
                     .entry(key)
                     .or_default()
-                    .merge_from(&entry_data);
+                    .merge_from(&named_entry_data);
             }
         }
     }
