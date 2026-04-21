@@ -7,9 +7,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use indexmap::{IndexMap, IndexSet};
 
 use crate::shared::lib4tables_enum_py::ST;
-use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program};
+use crate::shared::reta_program_types::{BoolAndTupleSet1Selection, Generated2Selection, GeneratorPairSelection, PairStr, Program};
 use crate::shared::reta_generators_inventory_py::{
-    GeneratorPairSpec, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS,
+    BOOL_AND_TUPLE_SET1_SPECS, GeneratorPairSpec, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS,
 };
 
 
@@ -350,7 +350,103 @@ impl Program {
     }
 
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
-        self.boolAndTupleSet1Options.iter().map(|v| v.map(|x| x as usize)).collect()
+        self.boolAndTupleSet1Selections_exact_py()
+            .into_iter()
+            .map(|selection| selection.option.and_then(|x| if x >= 0 { Some(x as usize) } else { None }))
+            .collect()
+    }
+
+    fn bool_and_tuple_option_sort_key_py(option: Option<i64>) -> i64 {
+        option.unwrap_or(i64::MIN)
+    }
+
+    fn bool_tuple_single_key_py(option: Option<i64>) -> String {
+        match option {
+            Some(value) => format!("({},)", value),
+            None => "(None,)".to_string(),
+        }
+    }
+
+    fn bool_and_tuple_selection_from_option_exact_py(option: Option<i64>) -> BoolAndTupleSet1Selection {
+        let lookup_key = option.unwrap_or(-1);
+        if let Some(spec) = BOOL_AND_TUPLE_SET1_SPECS.iter().find(|spec| spec.col_a == lookup_key) {
+            return BoolAndTupleSet1Selection {
+                parameter_main_name: spec.main_name.to_string(),
+                parameter_name: spec.parameter_name.to_string(),
+                option,
+            };
+        }
+        BoolAndTupleSet1Selection {
+            parameter_main_name: String::new(),
+            parameter_name: String::new(),
+            option,
+        }
+    }
+
+    fn boolAndTupleSet1Selections_exact_py(&self) -> Vec<BoolAndTupleSet1Selection> {
+        let mut decorated: Vec<(i64, usize, BoolAndTupleSet1Selection)> = if !self.boolAndTupleSet1Selections.is_empty() {
+            self.boolAndTupleSet1Selections
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(idx, selection)| (Self::bool_and_tuple_option_sort_key_py(selection.option), idx, selection))
+                .collect()
+        } else {
+            self.boolAndTupleSet1Options
+                .iter()
+                .cloned()
+                .map(Self::bool_and_tuple_selection_from_option_exact_py)
+                .enumerate()
+                .map(|(idx, selection)| (Self::bool_and_tuple_option_sort_key_py(selection.option), idx, selection))
+                .collect()
+        };
+        decorated.sort_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+
+        let mut seen: BTreeSet<Option<i64>> = BTreeSet::new();
+        let mut out = Vec::new();
+        for (_, _, selection) in decorated {
+            if seen.insert(selection.option) {
+                out.push(selection);
+            }
+        }
+        out
+    }
+
+    fn bool_and_tuple_generated_tags_exact_py(option: Option<i64>) -> Vec<ST> {
+        match option {
+            Some(10) => vec![ST::sternPolygon, ST::galaxie],
+            Some(42) => vec![ST::gleichfoermigesPolygon, ST::galaxie],
+            Some(131) => vec![ST::gleichfoermigesPolygon, ST::universum],
+            Some(5) | Some(138) | Some(202) | None => vec![ST::sternPolygon, ST::universum],
+            _ => vec![ST::sternPolygon, ST::universum],
+        }
+    }
+
+    fn bool_and_tuple_generated_parameter_groups_exact_py(&self, selection: &BoolAndTupleSet1Selection) -> Vec<Vec<PairStr>> {
+        let key = Self::bool_tuple_single_key_py(selection.option);
+        if let Some(entries) = self.dataDict.get(4).and_then(|dict| dict.get(&key)).cloned() {
+            if !entries.is_empty() {
+                return entries;
+            }
+        }
+
+        let mut main_name = selection.parameter_main_name.trim().to_string();
+        let mut parameter_name = selection.parameter_name.trim().to_string();
+        if main_name.is_empty() || parameter_name.is_empty() {
+            let lookup_key = selection.option.unwrap_or(-1);
+            if let Some(spec) = BOOL_AND_TUPLE_SET1_SPECS.iter().find(|spec| spec.col_a == lookup_key) {
+                if main_name.is_empty() {
+                    main_name = spec.main_name.to_string();
+                }
+                if parameter_name.is_empty() {
+                    parameter_name = spec.parameter_name.to_string();
+                }
+            }
+        }
+        if main_name.is_empty() || parameter_name.is_empty() {
+            return vec![];
+        }
+        vec![Self::pairstr_group_exact_py(main_name, parameter_name)]
     }
 
     
@@ -2191,7 +2287,8 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
     }
 
     pub fn spalteFuerGegenInnenAussenSeitlichPrim(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if self.boolAndTupleSet1Options_exact_py().is_empty() {
+        let extraSelections = self.boolAndTupleSet1Selections_exact_py();
+        if extraSelections.is_empty() {
             return;
         }
         fn prim_answer(oldPrimAmounts: i64, primAmounts: i64, i: i64) -> String {
@@ -2216,9 +2313,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
             }
         }
 
-        let extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
         let mut vergangenheit: Vec<String> = vec![];
-        for kk in extraSpalten {
+        for selection in extraSelections {
+            let kk = selection.option.and_then(|value| if value >= 0 { Some(value as usize) } else { None });
             let mut zeilenInhalte: Vec<String> = vec![];
             let mut primAmounts = 0i64;
             let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
@@ -2268,7 +2365,10 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
                 zeilenInhalte.push(joined);
             }
             let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, "Primzahlwirkung (7, Richtung)");
-            self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
+            let tags = Self::bool_and_tuple_generated_tags_exact_py(selection.option);
+            self.set_generated_spalten_tags_exact_py(spalte, &tags);
+            let parameter_groups = self.bool_and_tuple_generated_parameter_groups_exact_py(&selection);
+            self.set_generated_spalten_parameter_exact_py(spalte, parameter_groups);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -3333,5 +3433,68 @@ for couple_a in paare {
     pub fn apply_concat_generators_py(&mut self) {
         self.apply_concat_csv_generators_py();
         self.apply_post_csv_concat_generators_py();
+    }
+}
+
+#[cfg(test)]
+mod bool_and_tuple_transcompile_tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn bool_and_tuple_selections_sort_like_python_and_deduplicate_tuple_options() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.boolAndTupleSet1Options = vec![Some(131), Some(5), None, Some(10), Some(10), Some(42)];
+
+        let options: Vec<Option<i64>> = program
+            .boolAndTupleSet1Selections_exact_py()
+            .into_iter()
+            .map(|selection| selection.option)
+            .collect();
+
+        assert_eq!(options, vec![None, Some(5), Some(10), Some(42), Some(131)]);
+    }
+
+    #[test]
+    fn bool_and_tuple_tags_match_python_spalte_fuer_gegen_order() {
+        assert_eq!(
+            Program::bool_and_tuple_generated_tags_exact_py(None),
+            vec![ST::sternPolygon, ST::universum]
+        );
+        assert_eq!(
+            Program::bool_and_tuple_generated_tags_exact_py(Some(10)),
+            vec![ST::sternPolygon, ST::galaxie]
+        );
+        assert_eq!(
+            Program::bool_and_tuple_generated_tags_exact_py(Some(42)),
+            vec![ST::gleichfoermigesPolygon, ST::galaxie]
+        );
+        assert_eq!(
+            Program::bool_and_tuple_generated_tags_exact_py(Some(131)),
+            vec![ST::gleichfoermigesPolygon, ST::universum]
+        );
+    }
+
+    #[test]
+    fn bool_and_tuple_parameter_groups_use_python_data_dict_tuple_key() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.dataDict = (0..5).map(|_| IndexMap::new()).collect();
+        program.dataDict[4].insert(
+            "(10,)".to_string(),
+            vec![vec![PairStr("Primzahlwirkung".to_string(), "Galaxieabsicht".to_string())]],
+        );
+
+        let groups = program.bool_and_tuple_generated_parameter_groups_exact_py(
+            &BoolAndTupleSet1Selection {
+                parameter_main_name: String::new(),
+                parameter_name: String::new(),
+                option: Some(10),
+            },
+        );
+
+        assert_eq!(
+            groups,
+            vec![vec![PairStr("Primzahlwirkung".to_string(), "Galaxieabsicht".to_string())]]
+        );
     }
 }

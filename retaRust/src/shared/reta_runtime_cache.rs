@@ -5,10 +5,16 @@ use std::sync::OnceLock;
 
 use indexmap::IndexMap;
 
-use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program, SpaltenTyp};
+use crate::shared::reta_program_types::{BoolAndTupleSet1Selection, Generated2Selection, GeneratorPairSelection, PairStr, Program, SpaltenTyp};
 use crate::shared::words_py::{PyValue, StoreParameterEntry, Words};
 
 fn push_unique_pair_selection(target: &mut Vec<GeneratorPairSelection>, value: GeneratorPairSelection) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn push_unique_bool_and_tuple_set1_selection(target: &mut Vec<BoolAndTupleSet1Selection>, value: BoolAndTupleSet1Selection) {
     if !target.iter().any(|existing| existing == &value) {
         target.push(value);
     }
@@ -21,6 +27,7 @@ pub struct GeneratorFamilyData {
     pub generated2_codes: Vec<String>,
     pub generated2_selections: Vec<Generated2Selection>,
     pub bool_and_tuple_set1_options: Vec<Option<i64>>,
+    pub bool_and_tuple_set1_selections: Vec<BoolAndTupleSet1Selection>,
     pub metakonkret_pairs: Vec<(i64, i64)>,
     pub metakonkret_selections: Vec<GeneratorPairSelection>,
 }
@@ -48,6 +55,14 @@ impl GeneratorFamilyData {
             }
         }
         for selection in &mut out.generated2_selections {
+            if !parameter_main_name.is_empty() {
+                selection.parameter_main_name = parameter_main_name.to_string();
+            }
+            if !parameter_name.is_empty() {
+                selection.parameter_name = parameter_name.to_string();
+            }
+        }
+        for selection in &mut out.bool_and_tuple_set1_selections {
             if !parameter_main_name.is_empty() {
                 selection.parameter_main_name = parameter_main_name.to_string();
             }
@@ -112,6 +127,14 @@ impl GeneratorFamilyData {
                 });
                 if let Some(option) = option {
                     push_unique_option_i64(&mut self.bool_and_tuple_set1_options, option);
+                    push_unique_bool_and_tuple_set1_selection(
+                        &mut self.bool_and_tuple_set1_selections,
+                        BoolAndTupleSet1Selection {
+                            parameter_main_name: entry.parameterMainNames.first().cloned().unwrap_or_default(),
+                            parameter_name: entry.parameterNames.first().cloned().unwrap_or_default(),
+                            option,
+                        },
+                    );
                 }
             }
         }
@@ -153,6 +176,9 @@ impl GeneratorFamilyData {
         }
         for value in &other.bool_and_tuple_set1_options {
             push_unique_option_i64(&mut self.bool_and_tuple_set1_options, *value);
+        }
+        for value in &other.bool_and_tuple_set1_selections {
+            push_unique_bool_and_tuple_set1_selection(&mut self.bool_and_tuple_set1_selections, value.clone());
         }
         for value in &other.metakonkret_pairs {
             push_unique_pair(&mut self.metakonkret_pairs, *value);

@@ -97,6 +97,13 @@ pub struct GeneratorPairSelection {
     pub right: i64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BoolAndTupleSet1Selection {
+    pub parameter_main_name: String,
+    pub parameter_name: String,
+    pub option: Option<i64>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Program {
     pub argv: Vec<String>,
@@ -183,6 +190,7 @@ pub struct Program {
     pub generated2Codes: Vec<String>,
     pub generated2Selections: Vec<Generated2Selection>,
     pub boolAndTupleSet1Options: Vec<Option<i64>>,
+    pub boolAndTupleSet1Selections: Vec<BoolAndTupleSet1Selection>,
     pub metakonkretPairs: Vec<(i64, i64)>,
     pub metakonkretSelections: Vec<GeneratorPairSelection>,
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
@@ -293,6 +301,7 @@ impl Program {
             generated2Codes: vec![],
             generated2Selections: vec![],
             boolAndTupleSet1Options: vec![],
+            boolAndTupleSet1Selections: vec![],
             metakonkretPairs: vec![],
             metakonkretSelections: vec![],
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
