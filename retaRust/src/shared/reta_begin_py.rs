@@ -647,7 +647,12 @@ impl Program {
                 _ => false,
             };
             if !valid {
-                let msg = Self::cli_context_error_py(&arg);
+                let msg = if current_main == Some("spalten") {
+                    self.spalten_side_parameter_error_py(&arg)
+                        .unwrap_or_else(|| Self::cli_context_error_py(&arg))
+                } else {
+                    Self::cli_context_error_py(&arg)
+                };
                 if !emitted.contains(&msg) && !self.cliErrors.contains(&msg) {
                     emitted.push(msg.clone());
                     self.cliErrors.push(msg);
@@ -1140,6 +1145,26 @@ mod tests {
         let mut program = Program::new(argv.clone());
         let _ = program.parametersToCommandsAndNumbers(&argv, "", &words);
         assert!(program.cliErrors.is_empty(), "valid Python -language=english must not be treated as an unknown main parameter");
+    }
+
+    #[test]
+    fn context_validator_keeps_spalten_equals_alternative_message() {
+        let mut program = Program::new(vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--falsch=kaputt".to_string(),
+        ]);
+        program.paraDict.insert(
+            ("menschliches".to_string(), "liebe".to_string()),
+            vec![vec![PyValue::Int(2)]],
+        );
+
+        program.validate_cli_context_like_python();
+
+        let joined = program.cliErrors.join("\\n");
+        assert!(joined.contains("Mögliche Spaltenangaben vor dem Gleichheitszeichen"), "{joined}");
+        assert!(joined.contains("Mögliche Werte nach dem Gleichheitszeichen"), "{joined}");
+        assert!(!joined.contains("Es muss ein Hauptparameter"), "{joined}");
     }
 
     #[test]

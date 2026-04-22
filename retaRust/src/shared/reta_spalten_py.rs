@@ -109,6 +109,136 @@ impl Program {
         false
     }
 
+    fn push_unique_string_preserve_order_py(target: &mut Vec<String>, value: String) {
+        if !value.is_empty() && !target.iter().any(|existing| existing == &value) {
+            target.push(value);
+        }
+    }
+
+    pub(crate) fn spalten_eq_left_options_py(&self) -> Vec<String> {
+        let mut options = Vec::new();
+        for (main, _) in self.paraDict.keys() {
+            Self::push_unique_string_preserve_order_py(&mut options, main.clone());
+        }
+        // Python appends the two output-width helpers to this message although
+        // they are handled outside paraDict in produceAllSpaltenNumbers.
+        Self::push_unique_string_preserve_order_py(&mut options, "breiten".to_string());
+        Self::push_unique_string_preserve_order_py(&mut options, "breite".to_string());
+        options
+    }
+
+    pub(crate) fn spalten_eq_value_options_py(&self, main_filter: Option<&str>) -> Vec<String> {
+        let mut options = Vec::new();
+        for (main, value) in self.paraDict.keys() {
+            let main_matches = main_filter
+                .map(|filter| Self::parameter_main_name_matches_py(main, filter))
+                .unwrap_or(true);
+            if main_matches {
+                Self::push_unique_string_preserve_order_py(&mut options, value.clone());
+            }
+        }
+        options
+    }
+
+    pub(crate) fn spalten_eq_left_exists_py(&self, left_raw: &str) -> bool {
+        self.paraDict
+            .keys()
+            .any(|(stored_main, _)| Self::parameter_main_name_matches_py(stored_main, left_raw))
+    }
+
+    pub(crate) fn spalten_eq_value_exists_py(&self, left_raw: &str, value_raw: &str) -> bool {
+        let value = value_raw.strip_prefix('-').unwrap_or(value_raw);
+        self.paraDict.keys().any(|(stored_main, stored_value)| {
+            Self::parameter_main_name_matches_py(stored_main, left_raw) && stored_value == value
+        })
+    }
+
+    fn spalten_eq_value_has_numeric_payload_py(value_raw: &str) -> bool {
+        value_raw.chars().any(|c| c.is_ascii_digit())
+    }
+
+    pub(crate) fn spalten_eq_value_is_accepted_like_current_parser_py(&self, left_raw: &str, value_raw: &str) -> bool {
+        self.spalten_eq_value_exists_py(left_raw, value_raw)
+            || (self.spalten_eq_left_exists_py(left_raw)
+                && Self::spalten_eq_value_has_numeric_payload_py(value_raw))
+    }
+
+    fn render_spalten_options_with_prefix_py(options: Vec<String>, prefix: &str, separator: &str) -> String {
+        let rendered: Vec<String> = options
+            .into_iter()
+            .filter(|option| !option.is_empty())
+            .map(|option| format!("{}{}", prefix, option))
+            .collect();
+        if rendered.is_empty() {
+            "(keine)".to_string()
+        } else {
+            rendered.join(separator)
+        }
+    }
+
+    fn render_spalten_values_py(options: Vec<String>) -> String {
+        let rendered: Vec<String> = options.into_iter().filter(|option| !option.is_empty()).collect();
+        if rendered.is_empty() {
+            "(keine Textwerte; diesen Unter-Parameter ohne Wert verwenden)".to_string()
+        } else {
+            rendered.join(",")
+        }
+    }
+
+    pub(crate) fn spalten_eq_error_message_py(&self, left_raw: &str, value_raw: &str) -> String {
+        let clean_value = value_raw.strip_prefix('-').unwrap_or(value_raw);
+        let left_options = Self::render_spalten_options_with_prefix_py(
+            self.spalten_eq_left_options_py(),
+            "--",
+            ", ",
+        );
+        let left_exists = self.spalten_eq_left_exists_py(left_raw);
+        let value_options = if left_exists {
+            Self::render_spalten_values_py(self.spalten_eq_value_options_py(Some(left_raw)))
+        } else {
+            Self::render_spalten_values_py(self.spalten_eq_value_options_py(None))
+        };
+
+        if left_exists {
+            format!(
+                "Der Unter-Parameter \"--{}\" existiert, aber nicht mit dem Textwert \"{}\".\nMögliche Werte nach dem Gleichheitszeichen für \"--{}=\" sind:\n{}\nMögliche Spaltenangaben vor dem Gleichheitszeichen sind:\n{}",
+                left_raw,
+                clean_value,
+                left_raw,
+                value_options,
+                left_options,
+            )
+        } else {
+            format!(
+                "Der Unter-Parameter \"--{}\" mit dem Textwert \"{}\" existiert nicht für Haupt-Parameter -spalten.\nMögliche Spaltenangaben vor dem Gleichheitszeichen sind:\n{}\nMögliche Werte nach dem Gleichheitszeichen sind:\n{}",
+                left_raw,
+                clean_value,
+                left_options,
+                value_options,
+            )
+        }
+    }
+
+    pub(crate) fn spalten_side_parameter_error_py(&self, arg: &str) -> Option<String> {
+        let sub = arg.strip_prefix("--").unwrap_or(arg);
+        let sub = sub.strip_suffix('-').unwrap_or(sub);
+        if let Some((left_raw, values_raw)) = sub.split_once('=') {
+            let offending_value = values_raw
+                .split(',')
+                .find(|value| !self.spalten_eq_value_is_accepted_like_current_parser_py(left_raw, value.strip_prefix('-').unwrap_or(*value)))
+                .unwrap_or(values_raw);
+            Some(self.spalten_eq_error_message_py(left_raw, offending_value))
+        } else {
+            None
+        }
+    }
+
+    fn push_unique_cli_error_py(&mut self, msg: String) {
+        if !self.cliErrors.iter().any(|existing| existing == &msg) {
+            self.cliErrors.push(msg);
+        }
+    }
+
     pub(crate) fn resultingSpaltenFromTuple_py(&mut self, tupl: &Vec<Vec<PyValue>>, neg: &str, paraValue: Option<&str>, befehlName: Option<&str>) {
         for (i, raw_values) in tupl.iter().enumerate() {
             let mut normalized_values: Vec<i64> = Vec::new();
@@ -341,8 +471,15 @@ impl Program {
                                             }
                                         })
                                         .collect();
+                                    let found_fallback = !matching_tuples.is_empty();
                                     for tupl in matching_tuples {
                                         self.resultingSpaltenFromTuple(&tupl, neg, Some(&one), Some(&left));
+                                    }
+                                    if !found_fallback
+                                        && !self.spalten_eq_value_is_accepted_like_current_parser_py(&left_raw, &one)
+                                    {
+                                        let msg = self.spalten_eq_error_message_py(&left_raw, &one);
+                                        self.push_unique_cli_error_py(msg);
                                     }
                                 }
                             }
@@ -603,5 +740,52 @@ mod tests {
         let mut program = Program::new(vec!["reta".to_string(), "-language=xx".to_string()]);
         program.produceAllSpaltenNumbers("");
         assert_eq!(program.cliErrors, vec!["wrongLangSentence".to_string()]);
+    }
+
+    #[test]
+    fn spalten_equals_error_lists_left_and_right_alternatives_when_both_sides_are_wrong() {
+        let mut program = Program::new(vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--falsch=kaputt".to_string(),
+        ]);
+        program.paraDict.insert(
+            ("menschliches".to_string(), "liebe".to_string()),
+            vec![vec![PyValue::Int(2)]],
+        );
+        program.paraDict.insert(
+            ("menschliches".to_string(), "glaube".to_string()),
+            vec![vec![PyValue::Int(3)]],
+        );
+
+        program.produceAllSpaltenNumbers("");
+
+        let joined = program.cliErrors.join("\\n");
+        assert!(joined.contains("Mögliche Spaltenangaben vor dem Gleichheitszeichen"), "{joined}");
+        assert!(joined.contains("--menschliches"), "{joined}");
+        assert!(joined.contains("Mögliche Werte nach dem Gleichheitszeichen"), "{joined}");
+        assert!(joined.contains("liebe"), "{joined}");
+        assert!(!joined.contains("Es muss ein Hauptparameter"), "{joined}");
+    }
+
+    #[test]
+    fn spalten_equals_error_lists_values_for_known_left_side() {
+        let mut program = Program::new(vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--menschliches=kaputt".to_string(),
+        ]);
+        program.paraDict.insert(
+            ("menschliches".to_string(), "liebe".to_string()),
+            vec![vec![PyValue::Int(2)]],
+        );
+
+        program.produceAllSpaltenNumbers("");
+
+        let joined = program.cliErrors.join("\\n");
+        assert!(joined.contains("existiert, aber nicht mit dem Textwert"), "{joined}");
+        assert!(joined.contains("Mögliche Werte nach dem Gleichheitszeichen für \"--menschliches=\""), "{joined}");
+        assert!(joined.contains("liebe"), "{joined}");
+        assert!(!joined.contains("Es muss ein Hauptparameter"), "{joined}");
     }
 }
