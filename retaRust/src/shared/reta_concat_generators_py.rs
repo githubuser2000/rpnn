@@ -141,31 +141,48 @@ impl Program {
         vec![PairStr(main_name.into(), parameter_name.into())]
     }
 
+    fn pairstr_groups_from_pair_specs_exact_py(
+        &self,
+        left: i64,
+        right: i64,
+        specs: &[GeneratorPairSpec],
+    ) -> Vec<Vec<PairStr>> {
+        let mut groups: Vec<Vec<PairStr>> = Vec::new();
+        for spec in specs.iter().filter(|spec| {
+            (spec.col_a == left && spec.col_b == right)
+                || (spec.col_a == right && spec.col_b == left)
+        }) {
+            let group = Self::pairstr_group_exact_py(spec.main_name, spec.parameter_name);
+            if !groups.contains(&group) {
+                groups.push(group);
+            }
+        }
+        groups
+    }
+
     fn generated1_parameter_groups_exact_py(
         &self,
         selection: &GeneratorPairSelection,
         fallback_spalte: i64,
     ) -> Vec<Vec<PairStr>> {
-        let main_name = selection.parameter_main_name.trim();
-        let parameter_name = selection.parameter_name.trim();
-        if !main_name.is_empty() && !parameter_name.is_empty() {
-            return vec![Self::pairstr_group_exact_py(main_name, parameter_name)];
-        }
-
-        let groups: Vec<Vec<PairStr>> = GENERATED1_SPECS
-            .iter()
-            .filter(|spec| {
-                (spec.col_a == selection.left && spec.col_b == selection.right)
-                    || (spec.col_a == selection.right && spec.col_b == selection.left)
-            })
-            .map(|spec| Self::pairstr_group_exact_py(spec.main_name, spec.parameter_name))
-            .collect();
+        // Python schreibt hier `tables.dataDict[1][concept]`: der Key ist nur
+        // das Spaltenpaar. Wenn mehrere Parameter denselben Generated1-Concept
+        // teilen (z. B. Liebe / Liebe_(7) / Polung_der_Liebe -> 121,122), bekommt
+        // die eine generierte Spalte alle HTML-Parametergruppen, nicht nur den
+        // konkret angeforderten Namen.
+        let groups = self.pairstr_groups_from_pair_specs_exact_py(
+            selection.left,
+            selection.right,
+            GENERATED1_SPECS,
+        );
         if !groups.is_empty() {
             return groups;
         }
 
+        let main_name = selection.parameter_main_name.trim();
+        let parameter_name = selection.parameter_name.trim();
         let fallback = self.generator_pair_selection_meta_name_exact_py(selection, fallback_spalte);
-        if fallback.trim().is_empty() {
+        if fallback.trim().is_empty() && (main_name.is_empty() || parameter_name.is_empty()) {
             return vec![];
         }
         let main = if main_name.is_empty() {
@@ -198,21 +215,20 @@ impl Program {
     }
 
     fn metakonkret_parameter_groups_exact_py(&self, selection: &GeneratorPairSelection) -> Vec<Vec<PairStr>> {
-        let mut main_name = selection.parameter_main_name.trim().to_string();
-        let mut parameter_name = selection.parameter_name.trim().to_string();
-        if main_name.is_empty() || parameter_name.is_empty() {
-            if let Some(spec) = METAKONKRET_SPECS
-                .iter()
-                .find(|spec| spec.col_a == selection.left && spec.col_b == selection.right)
-            {
-                if main_name.is_empty() {
-                    main_name = spec.main_name.to_string();
-                }
-                if parameter_name.is_empty() {
-                    parameter_name = spec.parameter_name.to_string();
-                }
-            }
+        // Wie bei Generated1 kommen die HTML-Parameter aus dem Python-dataDict
+        // und werden über das Zahlenpaar adressiert, nicht über die zuletzt
+        // angeforderte CLI-Schreibweise.
+        let groups = self.pairstr_groups_from_pair_specs_exact_py(
+            selection.left,
+            selection.right,
+            METAKONKRET_SPECS,
+        );
+        if !groups.is_empty() {
+            return groups;
         }
+
+        let main_name = selection.parameter_main_name.trim();
+        let parameter_name = selection.parameter_name.trim();
         if main_name.is_empty() || parameter_name.is_empty() {
             return vec![];
         }
@@ -645,9 +661,24 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
         }
     }
 
+    fn collapse_pair_selections_like_python_set_py(
+        &self,
+        selections: Vec<GeneratorPairSelection>,
+    ) -> Vec<GeneratorPairSelection> {
+        let mut seen: BTreeSet<(i64, i64)> = BTreeSet::new();
+        let mut collapsed: Vec<GeneratorPairSelection> = Vec::new();
+        for selection in selections {
+            let key = (selection.left, selection.right);
+            if seen.insert(key) {
+                collapsed.push(selection);
+            }
+        }
+        collapsed
+    }
+
     fn generated1_selections_exact_py(&self) -> Vec<GeneratorPairSelection> {
         if !self.generated1Selections.is_empty() {
-            return self.generated1Selections.clone();
+            return self.collapse_pair_selections_like_python_set_py(self.generated1Selections.clone());
         }
         self.generated1Pairs
             .iter()
@@ -657,7 +688,7 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
 
     fn metakonkret_selections_exact_py(&self) -> Vec<GeneratorPairSelection> {
         if !self.metakonkretSelections.is_empty() {
-            return self.metakonkretSelections.clone();
+            return self.collapse_pair_selections_like_python_set_py(self.metakonkretSelections.clone());
         }
         self.metakonkretPairs
             .iter()
@@ -2673,10 +2704,9 @@ fn metakonkret_pairs_exact_py(&self) -> Vec<(i64, i64)> {
 
     pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let mut conceptSelections = self.generated1_selections_exact_py();
-        conceptSelections.sort_by(|a, b| {
-            (a.left, a.right, a.parameter_main_name.as_str(), a.parameter_name.as_str())
-                .cmp(&(b.left, b.right, b.parameter_main_name.as_str(), b.parameter_name.as_str()))
-        });
+        // Python macht `conceptsRowsSetOfTuple2 = list(conceptsRowsSetOfTuple); ...sort()`.
+        // Sortiert wird also nur nach dem Zahlenpaar, nicht nach Parametertexten.
+        conceptSelections.sort_by_key(|selection| (selection.left, selection.right));
         if conceptSelections.is_empty() {
             return;
         }
