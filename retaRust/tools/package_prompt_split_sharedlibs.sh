@@ -31,6 +31,17 @@ copy_required() {
   cp "$source" "$dest"
 }
 
+copy_required_dir() {
+  local source="$1"
+  local dest="$2"
+  if [[ ! -d "$source" ]]; then
+    echo "missing package input directory: $source" >&2
+    exit 1
+  fi
+  rm -rf "$dest"
+  cp -R "$source" "$dest"
+}
+
 copy_required "$TARGET_DIR/libreta.so" "$OUT_DIR/"
 copy_required "$TARGET_DIR/reta" "$OUT_DIR/"
 copy_required "$TARGET_DIR/libretaprompt_input.so" "$OUT_DIR/"
@@ -39,6 +50,7 @@ copy_required "$TARGET_DIR/rp" "$OUT_DIR/"
 copy_required "$TARGET_DIR/rpl" "$OUT_DIR/"
 copy_required "$TARGET_DIR/rpe" "$OUT_DIR/"
 copy_required "$TARGET_DIR/rpb" "$OUT_DIR/"
+copy_required_dir "$TARGET_DIR/csv" "$OUT_DIR/csv"
 copy_required crates/retaprompt_input/include/retaprompt_input.h "$OUT_DIR/include/"
 copy_required crates/retaprompt_commands/include/retaprompt_commands.h "$OUT_DIR/include/"
 copy_required "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" "$OUT_DIR/"
@@ -67,23 +79,35 @@ Supported runtime layouts:
 - rpl
 - rpe
 - rpb
+- csv/religion.csv and the other runtime CSV files
 
 2. Executables in one directory and libraries in ./lib:
 - ./reta ./rp ./rpl ./rpe ./rpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
+- ./csv/religion.csv and the other runtime CSV files
 
 3. Executables in bin and libraries in ../lib relative to bin:
 - ./bin/reta ./bin/rp ./bin/rpl ./bin/rpe ./bin/rpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
+- ./csv/religion.csv or ./share/reta/csv/religion.csv depending on install layout
 
-Embedded search paths:
+Embedded shared-library search paths:
 - $ORIGIN
 - $ORIGIN/lib
 - $ORIGIN/../lib
+
+Runtime CSV search order:
+- RETA_CSV_PATH
+- executable directory/csv
+- executable directory/../csv
+- executable directory/share/reta/csv
+- executable directory/../share/reta/csv
+- executable directory/../../csv
+- current working directory/csv
 
 Dependency chain:
 - reta -> libreta.so

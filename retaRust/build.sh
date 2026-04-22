@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
 PROFILE="${1:-release}"
 case "$PROFILE" in
   debug)
@@ -35,9 +38,19 @@ link_launcher() {
     -Wl,-rpath,'$ORIGIN/../lib'
 }
 
+link_launcher tools/launchers/reta.c "$TARGET_DIR/reta" reta
 link_launcher tools/launchers/rp.c  "$TARGET_DIR/rp"  retaprompt_input
 link_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl" retaprompt_input
 link_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe" retaprompt_input
 link_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb" retaprompt_commands
+
+copy_runtime_data() {
+  if [[ -d csv ]]; then
+    rm -rf "$TARGET_DIR/csv"
+    cp -R csv "$TARGET_DIR/csv"
+  fi
+}
+
+copy_runtime_data
 
 echo "Build complete: $TARGET_DIR"

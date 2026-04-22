@@ -73,6 +73,8 @@ MANIFEST="$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"
 verify_file_exists "$TARGET_DIR/libreta.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_commands.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_input.so"
+verify_file_exists "$TARGET_DIR/reta"
+verify_file_exists "$TARGET_DIR/csv/religion.csv"
 verify_file_exists "$TARGET_DIR/rp"
 verify_file_exists "$TARGET_DIR/rpl"
 verify_file_exists "$TARGET_DIR/rpe"
@@ -139,7 +141,14 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     "$TARGET_DIR/libretaprompt_commands.a",
     "$TARGET_DIR/libretaprompt_input.a"
   ],
+  "runtime_data": [
+    "$TARGET_DIR/csv"
+  ],
   "launchers": [
+    {
+      "path": "$TARGET_DIR/reta",
+      "links_to": ["libreta.so"]
+    },
     {
       "path": "$TARGET_DIR/rp",
       "links_to": ["libretaprompt_input.so"]
@@ -169,6 +178,8 @@ printf 'built dynamic shared libraries and launchers with the plain build path:\
 printf '  %s\n' "$TARGET_DIR/libreta.so"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_commands.so"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_input.so"
+printf '  %s\n' "$TARGET_DIR/reta"
+printf '  %s\n' "$TARGET_DIR/csv"
 printf '  %s\n' "$TARGET_DIR/rp"
 printf '  %s\n' "$TARGET_DIR/rpl"
 printf '  %s\n' "$TARGET_DIR/rpe"
