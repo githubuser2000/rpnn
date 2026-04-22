@@ -221,17 +221,69 @@ impl Program {
         }
     }
 
+
+    fn csv_parallel_worker_count_exact_py(total_rows: usize, min_rows_per_worker: usize) -> usize {
+        if total_rows <= 1 || total_rows < min_rows_per_worker.saturating_mul(2) {
+            return 1;
+        }
+        let max_workers_by_grain = (total_rows + min_rows_per_worker - 1) / min_rows_per_worker;
+        std::thread::available_parallelism()
+            .map(|value| value.get())
+            .unwrap_or(1)
+            .min(max_workers_by_grain)
+            .min(total_rows)
+            .max(1)
+    }
+
+    fn decode_religion_rows_parallel_exact_py(
+        &self,
+        rows: Vec<Vec<String>>,
+        mode: &str,
+    ) -> Vec<Vec<String>> {
+        let total_rows = rows.len();
+        let worker_count = Self::csv_parallel_worker_count_exact_py(total_rows, 64);
+        if worker_count <= 1 {
+            return rows
+                .into_iter()
+                .map(|row| {
+                    row.into_iter()
+                        .map(|ccc| self.decode_cell_exact_py(&ccc, mode))
+                        .collect::<Vec<String>>()
+                })
+                .collect();
+        }
+
+        let chunk_size = (total_rows + worker_count - 1) / worker_count;
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for chunk in rows.chunks(chunk_size) {
+                handles.push(scope.spawn(move || {
+                    chunk
+                        .iter()
+                        .map(|row| {
+                            row.iter()
+                                .map(|ccc| self.decode_cell_exact_py(ccc, mode))
+                                .collect::<Vec<String>>()
+                        })
+                        .collect::<Vec<Vec<String>>>()
+                }));
+            }
+
+            let mut decoded = Vec::with_capacity(total_rows);
+            for handle in handles {
+                let mut chunk_rows = handle
+                    .join()
+                    .expect("parallel religion.csv decoding worker panicked");
+                decoded.append(&mut chunk_rows);
+            }
+            decoded
+        })
+    }
+
     fn build_processed_religion_table_exact(&self, mode: &str, change_motives_column: &str) -> io::Result<Vec<Vec<String>>> {
         let csvFileNames = self.csv_file_names();
         let rows = self.load_csv_rows_semicolon_exact_path(&csvFileNames.religion)?;
-        let mut relitable: Vec<Vec<String>> = Vec::with_capacity(rows.len());
-        for row in rows {
-            let mut col: Vec<String> = Vec::with_capacity(row.len());
-            for ccc in row {
-                col.push(self.decode_cell_exact_py(&ccc, mode));
-            }
-            relitable.push(col);
-        }
+        let mut relitable = self.decode_religion_rows_parallel_exact_py(rows, mode);
         if !change_motives_column.is_empty() {
             let rows = self.load_csv_rows_semicolon_exact_path(change_motives_column)?;
             for (i, col) in rows.into_iter().enumerate() {

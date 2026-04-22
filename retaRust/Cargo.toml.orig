@@ -1,22 +1,21 @@
 [package]
 name = "reta"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2024"
+autobins = false
 default-run = "reta"
 
 [dependencies]
-indexmap = "2"
+indexmap = { version = "2", features = ["serde"] }
 hypher = { version = "0.1.7", default-features = false, features = ["german"] }
-termimad = "0.34.1"
-reedline = "0.47.0"
-ratatui = { version = "0.30.0", features = ["crossterm"] }
-crossterm = "0.29.0"
-nu-ansi-term = "0.50.3"
+libloading = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [lib]
 name = "reta"
 path = "src/lib.rs"
-crate-type = ["rlib", "staticlib"]
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "reta"
@@ -31,22 +30,21 @@ name = "generate4readme"
 path = "src/bin/generate4readme.rs"
 
 [[bin]]
-name = "rp"
-path = "src/bin/rp.rs"
-
-[[bin]]
-name = "rpl"
-path = "src/bin/rpl.rs"
-
-[[bin]]
 name = "reta_domain_probe"
 path = "src/bin/reta_domain_probe.rs"
 
 
-[[bin]]
-name = "rpb"
-path = "src/bin/rpb.rs"
-
-[[bin]]
-name = "rpe"
-path = "src/bin/rpe.rs"
+[workspace]
+members = [
+  ".",
+  "crates/retaprompt_input",
+  "crates/retaprompt_commands",
+  "crates/retaprompt_frontends"
+]
+default-members = [
+  ".",
+  "crates/retaprompt_input",
+  "crates/retaprompt_commands",
+  "crates/retaprompt_frontends"
+]
+resolver = "2"

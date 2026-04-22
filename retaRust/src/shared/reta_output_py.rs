@@ -203,6 +203,13 @@ struct HtmlRuntimeMetaPy {
     data_attributes: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Debug)]
+struct StructuredRowRenderPy {
+    line: String,
+    is_header: bool,
+    cells_len: usize,
+}
+
 fn html_slug_exact_py(txt: &str) -> String {
     txt.trim()
         .replace(' ', "_")
@@ -628,7 +635,7 @@ fn html_exact_header_attrs_py(
 
     fn prepare4out_width_for_display_col_py(&self, row_to_display_1_based: usize, combi_rows: usize) -> usize {
         // Python Prepare.setWidth(): if no terminal width/wrap context exists, keep the
-        // cell as one string.  Otherwise prefer --breiten values aligned to the visible
+        // cell as one string. Otherwise prefer --breiten values aligned to the visible
         // output columns, falling back to textWidth.
         if self.shellRowsAmount == 0 {
             return 0;
@@ -1960,6 +1967,298 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         false
     }
 
+    fn output_parallel_ranges_py(total_rows: usize, min_rows_per_worker: usize) -> Vec<(usize, usize)> {
+        if total_rows == 0 {
+            return Vec::new();
+        }
+        if total_rows <= 1 || total_rows < min_rows_per_worker.saturating_mul(2) {
+            return vec![(0, total_rows)];
+        }
+        let max_workers_by_grain = (total_rows + min_rows_per_worker - 1) / min_rows_per_worker;
+        let worker_count = std::thread::available_parallelism()
+            .map(|value| value.get())
+            .unwrap_or(1)
+            .min(max_workers_by_grain)
+            .min(total_rows)
+            .max(1);
+        if worker_count <= 1 {
+            return vec![(0, total_rows)];
+        }
+
+        let chunk_size = (total_rows + worker_count - 1) / worker_count;
+        let mut ranges = Vec::new();
+        let mut start = 0usize;
+        while start < total_rows {
+            let end = start.saturating_add(chunk_size).min(total_rows);
+            ranges.push((start, end));
+            start = end;
+        }
+        ranges
+    }
+
+    fn render_structured_rows_ordered_py<F>(
+        newTable: &[Vec<String>],
+        min_rows_per_worker: usize,
+        render_row: F,
+    ) -> Vec<StructuredRowRenderPy>
+    where
+        F: Fn(usize, &Vec<String>) -> Option<StructuredRowRenderPy> + Sync,
+    {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), min_rows_per_worker);
+        if ranges.len() <= 1 {
+            let mut rows = Vec::new();
+            for (row_idx, row) in newTable.iter().enumerate() {
+                if let Some(rendered) = render_row(row_idx, row) {
+                    rows.push(rendered);
+                }
+            }
+            return rows;
+        }
+
+        std::thread::scope(|scope| {
+            let render_row = &render_row;
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let mut rows = Vec::new();
+                    for (offset, row) in newTable[start..end].iter().enumerate() {
+                        let row_idx = start + offset;
+                        if let Some(rendered) = render_row(row_idx, row) {
+                            rows.push(rendered);
+                        }
+                    }
+                    rows
+                }));
+            }
+
+            let mut rows = Vec::new();
+            for handle in handles {
+                let mut rendered = handle
+                    .join()
+                    .expect("parallel structured output worker panicked");
+                rows.append(&mut rendered);
+            }
+            rows
+        })
+    }
+
+    fn max_cell_widths_parallel_py(newTable: &[Vec<String>], col_count: usize) -> Vec<usize> {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), 32);
+        if ranges.len() <= 1 {
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for row in newTable {
+                for col_idx in 0..col_count {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let cell_width = cell
+                        .split('\n')
+                        .map(|part| part.chars().count())
+                        .max()
+                        .unwrap_or(0);
+                    if cell_width > max_cell_widths[col_idx] {
+                        max_cell_widths[col_idx] = cell_width;
+                    }
+                }
+            }
+            return max_cell_widths;
+        }
+
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let mut local_widths: Vec<usize> = vec![0; col_count];
+                    for row in &newTable[start..end] {
+                        for col_idx in 0..col_count {
+                            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                            let cell_width = cell
+                                .split('\n')
+                                .map(|part| part.chars().count())
+                                .max()
+                                .unwrap_or(0);
+                            if cell_width > local_widths[col_idx] {
+                                local_widths[col_idx] = cell_width;
+                            }
+                        }
+                    }
+                    local_widths
+                }));
+            }
+
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for handle in handles {
+                let local_widths = handle
+                    .join()
+                    .expect("parallel cell-width worker panicked");
+                for (col_idx, width) in local_widths.into_iter().enumerate() {
+                    if width > max_cell_widths[col_idx] {
+                        max_cell_widths[col_idx] = width;
+                    }
+                }
+            }
+            max_cell_widths
+        })
+    }
+
+    fn render_shell_chunk_range_py(
+        &self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        widths: &[usize],
+        chunk_start: usize,
+        chunk_end: usize,
+        num_prefix_width: usize,
+        row_start: usize,
+        row_end: usize,
+    ) -> Vec<String> {
+        let mut one_chunk_lines: Vec<String> = vec![];
+
+        for (offset, row) in newTable[row_start..row_end].iter().enumerate() {
+            let row_idx = row_start + offset;
+            if self.keineleereninhalte {
+                let joined = (chunk_start..chunk_end)
+                    .filter_map(|i| row.get(i))
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
+                if stripped.is_empty() {
+                    continue;
+                }
+            }
+
+            let row_number = finallyDisplayLines
+                .get(row_idx)
+                .and_then(|s| s.trim().parse::<i64>().ok());
+            let is_header = row_number.is_none();
+
+            let mut wrapped_cells: Vec<Vec<String>> = vec![];
+            let mut max_sub = 1usize;
+            for col_idx in chunk_start..chunk_end {
+                let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                let wrapped = if widths[col_idx] == 0 {
+                    let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+                    if parts.is_empty() {
+                        parts.push(String::new());
+                    }
+                    parts
+                } else {
+                    Self::wrap_text_py(cell, widths[col_idx])
+                };
+                if wrapped.len() > max_sub {
+                    max_sub = wrapped.len();
+                }
+                wrapped_cells.push(wrapped);
+            }
+
+            let visible_sub_count = if self.textHeight > 0 {
+                max_sub.min(self.textHeight as usize)
+            } else {
+                max_sub
+            };
+
+            for sub_idx in 0..visible_sub_count {
+                let mut line = String::new();
+
+                if self.nummeriere {
+                    let label = if sub_idx == 0 {
+                        finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+                    let prefix = if is_header {
+                        " ".to_string()
+                    } else if let Some(n) = row_number {
+                        if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
+                            "█".to_string()
+                        } else {
+                            " ".to_string()
+                        }
+                    } else {
+                        " ".to_string()
+                    };
+                    line.push_str(&prefix);
+                    line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
+                }
+
+                for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
+                    let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
+                    let part = maybe_part.clone().unwrap_or_default();
+                    let is_rest = maybe_part.is_none();
+                    let rendered = if widths[abs_i] == 0 {
+                        part
+                    } else {
+                        format!("{:<width$}", part, width = widths[abs_i])
+                    };
+                    line.push_str(&Self::styled_shell_text_py(
+                        &rendered,
+                        row_number,
+                        is_header,
+                        is_rest,
+                        self.nocolor,
+                    ));
+                    if abs_i + 1 != chunk_end {
+                        line.push(' ');
+                    }
+                }
+
+                one_chunk_lines.push(line);
+            }
+        }
+
+        one_chunk_lines
+    }
+
+    fn render_shell_chunk_ordered_py(
+        &self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        widths: &[usize],
+        chunk_start: usize,
+        chunk_end: usize,
+        num_prefix_width: usize,
+    ) -> Vec<String> {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), 16);
+        if ranges.len() <= 1 {
+            return self.render_shell_chunk_range_py(
+                finallyDisplayLines,
+                newTable,
+                widths,
+                chunk_start,
+                chunk_end,
+                num_prefix_width,
+                0,
+                newTable.len(),
+            );
+        }
+
+        std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for (row_start, row_end) in ranges {
+                handles.push(scope.spawn(move || {
+                    self.render_shell_chunk_range_py(
+                        finallyDisplayLines,
+                        newTable,
+                        widths,
+                        chunk_start,
+                        chunk_end,
+                        num_prefix_width,
+                        row_start,
+                        row_end,
+                    )
+                }));
+            }
+
+            let mut one_chunk_lines = Vec::new();
+            for handle in handles {
+                let mut rendered = handle
+                    .join()
+                    .expect("parallel shell output worker panicked");
+                one_chunk_lines.append(&mut rendered);
+            }
+            one_chunk_lines
+        })
+    }
+
 
     fn render_structured_output_py(
         &mut self,
@@ -1970,52 +2269,64 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
     ) {
         let mut out_lines: Vec<String> = vec![];
         let mut chunked_lines: Vec<Vec<String>> = vec![];
-        match self.outType.as_str() {
+        let out_type = self.outType.clone();
+        let this: &Program = &*self;
+        match out_type.as_str() {
             "nichts" => {}
             "csv" => {
-                for (row_idx, row) in newTable.iter().enumerate() {
-                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
-                    if self.should_skip_structured_row_py(row, row_number) {
-                        continue;
+                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if this.should_skip_structured_row_py(row, row_number) {
+                        return None;
                     }
                     let is_header = row_number.is_none();
                     let mut fields: Vec<String> = vec![];
-                    if self.nummeriere {
-                        fields.push(Self::csv_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                    if this.nummeriere {
+                        fields.push(Self::csv_escape_cell_py(&this.row_prefix_text_py(row_number, is_header)));
                         let label = finallyDisplayLines.get(row_idx).cloned().unwrap_or_default();
                         fields.push(Self::csv_escape_cell_py(&label));
                     }
                     for cell in row {
-                        let limited = self.limit_cell_height_py(cell);
+                        let limited = this.limit_cell_height_py(cell);
                         fields.push(Self::csv_escape_cell_py(&limited));
                     }
-                    let line = fields.join(";");
-                    out_lines.push(line.clone());
-                    chunked_lines.push(vec![line]);
+                    let cells_len = fields.len();
+                    Some(StructuredRowRenderPy { line: fields.join(";"), is_header, cells_len })
+                });
+                for rendered in rendered_rows {
+                    out_lines.push(rendered.line.clone());
+                    chunked_lines.push(vec![rendered.line]);
                 }
             }
             "markdown" => {
-                let mut header_sep_done = false;
-                for (row_idx, row) in newTable.iter().enumerate() {
-                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
-                    if self.should_skip_structured_row_py(row, row_number) {
-                        continue;
+                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if this.should_skip_structured_row_py(row, row_number) {
+                        return None;
                     }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
-                    if self.nummeriere {
-                        cells.push(Self::markdown_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)));
+                    if this.nummeriere {
+                        cells.push(Self::markdown_escape_cell_py(&this.row_prefix_text_py(row_number, is_header)));
                         cells.push(Self::markdown_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
                     }
                     for cell in row {
-                        let limited = self.limit_cell_height_py(cell);
+                        let limited = this.limit_cell_height_py(cell);
                         cells.push(Self::markdown_escape_cell_py(&limited));
                     }
-                    let line = format!("|{}|", cells.join("|"));
-                    out_lines.push(line.clone());
-                    let mut block = vec![line];
-                    if is_header && !header_sep_done {
-                        let sep = format!("|{}|", vec![":--:"; cells.len()].join("|"));
+                    let cells_len = cells.len();
+                    Some(StructuredRowRenderPy { line: format!("|{}|", cells.join("|")), is_header, cells_len })
+                });
+                let mut header_sep_done = false;
+                for rendered in rendered_rows {
+                    out_lines.push(rendered.line.clone());
+                    let mut block = vec![rendered.line];
+                    if rendered.is_header && !header_sep_done {
+                        let sep = format!("|{}|", vec![":--:"; rendered.cells_len].join("|"));
                         out_lines.push(sep.clone());
                         block.push(sep);
                         header_sep_done = true;
@@ -2024,23 +2335,28 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 }
             }
             "emacs" => {
-                for (row_idx, row) in newTable.iter().enumerate() {
-                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
-                    if self.should_skip_structured_row_py(row, row_number) {
-                        continue;
+                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if this.should_skip_structured_row_py(row, row_number) {
+                        return None;
                     }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
-                    if self.nummeriere {
-                        cells.push(self.row_prefix_text_py(row_number, is_header));
+                    if this.nummeriere {
+                        cells.push(this.row_prefix_text_py(row_number, is_header));
                         cells.push(finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
                     }
-                    cells.extend(row.iter().map(|cell| self.limit_cell_height_py(cell)));
-                    let line = format!("|{}|", cells.join("|"));
-                    out_lines.push(line.clone());
-                    let mut block = vec![line];
-                    if is_header {
-                        let sep = format!("|{}|", vec!["----"; cells.len()].join("+"));
+                    cells.extend(row.iter().map(|cell| this.limit_cell_height_py(cell)));
+                    let cells_len = cells.len();
+                    Some(StructuredRowRenderPy { line: format!("|{}|", cells.join("|")), is_header, cells_len })
+                });
+                for rendered in rendered_rows {
+                    out_lines.push(rendered.line.clone());
+                    let mut block = vec![rendered.line];
+                    if rendered.is_header {
+                        let sep = format!("|{}|", vec!["----"; rendered.cells_len].join("+"));
                         out_lines.push(sep.clone());
                         block.push(sep);
                     }
@@ -2049,19 +2365,18 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             }
             "html" => {
                 let words = Words::new();
-                let _col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
-                out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
-                let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
-                for (row_idx, row) in newTable.iter().enumerate() {
-                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
-                    if self.should_skip_structured_row_py(row, row_number) {
-                        continue;
+                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 16, |row_idx, row| {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if this.should_skip_structured_row_py(row, row_number) {
+                        return None;
                     }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
-                    if self.nummeriere {
-                        let prefix_text = Self::html_escape_cell_py(&self.row_prefix_text_py(row_number, is_header));
+                    if this.nummeriere {
+                        let prefix_text = Self::html_escape_cell_py(&this.row_prefix_text_py(row_number, is_header));
                         let label_text = Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
                         if is_header {
                             cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 0), prefix_text));
@@ -2077,48 +2392,60 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                         }
                     }
                     for (visible_idx, cell) in row.iter().enumerate() {
-                        let html_col_idx = if self.nummeriere { visible_idx + 2 } else { visible_idx };
+                        let html_col_idx = if this.nummeriere { visible_idx + 2 } else { visible_idx };
                         let original_col = displayed_columns.get(visible_idx).cloned().flatten();
-                        let limited = self.limit_cell_height_py(cell);
+                        let limited = this.limit_cell_height_py(cell);
                         let escaped = Self::html_escape_cell_py(&limited);
-                        let attrs = self.html_runtime_attrs_exact_py(
-                            &words,
-                            original_col,
-                            html_col_idx,
-                            row_number,
-                            is_header,
-                        );
+                        let attrs = this.html_runtime_attrs_exact_py(&words, original_col, html_col_idx, row_number, is_header);
                         cells.push(format!(r#"<td{}>{}</td>"#, attrs, escaped));
                     }
-                    let line = format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" "));
-                    out_lines.push(line.clone());
-                    current_block.push(line);
+                    let cells_len = cells.len();
+                    Some(StructuredRowRenderPy {
+                        line: format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" ")),
+                        is_header,
+                        cells_len,
+                    })
+                });
+                out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
+                let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
+                for rendered in rendered_rows {
+                    out_lines.push(rendered.line.clone());
+                    current_block.push(rendered.line);
                 }
                 out_lines.push("</table>".to_string());
                 current_block.push("</table>".to_string());
                 chunked_lines.push(current_block);
             }
             "bbcode" => {
-                out_lines.push("[table]".to_string());
-                let mut current_block = vec!["[table]".to_string()];
-                for (row_idx, row) in newTable.iter().enumerate() {
-                    let row_number = finallyDisplayLines.get(row_idx).and_then(|s| s.trim().parse::<i64>().ok());
-                    if self.should_skip_structured_row_py(row, row_number) {
-                        continue;
+                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if this.should_skip_structured_row_py(row, row_number) {
+                        return None;
                     }
                     let is_header = row_number.is_none();
                     let mut cells: Vec<String> = vec![];
-                    if self.nummeriere {
-                        cells.push(format!("[td]{}[/td]", self.row_prefix_text_py(row_number, is_header)));
+                    if this.nummeriere {
+                        cells.push(format!("[td]{}[/td]", this.row_prefix_text_py(row_number, is_header)));
                         cells.push(format!("[td]{}[/td]", finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
                     }
                     for cell in row {
-                        let limited = self.limit_cell_height_py(cell);
+                        let limited = this.limit_cell_height_py(cell);
                         cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
                     }
-                    let line = format!("{}{}[/tr]", Self::bbcode_row_begin_py(row_number, is_header), cells.join(""));
-                    out_lines.push(line.clone());
-                    current_block.push(line);
+                    let cells_len = cells.len();
+                    Some(StructuredRowRenderPy {
+                        line: format!("{}{}[/tr]", Self::bbcode_row_begin_py(row_number, is_header), cells.join("")),
+                        is_header,
+                        cells_len,
+                    })
+                });
+                out_lines.push("[table]".to_string());
+                let mut current_block = vec!["[table]".to_string()];
+                for rendered in rendered_rows {
+                    out_lines.push(rendered.line.clone());
+                    current_block.push(rendered.line);
                 }
                 out_lines.push("[/table]".to_string());
                 current_block.push("[/table]".to_string());
@@ -2165,20 +2492,7 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             return newTable;
         }
 
-        let mut max_cell_widths: Vec<usize> = vec![0; col_count];
-        for row in &newTable {
-            for col_idx in 0..col_count {
-                let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                let cell_width = cell
-                    .split('\n')
-                    .map(|part| part.chars().count())
-                    .max()
-                    .unwrap_or(0);
-                if cell_width > max_cell_widths[col_idx] {
-                    max_cell_widths[col_idx] = cell_width;
-                }
-            }
-        }
+        let max_cell_widths = Self::max_cell_widths_parallel_py(&newTable, col_count);
 
         let mut widths: Vec<usize> = vec![0; col_count];
         for col_idx in 0..col_count {
@@ -2252,100 +2566,14 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
         for (chunk_start, chunk_end) in chunks.iter().cloned() {
-            let mut one_chunk_lines: Vec<String> = vec![];
-
-            for (row_idx, row) in newTable.iter().enumerate() {
-                if self.keineleereninhalte {
-                    let joined = (chunk_start..chunk_end)
-                        .filter_map(|i| row.get(i))
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    let stripped = joined.replace('-', "").replace('?', "").trim().to_string();
-                    if stripped.is_empty() {
-                        continue;
-                    }
-                }
-
-                let row_number = finallyDisplayLines
-                    .get(row_idx)
-                    .and_then(|s| s.trim().parse::<i64>().ok());
-                let is_header = row_number.is_none();
-
-                let mut wrapped_cells: Vec<Vec<String>> = vec![];
-                let mut max_sub = 1usize;
-                for col_idx in chunk_start..chunk_end {
-                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                    let wrapped = if widths[col_idx] == 0 {
-                        let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
-                        if parts.is_empty() {
-                            parts.push(String::new());
-                        }
-                        parts
-                    } else {
-                        Self::wrap_text_py(cell, widths[col_idx])
-                    };
-                    if wrapped.len() > max_sub {
-                        max_sub = wrapped.len();
-                    }
-                    wrapped_cells.push(wrapped);
-                }
-
-                let visible_sub_count = if self.textHeight > 0 {
-                    max_sub.min(self.textHeight as usize)
-                } else {
-                    max_sub
-                };
-
-                for sub_idx in 0..visible_sub_count {
-                    let mut line = String::new();
-
-                    if self.nummeriere {
-                        let label = if sub_idx == 0 {
-                            finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
-                        } else {
-                            String::new()
-                        };
-                        let prefix = if is_header {
-                            " ".to_string()
-                        } else if let Some(n) = row_number {
-                            if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
-                                "█".to_string()
-                            } else {
-                                " ".to_string()
-                            }
-                        } else {
-                            " ".to_string()
-                        };
-                        line.push_str(&prefix);
-                        line.push_str(&format!("{:>width$} ", label, width = num_prefix_width));
-                    }
-
-                    for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
-                        let maybe_part = wrapped_cells[local_i].get(sub_idx).cloned();
-                        let part = maybe_part.clone().unwrap_or_default();
-                        let is_rest = maybe_part.is_none();
-                        let rendered = if widths[abs_i] == 0 {
-                            part
-                        } else {
-                            format!("{:<width$}", part, width = widths[abs_i])
-                        };
-                        line.push_str(&Self::styled_shell_text_py(
-                            &rendered,
-                            row_number,
-                            is_header,
-                            is_rest,
-                            self.nocolor,
-                        ));
-                        if abs_i + 1 != chunk_end {
-                            line.push(' ');
-                        }
-                    }
-
-                    one_chunk_lines.push(line);
-                }
-            }
-
+            let one_chunk_lines = self.render_shell_chunk_ordered_py(
+                &finallyDisplayLines,
+                &newTable,
+                &widths,
+                chunk_start,
+                chunk_end,
+                num_prefix_width,
+            );
             chunked_lines.push(one_chunk_lines.clone());
             out_lines.extend(one_chunk_lines);
         }
@@ -2505,41 +2733,6 @@ mod tests {
 
         assert_eq!(old2new.last().copied(), Some(1040));
         assert!(!old2new.contains(&1041));
-    }
-
-    #[test]
-    fn prepare4out_wraps_cells_before_rendering_like_python_cellwork() {
-        let mut program = Program::new(vec!["reta".to_string()]);
-        program.ifZeilenSetted = true;
-        program.shellRowsAmount = 80;
-        program.textWidth = 4;
-        program.rowsAsNumbers = vec![0];
-
-        let relitable = vec![
-            vec!["kopf".to_string()],
-            vec!["eins zwei drei".to_string()],
-        ];
-
-        let (_, table, _, _, _) = program.prepare4out_py(
-            vec!["all".to_string()],
-            vec![],
-            relitable,
-            vec![0],
-        );
-
-        assert_eq!(table[1][0], "eins\nzwei\ndrei");
-    }
-
-    #[test]
-    fn prepare4out_width_uses_python_breiten_slice_for_combi_columns() {
-        let mut program = Program::new(vec!["reta".to_string()]);
-        program.shellRowsAmount = 80;
-        program.textWidth = 99;
-        program.rowsAsNumbers = vec![0, 1, 2];
-        program.breiten = vec![3, 5, 7];
-
-        assert_eq!(program.prepare4out_width_for_display_col_py(1, 2), 5);
-        assert_eq!(program.prepare4out_width_for_display_col_py(2, 2), 7);
     }
 
     #[test]

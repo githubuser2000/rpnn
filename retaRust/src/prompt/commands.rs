@@ -911,6 +911,77 @@ fn run_nested_prompt_input(
     }
 }
 
+
+fn prompt_parallel_worker_count_py(total: usize) -> usize {
+    if total <= 1 {
+        return 1;
+    }
+    std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1)
+        .min(total)
+        .max(1)
+}
+
+fn run_reta_batch_ordered_parallel_py(
+    argvs: Vec<Vec<String>>,
+) -> Result<Vec<RetaRunResult>, String> {
+    let total = argvs.len();
+    let worker_count = prompt_parallel_worker_count_py(total);
+    if worker_count <= 1 {
+        return Ok(argvs.into_iter().map(run_reta_from_args).collect());
+    }
+
+    let chunk_size = (total + worker_count - 1) / worker_count;
+    std::thread::scope(|scope| -> Result<Vec<RetaRunResult>, String> {
+        let mut handles = Vec::new();
+        for chunk in argvs.chunks(chunk_size) {
+            handles.push(scope.spawn(move || {
+                chunk
+                    .iter()
+                    .map(run_reta_from_args)
+                    .collect::<Vec<RetaRunResult>>()
+            }));
+        }
+
+        let mut results = Vec::with_capacity(total);
+        for handle in handles {
+            let mut chunk_results = handle.join().map_err(|_| {
+                "Paralleler retaPrompt-Batch-Aufruf ist in einem Worker fehlgeschlagen."
+                    .to_string()
+            })?;
+            results.append(&mut chunk_results);
+        }
+        Ok(results)
+    })
+}
+
+fn append_reta_batch_result_text_py(combined: &mut String, text: &str) {
+    if !combined.is_empty() && !combined.ends_with('\n') {
+        combined.push('\n');
+    }
+    combined.push_str(text);
+    if !combined.ends_with('\n') {
+        combined.push('\n');
+    }
+}
+
+fn combine_reta_batch_results_py(results: Vec<RetaRunResult>) -> PromptOutput {
+    let mut combined = String::new();
+    let mut exit_code = 0;
+
+    for result in results {
+        append_reta_batch_result_text_py(&mut combined, &result.render_text());
+        exit_code = exit_code.max(result.exit_code());
+    }
+
+    PromptOutput {
+        title: "reta".to_string(),
+        text: combined.trim_end_matches('\n').to_string(),
+        exit_code,
+    }
+}
+
 pub fn execute_command(
     command: PromptCommand,
     state: &mut SessionState,
@@ -1086,24 +1157,8 @@ pub fn execute_command(
             }))
         }
         PromptCommand::RetaBatch(argvs) => {
-            let mut combined = String::new();
-            let mut exit_code = 0;
-            for argv in argvs {
-                let result: RetaRunResult = run_reta_from_args(argv);
-                if !combined.is_empty() && !combined.ends_with('\n') {
-                    combined.push('\n');
-                }
-                combined.push_str(&result.render_text());
-                if !combined.ends_with('\n') {
-                    combined.push('\n');
-                }
-                exit_code = exit_code.max(result.exit_code());
-            }
-            Ok(Some(PromptOutput {
-                title: "reta".to_string(),
-                text: combined.trim_end_matches('\n').to_string(),
-                exit_code,
-            }))
+            let results = run_reta_batch_ordered_parallel_py(argvs)?;
+            Ok(Some(combine_reta_batch_results_py(results)))
         }
     }
 }
