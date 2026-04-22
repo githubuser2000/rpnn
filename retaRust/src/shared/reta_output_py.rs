@@ -626,6 +626,49 @@ fn html_exact_header_attrs_py(
         }
     }
 
+    fn prepare4out_width_for_display_col_py(&self, row_to_display_1_based: usize, combi_rows: usize) -> usize {
+        // Python Prepare.setWidth(): if no terminal width/wrap context exists, keep the
+        // cell as one string.  Otherwise prefer --breiten values aligned to the visible
+        // output columns, falling back to textWidth.
+        if self.shellRowsAmount == 0 {
+            return 0;
+        }
+
+        let selected_len = if combi_rows == 0 {
+            self.rowsAsNumbers.len()
+        } else {
+            combi_rows
+        };
+        let start = self.rowsAsNumbers.len().saturating_sub(selected_len);
+        let effective_breiten: Vec<i64> = if start < self.breiten.len() {
+            self.breiten.iter().skip(start).copied().collect()
+        } else {
+            vec![]
+        };
+
+        let certain = if row_to_display_1_based >= 1
+            && row_to_display_1_based - 1 < effective_breiten.len()
+        {
+            effective_breiten[row_to_display_1_based - 1]
+        } else {
+            self.textWidth
+        };
+
+        if certain <= 0 {
+            0
+        } else {
+            certain as usize
+        }
+    }
+
+    pub(crate) fn prepare_cell_work_py(&self, cell: &str, certaintextwidth: usize) -> Vec<String> {
+        let stripped = cell.trim();
+        if certaintextwidth == 0 {
+            return vec![stripped.to_string()];
+        }
+        Self::wrap_text_py(stripped, certaintextwidth)
+    }
+
     pub(crate) fn prepare4out_py(
         &mut self,
         paramLines: Vec<String>,
@@ -678,13 +721,18 @@ fn html_exact_header_attrs_py(
                 continue;
             }
             let mut new2Lines: Vec<String> = vec![];
+            let mut row_to_display = 0usize;
             for original_col in selected_cols.iter().copied() {
                 if original_col < 0 {
                     continue;
                 }
                 let col_idx = original_col as usize;
                 if let Some(cell) = relitable[idx].get(col_idx) {
-                    new2Lines.push(cell.clone());
+                    row_to_display += 1;
+                    let certaintextwidth =
+                        self.prepare4out_width_for_display_col_py(row_to_display, selected_cols.len());
+                    let prepared = self.prepare_cell_work_py(cell, certaintextwidth).join("\n");
+                    new2Lines.push(prepared);
                 }
             }
             newTable.push(new2Lines);
@@ -2457,6 +2505,41 @@ mod tests {
 
         assert_eq!(old2new.last().copied(), Some(1040));
         assert!(!old2new.contains(&1041));
+    }
+
+    #[test]
+    fn prepare4out_wraps_cells_before_rendering_like_python_cellwork() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.ifZeilenSetted = true;
+        program.shellRowsAmount = 80;
+        program.textWidth = 4;
+        program.rowsAsNumbers = vec![0];
+
+        let relitable = vec![
+            vec!["kopf".to_string()],
+            vec!["eins zwei drei".to_string()],
+        ];
+
+        let (_, table, _, _, _) = program.prepare4out_py(
+            vec!["all".to_string()],
+            vec![],
+            relitable,
+            vec![0],
+        );
+
+        assert_eq!(table[1][0], "eins\nzwei\ndrei");
+    }
+
+    #[test]
+    fn prepare4out_width_uses_python_breiten_slice_for_combi_columns() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.shellRowsAmount = 80;
+        program.textWidth = 99;
+        program.rowsAsNumbers = vec![0, 1, 2];
+        program.breiten = vec![3, 5, 7];
+
+        assert_eq!(program.prepare4out_width_for_display_col_py(1, 2), 5);
+        assert_eq!(program.prepare4out_width_for_display_col_py(2, 2), 7);
     }
 
     #[test]

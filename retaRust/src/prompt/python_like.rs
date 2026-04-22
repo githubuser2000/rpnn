@@ -1948,7 +1948,7 @@ pub fn expand_kurz_kurz_befehl(prompt_mode: PromptModus, tokens: &[String]) -> (
 
     if matches!(
         tokens.first().map(|s| s.as_str()),
-        Some("reta" | "shell" | "python")
+        Some("reta" | "shell" | "python" | "math")
     ) {
         (if_kurz_kurz, tokens.to_vec())
     } else {
@@ -8170,7 +8170,7 @@ pub fn promptVorbereitungGrosseAusgabe(
 
     if !matches!(
         liste.first().map(String::as_str),
-        Some("shell" | "python" | "abstand")
+        Some("shell" | "python" | "math" | "abstand")
     ) {
         liste = finalize_prompt_tokens_for_execution(&liste);
     }
@@ -9252,6 +9252,31 @@ mod tests {
             result.retaArgv,
             Some(strings(&["reta", "-zeilen", "--zaehlung=12"]))
         );
+    }
+
+    #[test]
+    fn prompt_grosse_ausgabe_keeps_math_process_command_unexpanded() {
+        let result = PromptGrosseAusgabe(
+            "",
+            PromptModus::Normal,
+            PromptModus::Normal,
+            PromptModus::Normal,
+            "math 12/4",
+            &[],
+        );
+
+        assert_eq!(result.liste, strings(&["math", "12/4"]));
+        assert_eq!(result.retaArgv, None);
+    }
+
+    #[test]
+    fn kurz_kurz_expansion_does_not_rewrite_math_commands() {
+        let (_, expanded) = expand_kurz_kurz_befehl(
+            PromptModus::Normal,
+            &strings(&["math", "12a"]),
+        );
+
+        assert_eq!(expanded, strings(&["math", "12a"]));
     }
 
     #[test]

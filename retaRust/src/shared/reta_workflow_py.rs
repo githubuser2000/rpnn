@@ -383,11 +383,7 @@ impl Program {
                 let cell = line.get(idx).cloned().unwrap_or_default();
                 rowToDisplay += 1;
                 let certaintextwidth = self.combo_certaintextwidth_py(rowToDisplay, selected_cols.len());
-                let into = if certaintextwidth == 0 {
-                    vec![cell.trim().to_string()]
-                } else {
-                    Self::wrap_text_py(cell.trim(), certaintextwidth)
-                };
+                let into = self.prepare_cell_work_py(&cell, certaintextwidth);
                 new2Lines.push(into.join("\n"));
             }
             newerTable.push(new2Lines);
