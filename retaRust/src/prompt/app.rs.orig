@@ -897,7 +897,6 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
         ReedlineEvent::UntilFound(vec![
             ReedlineEvent::MenuRight,
             ReedlineEvent::HistoryHintComplete,
-            ReedlineEvent::Menu(COMPLETION_MENU_NAME.to_string()),
             ReedlineEvent::Right,
         ]),
     );
@@ -937,9 +936,7 @@ fn newSession(
         let completion_menu = Box::new(ColumnarMenu::default().with_name(COMPLETION_MENU_NAME));
         editor = editor
             .with_completer(completer)
-            .with_menu(ReedlineMenu::EngineCompleter(completion_menu))
-            .with_quick_completions(true)
-            .with_partial_completions(true);
+            .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
     }
 
     editor = match mode {

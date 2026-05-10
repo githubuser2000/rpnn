@@ -110,25 +110,10 @@ struct CompletionCandidate {
     append_whitespace: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CandidateMatchMode {
-    Normal,
-    DashInsensitiveStructural,
-}
-
 #[derive(Clone, Debug)]
 struct TokenSegment {
     text: String,
     start: usize,
-}
-
-#[derive(Clone, Debug)]
-struct ValueCompletionContext {
-    parameter_token: String,
-    value_fragment: String,
-    value_replace_start: usize,
-    token_start: usize,
-    value_prefix: String,
 }
 
 #[derive(Clone, Debug)]
@@ -589,18 +574,23 @@ fn completion_candidates_for_line_in_mode_with_context(
         consume_space_token(&mut state, token);
     }
 
-    if let Some(value_context) = parse_value_context(&current_token, current_start) {
-        return build_value_candidates_from_state(&state, &value_context);
+    if let Some((parameter_token, value_fragment, replace_start)) =
+        parse_value_context(&current_token, current_start)
+    {
+        return build_value_candidates_from_state(
+            &state,
+            &parameter_token,
+            &value_fragment,
+            replace_start,
+        );
     }
 
     let mut candidates = state.options.clone();
-    if contextual_previous_tokens.is_empty()
-        && should_offer_main_switches_for_fragment(&current_token)
-    {
+    if contextual_previous_tokens.is_empty() && current_token.starts_with('-') {
         candidates = merge_unique(candidates, main_switches_vec());
     }
 
-    build_structural_completion_candidates(candidates, &current_token, current_start, None, true)
+    build_completion_candidates(candidates, &current_token, current_start, None, true)
 }
 
 fn build_contextual_previous_tokens(
@@ -812,9 +802,11 @@ fn parameter_options_for_main(main_switch: &str) -> (Vec<String>, ComplSitua) {
 
 fn build_value_candidates_from_state(
     state: &PythonCompletionState,
-    value_context: &ValueCompletionContext,
+    parameter_token: &str,
+    fragment: &str,
+    replace_start: usize,
 ) -> Vec<CompletionCandidate> {
-    let stripped = value_context.parameter_token.trim_start_matches('-');
+    let stripped = parameter_token.trim_start_matches('-');
     let raw_key = stripped.trim_end_matches('=');
     let key = normalize_completion_text(raw_key);
     let section = state.current_section();
@@ -830,91 +822,7 @@ fn build_value_candidates_from_state(
         candidates = close_parameter_key_candidates(section, &key);
     }
 
-    if let Some(canonical_parameter_token) = canonical_value_parameter_token(section, raw_key) {
-        let typed_parameter_token = parameter_token_with_equals(&value_context.parameter_token);
-        if normalize_completion_text(&typed_parameter_token)
-            != normalize_completion_text(&canonical_parameter_token)
-        {
-            return build_canonicalized_value_completion_candidates(
-                candidates,
-                &value_context.value_fragment,
-                value_context.token_start,
-                &canonical_parameter_token,
-                &value_context.value_prefix,
-            );
-        }
-    }
-
-    build_completion_candidates(
-        candidates,
-        &value_context.value_fragment,
-        value_context.value_replace_start,
-        None,
-        true,
-    )
-}
-
-fn build_canonicalized_value_completion_candidates(
-    candidates: Vec<String>,
-    fragment: &str,
-    replace_start: usize,
-    canonical_parameter_token: &str,
-    value_prefix: &str,
-) -> Vec<CompletionCandidate> {
-    filter_candidate_values(&candidates, fragment, true)
-        .into_iter()
-        .map(|value| {
-            let description = semantic_choice_completion_description(&value);
-            CompletionCandidate {
-                append_whitespace: !value.ends_with('='),
-                description,
-                replace_start,
-                value: format!("{canonical_parameter_token}{value_prefix}{value}"),
-            }
-        })
-        .collect()
-}
-
-fn parameter_token_with_equals(parameter_token: &str) -> String {
-    if parameter_token.ends_with('=') {
-        parameter_token.to_string()
-    } else {
-        format!("{parameter_token}=")
-    }
-}
-
-fn canonical_value_parameter_token(
-    section: Option<RetaMainSection>,
-    raw_key: &str,
-) -> Option<String> {
-    let normalized_key = normalize_completion_text(raw_key);
-    value_parameter_tokens_for_section(section)
-        .into_iter()
-        .find(|candidate| {
-            candidate.ends_with('=')
-                && normalize_completion_text(
-                    candidate.trim_start_matches('-').trim_end_matches('='),
-                ) == normalized_key
-        })
-}
-
-fn value_parameter_tokens_for_section(section: Option<RetaMainSection>) -> Vec<String> {
-    match section {
-        Some(RetaMainSection::Zeilen) => zeilen_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        Some(RetaMainSection::Spalten) => spalten_parameter_tokens(),
-        Some(RetaMainSection::Kombination) => kombi_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        Some(RetaMainSection::Ausgabe) => ausgabe_parameter_tokens()
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        None => Vec::new(),
-    }
+    build_completion_candidates(candidates, fragment, replace_start, None, true)
 }
 
 fn close_parameter_key_candidates(section: Option<RetaMainSection>, key: &str) -> Vec<String> {
@@ -1175,7 +1083,7 @@ fn split_tokens_with_positions(input: &str) -> Vec<TokenSegment> {
     out
 }
 
-fn parse_value_context(current_token: &str, token_start: usize) -> Option<ValueCompletionContext> {
+fn parse_value_context(current_token: &str, token_start: usize) -> Option<(String, String, usize)> {
     let eq_index = current_token.find('=')?;
     let parameter_token = current_token[..eq_index].to_string();
     let raw_values = &current_token[eq_index + 1..];
@@ -1183,14 +1091,8 @@ fn parse_value_context(current_token: &str, token_start: usize) -> Option<ValueC
         .map(|idx| idx + 1)
         .unwrap_or(0);
     let value_fragment = raw_values[value_offset..].to_string();
-    let value_replace_start = token_start + parameter_token.len() + 1 + value_offset;
-    Some(ValueCompletionContext {
-        parameter_token,
-        value_fragment,
-        value_replace_start,
-        token_start,
-        value_prefix: raw_values[..value_offset].to_string(),
-    })
+    let replace_start = token_start + parameter_token.len() + 1 + value_offset;
+    Some((parameter_token, value_fragment, replace_start))
 }
 
 fn last_top_level_comma_index(text: &str) -> Option<usize> {
@@ -1245,18 +1147,6 @@ fn section_from_main_token(token: &str) -> Option<RetaMainSection> {
 fn is_main_switch(token: &str) -> bool {
     let normalized = normalize_completion_text(token);
     reta_main_switches().any(|candidate| normalize_completion_text(candidate) == normalized)
-}
-
-fn should_offer_main_switches_for_fragment(fragment: &str) -> bool {
-    if fragment.is_empty() {
-        return false;
-    }
-
-    let normalized_body = normalize_dash_insensitive_fragment(fragment);
-    fragment.starts_with('-')
-        || reta_main_switches().any(|candidate| {
-            normalize_dash_insensitive_fragment(candidate).starts_with(&normalized_body)
-        })
 }
 
 fn ordered_prompt_commands() -> Vec<String> {
@@ -1394,42 +1284,7 @@ fn build_completion_candidates(
     description: Option<String>,
     append_whitespace: bool,
 ) -> Vec<CompletionCandidate> {
-    build_completion_candidates_with_match_mode(
-        candidates,
-        fragment,
-        replace_start,
-        description,
-        append_whitespace,
-        CandidateMatchMode::Normal,
-    )
-}
-
-fn build_structural_completion_candidates(
-    candidates: Vec<String>,
-    fragment: &str,
-    replace_start: usize,
-    description: Option<String>,
-    append_whitespace: bool,
-) -> Vec<CompletionCandidate> {
-    build_completion_candidates_with_match_mode(
-        candidates,
-        fragment,
-        replace_start,
-        description,
-        append_whitespace,
-        CandidateMatchMode::DashInsensitiveStructural,
-    )
-}
-
-fn build_completion_candidates_with_match_mode(
-    candidates: Vec<String>,
-    fragment: &str,
-    replace_start: usize,
-    description: Option<String>,
-    append_whitespace: bool,
-    match_mode: CandidateMatchMode,
-) -> Vec<CompletionCandidate> {
-    filter_candidate_values_with_match_mode(&candidates, fragment, true, match_mode)
+    filter_candidate_values(&candidates, fragment, true)
         .into_iter()
         .map(|value| CompletionCandidate {
             append_whitespace: append_whitespace && !value.ends_with('='),
@@ -1485,38 +1340,17 @@ fn filter_candidate_values(
     fragment: &str,
     fallback_contains: bool,
 ) -> Vec<String> {
-    filter_candidate_values_with_match_mode(
-        candidates,
-        fragment,
-        fallback_contains,
-        CandidateMatchMode::Normal,
-    )
-}
-
-fn filter_candidate_values_with_match_mode(
-    candidates: &[String],
-    fragment: &str,
-    fallback_contains: bool,
-    match_mode: CandidateMatchMode,
-) -> Vec<String> {
     if let Some(matches) = filter_candidates_for_special_fragment(candidates, fragment) {
         return matches;
     }
 
     let normalized_fragment = normalize_completion_text(fragment);
-    let dash_normalized_fragment = normalize_dash_insensitive_fragment(fragment);
     let mut prefix_matches = Vec::new();
     let mut seen = BTreeSet::new();
 
     for candidate in candidates {
         let normalized_candidate = normalize_completion_text(candidate);
-        if normalized_fragment.is_empty()
-            || normalized_candidate.starts_with(&normalized_fragment)
-            || structural_dash_insensitive_prefix_match(
-                candidate,
-                &dash_normalized_fragment,
-                match_mode,
-            )
+        if normalized_fragment.is_empty() || normalized_candidate.starts_with(&normalized_fragment)
         {
             if seen.insert(normalized_candidate) {
                 prefix_matches.push(candidate.clone());
@@ -1534,13 +1368,7 @@ fn filter_candidate_values_with_match_mode(
         if seen.contains(&normalized_candidate) {
             continue;
         }
-        if let Some(score) = fuzzy_score_for_candidate_fragment(
-            candidate,
-            &normalized_candidate,
-            &normalized_fragment,
-            &dash_normalized_fragment,
-            match_mode,
-        ) {
+        if let Some(score) = fuzzy_completion_score(&normalized_candidate, &normalized_fragment) {
             fuzzy_matches.push((score, index, normalized_candidate, candidate.clone()));
         }
     }
@@ -1560,54 +1388,6 @@ fn filter_candidate_values_with_match_mode(
     }
 
     out
-}
-
-fn structural_dash_insensitive_prefix_match(
-    candidate: &str,
-    dash_normalized_fragment: &str,
-    match_mode: CandidateMatchMode,
-) -> bool {
-    if match_mode != CandidateMatchMode::DashInsensitiveStructural
-        || !is_structural_dash_candidate(candidate)
-    {
-        return false;
-    }
-
-    normalize_dash_insensitive_fragment(candidate).starts_with(dash_normalized_fragment)
-}
-
-fn fuzzy_score_for_candidate_fragment(
-    candidate: &str,
-    normalized_candidate: &str,
-    normalized_fragment: &str,
-    dash_normalized_fragment: &str,
-    match_mode: CandidateMatchMode,
-) -> Option<FuzzyCompletionScore> {
-    if match_mode == CandidateMatchMode::DashInsensitiveStructural
-        && !dash_normalized_fragment.is_empty()
-        && is_structural_dash_candidate(candidate)
-    {
-        let dash_normalized_candidate = normalize_dash_insensitive_fragment(candidate);
-        if let Some(score) =
-            fuzzy_completion_score(&dash_normalized_candidate, dash_normalized_fragment)
-        {
-            return Some(score);
-        }
-    }
-
-    fuzzy_completion_score(normalized_candidate, normalized_fragment)
-}
-
-fn normalize_dash_insensitive_fragment(text: &str) -> String {
-    normalize_completion_text(text.trim_start_matches('-'))
-}
-
-fn is_structural_dash_candidate(candidate: &str) -> bool {
-    if !candidate.starts_with('-') {
-        return false;
-    }
-
-    is_main_switch(candidate) || candidate.starts_with("--")
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -2363,33 +2143,6 @@ mod tests {
             .as_deref(),
             Some("it=")
         );
-    }
-
-    #[test]
-    fn structural_completion_matches_main_switches_without_or_with_extra_dashes() {
-        let values = candidates_for_input("reta ze");
-        assert!(contains_normalized(&values, "-zeilen"));
-
-        let values = candidates_for_input("reta --ze");
-        assert!(contains_normalized(&values, "-zeilen"));
-    }
-
-    #[test]
-    fn structural_completion_matches_parameters_without_or_with_extra_dashes() {
-        let values = candidates_for_input("reta -zeilen zeit");
-        assert!(contains_normalized(&values, "--zeit="));
-
-        let values = candidates_for_input("reta -zeilen ---zeit");
-        assert!(contains_normalized(&values, "--zeit="));
-    }
-
-    #[test]
-    fn value_completion_canonicalizes_parameter_minus_prefix() {
-        let values = candidates_for_input("reta -zeilen zeit=h");
-        assert!(contains_normalized(&values, "--zeit=heute"));
-
-        let values = candidates_for_input("reta -zeilen ---zeit=h");
-        assert!(contains_normalized(&values, "--zeit=heute"));
     }
 
     #[test]
