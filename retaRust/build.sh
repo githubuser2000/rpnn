@@ -20,7 +20,7 @@ case "$PROFILE" in
     ;;
 esac
 
-cargo clean
+#cargo clean
 cargo build --workspace "${CARGO_FLAGS[@]}"
 
 mkdir -p "$TARGET_DIR"
@@ -52,5 +52,10 @@ copy_runtime_data() {
 }
 
 copy_runtime_data
+
+for a in rreta rrp rrpl rrpe rrpb
+do
+	cargo run --${PROFILE} --bin $a -- -h
+done
 
 echo "Build complete: $TARGET_DIR"

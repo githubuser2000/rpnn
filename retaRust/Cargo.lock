@@ -1150,7 +1150,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "reta"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "hypher",
  "indexmap",
@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "retaprompt_commands"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "indexmap",
  "libloading",
@@ -1171,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "retaprompt_frontends"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "retaprompt_commands",
  "retaprompt_input",
@@ -1179,7 +1179,7 @@ dependencies = [
 
 [[package]]
 name = "retaprompt_input"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "crossterm",
  "indexmap",

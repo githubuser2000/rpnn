@@ -1,6 +1,6 @@
 [package]
 name = "retaprompt_input"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 autobins = false
 publish = false
@@ -17,6 +17,6 @@ reedline = "0.47.0"
 ratatui = { version = "0.30.0", features = ["crossterm"] }
 crossterm = "0.29.0"
 
-[[bin]]
-name = "retaprompt_completion_probe"
-path = "src/bin/retaprompt_completion_probe.rs"
+#[[bin]]
+#name = "retaprompt_completion_probe"
+#path = "src/bin/retaprompt_completion_probe.rs"

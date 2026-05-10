@@ -1,6 +1,6 @@
 [package]
 name = "retaprompt_frontends"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 autobins = false
 publish = false
@@ -9,22 +9,22 @@ publish = false
 retaprompt_input = { path = "../retaprompt_input" }
 retaprompt_commands = { path = "../retaprompt_commands" }
 
-[[bin]]
-name = "retaprompt_launcher"
-path = "src/bin/retaprompt_launcher.rs"
+#[[bin]]
+#name = "retaprompt_launcher"
+#path = "src/bin/retaprompt_launcher.rs"
 
 [[bin]]
-name = "rp"
+name = "rrp"
 path = "src/bin/rp.rs"
 
 [[bin]]
-name = "rpl"
+name = "rrpl"
 path = "src/bin/rpl.rs"
 
 [[bin]]
-name = "rpb"
+name = "rrpb"
 path = "src/bin/rpb.rs"
 
 [[bin]]
-name = "rpe"
+name = "rrpe"
 path = "src/bin/rpe.rs"

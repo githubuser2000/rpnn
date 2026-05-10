@@ -1,9 +1,9 @@
 [package]
 name = "reta"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 autobins = false
-default-run = "reta"
+default-run = "rreta"
 
 [dependencies]
 indexmap = { version = "2", features = ["serde"] }
@@ -18,24 +18,24 @@ path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
 
 [[bin]]
-name = "reta"
+name = "rreta"
 path = "src/bin/reta.rs"
 
 [[bin]]
-name = "grundStrukHtml"
+name = "rgrundStrukHtml"
 path = "src/bin/grundStrukHtml.rs"
 
 [[bin]]
-name = "generate4readme"
+name = "rgenerate4readme"
 path = "src/bin/generate4readme.rs"
 
-[[bin]]
-name = "reta_domain_probe"
-path = "src/bin/reta_domain_probe.rs"
+#[[bin]]
+#name = r"reta_domain_probe"
+#path = "src/bin/reta_domain_probe.rs"
 
-[[bin]]
-name = "reta_extract_html_classes"
-path = "src/bin/reta_extract_html_classes.rs"
+#[[bin]]
+#name = "reta_extract_html_classes"
+#path = "src/bin/reta_extract_html_classes.rs"
 
 
 [workspace]
