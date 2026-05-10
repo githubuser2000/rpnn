@@ -3,13 +3,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::domain::python_html_meta::{html_meta_for_column, HtmlDeclMeta};
-use crate::domain::python_source_of_truth::{all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main};
+use crate::domain::python_source_of_truth::{
+    all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main,
+};
 use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
 use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
 
 use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
-
 
 struct PyLikeIntExprParser<'a> {
     chars: Vec<char>,
@@ -165,7 +166,11 @@ impl<'a> PyLikeIntExprParser<'a> {
         if start == self.pos {
             return None;
         }
-        self.chars[start..self.pos].iter().collect::<String>().parse::<i64>().ok()
+        self.chars[start..self.pos]
+            .iter()
+            .collect::<String>()
+            .parse::<i64>()
+            .ok()
     }
 
     fn parse_identifier(&mut self) -> Option<i64> {
@@ -250,97 +255,106 @@ impl HtmlRuntimeMetaPy {
 
 impl Program {
     fn displayed_column_numbers_for_html_py(rowsRange: &[i64]) -> Vec<Option<u32>> {
-    rowsRange
-        .iter()
-        .copied()
-        .map(|v| if v >= 0 { Some(v as u32) } else { None })
-        .collect()
-}
+        rowsRange
+            .iter()
+            .copied()
+            .map(|v| if v >= 0 { Some(v as u32) } else { None })
+            .collect()
+    }
 
-fn output_row_number_type_py(num: i64) -> i64 {
-    if num == 0 {
-        return 0;
-    }
-    if num.abs() == 1 {
-        return 2;
-    }
-    let factors = Self::prim_repeat2_py(&Self::prim_fak_py(num.abs()));
-    if factors.len() == 1 && factors[0].1 == 1 {
-        return 1;
-    }
-    if factors.len() == 1 {
-        return 3;
-    }
-    if factors.is_empty() {
-        return 0;
-    }
-    let mut intersection: Option<BTreeSet<i64>> = None;
-    for (_, amount) in factors {
-        let divisors: BTreeSet<i64> = (2..=amount).filter(|divisor| amount % divisor == 0).collect();
-        if divisors.is_empty() {
+    fn output_row_number_type_py(num: i64) -> i64 {
+        if num == 0 {
+            return 0;
+        }
+        if num.abs() == 1 {
             return 2;
         }
-        intersection = Some(match intersection {
-            Some(previous) => previous.intersection(&divisors).copied().collect(),
-            None => divisors,
-        });
+        let factors = Self::prim_repeat2_py(&Self::prim_fak_py(num.abs()));
+        if factors.len() == 1 && factors[0].1 == 1 {
+            return 1;
+        }
+        if factors.len() == 1 {
+            return 3;
+        }
+        if factors.is_empty() {
+            return 0;
+        }
+        let mut intersection: Option<BTreeSet<i64>> = None;
+        for (_, amount) in factors {
+            let divisors: BTreeSet<i64> = (2..=amount)
+                .filter(|divisor| amount % divisor == 0)
+                .collect();
+            if divisors.is_empty() {
+                return 2;
+            }
+            intersection = Some(match intersection {
+                Some(previous) => previous.intersection(&divisors).copied().collect(),
+                None => divisors,
+            });
+        }
+        match intersection {
+            Some(values) if !values.is_empty() => 3,
+            _ => 2,
+        }
     }
-    match intersection {
-        Some(values) if !values.is_empty() => 3,
-        _ => 2,
+
+    fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
+        let num = if is_header {
+            0
+        } else {
+            row_number.unwrap_or(0)
+        };
+        let style = match Self::output_row_number_type_py(num) {
+            1 if num % 2 == 0 => "background-color:#66ff66;color:#000000;",
+            1 => "background-color:#009900;color:#ffffff;",
+            2 if num % 2 == 0 => "background-color:#ffff66;color:#000099;",
+            2 => "background-color:#555500;color:#aaaaff;",
+            3 if num % 2 == 0 => "background-color:#9999ff;color:#202000;",
+            3 => "background-color:#000099;color:#ffff66;",
+            _ => "background-color:#ff2222;color:#002222;",
+        };
+        format!(r#" style="{}""#, style)
     }
-}
 
-fn html_row_style_py(row_number: Option<i64>, is_header: bool) -> String {
-    let num = if is_header { 0 } else { row_number.unwrap_or(0) };
-    let style = match Self::output_row_number_type_py(num) {
-        1 if num % 2 == 0 => "background-color:#66ff66;color:#000000;",
-        1 => "background-color:#009900;color:#ffffff;",
-        2 if num % 2 == 0 => "background-color:#ffff66;color:#000099;",
-        2 => "background-color:#555500;color:#aaaaff;",
-        3 if num % 2 == 0 => "background-color:#9999ff;color:#202000;",
-        3 => "background-color:#000099;color:#ffff66;",
-        _ => "background-color:#ff2222;color:#002222;",
-    };
-    format!(r#" style="{}""#, style)
-}
-
-fn bbcode_row_begin_py(row_number: Option<i64>, is_header: bool) -> String {
-    let num = if is_header { 0 } else { row_number.unwrap_or(0) };
-    match Self::output_row_number_type_py(num) {
-        1 if num % 2 == 0 => r#"[tr="background-color:#66ff66;color:#000000;"]"#.to_string(),
-        1 => r#"[tr="background-color:#009900;color:#ffffff;"]"#.to_string(),
-        2 if num % 2 == 0 => r#"[tr="background-color:#ffff66;color:#000099;"]"#.to_string(),
-        2 => r#"[tr="background-color:#555500;color:#aaaaff;"]"#.to_string(),
-        3 if num % 2 == 0 => r#"[tr="background-color:#9999ff;color:#202000;"]"#.to_string(),
-        3 => r#"[tr="background-color:#000099;color:#ffff66;"]"#.to_string(),
-        _ => r#"[tr="background-color:#ff2222;color:#002222;"]"#.to_string(),
+    fn bbcode_row_begin_py(row_number: Option<i64>, is_header: bool) -> String {
+        let num = if is_header {
+            0
+        } else {
+            row_number.unwrap_or(0)
+        };
+        match Self::output_row_number_type_py(num) {
+            1 if num % 2 == 0 => r#"[tr="background-color:#66ff66;color:#000000;"]"#.to_string(),
+            1 => r#"[tr="background-color:#009900;color:#ffffff;"]"#.to_string(),
+            2 if num % 2 == 0 => r#"[tr="background-color:#ffff66;color:#000099;"]"#.to_string(),
+            2 => r#"[tr="background-color:#555500;color:#aaaaff;"]"#.to_string(),
+            3 if num % 2 == 0 => r#"[tr="background-color:#9999ff;color:#202000;"]"#.to_string(),
+            3 => r#"[tr="background-color:#000099;color:#ffff66;"]"#.to_string(),
+            _ => r#"[tr="background-color:#ff2222;color:#002222;"]"#.to_string(),
+        }
     }
-}
 
-fn html_exact_header_attrs_py(
-    words: &Words,
-    original_col: Option<u32>,
-    html_col_idx: usize,
-) -> String {
-    let _ = words;
+    fn html_exact_header_attrs_py(
+        words: &Words,
+        original_col: Option<u32>,
+        html_col_idx: usize,
+    ) -> String {
+        let _ = words;
 
-    if original_col.is_none() && html_col_idx == 0 {
-        return r#" class="z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_" style="background-color:#ffffff;color:#000000;""#
+        if original_col.is_none() && html_col_idx == 0 {
+            return r#" class="z_0 r_0 p1_✗Zählung,, p2_p3_0_, p4_" style="background-color:#ffffff;color:#000000;""#
             .to_string();
-    }
-    if original_col.is_none() && html_col_idx == 1 {
-        return r#" class="z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_""#
-            .to_string();
-    }
+        }
+        if original_col.is_none() && html_col_idx == 1 {
+            return r#" class="z_0 r_1 p1_✗Nummerierung,, p2_p3_0_, p4_""#.to_string();
+        }
 
-    let r_part = format!("z_0 r_{}", html_col_idx);
-    if let Some(original_col) = original_col {
-        format!(r#" class="{} c_{}""#, r_part, original_col)
-    } else {
-        format!(r#" class="{}""#, r_part)
+        let r_part = format!("z_0 r_{}", html_col_idx);
+        if let Some(original_col) = original_col {
+            format!(r#" class="{} c_{}""#, r_part, original_col)
+        } else {
+            format!(r#" class="{}""#, r_part)
+        }
     }
-}
 
     fn html_escape_attr_value_py(text: &str) -> String {
         text.replace('&', "&amp;")
@@ -389,8 +403,9 @@ fn html_exact_header_attrs_py(
                     continue;
                 }
 
-                let (canonical_main, canonical_param) = canonicalize_pair(words, raw_main, raw_param)
-                    .unwrap_or((raw_main.to_string(), raw_param.to_string()));
+                let (canonical_main, canonical_param) =
+                    canonicalize_pair(words, raw_main, raw_param)
+                        .unwrap_or((raw_main.to_string(), raw_param.to_string()));
 
                 canonical_pairs.insert((canonical_main.clone(), canonical_param.clone()));
 
@@ -499,14 +514,16 @@ fn html_exact_header_attrs_py(
                 out.classes.insert(tag.html_class());
             }
             if !tag_names.is_empty() {
-                out.data_attributes.insert(
-                    "data-structural-tags".to_string(),
-                    tag_names.join("|"),
-                );
+                out.data_attributes
+                    .insert("data-structural-tags".to_string(), tag_names.join("|"));
             }
         }
 
-        if !out.classes.iter().any(|class_name| class_name.starts_with("p1_")) {
+        if !out
+            .classes
+            .iter()
+            .any(|class_name| class_name.starts_with("p1_"))
+        {
             out.classes.insert(format!("p1_col_{}", original_col));
         }
 
@@ -521,7 +538,11 @@ fn html_exact_header_attrs_py(
         row_number: Option<i64>,
         is_header: bool,
     ) -> String {
-        let z_value = if is_header { 0 } else { row_number.unwrap_or(0) };
+        let z_value = if is_header {
+            0
+        } else {
+            row_number.unwrap_or(0)
+        };
         let mut meta = if let Some(original_col) = original_col {
             self.html_runtime_meta_for_column_exact_py(words, original_col as i64)
         } else {
@@ -616,24 +637,36 @@ fn html_exact_header_attrs_py(
         if original_col < 0 {
             return;
         }
-        if !self.generatedSpaltenParameter_Exact.contains_key(&original_col) {
+        if !self
+            .generatedSpaltenParameter_Exact
+            .contains_key(&original_col)
+        {
             if let Some(entries) = self
                 .dataDict
                 .get(0)
                 .and_then(|dict| dict.get(&original_col.to_string()))
                 .cloned()
             {
-                self.generatedSpaltenParameter_Exact.insert(original_col, entries);
+                self.generatedSpaltenParameter_Exact
+                    .insert(original_col, entries);
             }
         }
-        if !self.generatedSpaltenParameter_Tags.contains_key(&original_col) {
+        if !self
+            .generatedSpaltenParameter_Tags
+            .contains_key(&original_col)
+        {
             if let Some(tags) = self.ordinary_column_tags_exact_py(original_col) {
-                self.generatedSpaltenParameter_Tags.insert(original_col, tags);
+                self.generatedSpaltenParameter_Tags
+                    .insert(original_col, tags);
             }
         }
     }
 
-    fn prepare4out_width_for_display_col_py(&self, row_to_display_1_based: usize, combi_rows: usize) -> usize {
+    fn prepare4out_width_for_display_col_py(
+        &self,
+        row_to_display_1_based: usize,
+        combi_rows: usize,
+    ) -> usize {
         // Python Prepare.setWidth(): if no terminal width/wrap context exists, keep the
         // cell as one string. Otherwise prefer --breiten values aligned to the visible
         // output columns, falling back to textWidth.
@@ -701,11 +734,8 @@ fn html_exact_header_attrs_py(
         } else {
             physical_max_row
         };
-        let mut selected_rows: Vec<i64> = self.selected_rows_from_param_lines_py(
-            &paramLines,
-            &paramLinesNot,
-            max_row,
-        );
+        let mut selected_rows: Vec<i64> =
+            self.selected_rows_from_param_lines_py(&paramLines, &paramLinesNot, max_row);
         selected_rows = dedup_preserve_order_i64(selected_rows);
         if !self.keineUeberschriften && !selected_rows.contains(&0) {
             selected_rows.insert(0, 0);
@@ -736,8 +766,8 @@ fn html_exact_header_attrs_py(
                 let col_idx = original_col as usize;
                 if let Some(cell) = relitable[idx].get(col_idx) {
                     row_to_display += 1;
-                    let certaintextwidth =
-                        self.prepare4out_width_for_display_col_py(row_to_display, selected_cols.len());
+                    let certaintextwidth = self
+                        .prepare4out_width_for_display_col_py(row_to_display, selected_cols.len());
                     let prepared = self.prepare_cell_work_py(cell, certaintextwidth).join("\n");
                     new2Lines.push(prepared);
                 }
@@ -760,17 +790,29 @@ fn html_exact_header_attrs_py(
         for original_col in rowsRange.iter().copied() {
             self.register_visible_column_metadata_exact_py(original_col);
         }
-        let numlen = old2newTable.last().map(|v| v.to_string().len() as i64).unwrap_or(0);
-        (finallyDisplayLines, newTable, numlen, rowsRange, old2newTable)
+        let numlen = old2newTable
+            .last()
+            .map(|v| v.to_string().len() as i64)
+            .unwrap_or(0);
+        (
+            finallyDisplayLines,
+            newTable,
+            numlen,
+            rowsRange,
+            old2newTable,
+        )
     }
-
 
     fn hoechste_zeile_114_py(&self, max_row_1024: i64) -> i64 {
         // Python Tables(None) starts with hoechsteZeile = {1024: 1024, 114: 163}.
         // The setter later writes both entries to the same explicit maximum.
         // Rust stores only the 1024 side as `hoechsteZeile`, so derive the
         // historical 114-side default here instead of widening the struct.
-        let py_114 = if self.hoechsteZeile == 1024 { 163 } else { self.hoechsteZeile };
+        let py_114 = if self.hoechsteZeile == 1024 {
+            163
+        } else {
+            self.hoechsteZeile
+        };
         std::cmp::min(max_row_1024, py_114)
     }
 
@@ -793,7 +835,8 @@ fn html_exact_header_attrs_py(
                 .collect();
         }
         if !param_lines_not.is_empty() {
-            let exclude_rows = self.filter_original_lines_py(BTreeSet::new(), param_lines_not, max_row);
+            let exclude_rows =
+                self.filter_original_lines_py(BTreeSet::new(), param_lines_not, max_row);
             selected_rows.retain(|row| !exclude_rows.contains(row));
         }
         selected_rows.sort_unstable();
@@ -817,12 +860,30 @@ fn html_exact_header_attrs_py(
 
         for ch in txt.chars() {
             match ch {
-                '(' => { depth_round += 1; current.push(ch); }
-                ')' => { depth_round -= 1; current.push(ch); }
-                '[' => { depth_square += 1; current.push(ch); }
-                ']' => { depth_square -= 1; current.push(ch); }
-                '{' => { depth_curly += 1; current.push(ch); }
-                '}' => { depth_curly -= 1; current.push(ch); }
+                '(' => {
+                    depth_round += 1;
+                    current.push(ch);
+                }
+                ')' => {
+                    depth_round -= 1;
+                    current.push(ch);
+                }
+                '[' => {
+                    depth_square += 1;
+                    current.push(ch);
+                }
+                ']' => {
+                    depth_square -= 1;
+                    current.push(ch);
+                }
+                '{' => {
+                    depth_curly += 1;
+                    current.push(ch);
+                }
+                '}' => {
+                    depth_curly -= 1;
+                    current.push(ch);
+                }
                 ',' if depth_round == 0 && depth_square == 0 && depth_curly == 0 => {
                     if !current.is_empty() {
                         out.push(current.clone());
@@ -846,7 +907,10 @@ fn html_exact_header_attrs_py(
         let mut parts = txt.split('+');
         let first = parts.next().unwrap_or_default();
         let first_ok = if let Some((a, b)) = first.split_once('-') {
-            !a.is_empty() && !b.is_empty() && a.chars().all(|c| c.is_ascii_digit()) && b.chars().all(|c| c.is_ascii_digit())
+            !a.is_empty()
+                && !b.is_empty()
+                && a.chars().all(|c| c.is_ascii_digit())
+                && b.chars().all(|c| c.is_ascii_digit())
         } else {
             first.chars().all(|c| c.is_ascii_digit())
         };
@@ -920,7 +984,10 @@ fn html_exact_header_attrs_py(
         };
         let mut out = BTreeSet::new();
         for value in Self::parse_python_like_range_values_py(start, stop, step)? {
-            out.insert(Self::eval_python_int_expr_py(expr.trim(), Some((variable, value)))?);
+            out.insert(Self::eval_python_int_expr_py(
+                expr.trim(),
+                Some((variable, value)),
+            )?);
         }
         Some(out)
     }
@@ -977,7 +1044,8 @@ fn html_exact_header_attrs_py(
             .map(|(idx, _)| &txt[idx..])
             .and_then(Self::parse_python_like_int_set_expr_py)
             .is_some();
-        (!stripped_plain.is_empty() && Self::is_plain_zeilen_angabe_between_kommas_filter_py(stripped_plain))
+        (!stripped_plain.is_empty()
+            && Self::is_plain_zeilen_angabe_between_kommas_filter_py(stripped_plain))
             || Self::parse_python_like_int_set_expr_py(txt).is_some()
             || generated_after_first
     }
@@ -985,12 +1053,25 @@ fn html_exact_header_attrs_py(
     fn is_zeilen_angabe_filter_py(txt: &str) -> bool {
         let parts = Self::split_top_level_commas_filter_py(txt);
         let any_at_all = parts.iter().any(|part| !part.is_empty());
-        any_at_all && parts.iter().all(|part| part.is_empty() || Self::is_zeilen_angabe_between_kommas_filter_py(part))
+        any_at_all
+            && parts.iter().all(|part| {
+                part.is_empty() || Self::is_zeilen_angabe_between_kommas_filter_py(part)
+            })
     }
 
-    pub(crate) fn bereich_to_numbers2_py(txt: &str, vielfache: bool, max_zahl: i64, allow_less_eq_zero: bool) -> BTreeSet<i64> {
+    pub(crate) fn bereich_to_numbers2_py(
+        txt: &str,
+        vielfache: bool,
+        max_zahl: i64,
+        allow_less_eq_zero: bool,
+    ) -> BTreeSet<i64> {
         let cleaned_parts = Self::split_top_level_commas_filter_py(txt);
-        let cleaned = cleaned_parts.iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join(",");
+        let cleaned = cleaned_parts
+            .iter()
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(",");
         if cleaned.is_empty() || !Self::is_zeilen_angabe_filter_py(&cleaned) {
             return BTreeSet::new();
         }
@@ -1001,7 +1082,11 @@ fn html_exact_header_attrs_py(
         // `vielfache` helper.  Keeping one global Rust maximum here used to
         // turn `v2` with open maximum into an almost unbounded loop.
         let python_global_max_is_inf = !vielfache && max_zahl == 0;
-        let python_global_max = if python_global_max_is_inf { i64::MAX / 4 } else { max_zahl };
+        let python_global_max = if python_global_max_is_inf {
+            i64::MAX / 4
+        } else {
+            max_zahl
+        };
         let mut dazu: BTreeSet<i64> = BTreeSet::new();
         let mut hinfort: BTreeSet<i64> = BTreeSet::new();
 
@@ -1010,7 +1095,8 @@ fn html_exact_header_attrs_py(
                 continue;
             }
             if ein_bereich.len() > 1 && ein_bereich.starts_with('-') {
-                if let Some(generated) = Self::parse_python_like_int_set_expr_py(&ein_bereich[1..]) {
+                if let Some(generated) = Self::parse_python_like_int_set_expr_py(&ein_bereich[1..])
+                {
                     hinfort.extend(generated);
                     continue;
                 }
@@ -1103,7 +1189,9 @@ fn html_exact_header_attrs_py(
                 let around_only_zero = around.is_empty() || around.iter().all(|a| *a == 0);
                 let mut i = 0i64;
                 loop {
-                    let cond = around.iter().all(|a| start.saturating_mul(i) < range_max.saturating_sub(*a));
+                    let cond = around
+                        .iter()
+                        .all(|a| start.saturating_mul(i) < range_max.saturating_sub(*a));
                     if !cond {
                         break;
                     }
@@ -1156,7 +1244,8 @@ fn html_exact_header_attrs_py(
     }
 
     fn teiler_py(zahlen_bereichs_angabe: &str) -> BTreeSet<i64> {
-        let zahlen_bereich_menge = Self::bereich_to_numbers2_py(zahlen_bereichs_angabe, false, 0, false);
+        let zahlen_bereich_menge =
+            Self::bereich_to_numbers2_py(zahlen_bereichs_angabe, false, 0, false);
         let mut zahlen_wbereich_menge: BTreeSet<i64> = BTreeSet::new();
         for each1 in zahlen_bereich_menge {
             for each2 in Self::multiples_py(each1, true) {
@@ -1245,7 +1334,10 @@ fn html_exact_header_attrs_py(
             .cloned()
             .collect();
 
-        if param_lines.iter().any(|p| p == "all") || relevant_params.is_empty() || !self.ifZeilenSetted {
+        if param_lines.iter().any(|p| p == "all")
+            || relevant_params.is_empty()
+            || !self.ifZeilenSetted
+        {
             num_range = (1..=max_row).collect();
         } else {
             num_range.clear();
@@ -1265,7 +1357,12 @@ fn html_exact_header_attrs_py(
         }
         if if_a_at_all {
             let joined = mehrere.join(",");
-            num_range.extend(Self::bereich_to_numbers2_py(&joined, false, max_row + 1, false));
+            num_range.extend(Self::bereich_to_numbers2_py(
+                &joined,
+                false,
+                max_row + 1,
+                false,
+            ));
             if if_teiler {
                 // Python calls teiler() with the current selected row set, not
                 // with the raw --vorhervonausschnitt argument.  That matters
@@ -1312,7 +1409,12 @@ fn html_exact_header_attrs_py(
                 num_range = (1..=max_row_114).collect();
             }
             let joined = mehrere.join(",");
-            num_range_yes_z.extend(Self::bereich_to_numbers2_py(&joined, true, max_row_114 + 1, false));
+            num_range_yes_z.extend(Self::bereich_to_numbers2_py(
+                &joined,
+                true,
+                max_row_114 + 1,
+                false,
+            ));
             if !num_range_yes_z.is_empty() {
                 num_range = num_range.intersection(&num_range_yes_z).copied().collect();
             }
@@ -1322,8 +1424,12 @@ fn html_exact_header_attrs_py(
                     let ja1 = eins.starts_with('-');
                     let ja2 = eins.starts_with("v-");
                     if ja1 || ja2 {
-                        if ja1 { eins = eins[1..].to_string(); }
-                        if ja2 { eins = format!("v{}", &eins[2..]); }
+                        if ja1 {
+                            eins = eins[1..].to_string();
+                        }
+                        if ja2 {
+                            eins = format!("v{}", &eins[2..]);
+                        }
                         let minus = Self::bereich_to_numbers2_py(&eins, true, max_row + 1, false);
                         num_range = num_range.difference(&minus).copied().collect();
                     }
@@ -1336,17 +1442,26 @@ fn html_exact_header_attrs_py(
         for condition in param_lines {
             if condition == "=" {
                 if_zeit_at_all = true;
-                if max_row >= 10 { num_range_yes_z.insert(10); }
+                if max_row >= 10 {
+                    num_range_yes_z.insert(10);
+                }
             } else if condition == "<" {
                 if_zeit_at_all = true;
                 num_range_yes_z.extend(1..=max_row.min(9));
             } else if condition == ">" {
                 if_zeit_at_all = true;
-                if max_row >= 11 { num_range_yes_z.extend(11..=max_row); }
+                if max_row >= 11 {
+                    num_range_yes_z.extend(11..=max_row);
+                }
             }
         }
         if if_zeit_at_all {
-            if num_range.is_empty() && !if_b_at_all && !if_a_at_all && !param_lines.iter().any(|p| p == "all") && num_range_yes_z.is_empty() {
+            if num_range.is_empty()
+                && !if_b_at_all
+                && !if_a_at_all
+                && !param_lines.iter().any(|p| p == "all")
+                && num_range_yes_z.is_empty()
+            {
                 num_range = (1..=max_row).collect();
             }
             if if_a_at_all || param_lines.iter().any(|p| p == "all") || if_b_at_all {
@@ -1361,18 +1476,32 @@ fn html_exact_header_attrs_py(
         mehrere.clear();
         for condition in param_lines {
             if condition.starts_with("_n_") && condition.len() > 3 {
-                num_range_yes_z.extend(Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false));
+                num_range_yes_z.extend(Self::bereich_to_numbers2_py(
+                    &condition[3..],
+                    false,
+                    max_row + 1,
+                    false,
+                ));
                 if_zaehlungen_at_all = true;
                 mehrere.push(condition[3..].to_string());
             } else if let Some(rest) = condition.strip_prefix("zaehlung=") {
-                num_range_yes_z.extend(Self::bereich_to_numbers2_py(rest, false, max_row + 1, false));
+                num_range_yes_z.extend(Self::bereich_to_numbers2_py(
+                    rest,
+                    false,
+                    max_row + 1,
+                    false,
+                ));
                 if_zaehlungen_at_all = true;
                 mehrere.push(rest.to_string());
             }
         }
         if if_zaehlungen_at_all {
             let mut num_range_yes_z2: BTreeSet<i64> = BTreeSet::new();
-            if num_range.is_empty() && !if_a_at_all && !if_b_at_all && !param_lines.iter().any(|p| p == "all") {
+            if num_range.is_empty()
+                && !if_a_at_all
+                && !if_b_at_all
+                && !param_lines.iter().any(|p| p == "all")
+            {
                 num_range = (1..=max_row).collect();
             }
             for n in &num_range {
@@ -1394,9 +1523,18 @@ fn html_exact_header_attrs_py(
                     let ja1 = eins.starts_with('-');
                     let ja2 = eins.starts_with("v-");
                     if ja1 || ja2 {
-                        if ja1 { eins = eins[1..].to_string(); }
-                        if ja2 { eins = format!("v{}", &eins[2..]); }
-                        minus_bereiche.extend(Self::bereich_to_numbers2_py(&eins, false, max_row + 1, false));
+                        if ja1 {
+                            eins = eins[1..].to_string();
+                        }
+                        if ja2 {
+                            eins = format!("v{}", &eins[2..]);
+                        }
+                        minus_bereiche.extend(Self::bereich_to_numbers2_py(
+                            &eins,
+                            false,
+                            max_row + 1,
+                            false,
+                        ));
                     }
                 }
                 if !minus_bereiche.is_empty() {
@@ -1416,7 +1554,12 @@ fn html_exact_header_attrs_py(
         if num_range.is_empty() && !relevant_params.is_empty() {
             num_range = (1..=max_row).collect();
         }
-        let primzahl_filter_present = param_lines.iter().any(|p| matches!(p.as_str(), "aussenerste" | "innenerste" | "aussenalle" | "innenalle"));
+        let primzahl_filter_present = param_lines.iter().any(|p| {
+            matches!(
+                p.as_str(),
+                "aussenerste" | "innenerste" | "aussenalle" | "innenalle"
+            )
+        });
         if primzahl_filter_present {
             let mut innen_aussen: BTreeMap<i64, (bool, bool, bool)> = BTreeMap::new();
             innen_aussen.insert(1, (true, false, true));
@@ -1436,16 +1579,40 @@ fn html_exact_header_attrs_py(
                 innen_aussen.insert(n, (innen, aussen, ein_fach_vorkommen));
             }
             if param_lines.iter().any(|p| p == "aussenerste") {
-                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.0 && t.2 { Some(*n) } else { None }));
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.0 && t.2 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "innenerste") {
-                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.1 && t.2 { Some(*n) } else { None }));
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.1 && t.2 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "aussenalle") {
-                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.0 { Some(*n) } else { None }));
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.0 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "innenalle") {
-                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| if t.1 { Some(*n) } else { None }));
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.1 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             let if_primtyp_at_all = !num_range_yes_z.is_empty();
             num_range = Self::cutset_py(if_primtyp_at_all, &num_range, &num_range_yes_z);
@@ -1461,18 +1628,27 @@ fn html_exact_header_attrs_py(
                 num_range_yes_z.extend(self.moonsun_rows_py(true, &num_range));
                 if_typ_at_all = true;
             } else if condition.contains("schwarzesonne") {
-                for n in &num_range { if *n % 3 == 0 { num_range_yes_z.insert(*n); } }
+                for n in &num_range {
+                    if *n % 3 == 0 {
+                        num_range_yes_z.insert(*n);
+                    }
+                }
                 if_typ_at_all = true;
             } else if condition.contains("sonne") {
                 num_range_yes_z.extend(self.moonsun_rows_py(false, &num_range));
                 if_typ_at_all = true;
             } else if condition.contains("planet") {
-                for n in &num_range { if *n % 2 == 0 { num_range_yes_z.insert(*n); } }
+                for n in &num_range {
+                    if *n % 2 == 0 {
+                        num_range_yes_z.insert(*n);
+                    }
+                }
                 if_typ_at_all = true;
             } else if condition.contains("SonneMitMondanteil") {
                 for n in &num_range {
                     let factors = Self::prim_repeat2_py(&Self::prim_fak_py(*n));
-                    let booleans: BTreeSet<bool> = factors.iter().map(|(_, faktor)| *faktor == 1).collect();
+                    let booleans: BTreeSet<bool> =
+                        factors.iter().map(|(_, faktor)| *faktor == 1).collect();
                     if booleans.contains(&true) && booleans.contains(&false) {
                         num_range_yes_z.insert(*n);
                     }
@@ -1486,7 +1662,7 @@ fn html_exact_header_attrs_py(
         let mut if_prim_at_all = false;
         for condition in param_lines {
             if condition.len() > 1 && condition.ends_with('p') {
-                if let Ok(v) = condition[..condition.len()-1].parse::<i64>() {
+                if let Ok(v) = condition[..condition.len() - 1].parse::<i64>() {
                     if_prim_at_all = true;
                     prim_multiples.push(v);
                 }
@@ -1494,7 +1670,12 @@ fn html_exact_header_attrs_py(
         }
         num_range_yes_z.clear();
         if if_prim_at_all {
-            if num_range.is_empty() && !if_b_at_all && !if_a_at_all && !param_lines.iter().any(|p| p == "all") && !if_typ_at_all {
+            if num_range.is_empty()
+                && !if_b_at_all
+                && !if_a_at_all
+                && !param_lines.iter().any(|p| p == "all")
+                && !if_typ_at_all
+            {
                 num_range = (1..=max_row).collect();
             }
             for n in &num_range {
@@ -1516,10 +1697,13 @@ fn html_exact_header_attrs_py(
                 mehrere.push(condition[3..].to_string());
             } else if condition.len() > 1 && condition.ends_with('^') {
                 if_power_at_all = true;
-                mehrere.push(condition[..condition.len()-1].to_string());
+                mehrere.push(condition[..condition.len() - 1].to_string());
             }
         }
-        let to_power_it: Vec<i64> = Self::bereich_to_numbers2_py(&mehrere.join(","), false, max_row + 1, false).into_iter().collect();
+        let to_power_it: Vec<i64> =
+            Self::bereich_to_numbers2_py(&mehrere.join(","), false, max_row + 1, false)
+                .into_iter()
+                .collect();
         if if_power_at_all {
             num_range_yes_z.clear();
             if num_range.is_empty() && !relevant_params.is_empty() {
@@ -1529,7 +1713,9 @@ fn html_exact_header_attrs_py(
                 for base in to_power_it {
                     let mut n = 0u32;
                     loop {
-                        let Some(one_power) = base.checked_pow(n) else { break; };
+                        let Some(one_power) = base.checked_pow(n) else {
+                            break;
+                        };
                         if one_power > last_el {
                             break;
                         }
@@ -1545,8 +1731,13 @@ fn html_exact_header_attrs_py(
         let mut if_multiples_from_any_at_all = false;
         let mut any_multiples: Vec<i64> = Vec::new();
         for condition in param_lines {
-            if condition.len() > 1 && condition.ends_with('v') && condition[..condition.len()-1].chars().all(|c| c.is_ascii_digit()) {
-                if let Ok(v) = condition[..condition.len()-1].parse::<i64>() {
+            if condition.len() > 1
+                && condition.ends_with('v')
+                && condition[..condition.len() - 1]
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+            {
+                if let Ok(v) = condition[..condition.len() - 1].parse::<i64>() {
                     if_multiples_from_any_at_all = true;
                     any_multiples.push(v);
                 }
@@ -1572,12 +1763,16 @@ fn html_exact_header_attrs_py(
             }
         }
 
-        let invertieren = param_lines.iter().any(|condition| condition.starts_with("_i_") || condition == "1i");
+        let invertieren = param_lines
+            .iter()
+            .any(|condition| condition.starts_with("_i_") || condition == "1i");
         if invertieren {
             let current: BTreeSet<i64> = num_range.clone();
             let mut num_range2_set = BTreeSet::new();
             for i in 1..=max_row {
-                if (current.contains(&(i + 1)) || current.contains(&(i - 1))) && !current.contains(&i) {
+                if (current.contains(&(i + 1)) || current.contains(&(i - 1)))
+                    && !current.contains(&i)
+                {
                     num_range2_set.insert(i);
                 }
             }
@@ -1585,7 +1780,11 @@ fn html_exact_header_attrs_py(
         }
 
         let num_range_list: Vec<i64> = num_range.iter().copied().collect();
-        let num_range2_map: BTreeMap<i64, i64> = num_range_list.iter().enumerate().map(|(i, a)| ((i as i64) + 1, *a)).collect();
+        let num_range2_map: BTreeMap<i64, i64> = num_range_list
+            .iter()
+            .enumerate()
+            .map(|(i, a)| ((i as i64) + 1, *a))
+            .collect();
 
         let mut z_ja = false;
         let mut num_range_neu2: BTreeSet<i64> = BTreeSet::new();
@@ -1593,7 +1792,13 @@ fn html_exact_header_attrs_py(
             if condition.starts_with("_z_") && condition.len() > 3 {
                 z_ja = true;
                 let neu = Self::bereich_to_numbers2_py(&condition[3..], false, max_row + 1, false);
-                for a in num_range2_map.keys().copied().collect::<BTreeSet<_>>().intersection(&neu).copied() {
+                for a in num_range2_map
+                    .keys()
+                    .copied()
+                    .collect::<BTreeSet<_>>()
+                    .intersection(&neu)
+                    .copied()
+                {
                     if let Some(mapped) = num_range2_map.get(&a) {
                         num_range_neu2.insert(*mapped);
                     }
@@ -1610,7 +1815,13 @@ fn html_exact_header_attrs_py(
             if condition.starts_with("_y_") && condition.len() > 3 {
                 y_ja = true;
                 let neu = Self::bereich_to_numbers2_py(&condition[3..], true, max_row + 1, false);
-                for a in num_range2_map.keys().copied().collect::<BTreeSet<_>>().intersection(&neu).copied() {
+                for a in num_range2_map
+                    .keys()
+                    .copied()
+                    .collect::<BTreeSet<_>>()
+                    .intersection(&neu)
+                    .copied()
+                {
                     if let Some(mapped) = num_range2_map.get(&a) {
                         num_range_neu2.insert(*mapped);
                     }
@@ -1651,65 +1862,62 @@ fn html_exact_header_attrs_py(
         out
     }
 
-fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
-    if width <= 1 || word.chars().count() <= width {
-        return vec![word.to_string()];
-    }
+    fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
+        if width <= 1 || word.chars().count() <= width {
+            return vec![word.to_string()];
+        }
 
-    // hypher panics for long words when alloc is disabled.
-    // Keep display behavior unchanged for normal words and
-    // hard-split only in the panic case.
-    if word.len() > 45 {
-        return Self::hard_split_long_word_py(word, width);
-    }
+        // hypher panics for long words when alloc is disabled.
+        // Keep display behavior unchanged for normal words and
+        // hard-split only in the panic case.
+        if word.len() > 45 {
+            return Self::hard_split_long_word_py(word, width);
+        }
 
-    let lang = Self::hypher_lang_py(word);
-    let syllables: Vec<String> = hyphenate(word, lang)
-        .map(|s| s.to_string())
-        .collect();
+        let lang = Self::hypher_lang_py(word);
+        let syllables: Vec<String> = hyphenate(word, lang).map(|s| s.to_string()).collect();
 
-    if syllables.is_empty() {
-        return Self::hard_split_long_word_py(word, width);
-    }
+        if syllables.is_empty() {
+            return Self::hard_split_long_word_py(word, width);
+        }
 
-    let mut out: Vec<String> = Vec::new();
-    let mut current = String::new();
+        let mut out: Vec<String> = Vec::new();
+        let mut current = String::new();
 
-    for (idx, syl) in syllables.iter().enumerate() {
-        let is_last = idx + 1 == syllables.len();
-        let syl_len = syl.chars().count();
-        let current_len = current.chars().count();
-        let reserve_for_hyphen = if is_last { 0usize } else { 1usize };
+        for (idx, syl) in syllables.iter().enumerate() {
+            let is_last = idx + 1 == syllables.len();
+            let syl_len = syl.chars().count();
+            let current_len = current.chars().count();
+            let reserve_for_hyphen = if is_last { 0usize } else { 1usize };
 
-        if current.is_empty() {
-            if syl_len >= width {
-                return Self::hard_split_long_word_py(word, width);
+            if current.is_empty() {
+                if syl_len >= width {
+                    return Self::hard_split_long_word_py(word, width);
+                }
+                current.push_str(syl);
+                continue;
             }
-            current.push_str(syl);
-            continue;
+
+            if current_len + syl_len + reserve_for_hyphen <= width {
+                current.push_str(syl);
+            } else {
+                let mut piece = current;
+                piece.push('-');
+                out.push(piece);
+                current = syl.clone();
+            }
         }
 
-        if current_len + syl_len + reserve_for_hyphen <= width {
-            current.push_str(syl);
+        if !current.is_empty() {
+            out.push(current);
+        }
+
+        if out.is_empty() {
+            Self::hard_split_long_word_py(word, width)
         } else {
-            let mut piece = current;
-            piece.push('-');
-            out.push(piece);
-            current = syl.clone();
+            out
         }
     }
-
-    if !current.is_empty() {
-        out.push(current);
-    }
-
-    if out.is_empty() {
-        Self::hard_split_long_word_py(word, width)
-    } else {
-        out
-    }
-}
-
 
     pub(crate) fn wrap_text_py(txt: &str, width: usize) -> Vec<String> {
         if width == 0 {
@@ -1758,8 +1966,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         }
     }
 
-
-
     fn py_round_positive_i64(value: f64) -> i64 {
         let floor = value.floor();
         let frac = value - floor;
@@ -1769,7 +1975,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             floor as i64 + 1
         } else {
             let floor_i = floor as i64;
-            if floor_i % 2 == 0 { floor_i } else { floor_i + 1 }
+            if floor_i % 2 == 0 {
+                floor_i
+            } else {
+                floor_i + 1
+            }
         }
     }
 
@@ -1840,7 +2050,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         zaehlung
     }
 
-    pub(crate) fn shell_style_py(row_number: Option<i64>, is_header: bool, rest: bool) -> &'static str {
+    pub(crate) fn shell_style_py(
+        row_number: Option<i64>,
+        is_header: bool,
+        rest: bool,
+    ) -> &'static str {
         if is_header {
             return "[41m[30m[4m";
         }
@@ -1895,7 +2109,13 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         "[0m[0m"
     }
 
-    pub(crate) fn styled_shell_text_py(text: &str, row_number: Option<i64>, is_header: bool, rest: bool, nocolor: bool) -> String {
+    pub(crate) fn styled_shell_text_py(
+        text: &str,
+        row_number: Option<i64>,
+        is_header: bool,
+        rest: bool,
+        nocolor: bool,
+    ) -> String {
         if nocolor || text.is_empty() {
             return text.to_string();
         }
@@ -1903,10 +2123,14 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         if style.is_empty() {
             text.to_string()
         } else {
-            format!("{}{}{}", style, text, Self::shell_reset_py(row_number, is_header, rest))
+            format!(
+                "{}{}{}",
+                style,
+                text,
+                Self::shell_reset_py(row_number, is_header, rest)
+            )
         }
     }
-
 
     fn csv_escape_cell_py(text: &str) -> String {
         if text.contains(';') || text.contains('"') || text.contains('\n') || text.contains('\r') {
@@ -1967,7 +2191,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         false
     }
 
-    fn output_parallel_ranges_py(total_rows: usize, min_rows_per_worker: usize) -> Vec<(usize, usize)> {
+    fn output_parallel_ranges_py(
+        total_rows: usize,
+        min_rows_per_worker: usize,
+    ) -> Vec<(usize, usize)> {
         if total_rows == 0 {
             return Vec::new();
         }
@@ -2033,10 +2260,9 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
             let mut rows = Vec::new();
             for handle in handles {
-                let mut rendered = handle
-                    .join()
-                    .expect("parallel structured output worker panicked");
-                rows.append(&mut rendered);
+                if let Ok(mut rendered) = handle.join() {
+                    rows.append(&mut rendered);
+                }
             }
             rows
         })
@@ -2086,12 +2312,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
             let mut max_cell_widths: Vec<usize> = vec![0; col_count];
             for handle in handles {
-                let local_widths = handle
-                    .join()
-                    .expect("parallel cell-width worker panicked");
-                for (col_idx, width) in local_widths.into_iter().enumerate() {
-                    if width > max_cell_widths[col_idx] {
-                        max_cell_widths[col_idx] = width;
+                if let Ok(local_widths) = handle.join() {
+                    for (col_idx, width) in local_widths.into_iter().enumerate() {
+                        if width > max_cell_widths[col_idx] {
+                            max_cell_widths[col_idx] = width;
+                        }
                     }
                 }
             }
@@ -2136,7 +2361,8 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             for col_idx in chunk_start..chunk_end {
                 let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
                 let wrapped = if widths[col_idx] == 0 {
-                    let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+                    let mut parts: Vec<String> =
+                        cell.split('\n').map(|part| part.to_string()).collect();
                     if parts.is_empty() {
                         parts.push(String::new());
                     }
@@ -2161,7 +2387,10 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
                 if self.nummeriere {
                     let label = if sub_idx == 0 {
-                        finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()
+                        finallyDisplayLines
+                            .get(row_idx)
+                            .cloned()
+                            .unwrap_or_default()
                     } else {
                         String::new()
                     };
@@ -2250,15 +2479,13 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
 
             let mut one_chunk_lines = Vec::new();
             for handle in handles {
-                let mut rendered = handle
-                    .join()
-                    .expect("parallel shell output worker panicked");
-                one_chunk_lines.append(&mut rendered);
+                if let Ok(mut rendered) = handle.join() {
+                    one_chunk_lines.append(&mut rendered);
+                }
             }
             one_chunk_lines
         })
     }
-
 
     fn render_structured_output_py(
         &mut self,
@@ -2274,53 +2501,75 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         match out_type.as_str() {
             "nichts" => {}
             "csv" => {
-                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if this.should_skip_structured_row_py(row, row_number) {
-                        return None;
-                    }
-                    let is_header = row_number.is_none();
-                    let mut fields: Vec<String> = vec![];
-                    if this.nummeriere {
-                        fields.push(Self::csv_escape_cell_py(&this.row_prefix_text_py(row_number, is_header)));
-                        let label = finallyDisplayLines.get(row_idx).cloned().unwrap_or_default();
-                        fields.push(Self::csv_escape_cell_py(&label));
-                    }
-                    for cell in row {
-                        let limited = this.limit_cell_height_py(cell);
-                        fields.push(Self::csv_escape_cell_py(&limited));
-                    }
-                    let cells_len = fields.len();
-                    Some(StructuredRowRenderPy { line: fields.join(";"), is_header, cells_len })
-                });
+                let rendered_rows =
+                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if this.should_skip_structured_row_py(row, row_number) {
+                            return None;
+                        }
+                        let is_header = row_number.is_none();
+                        let mut fields: Vec<String> = vec![];
+                        if this.nummeriere {
+                            fields.push(Self::csv_escape_cell_py(
+                                &this.row_prefix_text_py(row_number, is_header),
+                            ));
+                            let label = finallyDisplayLines
+                                .get(row_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            fields.push(Self::csv_escape_cell_py(&label));
+                        }
+                        for cell in row {
+                            let limited = this.limit_cell_height_py(cell);
+                            fields.push(Self::csv_escape_cell_py(&limited));
+                        }
+                        let cells_len = fields.len();
+                        Some(StructuredRowRenderPy {
+                            line: fields.join(";"),
+                            is_header,
+                            cells_len,
+                        })
+                    });
                 for rendered in rendered_rows {
                     out_lines.push(rendered.line.clone());
                     chunked_lines.push(vec![rendered.line]);
                 }
             }
             "markdown" => {
-                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if this.should_skip_structured_row_py(row, row_number) {
-                        return None;
-                    }
-                    let is_header = row_number.is_none();
-                    let mut cells: Vec<String> = vec![];
-                    if this.nummeriere {
-                        cells.push(Self::markdown_escape_cell_py(&this.row_prefix_text_py(row_number, is_header)));
-                        cells.push(Self::markdown_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
-                    }
-                    for cell in row {
-                        let limited = this.limit_cell_height_py(cell);
-                        cells.push(Self::markdown_escape_cell_py(&limited));
-                    }
-                    let cells_len = cells.len();
-                    Some(StructuredRowRenderPy { line: format!("|{}|", cells.join("|")), is_header, cells_len })
-                });
+                let rendered_rows =
+                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if this.should_skip_structured_row_py(row, row_number) {
+                            return None;
+                        }
+                        let is_header = row_number.is_none();
+                        let mut cells: Vec<String> = vec![];
+                        if this.nummeriere {
+                            cells.push(Self::markdown_escape_cell_py(
+                                &this.row_prefix_text_py(row_number, is_header),
+                            ));
+                            cells.push(Self::markdown_escape_cell_py(
+                                &finallyDisplayLines
+                                    .get(row_idx)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            ));
+                        }
+                        for cell in row {
+                            let limited = this.limit_cell_height_py(cell);
+                            cells.push(Self::markdown_escape_cell_py(&limited));
+                        }
+                        let cells_len = cells.len();
+                        Some(StructuredRowRenderPy {
+                            line: format!("|{}|", cells.join("|")),
+                            is_header,
+                            cells_len,
+                        })
+                    });
                 let mut header_sep_done = false;
                 for rendered in rendered_rows {
                     out_lines.push(rendered.line.clone());
@@ -2335,23 +2584,33 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 }
             }
             "emacs" => {
-                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if this.should_skip_structured_row_py(row, row_number) {
-                        return None;
-                    }
-                    let is_header = row_number.is_none();
-                    let mut cells: Vec<String> = vec![];
-                    if this.nummeriere {
-                        cells.push(this.row_prefix_text_py(row_number, is_header));
-                        cells.push(finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
-                    }
-                    cells.extend(row.iter().map(|cell| this.limit_cell_height_py(cell)));
-                    let cells_len = cells.len();
-                    Some(StructuredRowRenderPy { line: format!("|{}|", cells.join("|")), is_header, cells_len })
-                });
+                let rendered_rows =
+                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if this.should_skip_structured_row_py(row, row_number) {
+                            return None;
+                        }
+                        let is_header = row_number.is_none();
+                        let mut cells: Vec<String> = vec![];
+                        if this.nummeriere {
+                            cells.push(this.row_prefix_text_py(row_number, is_header));
+                            cells.push(
+                                finallyDisplayLines
+                                    .get(row_idx)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            );
+                        }
+                        cells.extend(row.iter().map(|cell| this.limit_cell_height_py(cell)));
+                        let cells_len = cells.len();
+                        Some(StructuredRowRenderPy {
+                            line: format!("|{}|", cells.join("|")),
+                            is_header,
+                            cells_len,
+                        })
+                    });
                 for rendered in rendered_rows {
                     out_lines.push(rendered.line.clone());
                     let mut block = vec![rendered.line];
@@ -2366,46 +2625,77 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             "html" => {
                 let words = Words::new();
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
-                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 16, |row_idx, row| {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if this.should_skip_structured_row_py(row, row_number) {
-                        return None;
-                    }
-                    let is_header = row_number.is_none();
-                    let mut cells: Vec<String> = vec![];
-                    if this.nummeriere {
-                        let prefix_text = Self::html_escape_cell_py(&this.row_prefix_text_py(row_number, is_header));
-                        let label_text = Self::html_escape_cell_py(&finallyDisplayLines.get(row_idx).cloned().unwrap_or_default());
-                        if is_header {
-                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 0), prefix_text));
-                            cells.push(format!(r#"<td{}> {} </td>"#, Self::html_exact_header_attrs_py(&words, None, 1), label_text));
-                        } else {
-                            let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
-                                r#" style="background-color:#000000;color:#ffffff;""#
-                            } else {
-                                r#" style="background-color:#ffffff;color:#000000;""#
-                            };
-                            cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_text));
-                            cells.push(format!(r#"<td>{}</td>"#, label_text));
+                let rendered_rows =
+                    Self::render_structured_rows_ordered_py(newTable, 16, |row_idx, row| {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if this.should_skip_structured_row_py(row, row_number) {
+                            return None;
                         }
-                    }
-                    for (visible_idx, cell) in row.iter().enumerate() {
-                        let html_col_idx = if this.nummeriere { visible_idx + 2 } else { visible_idx };
-                        let original_col = displayed_columns.get(visible_idx).cloned().flatten();
-                        let limited = this.limit_cell_height_py(cell);
-                        let escaped = Self::html_escape_cell_py(&limited);
-                        let attrs = this.html_runtime_attrs_exact_py(&words, original_col, html_col_idx, row_number, is_header);
-                        cells.push(format!(r#"<td{}>{}</td>"#, attrs, escaped));
-                    }
-                    let cells_len = cells.len();
-                    Some(StructuredRowRenderPy {
-                        line: format!("<tr{}>{}</tr>", Self::html_row_style_py(row_number, is_header), cells.join(" ")),
-                        is_header,
-                        cells_len,
-                    })
-                });
+                        let is_header = row_number.is_none();
+                        let mut cells: Vec<String> = vec![];
+                        if this.nummeriere {
+                            let prefix_text = Self::html_escape_cell_py(
+                                &this.row_prefix_text_py(row_number, is_header),
+                            );
+                            let label_text = Self::html_escape_cell_py(
+                                &finallyDisplayLines
+                                    .get(row_idx)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            );
+                            if is_header {
+                                cells.push(format!(
+                                    r#"<td{}> {} </td>"#,
+                                    Self::html_exact_header_attrs_py(&words, None, 0),
+                                    prefix_text
+                                ));
+                                cells.push(format!(
+                                    r#"<td{}> {} </td>"#,
+                                    Self::html_exact_header_attrs_py(&words, None, 1),
+                                    label_text
+                                ));
+                            } else {
+                                let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
+                                    r#" style="background-color:#000000;color:#ffffff;""#
+                                } else {
+                                    r#" style="background-color:#ffffff;color:#000000;""#
+                                };
+                                cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_text));
+                                cells.push(format!(r#"<td>{}</td>"#, label_text));
+                            }
+                        }
+                        for (visible_idx, cell) in row.iter().enumerate() {
+                            let html_col_idx = if this.nummeriere {
+                                visible_idx + 2
+                            } else {
+                                visible_idx
+                            };
+                            let original_col =
+                                displayed_columns.get(visible_idx).cloned().flatten();
+                            let limited = this.limit_cell_height_py(cell);
+                            let escaped = Self::html_escape_cell_py(&limited);
+                            let attrs = this.html_runtime_attrs_exact_py(
+                                &words,
+                                original_col,
+                                html_col_idx,
+                                row_number,
+                                is_header,
+                            );
+                            cells.push(format!(r#"<td{}>{}</td>"#, attrs, escaped));
+                        }
+                        let cells_len = cells.len();
+                        Some(StructuredRowRenderPy {
+                            line: format!(
+                                "<tr{}>{}</tr>",
+                                Self::html_row_style_py(row_number, is_header),
+                                cells.join(" ")
+                            ),
+                            is_header,
+                            cells_len,
+                        })
+                    });
                 out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
                 let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
                 for rendered in rendered_rows {
@@ -2417,30 +2707,44 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
                 chunked_lines.push(current_block);
             }
             "bbcode" => {
-                let rendered_rows = Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if this.should_skip_structured_row_py(row, row_number) {
-                        return None;
-                    }
-                    let is_header = row_number.is_none();
-                    let mut cells: Vec<String> = vec![];
-                    if this.nummeriere {
-                        cells.push(format!("[td]{}[/td]", this.row_prefix_text_py(row_number, is_header)));
-                        cells.push(format!("[td]{}[/td]", finallyDisplayLines.get(row_idx).cloned().unwrap_or_default()));
-                    }
-                    for cell in row {
-                        let limited = this.limit_cell_height_py(cell);
-                        cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
-                    }
-                    let cells_len = cells.len();
-                    Some(StructuredRowRenderPy {
-                        line: format!("{}{}[/tr]", Self::bbcode_row_begin_py(row_number, is_header), cells.join("")),
-                        is_header,
-                        cells_len,
-                    })
-                });
+                let rendered_rows =
+                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if this.should_skip_structured_row_py(row, row_number) {
+                            return None;
+                        }
+                        let is_header = row_number.is_none();
+                        let mut cells: Vec<String> = vec![];
+                        if this.nummeriere {
+                            cells.push(format!(
+                                "[td]{}[/td]",
+                                this.row_prefix_text_py(row_number, is_header)
+                            ));
+                            cells.push(format!(
+                                "[td]{}[/td]",
+                                finallyDisplayLines
+                                    .get(row_idx)
+                                    .cloned()
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        for cell in row {
+                            let limited = this.limit_cell_height_py(cell);
+                            cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
+                        }
+                        let cells_len = cells.len();
+                        Some(StructuredRowRenderPy {
+                            line: format!(
+                                "{}{}[/tr]",
+                                Self::bbcode_row_begin_py(row_number, is_header),
+                                cells.join("")
+                            ),
+                            is_header,
+                            cells_len,
+                        })
+                    });
                 out_lines.push("[table]".to_string());
                 let mut current_block = vec!["[table]".to_string()];
                 for rendered in rendered_rows {
@@ -2462,7 +2766,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
         self.finallyDisplayLines = out_lines;
         self.numlen = numlen;
     }
-
 
     pub(crate) fn cliOut_py(
         &mut self,
@@ -2531,7 +2834,11 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             }
         };
         let chunk_budget = if detected_shell_width > 0 {
-            detected_shell_width.saturating_sub(if self.nummeriere { num_prefix_width + 1 } else { 0 })
+            detected_shell_width.saturating_sub(if self.nummeriere {
+                num_prefix_width + 1
+            } else {
+                0
+            })
         } else {
             0usize
         };
@@ -2646,8 +2953,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
             self.prepareFinallyDisplayLines();
         }
     }
-
-
 }
 
 #[cfg(test)]
@@ -2695,21 +3000,14 @@ mod tests {
         assert!(values.contains(&200));
     }
 
-
     #[test]
     fn prepare4out_all_respects_python_default_1024_row_limit() {
         let mut program = Program::new(vec!["reta".to_string()]);
         program.ifZeilenSetted = true;
-        let relitable: Vec<Vec<String>> = (0..1043)
-            .map(|row| vec![row.to_string()])
-            .collect();
+        let relitable: Vec<Vec<String>> = (0..1043).map(|row| vec![row.to_string()]).collect();
 
-        let (_, _, _, _, old2new) = program.prepare4out_py(
-            vec!["all".to_string()],
-            vec![],
-            relitable,
-            vec![0],
-        );
+        let (_, _, _, _, old2new) =
+            program.prepare4out_py(vec!["all".to_string()], vec![], relitable, vec![0]);
 
         assert_eq!(old2new.last().copied(), Some(1024));
         assert!(!old2new.contains(&1025));
@@ -2720,16 +3018,10 @@ mod tests {
         let mut program = Program::new(vec!["reta".to_string()]);
         program.ifZeilenSetted = true;
         program.hoechsteZeile = 1040;
-        let relitable: Vec<Vec<String>> = (0..1043)
-            .map(|row| vec![row.to_string()])
-            .collect();
+        let relitable: Vec<Vec<String>> = (0..1043).map(|row| vec![row.to_string()]).collect();
 
-        let (_, _, _, _, old2new) = program.prepare4out_py(
-            vec!["all".to_string()],
-            vec![],
-            relitable,
-            vec![0],
-        );
+        let (_, _, _, _, old2new) =
+            program.prepare4out_py(vec!["all".to_string()], vec![], relitable, vec![0]);
 
         assert_eq!(old2new.last().copied(), Some(1040));
         assert!(!old2new.contains(&1041));
@@ -2748,7 +3040,10 @@ mod tests {
         let table = vec![vec!["abcdefghi".to_string()]];
         let _ = program.cliOut_py(vec!["1".to_string()], table.clone(), 1, vec![1]);
 
-        assert_eq!(program.finallyDisplayLines, vec!["abc".to_string(), "def".to_string()]);
+        assert_eq!(
+            program.finallyDisplayLines,
+            vec!["abc".to_string(), "def".to_string()]
+        );
     }
 
     #[test]
@@ -2766,4 +3061,3 @@ mod tests {
         assert!(!joined.contains("c"));
     }
 }
-

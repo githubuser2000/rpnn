@@ -1,5 +1,5 @@
-pub mod domain;
 pub mod doc_tools;
+pub mod domain;
 pub mod runtime;
 pub mod shared;
 
@@ -145,9 +145,14 @@ pub fn run_reta_and_print_from_env() -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_run_and_print_from_env_ffi() -> i32 {
-    run_reta_and_print_from_env()
+    match std::panic::catch_unwind(run_reta_and_print_from_env) {
+        Ok(exit_code) => exit_code,
+        Err(_) => {
+            eprintln!("panic inside reta_run_and_print_from_env_ffi");
+            101
+        }
+    }
 }
-
 
 #[cfg(test)]
 mod tests {

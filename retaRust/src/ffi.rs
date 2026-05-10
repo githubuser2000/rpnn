@@ -1,15 +1,29 @@
-use std::ffi::{CStr, CString};
+use std::collections::BTreeSet;
+use std::ffi::CString;
 use std::os::raw::c_char;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
 use crate::{build_cli_request, run_reta, RetaRuntime};
+
+pub const RETA_ABI_VERSION: u32 = 1;
+const MAX_FFI_ARGC: usize = 4096;
+const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
+
+static FFI_ALLOCATIONS: OnceLock<Mutex<BTreeSet<usize>>> = OnceLock::new();
 
 #[repr(C)]
 pub struct RetaFfiResponse {
     pub stdout_text: *mut c_char,
     pub stderr_text: *mut c_char,
     pub exit_code: i32,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_abi_version() -> u32 {
+    RETA_ABI_VERSION
 }
 
 #[unsafe(no_mangle)]
@@ -22,14 +36,49 @@ pub unsafe extern "C" fn reta_run_argv(
     stderr_is_tty: u8,
     stdin_is_tty: u8,
 ) -> RetaFfiResponse {
-    let args = read_argv(argc, argv).unwrap_or_else(|message| vec![format!("--ffi-error={message}")]);
-    let stdin_text = read_optional_string(stdin_text).ok().flatten();
+    match catch_unwind(AssertUnwindSafe(|| unsafe {
+        reta_run_argv_impl(
+            argc,
+            argv,
+            stdin_text,
+            terminal_width,
+            stdout_is_tty,
+            stderr_is_tty,
+            stdin_is_tty,
+        )
+    })) {
+        Ok(response) => response,
+        Err(_) => ffi_error_response(101, "panic inside reta_run_argv\n"),
+    }
+}
+
+unsafe fn reta_run_argv_impl(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+) -> RetaFfiResponse {
+    let args = match unsafe { read_argv(argc, argv) } {
+        Ok(args) => args,
+        Err(message) => return ffi_error_response(2, format!("reta ffi error: {message}\n")),
+    };
+    let stdin_text = match unsafe { read_optional_string(stdin_text) } {
+        Ok(stdin_text) => stdin_text,
+        Err(message) => return ffi_error_response(2, format!("reta ffi stdin error: {message}\n")),
+    };
 
     let request = build_cli_request(
         &args,
         stdin_text,
         RetaRuntime {
-            terminal_width: if terminal_width == 0 { None } else { Some(terminal_width) },
+            terminal_width: if terminal_width == 0 {
+                None
+            } else {
+                Some(terminal_width)
+            },
             stdout_is_tty: Some(stdout_is_tty != 0),
             stderr_is_tty: Some(stderr_is_tty != 0),
             stdin_is_tty: Some(stdin_is_tty != 0),
@@ -56,6 +105,10 @@ pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
         return;
     }
 
+    if !unregister_ffi_allocation(ptr) {
+        return;
+    }
+
     unsafe {
         let _ = CString::from_raw(ptr);
     }
@@ -63,42 +116,34 @@ pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_shared_words_json() -> *mut c_char {
-    match serde_json::to_string(crate::shared_words()) {
-        Ok(json) => into_c_string(json),
-        Err(error) => into_c_string(format!(
-            r#"{{"error":"{}"}}"#,
-            error.to_string().replace('"', "'")
-        )),
-    }
+    ffi_json_result(|| serde_json::to_string(crate::shared_words()))
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
-    match serde_json::to_string(&crate::domain::python_source_of_truth::all_main_alias_groups(
-        crate::shared_words(),
-    )) {
-        Ok(json) => into_c_string(json),
-        Err(error) => into_c_string(format!(
-            r#"{{"error":"{}"}}"#,
-            error.to_string().replace('"', "'")
-        )),
-    }
+    ffi_json_result(|| {
+        serde_json::to_string(
+            &crate::domain::python_source_of_truth::all_main_alias_groups(crate::shared_words()),
+        )
+    })
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_parameter_alias_groups_for_main_json(
     canonical_main: *const c_char,
 ) -> *mut c_char {
-    let main = read_required_string(canonical_main).unwrap_or_default();
-    match serde_json::to_string(&crate::domain::python_source_of_truth::parameter_alias_groups_for_main(
-        crate::shared_words(),
-        &main,
-    )) {
-        Ok(json) => into_c_string(json),
-        Err(error) => into_c_string(format!(
-            r#"{{"error":"{}"}}"#,
-            error.to_string().replace('"', "'")
-        )),
+    match catch_unwind(AssertUnwindSafe(|| {
+        let main = unsafe { read_required_string(canonical_main) }.unwrap_or_default();
+        serde_json::to_string(
+            &crate::domain::python_source_of_truth::parameter_alias_groups_for_main(
+                crate::shared_words(),
+                &main,
+            ),
+        )
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_parameter_alias_groups_for_main_json"),
     }
 }
 
@@ -106,19 +151,26 @@ pub unsafe extern "C" fn reta_parameter_alias_groups_for_main_json(
 pub unsafe extern "C" fn reta_resolve_parameter_main_alias(
     main_alias: *const c_char,
 ) -> *mut c_char {
-    let main = read_required_string(main_alias).unwrap_or_default();
-    match crate::domain::python_source_of_truth::resolve_parameter_main_alias(
-        crate::shared_words(),
-        &main,
-    ) {
-        Some(canonical) => into_c_string(canonical),
-        None => into_c_string(String::new()),
+    match catch_unwind(AssertUnwindSafe(|| {
+        let main = unsafe { read_required_string(main_alias) }.unwrap_or_default();
+        crate::domain::python_source_of_truth::resolve_parameter_main_alias(
+            crate::shared_words(),
+            &main,
+        )
+    })) {
+        Ok(Some(canonical)) => into_c_string(canonical),
+        Ok(None) => into_c_string(String::new()),
+        Err(_) => into_c_string(String::new()),
     }
 }
 
-fn read_argv(argc: usize, argv: *const *const c_char) -> Result<Vec<String>, String> {
+unsafe fn read_argv(argc: usize, argv: *const *const c_char) -> Result<Vec<String>, String> {
     if argc == 0 {
         return Ok(Vec::new());
+    }
+
+    if argc > MAX_FFI_ARGC {
+        return Err(format!("argc {argc} ueberschreitet Maximum {MAX_FFI_ARGC}"));
     }
 
     if argv.is_null() {
@@ -128,38 +180,90 @@ fn read_argv(argc: usize, argv: *const *const c_char) -> Result<Vec<String>, Str
     let mut args = Vec::with_capacity(argc);
     for index in 0..argc {
         let arg_ptr = unsafe { *argv.add(index) };
-        let arg = read_required_string(arg_ptr)
-            .map_err(|_| format!("argv[{index}] ist kein valider UTF-8-String"))?;
+        let arg = unsafe { read_required_string(arg_ptr) }
+            .map_err(|message| format!("argv[{index}] {message}"))?;
         args.push(arg);
     }
 
     Ok(args)
 }
 
-fn read_required_string(ptr: *const c_char) -> Result<String, ()> {
+unsafe fn read_required_string(ptr: *const c_char) -> Result<String, String> {
     if ptr.is_null() {
         return Ok(String::new());
     }
-
-    let text = unsafe { CStr::from_ptr(ptr) }.to_str().map_err(|_| ())?;
-    Ok(text.to_string())
+    unsafe { read_c_string_bounded(ptr, MAX_FFI_STRING_BYTES) }
 }
 
-fn read_optional_string(ptr: *const c_char) -> Result<Option<String>, ()> {
+unsafe fn read_optional_string(ptr: *const c_char) -> Result<Option<String>, String> {
     if ptr.is_null() {
         return Ok(None);
     }
+    unsafe { read_c_string_bounded(ptr, MAX_FFI_STRING_BYTES) }.map(Some)
+}
 
-    let text = unsafe { CStr::from_ptr(ptr) }.to_str().map_err(|_| ())?;
-    Ok(Some(text.to_string()))
+unsafe fn read_c_string_bounded(ptr: *const c_char, max_bytes: usize) -> Result<String, String> {
+    for len in 0..max_bytes {
+        let byte = unsafe { *ptr.add(len) };
+        if byte == 0 {
+            let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+            return std::str::from_utf8(bytes)
+                .map(|text| text.to_string())
+                .map_err(|_| "ist kein valider UTF-8-String".to_string());
+        }
+    }
+    Err(format!(
+        "ist laenger als {max_bytes} Bytes oder nicht NUL-terminiert"
+    ))
+}
+
+fn ffi_json_result<F>(build: F) -> *mut c_char
+where
+    F: FnOnce() -> serde_json::Result<String>,
+{
+    match catch_unwind(AssertUnwindSafe(build)) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta JSON FFI export"),
+    }
+}
+
+fn ffi_error_response<S: Into<String>>(exit_code: i32, stderr_text: S) -> RetaFfiResponse {
+    RetaFfiResponse {
+        stdout_text: into_c_string(String::new()),
+        stderr_text: into_c_string(stderr_text.into()),
+        exit_code,
+    }
+}
+
+fn json_error_string(message: &str) -> *mut c_char {
+    into_c_string(format!(r#"{{"error":"{}"}}"#, message.replace('"', "'")))
+}
+
+fn register_ffi_allocation(ptr: *mut c_char) -> *mut c_char {
+    if !ptr.is_null() {
+        if let Ok(mut guard) = FFI_ALLOCATIONS
+            .get_or_init(|| Mutex::new(BTreeSet::new()))
+            .lock()
+        {
+            guard.insert(ptr as usize);
+        }
+    }
+    ptr
+}
+
+fn unregister_ffi_allocation(ptr: *mut c_char) -> bool {
+    FFI_ALLOCATIONS
+        .get_or_init(|| Mutex::new(BTreeSet::new()))
+        .lock()
+        .map(|mut guard| guard.remove(&(ptr as usize)))
+        .unwrap_or(false)
 }
 
 fn into_c_string(text: String) -> *mut c_char {
     let sanitized = text.replace('\0', "�");
-    match CString::new(sanitized) {
-        Ok(c_string) => c_string.into_raw(),
-        Err(_) => CString::new("internal error while building CString")
-            .expect("static fallback must be a valid CString")
-            .into_raw(),
-    }
+    let c_string = CString::new(sanitized).unwrap_or_else(|_| {
+        CString::new("internal error while building CString").unwrap_or_else(|_| CString::default())
+    });
+    register_ffi_allocation(c_string.into_raw())
 }

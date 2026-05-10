@@ -10,7 +10,6 @@ use crate::shared::lib4tables_enum_py::ST;
 
 pub use crate::libs::tableHandling::TablesConcat as Concat;
 
-
 pub type Pair = (i64, i64);
 pub type PairsByNumber = IndexMap<i64, IndexSet<Pair>>;
 
@@ -47,7 +46,10 @@ impl PyFraction {
     }
 
     pub fn from_int(value: i64) -> Self {
-        Self { numerator: value, denominator: 1 }
+        Self {
+            numerator: value,
+            denominator: 1,
+        }
     }
 
     pub fn mul(self, other: Self) -> Option<Self> {
@@ -79,7 +81,8 @@ impl PyFraction {
 
 pub type FractionPair = (PyFraction, PyFraction);
 pub type FractionPairsByNumber = IndexMap<i64, IndexSet<FractionPair>>;
-pub type RawFractionCombinationMap = IndexMap<String, IndexMap<String, IndexMap<String, IndexSet<FractionPair>>>>;
+pub type RawFractionCombinationMap =
+    IndexMap<String, IndexMap<String, IndexMap<String, IndexSet<FractionPair>>>>;
 
 fn py_round_float(value: f64) -> f64 {
     let floor = value.floor();
@@ -133,15 +136,20 @@ pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
     if !gleichf {
         for frac in fracs.iter().copied() {
             for zusatz_mul in 1..=limit {
-                let Some(faktor) = PyFraction::new(frac.denominator.saturating_mul(zusatz_mul), 1) else {
+                let Some(faktor) = PyFraction::new(frac.denominator.saturating_mul(zusatz_mul), 1)
+                else {
                     continue;
                 };
                 let pair = (frac, faktor);
-                let Some(product) = pair.0.mul(pair.1) else { continue; };
+                let Some(product) = pair.0.mul(pair.1) else {
+                    continue;
+                };
                 let product_float = product.as_f64();
                 let mulr = py_round_float(product_float);
                 let mul = round_to_thousand_py(product_float);
-                assert_eq!(mulr, mul);
+                if mulr != mul {
+                    continue;
+                }
                 if mul > limit as f64 {
                     break;
                 }
@@ -151,10 +159,14 @@ pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
 
         for frac in fracs.iter().copied() {
             for zusatz_mul in (1..=limit).rev() {
-                let Some(faktor) = PyFraction::new(frac.denominator, zusatz_mul) else { continue; };
+                let Some(faktor) = PyFraction::new(frac.denominator, zusatz_mul) else {
+                    continue;
+                };
                 if fracs2_set.contains(&faktor) || faktor.numerator == 1 {
                     let pair = (frac, faktor);
-                    let Some(product) = pair.0.mul(pair.1) else { continue; };
+                    let Some(product) = pair.0.mul(pair.1) else {
+                        continue;
+                    };
                     let product_float = product.as_f64();
                     let mulr = py_round_float(product_float);
                     if product_float > limit as f64 {
@@ -169,16 +181,23 @@ pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
     } else {
         for frac in fracs.iter().copied() {
             for zusatz_div in 1..=limit {
-                let Some(faktor) = PyFraction::new(1, frac.numerator.saturating_mul(zusatz_div)) else {
+                let Some(faktor) = PyFraction::new(1, frac.numerator.saturating_mul(zusatz_div))
+                else {
                     continue;
                 };
                 let pair = (frac, faktor);
-                let Some(product) = pair.0.mul(pair.1) else { continue; };
-                let Some(div) = product.recip() else { continue; };
+                let Some(product) = pair.0.mul(pair.1) else {
+                    continue;
+                };
+                let Some(div) = product.recip() else {
+                    continue;
+                };
                 let div_float = div.as_f64();
                 let divr = py_round_float(div_float);
                 let div = round_to_thousand_py(div_float);
-                assert_eq!(divr, div);
+                if divr != div {
+                    continue;
+                }
                 if div > limit as f64 {
                     break;
                 }
@@ -188,17 +207,29 @@ pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
 
         for frac in fracs.iter().copied() {
             for zusatz_div in 1..=limit {
-                let Some(recip) = frac.recip() else { continue; };
-                let Some(divisor) = PyFraction::new(zusatz_div, 1) else { continue; };
-                let Some(faktor) = recip.div(divisor) else { continue; };
+                let Some(recip) = frac.recip() else {
+                    continue;
+                };
+                let Some(divisor) = PyFraction::new(zusatz_div, 1) else {
+                    continue;
+                };
+                let Some(faktor) = recip.div(divisor) else {
+                    continue;
+                };
                 if fracs2_set.contains(&faktor) || faktor.numerator == 1 {
                     let pair = (frac, faktor);
-                    let Some(product) = pair.0.mul(pair.1) else { continue; };
-                    let Some(inv_product) = product.recip() else { continue; };
+                    let Some(product) = pair.0.mul(pair.1) else {
+                        continue;
+                    };
+                    let Some(inv_product) = product.recip() else {
+                        continue;
+                    };
                     let inv_float = inv_product.as_f64();
                     let mulr = py_round_float(inv_float);
                     let mul = round_to_thousand_py(inv_float);
-                    assert_eq!(mulr, mul);
+                    if mulr != mul {
+                        continue;
+                    }
                     if mul != 0.0 && 1.0 / mul > limit as f64 {
                         break;
                     }
@@ -229,12 +260,13 @@ fn insert_combo(
     op: &str,
     pair: FractionPair,
 ) {
-    target
+    if let Some(bucket) = target
         .get_mut(outer)
         .and_then(|inner| inner.get_mut(poly))
         .and_then(|ops| ops.get_mut(op))
-        .expect("fraction combination bucket must exist")
-        .insert(pair);
+    {
+        bucket.insert(pair);
+    }
 }
 
 fn python_is_rounded_integer(value: f64) -> bool {
@@ -312,7 +344,10 @@ fn round_to_thousand(value: f64) -> f64 {
     round_to_thousand_py(value)
 }
 
-pub fn convertSetOfPaarenToDictOfNumToPaareDiv(paareSet: BTreeSet<Pair>, gleichf: bool) -> PairsByNumber {
+pub fn convertSetOfPaarenToDictOfNumToPaareDiv(
+    paareSet: BTreeSet<Pair>,
+    gleichf: bool,
+) -> PairsByNumber {
     let mut result: PairsByNumber = IndexMap::new();
     for paar in paareSet {
         let div = if !gleichf {
@@ -321,13 +356,18 @@ pub fn convertSetOfPaarenToDictOfNumToPaareDiv(paareSet: BTreeSet<Pair>, gleichf
             paar.1 as f64 / paar.0 as f64
         };
         let rounded = round_to_thousand(div);
-        assert_eq!(rounded, rounded.round());
+        if rounded != rounded.round() {
+            continue;
+        }
         result.entry(rounded as i64).or_default().insert(paar);
     }
     result
 }
 
-pub fn convertSetOfPaarenToDictOfNumToPaareMul(paareSet: BTreeSet<Pair>, gleichf: bool) -> PairsByNumber {
+pub fn convertSetOfPaarenToDictOfNumToPaareMul(
+    paareSet: BTreeSet<Pair>,
+    gleichf: bool,
+) -> PairsByNumber {
     let mut result: PairsByNumber = IndexMap::new();
     for paar in paareSet {
         let mut mul = paar.0 as f64 * paar.1 as f64;
@@ -336,7 +376,9 @@ pub fn convertSetOfPaarenToDictOfNumToPaareMul(paareSet: BTreeSet<Pair>, gleichf
         }
         let mulr = mul.round();
         let rounded = round_to_thousand(mul);
-        assert_eq!(rounded, mulr);
+        if rounded != mulr {
+            continue;
+        }
         result.entry(mulr as i64).or_default().insert(paar);
     }
     result
@@ -345,7 +387,9 @@ pub fn convertSetOfPaarenToDictOfNumToPaareMul(paareSet: BTreeSet<Pair>, gleichf
 pub fn combineDicts(a: PairsByNumber, b: PairsByNumber) -> PairsByNumber {
     let mut e: PairsByNumber = IndexMap::new();
     for (key, value) in a.into_iter().chain(b.into_iter()) {
-        e.entry(key).or_default().extend(value.into_iter().map(|v| (v.0, v.1)));
+        e.entry(key)
+            .or_default()
+            .extend(value.into_iter().map(|v| (v.0, v.1)));
     }
     e
 }
@@ -385,7 +429,6 @@ fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
     }
     a.abs().max(1)
 }
-
 
 fn cell_at(relitable: &[Vec<String>], row: usize, col: usize) -> String {
     relitable
@@ -553,11 +596,19 @@ pub fn ModalLogikIntoTable(
         return;
     };
 
-    for (modalOperatoren, vervielfachter) in entry.modalS.iter().zip(entry.vervielfachter.iter().copied()) {
+    for (modalOperatoren, vervielfachter) in entry
+        .modalS
+        .iter()
+        .zip(entry.vervielfachter.iter().copied())
+    {
         if modalOperatoren.len() < 2 {
             continue;
         }
-        let content_col = if distanceFromLine.abs() % 2 == 0 { concept.0 } else { concept.1 };
+        let content_col = if distanceFromLine.abs() % 2 == 0 {
+            concept.0
+        } else {
+            concept.1
+        };
         let into_its_content = cell_at(relitable, vervielfachter, content_col);
         if into_its_content.is_empty() {
             continue;
@@ -583,7 +634,11 @@ pub fn ModalLogikIntoTable(
             fragment.push_str(", nicht: ");
             fragment.push_str(&modalOperatoren[2..].join(", "));
             fragment.push_str(" (das alles nicht): ");
-            fragment.push_str(&modal_replace_zuerst_zweites(&cell_at(relitable, vervielfachter, concept.0)));
+            fragment.push_str(&modal_replace_zuerst_zweites(&cell_at(
+                relitable,
+                vervielfachter,
+                concept.0,
+            )));
         }
         if !htmlOutputYes && !bbcodeOutputYes {
             fragment.push_str(" | ");
@@ -651,22 +706,28 @@ pub fn switching(
         (transzendentalienSpalten.1, 1usize)
     };
 
-    let a = moreAndLess.0.and_then(|coord| match coord {
-        MetaCoordinate::Int(value) => value.checked_mul(metavariable).and_then(|mul| {
-            if mul >= 0 && (mul as usize) < relitable_len {
-                Some(MetaCoordinate::Int(mul))
-            } else {
-                None
-            }
-        }),
-        MetaCoordinate::Fraction(value) => value.mul(PyFraction::from_int(metavariable)).and_then(|mul| {
-            if mul.is_integer() && mul.numerator >= 0 && (mul.numerator as usize) < relitable_len {
-                Some(MetaCoordinate::Int(mul.numerator))
-            } else {
-                None
-            }
-        }),
-    });
+    let a =
+        moreAndLess.0.and_then(|coord| match coord {
+            MetaCoordinate::Int(value) => value.checked_mul(metavariable).and_then(|mul| {
+                if mul >= 0 && (mul as usize) < relitable_len {
+                    Some(MetaCoordinate::Int(mul))
+                } else {
+                    None
+                }
+            }),
+            MetaCoordinate::Fraction(value) => value
+                .mul(PyFraction::from_int(metavariable))
+                .and_then(|mul| {
+                    if mul.is_integer()
+                        && mul.numerator >= 0
+                        && (mul.numerator as usize) < relitable_len
+                    {
+                        Some(MetaCoordinate::Int(mul.numerator))
+                    } else {
+                        None
+                    }
+                }),
+        });
 
     let b = moreAndLess.1.and_then(|coord| {
         let mut right = coord.as_fraction()?;
@@ -714,7 +775,11 @@ pub fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie(
     if koord.denominator == 0 || koord.numerator == 0 {
         return Some(String::new());
     }
-    if koord.denominator > 100 || koord.numerator > 100 || koord.denominator < 0 || koord.numerator < 0 {
+    if koord.denominator > 100
+        || koord.numerator > 100
+        || koord.denominator < 0
+        || koord.numerator < 0
+    {
         return None;
     }
     if koord.numerator == 1 {
@@ -724,11 +789,18 @@ pub fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie(
             if is_universe {
                 let extra = cell_at(relitable, idx, 201);
                 let sep = if extra.chars().count() > 2 {
-                    if htmlOutputYes { "<br>" } else { "; " }
+                    if htmlOutputYes {
+                        "<br>"
+                    } else {
+                        "; "
+                    }
                 } else {
                     ""
                 };
-                Some(format!("{} (1/{}){}{}", base, koord.denominator, sep, extra))
+                Some(format!(
+                    "{} (1/{}){}{}",
+                    base, koord.denominator, sep, extra
+                ))
             } else {
                 Some(base)
             }
@@ -742,7 +814,11 @@ pub fn spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie(
             if is_universe {
                 let extra = cell_at(relitable, idx, 198);
                 let sep = if extra.chars().count() > 2 {
-                    if htmlOutputYes { "<br>" } else { "; " }
+                    if htmlOutputYes {
+                        "<br>"
+                    } else {
+                        "; "
+                    }
                 } else {
                     ""
                 };
@@ -778,7 +854,11 @@ pub fn spalteMetaKonkretAbstrakt_UeberschriftenUndTags(
 ) -> (BTreeSet<i64>, String, BTreeSet<ST>) {
     let mut rows = rowsAsNumbers.clone();
     rows.insert(current_header_len);
-    let star_tag = if ifInvers == 0 { ST::sternPolygon } else { ST::gleichfoermigesPolygon };
+    let star_tag = if ifInvers == 0 {
+        ST::sternPolygon
+    } else {
+        ST::gleichfoermigesPolygon
+    };
     let mut tags = BTreeSet::from([star_tag, ST::universum]);
     if bothRows == 1 {
         tags.insert(ST::gebrRat);
@@ -799,7 +879,11 @@ pub fn spalteMetaKonkretAbstrakt_UeberschriftenUndTags(
         _ => "",
     }
     .to_string();
-    heading.push_str(if ifInvers == 1 { " für 1/n statt n" } else { " für n" });
+    heading.push_str(if ifInvers == 1 {
+        " für 1/n statt n"
+    } else {
+        " für n"
+    });
     (rows, heading, tags)
 }
 
@@ -878,7 +962,11 @@ pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(
                     } else {
                         transzendentalienSpalten.1
                     };
-                    let inverse_prefix = if entry.column != inverse_col && row != 1 { "1/" } else { "" };
+                    let inverse_prefix = if entry.column != inverse_col && row != 1 {
+                        "1/"
+                    } else {
+                        ""
+                    };
                     into_list.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
                     into_list.push_str(&entry.vorwort1);
                     into_list.push_str(&thema);
@@ -901,7 +989,11 @@ pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(
                         } else {
                             transzendentalienSpalten.1
                         };
-                        let inverse_prefix = if entry.column != inverse_col && row != 1 { "1/" } else { "" };
+                        let inverse_prefix = if entry.column != inverse_col && row != 1 {
+                            "1/"
+                        } else {
+                            ""
+                        };
                         into_list.push_str(list_item_prefix(htmlOutputYes, bbcodeOutputYes));
                         into_list.push_str(&entry.vorwort2);
                         into_list.push_str(&thema);
@@ -947,7 +1039,12 @@ pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(
     if into_list.is_empty() {
         String::new()
     } else {
-        format!("{}{}{}", list_open(htmlOutputYes, bbcodeOutputYes), into_list, list_close(htmlOutputYes, bbcodeOutputYes))
+        format!(
+            "{}{}{}",
+            list_open(htmlOutputYes, bbcodeOutputYes),
+            into_list,
+            list_close(htmlOutputYes, bbcodeOutputYes)
+        )
     }
 }
 
@@ -1036,7 +1133,8 @@ pub fn readConcatCsv_LoopBody(
     _spalten_vanilla_amount: i64,
     u: usize,
 ) -> Option<i64> {
-    let selected = (concatTableSelection.contains(&((u + 2) as i64)) && (2..10).contains(&concatTable))
+    let selected = (concatTableSelection.contains(&((u + 2) as i64))
+        && (2..10).contains(&concatTable))
         || concatTable == 1;
     if !selected {
         return None;
@@ -1044,10 +1142,17 @@ pub fn readConcatCsv_LoopBody(
     if (2..10).contains(&concatTable) && u + 1 == dazu_len {
         return None;
     }
-    let delta = if (2..10).contains(&concatTable) { 1usize } else { 0usize };
-    Some((u + relitable_header_len).saturating_sub(dazu_len).saturating_add(delta) as i64)
+    let delta = if (2..10).contains(&concatTable) {
+        1usize
+    } else {
+        0usize
+    };
+    Some(
+        (u + relitable_header_len)
+            .saturating_sub(dazu_len)
+            .saturating_add(delta) as i64,
+    )
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1080,7 +1185,12 @@ mod tests {
         let combined = combineDicts(a, b);
         assert_eq!(combined.keys().copied().collect::<Vec<_>>(), vec![3, 2, 4]);
         assert_eq!(
-            combined.get(&2).unwrap().iter().copied().collect::<Vec<_>>(),
+            combined
+                .get(&2)
+                .unwrap()
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
             vec![(6, 3), (10, 5)]
         );
     }
@@ -1121,14 +1231,13 @@ mod tests {
     fn fraction_multiplier_dict_keeps_python_order_and_secondary_pass() {
         let fracs = vec![frac(2, 3), frac(3, 4)];
         let fracs2 = vec![frac(3, 2), frac(4, 3), frac(1, 2)];
-        let out = convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
-            &fracs,
-            &fracs2,
-            false,
-            8,
-        );
+        let out =
+            convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(&fracs, &fracs2, false, 8);
 
-        assert_eq!(out.keys().copied().collect::<Vec<_>>(), vec![2, 4, 6, 8, 3, 1]);
+        assert_eq!(
+            out.keys().copied().collect::<Vec<_>>(),
+            vec![2, 4, 6, 8, 3, 1]
+        );
         assert_eq!(rendered_pairs(&out, 2), vec!["2/3*3/1"]);
         assert_eq!(rendered_pairs(&out, 6), vec!["2/3*9/1", "3/4*8/1"]);
         assert_eq!(rendered_pairs(&out, 1), vec!["2/3*3/2", "3/4*4/3"]);
@@ -1138,12 +1247,7 @@ mod tests {
     fn fraction_equalform_dict_keeps_python_reciprocal_shape() {
         let fracs = vec![frac(2, 3), frac(3, 4)];
         let fracs2 = vec![frac(3, 2), frac(4, 3), frac(1, 2)];
-        let out = convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(
-            &fracs,
-            &fracs2,
-            true,
-            8,
-        );
+        let out = convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(&fracs, &fracs2, true, 8);
 
         assert_eq!(out.keys().copied().collect::<Vec<_>>(), vec![3, 6, 4, 8, 1]);
         assert_eq!(rendered_pairs(&out, 3), vec!["2/3*1/2"]);
@@ -1163,7 +1267,10 @@ mod tests {
         );
         let galgal = out.get("GalGal").unwrap();
         let stern = galgal.get("stern").unwrap();
-        assert!(stern.get("mul").unwrap().contains(&(frac(2, 3), frac(3, 2))));
+        assert!(stern
+            .get("mul")
+            .unwrap()
+            .contains(&(frac(2, 3), frac(3, 2))));
         assert!(stern.get("div").unwrap().is_empty());
     }
 }

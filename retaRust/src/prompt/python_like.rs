@@ -1,16 +1,17 @@
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::IndexMap;
 use std::sync::OnceLock;
 
-use crate::shared::words_py::PyValue;
 use crate::domain::python_source_of_truth::{
     all_main_alias_groups, parameter_alias_groups_for_main,
 };
+use crate::shared::words_py::PyValue;
 use crate::shared_words;
 
 use super::semantic_choices::{
-    semantic_wahl15_ordered_keys, semantic_wahl16_ordered_keys, semantic_wahl15_value,
+    semantic_wahl15_ordered_keys, semantic_wahl15_value, semantic_wahl16_ordered_keys,
     semantic_wahl16_value, RETAPROMPT_AUSGABE_ART_PARAMETER, RETAPROMPT_AUSGABE_ART_VALUES,
     RETAPROMPT_AUSGABE_REGEX_PARAMETERS, RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER,
     RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER, RETAPROMPT_RETA_MAIN_SWITCHES,
@@ -19,6 +20,50 @@ use super::semantic_choices::{
     RETAPROMPT_ZEILEN_TYP_PARAMETER, RETAPROMPT_ZEILEN_TYP_VALUES,
     RETAPROMPT_ZEILEN_ZEIT_PARAMETER, RETAPROMPT_ZEILEN_ZEIT_VALUES,
 };
+
+const MAX_PROMPT_PATTERN_CHARS: usize = 4096;
+const MAX_PROMPT_MATCH_TEXT_CHARS: usize = 4096;
+const MAX_REGEX_LIKE_GROUP_DEPTH: usize = 128;
+const MAX_ROW_EXPR_CHARS: usize = 8192;
+const MAX_ROW_EXPR_PARSE_DEPTH: usize = 256;
+const MAX_ROW_CONDITION_PARSE_DEPTH: usize = 256;
+const MAX_ROW_EVAL_NESTED_CALL_DEPTH: u32 = 256;
+const MAX_ROW_ITERABLE_PARSE_DEPTH: u32 = 256;
+const MAX_ROW_TRUTH_ITERABLE_PARSE_DEPTH: u32 = 256;
+const MAX_ROW_COMPREHENSION_DEPTH: usize = 128;
+
+thread_local! {
+    static ROW_EXPR_EVAL_DEPTH: Cell<u32> = Cell::new(0);
+    static ROW_ITERABLE_PARSE_DEPTH: Cell<u32> = Cell::new(0);
+    static ROW_TRUTH_ITERABLE_PARSE_DEPTH: Cell<u32> = Cell::new(0);
+}
+
+struct PromptDepthGuard<'a> {
+    cell: &'a Cell<u32>,
+    previous: u32,
+}
+
+impl Drop for PromptDepthGuard<'_> {
+    fn drop(&mut self) {
+        self.cell.set(self.previous);
+    }
+}
+
+fn with_prompt_depth<T, F>(cell: &Cell<u32>, max_depth: u32, f: F) -> Option<T>
+where
+    F: FnOnce() -> Option<T>,
+{
+    let current = cell.get();
+    if current >= max_depth {
+        return None;
+    }
+    cell.set(current + 1);
+    let _guard = PromptDepthGuard {
+        cell,
+        previous: current,
+    };
+    f()
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PromptModus {
@@ -304,7 +349,10 @@ fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> 
             push_unique_preserving_normalized(&mut galaxie, &mut galaxie_seen, value.clone());
         }
     }
-    inventory.insert(RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER.to_string(), galaxie);
+    inventory.insert(
+        RETAPROMPT_KOMBINATION_GALAXIE_PARAMETER.to_string(),
+        galaxie,
+    );
 
     let mut universum = Vec::new();
     let mut universum_seen = BTreeSet::new();
@@ -313,7 +361,10 @@ fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> 
             push_unique_preserving_normalized(&mut universum, &mut universum_seen, value.clone());
         }
     }
-    inventory.insert(RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER.to_string(), universum);
+    inventory.insert(
+        RETAPROMPT_KOMBINATION_UNIVERSUM_PARAMETER.to_string(),
+        universum,
+    );
     inventory
 }
 
@@ -519,41 +570,34 @@ fn special_fragment_matches_candidate(candidate: &str, matcher: &SpecialFragment
 }
 
 fn glob_like_match(pattern: &str, text: &str) -> bool {
-    if pattern.is_empty() {
-        return text.is_empty();
-    }
-
     let pattern_chars = pattern.chars().collect::<Vec<_>>();
     let text_chars = text.chars().collect::<Vec<_>>();
-    let mut memo = BTreeMap::new();
-    glob_like_match_chars(&pattern_chars, &text_chars, 0, 0, &mut memo)
-}
-
-fn glob_like_match_chars(
-    pattern: &[char],
-    text: &[char],
-    pattern_index: usize,
-    text_index: usize,
-    memo: &mut BTreeMap<(usize, usize), bool>,
-) -> bool {
-    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
-        return *cached;
+    if pattern_chars.len() > MAX_PROMPT_PATTERN_CHARS
+        || text_chars.len() > MAX_PROMPT_MATCH_TEXT_CHARS
+    {
+        return false;
+    }
+    if pattern_chars.is_empty() {
+        return text_chars.is_empty();
     }
 
-    let result = if pattern_index == pattern.len() {
-        text_index == text.len()
-    } else if pattern[pattern_index] == '*' {
-        glob_like_match_chars(pattern, text, pattern_index + 1, text_index, memo)
-            || (text_index < text.len()
-                && glob_like_match_chars(pattern, text, pattern_index, text_index + 1, memo))
-    } else {
-        text_index < text.len()
-            && pattern[pattern_index] == text[text_index]
-            && glob_like_match_chars(pattern, text, pattern_index + 1, text_index + 1, memo)
-    };
-
-    memo.insert((pattern_index, text_index), result);
-    result
+    let mut dp = vec![vec![false; text_chars.len() + 1]; pattern_chars.len() + 1];
+    dp[0][0] = true;
+    for i in 1..=pattern_chars.len() {
+        if pattern_chars[i - 1] == '*' {
+            dp[i][0] = dp[i - 1][0];
+        }
+    }
+    for i in 1..=pattern_chars.len() {
+        for j in 1..=text_chars.len() {
+            dp[i][j] = if pattern_chars[i - 1] == '*' {
+                dp[i - 1][j] || dp[i][j - 1]
+            } else {
+                dp[i - 1][j - 1] && pattern_chars[i - 1] == text_chars[j - 1]
+            };
+        }
+    }
+    dp[pattern_chars.len()][text_chars.len()]
 }
 
 fn strip_regex_like_anchors(pattern: &str) -> (bool, bool, &str) {
@@ -601,6 +645,7 @@ struct RegexLikeToken {
 struct RegexLikeParser {
     chars: Vec<char>,
     pos: usize,
+    group_depth: usize,
 }
 
 impl RegexLikeParser {
@@ -608,10 +653,14 @@ impl RegexLikeParser {
         Self {
             chars: pattern.chars().collect(),
             pos: 0,
+            group_depth: 0,
         }
     }
 
     fn parse(pattern: &str) -> Option<Vec<Vec<RegexLikeToken>>> {
+        if pattern.chars().count() > MAX_PROMPT_PATTERN_CHARS {
+            return None;
+        }
         let mut parser = Self::new(pattern);
         let alternatives = parser.parse_alternatives(None)?;
         (parser.pos == parser.chars.len()).then_some(alternatives)
@@ -689,11 +738,16 @@ impl RegexLikeParser {
     }
 
     fn parse_group(&mut self) -> Option<RegexLikeAtom> {
+        if self.group_depth >= MAX_REGEX_LIKE_GROUP_DEPTH {
+            return None;
+        }
         if self.peek() == Some('?') && self.peek_next() == Some(':') {
             self.pos += 2;
         }
-        let alternatives = self.parse_alternatives(Some(')'))?;
-        Some(RegexLikeAtom::Group(alternatives))
+        self.group_depth += 1;
+        let alternatives = self.parse_alternatives(Some(')'));
+        self.group_depth -= 1;
+        Some(RegexLikeAtom::Group(alternatives?))
     }
 
     fn parse_class_char(&mut self) -> Option<char> {
@@ -769,7 +823,11 @@ fn regex_like_atom_match_positions(
         }
         RegexLikeAtom::Group(alternatives) => {
             for alternative in alternatives {
-                out.extend(regex_like_sequence_match_positions(alternative, text, start));
+                out.extend(regex_like_sequence_match_positions(
+                    alternative,
+                    text,
+                    start,
+                ));
             }
         }
     }
@@ -850,6 +908,11 @@ fn regex_like_sequence_match_positions(
 }
 
 pub fn regex_like_search(pattern: &str, text: &str) -> bool {
+    if pattern.chars().count() > MAX_PROMPT_PATTERN_CHARS
+        || text.chars().count() > MAX_PROMPT_MATCH_TEXT_CHARS
+    {
+        return false;
+    }
     if pattern.is_empty() {
         return true;
     }
@@ -922,42 +985,37 @@ fn regex_like_full_match_chars(
     text: &[char],
     pattern_index: usize,
     text_index: usize,
-    memo: &mut BTreeMap<(usize, usize), bool>,
+    _memo: &mut BTreeMap<(usize, usize), bool>,
 ) -> bool {
-    if let Some(cached) = memo.get(&(pattern_index, text_index)) {
-        return *cached;
+    if pattern_index != 0 || text_index != 0 {
+        return false;
+    }
+    if pattern.len() > MAX_PROMPT_PATTERN_CHARS || text.len() > MAX_PROMPT_MATCH_TEXT_CHARS {
+        return false;
     }
 
-    let result = if pattern_index == pattern.len() {
-        text_index == text.len()
-    } else {
-        let first_match = text_index < text.len()
-            && (pattern[pattern_index] == '.' || pattern[pattern_index] == text[text_index]);
-
-        if pattern_index + 1 < pattern.len() && pattern[pattern_index + 1] == '*' {
-            regex_like_full_match_chars(pattern, text, pattern_index + 2, text_index, memo)
-                || (first_match
-                    && regex_like_full_match_chars(
-                        pattern,
-                        text,
-                        pattern_index,
-                        text_index + 1,
-                        memo,
-                    ))
-        } else {
-            first_match
-                && regex_like_full_match_chars(
-                    pattern,
-                    text,
-                    pattern_index + 1,
-                    text_index + 1,
-                    memo,
-                )
+    let mut dp = vec![vec![false; text.len() + 1]; pattern.len() + 1];
+    dp[0][0] = true;
+    for i in 1..=pattern.len() {
+        if pattern[i - 1] == '*' && i >= 2 && pattern[i - 2] != '*' {
+            dp[i][0] = dp[i - 2][0];
         }
-    };
+    }
 
-    memo.insert((pattern_index, text_index), result);
-    result
+    for i in 1..=pattern.len() {
+        for j in 1..=text.len() {
+            let current = pattern[i - 1];
+            if current == '*' && i >= 2 && pattern[i - 2] != '*' {
+                let repeated = pattern[i - 2];
+                let repeated_matches = repeated == '.' || repeated == text[j - 1];
+                dp[i][j] = dp[i - 2][j] || (repeated_matches && dp[i][j - 1]);
+            } else {
+                dp[i][j] = dp[i - 1][j - 1] && (current == '.' || current == text[j - 1]);
+            }
+        }
+    }
+
+    dp[pattern.len()][text.len()]
 }
 
 fn expand_prompt_regex_like_token(token: &str) -> Vec<String> {
@@ -1013,7 +1071,11 @@ fn expand_reta_simple_regex_like_token(token: &str, current_section: Option<&str
 }
 
 fn collapse_python_style_equals_tokens(tokens: &[String]) -> Vec<String> {
-    fn flush_group(target: &mut Vec<String>, prefix: &mut Option<String>, values: &mut Vec<String>) {
+    fn flush_group(
+        target: &mut Vec<String>,
+        prefix: &mut Option<String>,
+        values: &mut Vec<String>,
+    ) {
         let Some(current_prefix) = prefix.take() else {
             return;
         };
@@ -1200,8 +1262,6 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     }
 }
 
-
-
 /// Python `retaPrompt.lastRetaHauptPara`: return the last main `reta`
 /// parameter token seen in a token stream.
 #[allow(non_snake_case)]
@@ -1296,7 +1356,10 @@ pub fn allEqSignAbarbeitung(tokens: &[String]) -> Vec<String> {
 /// Python `retaPrompt.regExReplace`: expand prompt and `reta` regex/glob tokens.
 #[allow(non_snake_case)]
 pub fn regExReplace(tokens: &[String]) -> Vec<String> {
-    if tokens.iter().any(|token| token_has_python_regex_or_glob(token)) {
+    if tokens
+        .iter()
+        .any(|token| token_has_python_regex_or_glob(token))
+    {
         allEqSignAbarbeitung(tokens)
     } else {
         tokens.to_vec()
@@ -1486,7 +1549,11 @@ pub fn libreta_prompt_custom_split2(input_string: &str, delimiter: char) -> Vec<
             stack.push('(');
             temp.push(ch);
         } else if matches!(ch, ')' | '}' | ']') {
-            if stack.last().map(|last| "({[".contains(*last)).unwrap_or(false) {
+            if stack
+                .last()
+                .map(|last| "({[".contains(*last))
+                .unwrap_or(false)
+            {
                 stack.pop();
                 temp.push(ch);
             } else {
@@ -1652,8 +1719,9 @@ pub fn verifyBruchNganzZahlBetweenCommas(
         bruchAndGanzZahlEtwaKorrekterBereich.push(false);
     }
 
-    let bruchAndGanzZahlEtwaKorrekterBereichAllTrue =
-        bruchAndGanzZahlEtwaKorrekterBereich.iter().all(|value| *value);
+    let bruchAndGanzZahlEtwaKorrekterBereichAllTrue = bruchAndGanzZahlEtwaKorrekterBereich
+        .iter()
+        .all(|value| *value);
 
     VerifyBruchGanzZahlBetweenCommasResult {
         bruchAndGanzZahlEtwaKorrekterBereich,
@@ -1696,8 +1764,7 @@ pub fn verifyBruchNganzZahlCommaList(
             &etwaBruch,
             zahlenAngaben_1,
         );
-        bruchAndGanzZahlEtwaKorrekterBereich1 =
-            verified.bruchAndGanzZahlEtwaKorrekterBereich;
+        bruchAndGanzZahlEtwaKorrekterBereich1 = verified.bruchAndGanzZahlEtwaKorrekterBereich;
         bruchBereichsAngaben1 = verified.bruchBereichsAngaben;
         bruchRanges1 = verified.bruchRanges;
         zahlenAngaben_1 = verified.zahlenAngaben_;
@@ -1727,7 +1794,6 @@ pub fn verifyBruchNganzZahlCommaList(
         fullBlockIsZahlenbereichAndBruch_Z,
     }
 }
-
 
 #[allow(non_snake_case)]
 pub fn is15or16command(text: &str) -> bool {
@@ -1760,7 +1826,10 @@ pub fn isReTaParameter(t: &str) -> bool {
 pub fn verkuerze_dict(dictionary: &[(String, String)]) -> Vec<(String, String)> {
     let mut dict2: Vec<(String, String)> = Vec::new();
     for (key, value) in dictionary {
-        if !dict2.iter().any(|(_, existing_value)| existing_value == value) {
+        if !dict2
+            .iter()
+            .any(|(_, existing_value)| existing_value == value)
+        {
             dict2.push((key.clone(), value.clone()));
         }
     }
@@ -1828,13 +1897,10 @@ fn is_signed_integer(text: &str) -> bool {
     !body.is_empty() && body.chars().all(|c| c.is_ascii_digit())
 }
 
-
 fn python_short_default_has_single_effective_token(tokens: &[String]) -> bool {
     let mut distinct = BTreeSet::new();
     for token in tokens {
-        if token != "e"
-            && token != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
-        {
+        if token != "e" && token != "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar" {
             distinct.insert(token.as_str());
         }
     }
@@ -2549,9 +2615,9 @@ fn expand_python_row_numbers_vielfache(
     let only_zero_distance = around.iter().all(|distance| *distance == 0);
 
     loop {
-        let keep_going = around.iter().all(|distance| {
-            start.saturating_mul(multiplier) < limit.saturating_sub(*distance)
-        });
+        let keep_going = around
+            .iter()
+            .all(|distance| start.saturating_mul(multiplier) < limit.saturating_sub(*distance));
         if !keep_going {
             break;
         }
@@ -2586,7 +2652,6 @@ fn expand_python_row_numbers_vielfache(
 
     out.into_iter().collect()
 }
-
 
 fn checked_python_floor_div(left: i64, right: i64) -> Option<i64> {
     if right == 0 {
@@ -2725,7 +2790,6 @@ fn parse_python_int_literal(raw: &str, radix: u32, allow_prefix_underscore: bool
     i64::from_str_radix(&cleaned, radix).ok()
 }
 
-
 #[derive(Clone, Copy)]
 struct PythonRowExprVar<'a> {
     name: &'a str,
@@ -2736,6 +2800,7 @@ struct PythonRowExprParser<'a> {
     chars: Vec<char>,
     pos: usize,
     vars: Vec<PythonRowExprVar<'a>>,
+    parse_depth: usize,
 }
 
 impl<'a> PythonRowExprParser<'a> {
@@ -2747,6 +2812,7 @@ impl<'a> PythonRowExprParser<'a> {
             chars: text.chars().collect(),
             pos: 0,
             vars,
+            parse_depth: 0,
         }
     }
 
@@ -2761,6 +2827,7 @@ impl<'a> PythonRowExprParser<'a> {
                     value: *value,
                 })
                 .collect(),
+            parse_depth: 0,
         }
     }
 
@@ -2796,7 +2863,13 @@ impl<'a> PythonRowExprParser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<i64> {
-        self.parse_bit_or()
+        if self.parse_depth >= MAX_ROW_EXPR_PARSE_DEPTH {
+            return None;
+        }
+        self.parse_depth += 1;
+        let value = self.parse_bit_or();
+        self.parse_depth -= 1;
+        value
     }
 
     fn parse_bit_or(&mut self) -> Option<i64> {
@@ -2888,12 +2961,24 @@ impl<'a> PythonRowExprParser<'a> {
     }
 
     fn parse_unary(&mut self) -> Option<i64> {
+        if self.parse_depth >= MAX_ROW_EXPR_PARSE_DEPTH {
+            return None;
+        }
         if self.consume_text("+") {
-            self.parse_unary()
+            self.parse_depth += 1;
+            let value = self.parse_unary();
+            self.parse_depth -= 1;
+            value
         } else if self.consume_text("-") {
-            self.parse_unary()?.checked_neg()
+            self.parse_depth += 1;
+            let value = self.parse_unary().and_then(|value| value.checked_neg());
+            self.parse_depth -= 1;
+            value
         } else if self.consume_text("~") {
-            Some(!self.parse_unary()?)
+            self.parse_depth += 1;
+            let value = self.parse_unary().map(|value| !value);
+            self.parse_depth -= 1;
+            value
         } else {
             self.parse_power()
         }
@@ -2944,7 +3029,9 @@ impl<'a> PythonRowExprParser<'a> {
                     "math.gcd" => return checked_python_gcd_many(&args),
                     "math.lcm" if args.is_empty() => return Some(1),
                     "math.lcm" => return checked_python_lcm_many(&args),
-                    "math.factorial" if args.len() == 1 => return checked_python_factorial(args[0]),
+                    "math.factorial" if args.len() == 1 => {
+                        return checked_python_factorial(args[0]);
+                    }
                     "math.isqrt" if args.len() == 1 => return checked_python_isqrt(args[0]),
                     "math.floor" | "math.ceil" | "math.trunc" if args.len() == 1 => {
                         return Some(args[0]);
@@ -2975,9 +3062,13 @@ impl<'a> PythonRowExprParser<'a> {
                     };
                     let values = parse_python_iterable_values_with_vars(&parts[0], &vars)?;
                     return if ident == "sum" {
-                        values.into_iter().try_fold(start, |acc, value| acc.checked_add(value))
+                        values
+                            .into_iter()
+                            .try_fold(start, |acc, value| acc.checked_add(value))
                     } else {
-                        values.into_iter().try_fold(start, |acc, value| acc.checked_mul(value))
+                        values
+                            .into_iter()
+                            .try_fold(start, |acc, value| acc.checked_mul(value))
                     };
                 }
             }
@@ -2992,8 +3083,16 @@ impl<'a> PythonRowExprParser<'a> {
                 "len" => Some(values?.len() as i64),
                 "min" => values?.into_iter().min(),
                 "max" => values?.into_iter().max(),
-                "all" => Some(if values?.into_iter().all(|value| value != 0) { 1 } else { 0 }),
-                "any" => Some(if values?.into_iter().any(|value| value != 0) { 1 } else { 0 }),
+                "all" => Some(if values?.into_iter().all(|value| value != 0) {
+                    1
+                } else {
+                    0
+                }),
+                "any" => Some(if values?.into_iter().any(|value| value != 0) {
+                    1
+                } else {
+                    0
+                }),
                 "bool" => Some(if values?.is_empty() { 0 } else { 1 }),
                 _ => None,
             };
@@ -3083,8 +3182,7 @@ impl<'a> PythonRowExprParser<'a> {
                     self.pos += 2;
                     let digits_start = self.pos;
                     while !self.finished()
-                        && (self.chars[self.pos] == '_'
-                            || self.chars[self.pos].is_digit(radix))
+                        && (self.chars[self.pos] == '_' || self.chars[self.pos].is_digit(radix))
                     {
                         self.pos += 1;
                     }
@@ -3143,8 +3241,16 @@ impl<'a> PythonRowExprParser<'a> {
 }
 
 fn eval_python_row_expr_with_vars(text: &str, vars: &BTreeMap<String, i64>) -> Option<i64> {
+    ROW_EXPR_EVAL_DEPTH.with(|depth| {
+        with_prompt_depth(depth, MAX_ROW_EVAL_NESTED_CALL_DEPTH, || {
+            eval_python_row_expr_with_vars_guarded(text, vars)
+        })
+    })
+}
+
+fn eval_python_row_expr_with_vars_guarded(text: &str, vars: &BTreeMap<String, i64>) -> Option<i64> {
     let trimmed = text.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed.chars().count() > MAX_ROW_EXPR_CHARS {
         return None;
     }
     if let Some(value) = eval_python_row_subscript_with_vars(trimmed, vars) {
@@ -3203,7 +3309,10 @@ fn strip_python_collection_wrappers_with_kind(text: &str) -> Option<(&str, Pytho
     if !trimmed.starts_with(open) || !trimmed.ends_with(close) {
         return None;
     }
-    Some((&trimmed[open.len_utf8()..trimmed.len() - close.len_utf8()], kind))
+    Some((
+        &trimmed[open.len_utf8()..trimmed.len() - close.len_utf8()],
+        kind,
+    ))
 }
 
 fn strip_top_level_wrapping_parens(text: &str) -> Option<&str> {
@@ -3220,7 +3329,8 @@ fn strip_top_level_wrapping_parens(text: &str) -> Option<&str> {
             '(' => round += 1,
             ')' => {
                 round -= 1;
-                if round == 0 && square == 0 && curly == 0 && index + ch.len_utf8() < trimmed.len() {
+                if round == 0 && square == 0 && curly == 0 && index + ch.len_utf8() < trimmed.len()
+                {
                     return None;
                 }
             }
@@ -3263,11 +3373,13 @@ fn split_top_level_trailing_subscript(text: &str) -> Option<(&str, &str)> {
                 if round < 0 || square < 0 || curly < 0 {
                     return None;
                 }
-                if round == 0 && square == 0 && curly == 0 && index + ch.len_utf8() == trimmed.len() {
+                if round == 0 && square == 0 && curly == 0 && index + ch.len_utf8() == trimmed.len()
+                {
                     let start = candidate_start?;
                     let base = trimmed[..start].trim();
                     let index_text = trimmed[start + 1..index].trim();
-                    return (!base.is_empty() && !index_text.is_empty()).then_some((base, index_text));
+                    return (!base.is_empty() && !index_text.is_empty())
+                        .then_some((base, index_text));
                 }
             }
             '{' => curly += 1,
@@ -3284,7 +3396,11 @@ fn split_top_level_trailing_subscript(text: &str) -> Option<(&str, &str)> {
 
 fn python_normalize_index(index: i64, len: usize) -> Option<usize> {
     let len_i64 = i64::try_from(len).ok()?;
-    let index = if index < 0 { len_i64.checked_add(index)? } else { index };
+    let index = if index < 0 {
+        len_i64.checked_add(index)?
+    } else {
+        index
+    };
     if (0..len_i64).contains(&index) {
         usize::try_from(index).ok()
     } else {
@@ -3467,7 +3583,10 @@ fn find_first_top_level_keyword<'a>(
     let mut best: Option<(usize, &'a str)> = None;
     for keyword in keywords {
         if let Some(index) = find_top_level_keyword(text, keyword) {
-            if best.map(|(best_index, _)| index < best_index).unwrap_or(true) {
+            if best
+                .map(|(best_index, _)| index < best_index)
+                .unwrap_or(true)
+            {
                 best = Some((index, *keyword));
             }
         }
@@ -3552,8 +3671,19 @@ fn compare_python_row_i64(left: i64, operator: &str, right: i64) -> Option<bool>
 }
 
 fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>) -> Option<bool> {
+    eval_python_row_condition_with_vars_inner(text, vars, 0)
+}
+
+fn eval_python_row_condition_with_vars_inner(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+    depth: usize,
+) -> Option<bool> {
+    if depth >= MAX_ROW_CONDITION_PARSE_DEPTH {
+        return None;
+    }
     let trimmed = text.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed.chars().count() > MAX_ROW_EXPR_CHARS {
         return None;
     }
     match trimmed {
@@ -3562,7 +3692,7 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>)
         _ => {}
     }
     if let Some(inner) = strip_top_level_wrapping_parens(trimmed) {
-        return eval_python_row_condition_with_vars(inner, vars);
+        return eval_python_row_condition_with_vars_inner(inner, vars, depth + 1);
     }
     if let Some(inner) = parse_python_call_inner(trimmed, "all") {
         let values = parse_python_truth_iterable_values_with_vars(inner, vars)?;
@@ -3574,18 +3704,30 @@ fn eval_python_row_condition_with_vars(text: &str, vars: &BTreeMap<String, i64>)
     }
     if let Some(index) = find_top_level_keyword(trimmed, " or ") {
         return Some(
-            eval_python_row_condition_with_vars(&trimmed[..index], vars)?
-                || eval_python_row_condition_with_vars(&trimmed[index + 4..], vars)?,
+            eval_python_row_condition_with_vars_inner(&trimmed[..index], vars, depth + 1)?
+                || eval_python_row_condition_with_vars_inner(
+                    &trimmed[index + 4..],
+                    vars,
+                    depth + 1,
+                )?,
         );
     }
     if let Some(index) = find_top_level_keyword(trimmed, " and ") {
         return Some(
-            eval_python_row_condition_with_vars(&trimmed[..index], vars)?
-                && eval_python_row_condition_with_vars(&trimmed[index + 5..], vars)?,
+            eval_python_row_condition_with_vars_inner(&trimmed[..index], vars, depth + 1)?
+                && eval_python_row_condition_with_vars_inner(
+                    &trimmed[index + 5..],
+                    vars,
+                    depth + 1,
+                )?,
         );
     }
     if let Some(rest) = trimmed.strip_prefix("not ") {
-        return Some(!eval_python_row_condition_with_vars(rest, vars)?);
+        return Some(!eval_python_row_condition_with_vars_inner(
+            rest,
+            vars,
+            depth + 1,
+        )?);
     }
     if let Some(index) = find_top_level_keyword(trimmed, " not in ") {
         let left = eval_python_row_expr_with_vars(&trimmed[..index], vars)?;
@@ -3636,7 +3778,11 @@ fn parse_python_range_values_with_vars(
 
     let mut out = Vec::new();
     let mut current = start;
-    while if step > 0 { current < stop } else { current > stop } {
+    while if step > 0 {
+        current < stop
+    } else {
+        current > stop
+    } {
         out.push(current);
         if out.len() > 20_000 {
             return None;
@@ -3646,7 +3792,10 @@ fn parse_python_range_values_with_vars(
     Some(out)
 }
 
-fn split_top_level_iterable_binary<'a>(text: &'a str, operator: char) -> Option<(&'a str, &'a str)> {
+fn split_top_level_iterable_binary<'a>(
+    text: &'a str,
+    operator: char,
+) -> Option<(&'a str, &'a str)> {
     let mut round = 0i32;
     let mut square = 0i32;
     let mut curly = 0i32;
@@ -3707,7 +3856,6 @@ fn split_top_level_iterable_binary_rightmost<'a>(
         text[index + operator.len_utf8()..].trim(),
     ))
 }
-
 
 fn split_top_level_dict_key_value(text: &str) -> Option<(&str, &str)> {
     let mut round = 0i32;
@@ -3829,8 +3977,9 @@ fn eval_python_filter_predicate_with_vars(
     }
     match predicate {
         "bool" | "abs" | "int" | "round" => Some(value != 0),
-        _ => eval_python_map_function_with_vars(predicate, &[value], vars)
-            .map(|mapped| mapped != 0),
+        _ => {
+            eval_python_map_function_with_vars(predicate, &[value], vars).map(|mapped| mapped != 0)
+        }
     }
 }
 
@@ -3959,8 +4108,15 @@ fn parse_python_builtin_iterable_values_with_vars(
         let min_len = python_map_min_len(&columns);
         let mut out = Vec::new();
         for index in 0..min_len {
-            let args = columns.iter().map(|column| column[index]).collect::<Vec<_>>();
-            out.push(eval_python_map_function_with_vars(function_name, &args, vars)?);
+            let args = columns
+                .iter()
+                .map(|column| column[index])
+                .collect::<Vec<_>>();
+            out.push(eval_python_map_function_with_vars(
+                function_name,
+                &args,
+                vars,
+            )?);
         }
         return Some(out);
     }
@@ -3996,7 +4152,11 @@ fn parse_python_builtin_iterable_values_with_vars(
             };
             let mut values = parse_python_iterable_values_with_vars(&source, vars)?;
             if name == "set" || name == "frozenset" {
-                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+                values = values
+                    .into_iter()
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
             }
             if name == "reversed" {
                 values.reverse();
@@ -4011,7 +4171,21 @@ fn parse_python_iterable_values_with_vars(
     text: &str,
     vars: &BTreeMap<String, i64>,
 ) -> Option<Vec<i64>> {
+    ROW_ITERABLE_PARSE_DEPTH.with(|depth| {
+        with_prompt_depth(depth, MAX_ROW_ITERABLE_PARSE_DEPTH, || {
+            parse_python_iterable_values_with_vars_guarded(text, vars)
+        })
+    })
+}
+
+fn parse_python_iterable_values_with_vars_guarded(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<i64>> {
     let trimmed = text.trim();
+    if trimmed.is_empty() || trimmed.chars().count() > MAX_ROW_EXPR_CHARS {
+        return None;
+    }
 
     if let Some(values) = parse_python_dict_view_values_with_vars(trimmed, vars) {
         return Some(values);
@@ -4034,7 +4208,12 @@ fn parse_python_iterable_values_with_vars(
     if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '|') {
         let mut out = parse_python_iterable_values_with_vars(left, vars)?;
         out.extend(parse_python_iterable_values_with_vars(right, vars)?);
-        return Some(out.into_iter().collect::<BTreeSet<_>>().into_iter().collect());
+        return Some(
+            out.into_iter()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        );
     }
 
     if let Some((left, right)) = split_top_level_iterable_binary(trimmed, '^') {
@@ -4120,7 +4299,13 @@ fn python_str_as_generator_source(text: &str) -> Option<String> {
 fn parse_python_str_as_generator_values(text: &str) -> Option<Vec<i64>> {
     let source = python_str_as_generator_source(text)?;
     let values = parse_python_iterable_values(&source)?;
-    Some(values.into_iter().collect::<BTreeSet<_>>().into_iter().collect())
+    Some(
+        values
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect(),
+    )
 }
 
 #[derive(Clone, Debug)]
@@ -4175,16 +4360,14 @@ fn parse_python_comprehension_clauses(mut tail: &str) -> Option<Vec<PythonCompre
         let var_names = parse_python_binding_names(tail[..in_index].trim())?;
 
         let rest_after_in = tail[in_index + 4..].trim_start();
-        let (source_text, rest_after_source) = match find_first_top_level_keyword(
-            rest_after_in,
-            &[" if ", " for "],
-        ) {
-            Some((index, _)) => (
-                rest_after_in[..index].trim().to_string(),
-                rest_after_in[index..].trim_start(),
-            ),
-            None => (rest_after_in.trim().to_string(), ""),
-        };
+        let (source_text, rest_after_source) =
+            match find_first_top_level_keyword(rest_after_in, &[" if ", " for "]) {
+                Some((index, _)) => (
+                    rest_after_in[..index].trim().to_string(),
+                    rest_after_in[index..].trim_start(),
+                ),
+                None => (rest_after_in.trim().to_string(), ""),
+            };
         if source_text.is_empty() {
             return None;
         }
@@ -4214,16 +4397,14 @@ fn parse_python_comprehension_clauses(mut tail: &str) -> Option<Vec<PythonCompre
                 return None;
             };
             let after_if = after_if.trim_start();
-            let (filter_text, next_rest) = match find_first_top_level_keyword(
-                after_if,
-                &[" if ", " for "],
-            ) {
-                Some((index, _)) => (
-                    after_if[..index].trim().to_string(),
-                    after_if[index..].trim_start(),
-                ),
-                None => (after_if.trim().to_string(), ""),
-            };
+            let (filter_text, next_rest) =
+                match find_first_top_level_keyword(after_if, &[" if ", " for "]) {
+                    Some((index, _)) => (
+                        after_if[..index].trim().to_string(),
+                        after_if[index..].trim_start(),
+                    ),
+                    None => (after_if.trim().to_string(), ""),
+                };
             if filter_text.is_empty() {
                 return None;
             }
@@ -4315,12 +4496,7 @@ fn parse_python_dict_pairs_with_vars(
         let mut vars = outer_vars.clone();
         let mut out = Vec::new();
         expand_python_dict_pair_comprehension_values(
-            &clauses,
-            0,
-            key_expr,
-            value_expr,
-            &mut vars,
-            &mut out,
+            &clauses, 0, key_expr, value_expr, &mut vars, &mut out,
         )?;
         return Some(python_dict_pairs_finish(out));
     }
@@ -4515,12 +4691,20 @@ fn parse_python_dict_items_rows_with_vars(
     }
     let base = text.trim().strip_suffix(".items()")?.trim();
     let pairs = parse_python_dict_pairs_with_vars(base, vars)?;
-    Some(pairs.into_iter().map(|(key, value)| vec![key, value]).collect())
+    Some(
+        pairs
+            .into_iter()
+            .map(|(key, value)| vec![key, value])
+            .collect(),
+    )
 }
 
 fn python_binding_rows_finish(rows: Vec<Vec<i64>>, kind: PythonCollectionKind) -> Vec<Vec<i64>> {
     if kind.deduplicates_like_python_set_conversion() {
-        rows.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+        rows.into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     } else {
         rows
     }
@@ -4640,14 +4824,21 @@ fn parse_python_builtin_binding_rows_with_vars(
         let min_len = python_map_min_len(&columns);
         let mut rows = Vec::new();
         for index in 0..min_len {
-            let args = columns.iter().map(|column| column[index]).collect::<Vec<_>>();
+            let args = columns
+                .iter()
+                .map(|column| column[index])
+                .collect::<Vec<_>>();
             let (arg_names, expr_text) = parse_python_lambda_parts(function_name)?;
             if arg_names.len() != args.len() {
                 return None;
             }
             let mut scoped_vars = vars.clone();
             assign_python_binding_vars(&mut scoped_vars, &arg_names, &args)?;
-            rows.push(parse_python_tuple_row_with_vars(expr_text, &scoped_vars, arity)?);
+            rows.push(parse_python_tuple_row_with_vars(
+                expr_text,
+                &scoped_vars,
+                arity,
+            )?);
         }
         return Some(rows);
     }
@@ -4684,7 +4875,11 @@ fn parse_python_builtin_binding_rows_with_vars(
             };
             let mut rows = parse_python_iterable_binding_rows_with_vars(&source, vars, arity)?;
             if name == "set" || name == "frozenset" {
-                rows = rows.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+                rows = rows
+                    .into_iter()
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
             }
             if name == "reversed" {
                 rows.reverse();
@@ -4729,6 +4924,9 @@ fn expand_python_comprehension_values(
         out.push(eval_python_row_expr_with_vars(expr_text, vars)?);
         return Some(());
     }
+    if clause_index >= MAX_ROW_COMPREHENSION_DEPTH {
+        return None;
+    }
 
     let clause = &clauses[clause_index];
     let binding_rows = parse_python_iterable_binding_rows_with_vars(
@@ -4763,7 +4961,11 @@ fn expand_python_comprehension_values(
 
 fn python_collection_values_finish(values: Vec<i64>, kind: PythonCollectionKind) -> Vec<i64> {
     if kind.deduplicates_like_python_set_conversion() {
-        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+        values
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     } else {
         values
     }
@@ -4799,7 +5001,10 @@ fn parse_python_generated_row_values_inner_with_kind(
             continue;
         }
         if let Some(starred_iterable) = trimmed.strip_prefix('*') {
-            out.extend(parse_python_iterable_values_with_vars(starred_iterable, outer_vars)?);
+            out.extend(parse_python_iterable_values_with_vars(
+                starred_iterable,
+                outer_vars,
+            )?);
             continue;
         }
         let expr_text = split_top_level_dict_key_value(trimmed)
@@ -4832,7 +5037,11 @@ fn parse_python_generated_row_values_with_vars(
 
 fn python_truth_values_finish(values: Vec<bool>, kind: PythonCollectionKind) -> Vec<bool> {
     if kind.deduplicates_like_python_set_conversion() {
-        values.into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+        values
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     } else {
         values
     }
@@ -4848,6 +5057,9 @@ fn expand_python_truth_comprehension_values(
     if clause_index >= clauses.len() {
         out.push(eval_python_row_condition_with_vars(expr_text, vars)?);
         return Some(());
+    }
+    if clause_index >= MAX_ROW_COMPREHENSION_DEPTH {
+        return None;
     }
 
     let clause = &clauses[clause_index];
@@ -4872,7 +5084,13 @@ fn expand_python_truth_comprehension_values(
             .into_iter()
             .all(|value| value);
         if keep {
-            expand_python_truth_comprehension_values(clauses, clause_index + 1, expr_text, vars, out)?;
+            expand_python_truth_comprehension_values(
+                clauses,
+                clause_index + 1,
+                expr_text,
+                vars,
+                out,
+            )?;
         }
     }
 
@@ -4911,7 +5129,10 @@ fn parse_python_truth_generated_values_inner_with_kind(
             continue;
         }
         if let Some(starred_iterable) = trimmed.strip_prefix('*') {
-            out.extend(parse_python_truth_iterable_values_with_vars(starred_iterable, outer_vars)?);
+            out.extend(parse_python_truth_iterable_values_with_vars(
+                starred_iterable,
+                outer_vars,
+            )?);
             continue;
         }
         let expr_text = split_top_level_dict_key_value(trimmed)
@@ -4969,7 +5190,10 @@ fn parse_python_truth_builtin_iterable_values_with_vars(
         let min_len = python_map_min_len(&columns);
         let mut out = Vec::new();
         for index in 0..min_len {
-            let args = columns.iter().map(|column| column[index]).collect::<Vec<_>>();
+            let args = columns
+                .iter()
+                .map(|column| column[index])
+                .collect::<Vec<_>>();
             let value = if parse_python_lambda_parts(function_name).is_some() {
                 eval_python_lambda_condition_with_vars(function_name, &args, vars)?
             } else {
@@ -5011,7 +5235,11 @@ fn parse_python_truth_builtin_iterable_values_with_vars(
             };
             let mut values = parse_python_truth_iterable_values_with_vars(&source, vars)?;
             if name == "set" || name == "frozenset" {
-                values = values.into_iter().collect::<BTreeSet<_>>().into_iter().collect();
+                values = values
+                    .into_iter()
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
             }
             if name == "reversed" {
                 values.reverse();
@@ -5026,6 +5254,17 @@ fn parse_python_truth_iterable_values_with_vars(
     text: &str,
     vars: &BTreeMap<String, i64>,
 ) -> Option<Vec<bool>> {
+    ROW_TRUTH_ITERABLE_PARSE_DEPTH.with(|depth| {
+        with_prompt_depth(depth, MAX_ROW_TRUTH_ITERABLE_PARSE_DEPTH, || {
+            parse_python_truth_iterable_values_with_vars_guarded(text, vars)
+        })
+    })
+}
+
+fn parse_python_truth_iterable_values_with_vars_guarded(
+    text: &str,
+    vars: &BTreeMap<String, i64>,
+) -> Option<Vec<bool>> {
     parse_python_iterable_values_with_vars(text, vars)
         .map(|values| values.into_iter().map(|value| value != 0).collect())
         .or_else(|| parse_python_truth_builtin_iterable_values_with_vars(text, vars))
@@ -5033,11 +5272,7 @@ fn parse_python_truth_iterable_values_with_vars(
         .or_else(|| parse_python_truth_generated_values_with_vars(text, vars))
 }
 
-
-fn expand_python_row_generated_values_vielfache(
-    values: &[i64],
-    max_zahl: Option<i64>,
-) -> Vec<i64> {
+fn expand_python_row_generated_values_vielfache(values: &[i64], max_zahl: Option<i64>) -> Vec<i64> {
     let limit = max_zahl.unwrap_or_else(python_row_multiple_limit);
     if limit <= 0 {
         return Vec::new();
@@ -5143,7 +5378,6 @@ fn python_row_spec_to_numbers_with_options(
 pub fn python_row_spec_to_numbers(spec: &str) -> Option<Vec<i64>> {
     python_row_spec_to_numbers_with_options(spec, false, Some(python_row_multiple_limit()))
 }
-
 
 fn expand_fraction_range_piece(piece: &str) -> Option<Vec<(i64, i64)>> {
     let (left, right) = split_fraction_operator(piece, '-')?;
@@ -5398,7 +5632,10 @@ fn python_bruch_spalt(text: &str) -> Option<Vec<Vec<String>>> {
 }
 
 fn is_python_bruch_fraction_tuple(values: &[String]) -> bool {
-    values.len() == 2 && values.iter().all(|value| parse_unsigned_row_i64(value).is_some())
+    values.len() == 2
+        && values
+            .iter()
+            .all(|value| parse_unsigned_row_i64(value).is_some())
 }
 
 fn parse_python_bruch_fraction_tuple(values: &[String]) -> Option<(i64, i64)> {
@@ -5438,13 +5675,15 @@ fn create_ranges_for_python_bruch_list(bruch_list: &[Vec<String>]) -> Option<Pyt
         if flag > 3 {
             return None;
         } else if flag == 3 {
-            let left_denominator = *first_fraction_denominators.get(first_fraction_denominators.len().saturating_sub(2))?;
+            let left_denominator = *first_fraction_denominators
+                .get(first_fraction_denominators.len().saturating_sub(2))?;
             let right_denominator = *first_fraction_denominators.last()?;
             denominator_pieces.push(left_denominator.to_string());
             denominator_pieces.push("-".to_string());
             denominator_pieces.push(right_denominator.to_string());
 
-            let start = *first_fraction_numerators.get(first_fraction_numerators.len().saturating_sub(2))?;
+            let start = *first_fraction_numerators
+                .get(first_fraction_numerators.len().saturating_sub(2))?;
             let end = *first_fraction_numerators.last()?;
             numerator_range = if start <= end {
                 (start..=end).collect()
@@ -5501,8 +5740,6 @@ fn create_ranges_for_python_bruch_list(bruch_list: &[Vec<String>]) -> Option<Pyt
         denominator_spec: denominator_pieces.join(""),
     })
 }
-
-
 
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -5576,7 +5813,10 @@ impl TXT {
                 .filter(|part| !part.trim().is_empty())
                 .map(|part| part.trim().to_string())
                 .collect();
-            self.stextS = trimmed.split_whitespace().map(|part| part.to_string()).collect();
+            self.stextS = trimmed
+                .split_whitespace()
+                .map(|part| part.to_string())
+                .collect();
         } else {
             self.stext = libreta_prompt_custom_split(&trimmed);
             self.stextS = self.stext.clone();
@@ -5620,7 +5860,10 @@ pub fn dictToList<V: Clone>(dict_: &IndexMap<String, V>) -> Vec<V> {
 
 /// Python `retaPrompt.getDictLimtedByKeyList`: OrderedDict over the requested key order.
 #[allow(non_snake_case)]
-pub fn getDictLimtedByKeyList<V: Clone>(d: &IndexMap<String, V>, keys: &[String]) -> IndexMap<String, V> {
+pub fn getDictLimtedByKeyList<V: Clone>(
+    d: &IndexMap<String, V>,
+    keys: &[String],
+) -> IndexMap<String, V> {
     let mut out = IndexMap::new();
     for key in keys {
         if let Some(value) = d.get(key) {
@@ -5824,7 +6067,11 @@ pub fn PromptLoescheVorSpeicherungBefehle(
         (kept.join(" "), String::new())
     } else {
         (
-            placeholder_tokens.into_iter().flatten().collect::<Vec<_>>().join(" "),
+            placeholder_tokens
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" "),
             text_trimmed,
         )
     };
@@ -5860,9 +6107,6 @@ fn parse_python_bruch_spalt_group_piece(piece: &str) -> Option<PythonFractionGro
         denominator_values,
     })
 }
-
-
-
 
 #[derive(Clone, Debug)]
 struct PythonFractionGroup {
@@ -5905,21 +6149,18 @@ fn fraction_denominator_values_from_python_spec(spec: &str) -> Vec<i64> {
         None => (false, trimmed),
     };
 
-    let base_values = python_row_spec_to_numbers_with_options(
-        core,
-        false,
-        Some(python_row_multiple_limit()),
-    )
-    .unwrap_or_else(|| {
-        parse_unsigned_row_i64(core)
-            .map(|value| vec![value])
-            .unwrap_or_default()
-    })
-    .into_iter()
-    .filter(|value| *value > 0)
-    .collect::<BTreeSet<_>>()
-    .into_iter()
-    .collect::<Vec<_>>();
+    let base_values =
+        python_row_spec_to_numbers_with_options(core, false, Some(python_row_multiple_limit()))
+            .unwrap_or_else(|| {
+                parse_unsigned_row_i64(core)
+                    .map(|value| vec![value])
+                    .unwrap_or_default()
+            })
+            .into_iter()
+            .filter(|value| *value > 0)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
 
     if inline_vielfache {
         expand_values_over_python_fraction_allowed_multiples(&base_values)
@@ -6002,17 +6243,15 @@ fn parse_python_fraction_group_piece(piece: &str) -> Option<PythonFractionGroup>
     }
 
     let (vielfache, numerator, denominator) = parse_fraction_pair_with_inline_vielfache(inner)?;
-    let denominator_spec = format!(
-        "{}{}",
-        if vielfache { "v" } else { "" },
-        denominator.abs()
-    );
+    let denominator_spec = format!("{}{}", if vielfache { "v" } else { "" }, denominator.abs());
     let numerator_values = vec![numerator.abs()];
     let denominator_values = fraction_denominator_values_from_python_spec(&denominator_spec);
-    (!numerator_values.is_empty() && !denominator_values.is_empty()).then_some(PythonFractionGroup {
-        numerator_values,
-        denominator_values,
-    })
+    (!numerator_values.is_empty() && !denominator_values.is_empty()).then_some(
+        PythonFractionGroup {
+            numerator_values,
+            denominator_values,
+        },
+    )
 }
 
 fn insert_fraction_group_value(map: &mut BTreeMap<i64, BTreeSet<i64>>, key: i64, value: i64) {
@@ -6250,7 +6489,14 @@ fn add_python_fraction_integer_side_effects(
             )
         })
         .collect::<BTreeMap<_, _>>();
-    let side_effects = addMoreVals2(false, Vec::new(), Vec::new(), &grouped_values, Vec::new(), false);
+    let side_effects = addMoreVals2(
+        false,
+        Vec::new(),
+        Vec::new(),
+        &grouped_values,
+        Vec::new(),
+        false,
+    );
 
     for value in side_effects.sdazu {
         if let Ok(number) = value.parse::<i64>() {
@@ -6305,16 +6551,15 @@ fn build_python_row_buckets_with_global_vielfache(
                 continue;
             }
 
-            let (subtract, core): (bool, std::borrow::Cow<'_, str>) = if let Some((
-                fraction_subtract,
-                fraction_core,
-            )) = split_python_fraction_piece_prefixes(piece_trimmed)
-            {
-                (fraction_subtract, std::borrow::Cow::Owned(fraction_core))
-            } else {
-                let (piece_subtract, piece_core) = strip_row_piece_prefixes(piece_trimmed);
-                (piece_subtract, std::borrow::Cow::Borrowed(piece_core))
-            };
+            let (subtract, core): (bool, std::borrow::Cow<'_, str>) =
+                if let Some((fraction_subtract, fraction_core)) =
+                    split_python_fraction_piece_prefixes(piece_trimmed)
+                {
+                    (fraction_subtract, std::borrow::Cow::Owned(fraction_core))
+                } else {
+                    let (piece_subtract, piece_core) = strip_row_piece_prefixes(piece_trimmed);
+                    (piece_subtract, std::borrow::Cow::Borrowed(piece_core))
+                };
             let core = core.as_ref();
 
             if core.contains('/')
@@ -6469,9 +6714,7 @@ fn build_python_row_buckets_with_global_vielfache(
         non_whole_fraction_groups =
             expand_python_fraction_groups_for_global_vielfache(&non_whole_fraction_groups);
         negative_non_whole_fraction_groups =
-            expand_python_fraction_groups_for_global_vielfache(
-                &negative_non_whole_fraction_groups,
-            );
+            expand_python_fraction_groups_for_global_vielfache(&negative_non_whole_fraction_groups);
         reciprocal_numbers = expand_values_over_python_fraction_allowed_multiples(
             &reciprocal_numbers.iter().copied().collect::<Vec<_>>(),
         )
@@ -6674,7 +6917,6 @@ pub fn bruchBereichsManagementAndWbefehl(
     bruch_bereichs_management_from_normalized(zahlenBereichC, &normalized, zahlenAngaben_)
 }
 
-
 fn prompt_python_default_oberesmaximum_seed() -> i64 {
     // Python retaPrompt liest hier letztlich `tables.hoechsteZeile[1024]` aus dem
     // laufenden Programm oder faellt auf das globale `retaProgram` zurueck.
@@ -6805,7 +7047,6 @@ fn build_python_row_section(
         None,
     )
 }
-
 
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -7629,7 +7870,11 @@ fn retaCmdAbstraction_n_and_1pron(
     extra_params: &[String],
     trailing_tokens: &[String],
 ) -> RetaCmdAbstractionNAnd1ProNResult {
-    if !condition || normalized.iter().any(|token| matches!(token.as_str(), "abc" | "abcd")) {
+    if !condition
+        || normalized
+            .iter()
+            .any(|token| matches!(token.as_str(), "abc" | "abcd"))
+    {
         return RetaCmdAbstractionNAnd1ProNResult::default();
     }
 
@@ -7701,14 +7946,7 @@ fn build_reciprocal_concept_call(
     };
     let (zeiln1, zeiln2) = split_zeiln1234_tokens(&zeilen_tokens);
     let stext_e = prompt_flags_for_reta_execute(invert, suppress_empty, no_headers);
-    let mut argv = retaExecuteNprint(
-        &[],
-        &stext_e,
-        &zeiln1,
-        &zeiln2,
-        &[para.to_string()],
-        None,
-    );
+    let mut argv = retaExecuteNprint(&[], &stext_e, &zeiln1, &zeiln2, &[para.to_string()], None);
     append_passthrough_params_to_reta_argv(&mut argv, extra_params);
     for token in trailing_tokens {
         argv.push(token.clone());
@@ -7798,13 +8036,7 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
     if normalized.iter().any(|t| {
         matches!(
             t.as_str(),
-            "help"
-                | "hilfe"
-                | "befehle"
-                | "kurzbefehle"
-                | "shell"
-                | "python"
-                | "math"
+            "help" | "hilfe" | "befehle" | "kurzbefehle" | "shell" | "python" | "math"
         )
     }) {
         return Vec::new();
@@ -7961,13 +8193,7 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
     if normalized.iter().any(|t| {
         matches!(
             t.as_str(),
-            "help"
-                | "hilfe"
-                | "befehle"
-                | "kurzbefehle"
-                | "shell"
-                | "python"
-                | "math"
+            "help" | "hilfe" | "befehle" | "kurzbefehle" | "shell" | "python" | "math"
         )
     }) {
         return None;
@@ -8752,7 +8978,6 @@ fn parse_row_spec_numbers(row_specs: &[String]) -> Option<Vec<i64>> {
     Some(numbers)
 }
 
-
 fn rotate_python_trailing_prompt_prefix(text: &str) -> String {
     if text.is_empty() {
         return String::new();
@@ -8816,24 +9041,24 @@ fn parse_prefix_and_numeric_suffix(text: &str) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
+    use std::cell::Cell;
     use std::collections::{BTreeMap, BTreeSet};
 
     use super::{
-        addMoreVals, addMoreVals2, anotherOberesMaximum, bruchBereichsManagementAndWbefehl, bruchSpalt,
-        build_reta_calls_from_prompt_tokens, createRangesForBruchLists, dictToList,
-        expand_kurz_kurz_befehl, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
-        getDictLimtedByKeyList, grKl, PromptLoescheVorSpeicherungBefehle, TXT,
-        expand_python_regex_like_tokens, findregEx, regExReplace, allEqSignAbarbeitung, aufloesen, prepare_prompt_big_output_for_stored_reta,
+        addMoreVals, addMoreVals2, allEqSignAbarbeitung, anotherOberesMaximum, aufloesen,
+        bruchBereichsManagementAndWbefehl, bruchSpalt, build_reta_calls_from_prompt_tokens,
+        createRangesForBruchLists, dictToList, expand_kurz_kurz_befehl,
+        expand_python_regex_like_tokens, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
+        findregEx, getDictLimtedByKeyList, grKl, isReTaParameter, is_15or16_command,
+        is_zeilen_angabe_between_kommas_py, libreta_prompt_custom_split,
+        libreta_prompt_custom_split2, libreta_prompt_split_kpattern_commas_py,
+        looks_like_numeric_or_fraction_range, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
         prepare_prompt_big_output_for_stored_rows, promptVorbereitungGrosseAusgabe,
-        PromptGrosseAusgabe, PromptSonderBefehlAktion,
-        PromptVonGrosserAusgabeSonderBefehlAusgaben,
-        is_15or16_command, is_zeilen_angabe_between_kommas_py, isReTaParameter,
-        libreta_prompt_custom_split, libreta_prompt_custom_split2, retaExecuteNprint,
-        zeiln1234create,
-        libreta_prompt_split_kpattern_commas_py, looks_like_numeric_or_fraction_range,
-        python_row_spec_to_numbers, verifyBruchNganzZahlBetweenCommas,
-        verifyBruchNganzZahlCommaList, verkuerze_dict, PromptModus,
+        python_row_spec_to_numbers, regExReplace, retaExecuteNprint,
+        verifyBruchNganzZahlBetweenCommas, verifyBruchNganzZahlCommaList, verkuerze_dict,
+        zeiln1234create, PromptGrosseAusgabe, PromptLoescheVorSpeicherungBefehle, PromptModus,
+        PromptSonderBefehlAktion, PromptVonGrosserAusgabeSonderBefehlAusgaben, TXT,
     };
 
     fn strings(values: &[&str]) -> Vec<String> {
@@ -8872,7 +9097,10 @@ mod tests {
         dict.insert("c".to_string(), 3);
         assert_eq!(dictToList(&dict), vec![1, 2, 3]);
         let limited = getDictLimtedByKeyList(&dict, &strings(&["c", "a", "x"]));
-        assert_eq!(limited.keys().cloned().collect::<Vec<_>>(), strings(&["c", "a"]));
+        assert_eq!(
+            limited.keys().cloned().collect::<Vec<_>>(),
+            strings(&["c", "a"])
+        );
         assert_eq!(limited.values().copied().collect::<Vec<_>>(), vec![3, 1]);
 
         let a = BTreeSet::from([1, 5, 9]);
@@ -8885,10 +9113,16 @@ mod tests {
     fn reta_prompt_fraction_helpers_expose_python_names() {
         let bruch = bruchSpalt("1/2");
         assert_eq!(bruch, vec![vec![], strings(&["1", "2"]), vec![]]);
-        assert_eq!(createRangesForBruchLists(&bruch), Some((vec![1], "2".to_string())));
+        assert_eq!(
+            createRangesForBruchLists(&bruch),
+            Some((vec![1], "2".to_string()))
+        );
 
         let bruch_range = bruchSpalt("1/2-3/3");
-        assert_eq!(createRangesForBruchLists(&bruch_range), Some((vec![1, 2, 3], "2-3".to_string())));
+        assert_eq!(
+            createRangesForBruchLists(&bruch_range),
+            Some((vec![1, 2, 3], "2-3".to_string()))
+        );
     }
 
     #[test]
@@ -8924,28 +9158,19 @@ mod tests {
             Some(PromptSonderBefehlAktion::Shell(strings(&["echo", "hi"])))
         );
 
-        let blocked = PromptVonGrosserAusgabeSonderBefehlAusgaben(
-            false,
-            &strings(&["shell", "abc"]),
-            false,
-        );
+        let blocked =
+            PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &strings(&["shell", "abc"]), false);
         assert!(!blocked.cmdGaveOutput);
         assert_eq!(blocked.aktion, None);
 
-        let logging = PromptVonGrosserAusgabeSonderBefehlAusgaben(
-            false,
-            &strings(&["12", "loggen"]),
-            false,
-        );
+        let logging =
+            PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &strings(&["12", "loggen"]), false);
         assert!(logging.cmdGaveOutput);
         assert!(logging.loggingSwitch);
         assert_eq!(logging.loggingCommand, Some(true));
 
-        let blocked_logging = PromptVonGrosserAusgabeSonderBefehlAusgaben(
-            false,
-            &strings(&["abc", "loggen"]),
-            false,
-        );
+        let blocked_logging =
+            PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &strings(&["abc", "loggen"]), false);
         assert!(!blocked_logging.cmdGaveOutput);
         assert!(!blocked_logging.loggingSwitch);
         assert_eq!(blocked_logging.loggingCommand, None);
@@ -8953,15 +9178,23 @@ mod tests {
 
     #[test]
     fn reta_prompt_number_relation_helpers_follow_python_results() {
-        assert_eq!(findEqualNennerZaehler("1-5", "3-7", Vec::new()), strings(&["3", "4", "5"]));
+        assert_eq!(
+            findEqualNennerZaehler("1-5", "3-7", Vec::new()),
+            strings(&["3", "4", "5"])
+        );
         assert_eq!(
             findNennerZaehlerMakesWholeNum("2-4", "2-8", Vec::new(), Vec::new()),
-            (strings(&["1", "1", "2", "1", "3", "2", "4", "2"]), strings(&["1", "2", "1", "1"]))
+            (
+                strings(&["1", "1", "2", "1", "3", "2", "4", "2"]),
+                strings(&["1", "2", "1", "1"])
+            )
         );
         assert_eq!(anotherOberesMaximum("3-5", 9, 1024), "--oberesmaximum=1025");
-        assert_eq!(anotherOberesMaximum("3-1050", 9, 1024), "--oberesmaximum=1051");
+        assert_eq!(
+            anotherOberesMaximum("3-1050", 9, 1024),
+            "--oberesmaximum=1051"
+        );
     }
-
 
     #[test]
     fn prompt_vorbereitung_grosse_ausgabe_expands_bare_number_defaults() {
@@ -9006,7 +9239,9 @@ mod tests {
 
         assert!(prepared.ifKurzKurz);
         assert!(prepared.liste.contains(&"-ausgabe".to_string()));
-        assert!(prepared.liste.contains(&"--keineueberschriften".to_string()));
+        assert!(prepared
+            .liste
+            .contains(&"--keineueberschriften".to_string()));
     }
 
     #[test]
@@ -9131,26 +9366,12 @@ mod tests {
 
     #[test]
     fn zeiln1234create_names_python_row_builder_for_plain_and_vielfache() {
-        let plain = zeiln1234create(
-            &strings(&[]),
-            true,
-            &[],
-            "12",
-            1024,
-            "12",
-        );
+        let plain = zeiln1234create(&strings(&[]), true, &[], "12", 1024, "12");
         assert_eq!(plain.zeiln1, "--vorhervonausschnitt=12");
         assert_eq!(plain.zeiln2, "--oberesmaximum=1025");
         assert_eq!(plain.zeiln3, "--vorhervonausschnitt=0");
 
-        let vielfache = zeiln1234create(
-            &strings(&["vielfache"]),
-            true,
-            &[],
-            "12",
-            1024,
-            "12",
-        );
+        let vielfache = zeiln1234create(&strings(&["vielfache"]), true, &[], "12", 1024, "12");
         assert_eq!(vielfache.zeiln1, "--vielfachevonzahlen=12");
         assert_eq!(vielfache.zeiln2, "--vorhervonausschnitt=12,v12");
     }
@@ -9172,8 +9393,12 @@ mod tests {
         assert_eq!(argv[0], "reta");
         assert_eq!(argv[1], "-zeilen");
         assert!(argv.iter().any(|token| token == "--invertieren"));
-        assert!(argv.iter().any(|token| token == "--grundstrukturen=emotion"));
-        assert!(argv.iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2"));
+        assert!(argv
+            .iter()
+            .any(|token| token == "--grundstrukturen=emotion"));
+        assert!(argv
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2"));
         assert!(argv.iter().any(|token| token == "--keineleereninhalte"));
         assert!(argv.iter().any(|token| token == "--keineueberschriften"));
         assert!(argv.iter().any(|token| token == "--nocolor"));
@@ -9182,7 +9407,8 @@ mod tests {
     #[test]
     fn reta_cmd_abstraction_n_and_1pron_builds_primary_and_reciprocal_calls() {
         let normalized = strings(&["emotion", "2", "1/2"]);
-        let bruch_management = super::bruch_bereichs_management_from_normalized("", &normalized, &[]);
+        let bruch_management =
+            super::bruch_bereichs_management_from_normalized("", &normalized, &[]);
         let row_buckets = bruch_management.row_buckets();
         let spec = super::semantic_specs()
             .iter()
@@ -9207,10 +9433,18 @@ mod tests {
         assert!(result.was_n_1pro_n_cmd);
         assert!(result.cmd_gave_output);
         assert_eq!(result.calls.len(), 2, "{result:?}");
-        assert!(result.calls[0].iter().any(|token| token == "--grundstrukturen=emotion"));
-        assert!(result.calls[1].iter().any(|token| token == "--grundstrukturen=emotion"));
-        assert!(result.calls[0].iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=2,3"));
-        assert!(result.calls[1].iter().any(|token| token == "--spaltenreihenfolgeundnurdiese=4,5"));
+        assert!(result.calls[0]
+            .iter()
+            .any(|token| token == "--grundstrukturen=emotion"));
+        assert!(result.calls[1]
+            .iter()
+            .any(|token| token == "--grundstrukturen=emotion"));
+        assert!(result.calls[0]
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=2,3"));
+        assert!(result.calls[1]
+            .iter()
+            .any(|token| token == "--spaltenreihenfolgeundnurdiese=4,5"));
     }
 
     #[test]
@@ -9271,30 +9505,20 @@ mod tests {
 
     #[test]
     fn kurz_kurz_expansion_does_not_rewrite_math_commands() {
-        let (_, expanded) = expand_kurz_kurz_befehl(
-            PromptModus::Normal,
-            &strings(&["math", "12a"]),
-        );
+        let (_, expanded) =
+            expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["math", "12a"]));
 
         assert_eq!(expanded, strings(&["math", "12a"]));
     }
 
     #[test]
     fn reta_prompt_delete_before_storage_matches_python_cases() {
-        let by_index = PromptLoescheVorSpeicherungBefehle(
-            "a b c d",
-            PromptModus::Speichern,
-            "2-3",
-        );
+        let by_index = PromptLoescheVorSpeicherungBefehle("a b c d", PromptModus::Speichern, "2-3");
         assert_eq!(by_index.platzhalter, "a d");
         assert_eq!(by_index.promptMode, PromptModus::Normal);
         assert_eq!(by_index.text, "2-3");
 
-        let by_word = PromptLoescheVorSpeicherungBefehle(
-            "a b c d",
-            PromptModus::Speichern,
-            "b d",
-        );
+        let by_word = PromptLoescheVorSpeicherungBefehle("a b c d", PromptModus::Speichern, "b d");
         assert_eq!(by_word.platzhalter, "a c");
         assert_eq!(by_word.promptMode, PromptModus::Normal);
         assert_eq!(by_word.text, "");
@@ -9445,10 +9669,12 @@ mod tests {
 
     #[test]
     fn verkuerze_dict_preserves_first_key_per_value_like_python() {
-        let reduced = verkuerze_dict(&strings(&["a", "b", "c", "d"])
-            .into_iter()
-            .zip(strings(&["1", "2", "1", "3"]))
-            .collect::<Vec<_>>());
+        let reduced = verkuerze_dict(
+            &strings(&["a", "b", "c", "d"])
+                .into_iter()
+                .zip(strings(&["1", "2", "1", "3"]))
+                .collect::<Vec<_>>(),
+        );
         assert_eq!(
             reduced,
             vec![
@@ -9632,7 +9858,10 @@ mod tests {
             findregEx("r\"^emo.*\"", &strings(&["emotion", "freiheit"])),
             strings(&["emotion"])
         );
-        assert_eq!(regExReplace(&strings(&["r\"emo.*\""])), strings(&["emotion"]));
+        assert_eq!(
+            regExReplace(&strings(&["r\"emo.*\""])),
+            strings(&["emotion"])
+        );
         assert_eq!(
             regExReplace(&strings(&["reta", "-zeilen", "--zeit", "=", "r\"heu.*\""])),
             strings(&["reta", "-zeilen", "--zeit=heute"])
@@ -9665,10 +9894,7 @@ mod tests {
             "-ausgabe",
             "--art=r\"^(html|csv)$\"",
         ]));
-        assert_eq!(
-            expanded,
-            strings(&["reta", "-ausgabe", "--art=html,csv"])
-        );
+        assert_eq!(expanded, strings(&["reta", "-ausgabe", "--art=html,csv"]));
     }
 
     #[test]
@@ -9686,7 +9912,10 @@ mod tests {
             "--zeit=r\"heu.*\"",
             "--zeit=morgen",
         ]));
-        assert_eq!(expanded, strings(&["reta", "-zeilen", "--zeit=heute,morgen"]));
+        assert_eq!(
+            expanded,
+            strings(&["reta", "-zeilen", "--zeit=heute,morgen"])
+        );
     }
 
     #[test]
@@ -9700,12 +9929,13 @@ mod tests {
         assert!(is_15or16_command("16_15"));
         assert!(is_15or16_command("16_15_"));
 
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
-            "15_15", "15_9_6", "16_15", "12",
-        ]));
+        let calls =
+            build_reta_calls_from_prompt_tokens(&strings(&["15_15", "15_9_6", "16_15", "12"]));
         assert!(calls.iter().any(|call| call.iter().any(|token| {
             token.starts_with("--grundstrukturen=")
-                && token.contains("nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)")
+                && token.contains(
+                    "nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)",
+                )
                 && token.contains("Größenordnung")
                 && !token.contains("pro_contra")
                 && !token.contains("strukturgroesse")
@@ -9714,10 +9944,8 @@ mod tests {
 
     #[test]
     fn prompt_execution_regex_expands_all_python_main_parameters() {
-        let expanded = expand_python_regex_like_tokens(&strings(&[
-            "reta",
-            "r\"^(h|help|debug|nichts)$\"",
-        ]));
+        let expanded =
+            expand_python_regex_like_tokens(&strings(&["reta", "r\"^(h|help|debug|nichts)$\""]));
         assert_eq!(
             expanded,
             strings(&["reta", "-h", "-help", "-debug", "-nichts"])
@@ -9726,11 +9954,8 @@ mod tests {
 
     #[test]
     fn prompt_execution_regex_keeps_python_empty_value_parameters_as_flags() {
-        let expanded = expand_python_regex_like_tokens(&strings(&[
-            "reta",
-            "-zeilen",
-            "--zaehlung=r\"^1$\"",
-        ]));
+        let expanded =
+            expand_python_regex_like_tokens(&strings(&["reta", "-zeilen", "--zaehlung=r\"^1$\""]));
         assert_eq!(expanded, strings(&["reta", "-zeilen", "--zaehlung"]));
     }
 
@@ -9848,29 +10073,33 @@ mod tests {
     #[test]
     fn universum_equal_fraction_range_emits_verhaeltnisgleicherzahl_call() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "2-4/2-4"]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--universum=verhaeltnisgleicherzahl")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=2,3,4")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--universum=verhaeltnisgleicherzahl")
+        }));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=2,3,4")
+        }));
     }
 
     #[test]
     fn fraction_rectangle_expands_like_python_create_ranges_for_bruch_lists() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "1/2-3/3"]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--grundstrukturen=emotion")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--grundstrukturen=emotion")
+        }));
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=3")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=2,3")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=2,3")
+        }));
     }
 
     #[test]
@@ -9882,9 +10111,10 @@ mod tests {
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=6")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=3,7")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=3,7")
+        }));
         assert!(!calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochengalaxie=3")));
@@ -9902,9 +10132,10 @@ mod tests {
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=8")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=8,9,10")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=8,9,10")
+        }));
         assert!(!calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=2")));
@@ -9939,40 +10170,30 @@ mod tests {
     fn repeated_denominator_fraction_range_uses_python_reverse_mapping() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "2/5-3/5"]));
         assert_eq!(calls.len(), 1);
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--gebrochenemotion=5"));
+        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=5"));
         assert!(calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=2,3"));
         assert!(calls[0]
             .iter()
             .any(|token| token == "--spaltenreihenfolgeundnurdiese=1"));
-        assert!(!calls[0]
-            .iter()
-            .any(|token| token == "--gebrochenemotion=2"));
-        assert!(!calls[0]
-            .iter()
-            .any(|token| token == "--gebrochenemotion=3"));
+        assert!(!calls[0].iter().any(|token| token == "--gebrochenemotion=2"));
+        assert!(!calls[0].iter().any(|token| token == "--gebrochenemotion=3"));
     }
 
     #[test]
     fn fraction_global_vielfache_expands_non_whole_numerators_like_python() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
-            "emotion",
-            "vielfache",
-            "2/3",
-            "-4/3",
-        ]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--gebrochenemotion=3")
-            && call
-                .iter()
-                .any(|token| token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22")
-            && call
-                .iter()
-                .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")));
+        let calls =
+            build_reta_calls_from_prompt_tokens(&strings(&["emotion", "vielfache", "2/3", "-4/3"]));
+        assert!(calls.iter().any(|call| {
+            call.iter().any(|token| token == "--gebrochenemotion=3")
+                && call
+                    .iter()
+                    .any(|token| token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22")
+                && call
+                    .iter()
+                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")
+        }));
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=6")));
@@ -9991,20 +10212,23 @@ mod tests {
     #[test]
     fn fraction_global_vielfache_adds_integer_side_effect_rows_like_python() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "vielfache", "2/3"]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--grundstrukturen=emotion")
-            && call.iter().any(|token| {
-                token.starts_with("--vielfachevonzahlen=") && token.contains('2')
-            })));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--grundstrukturen=emotion")
+                && call
+                    .iter()
+                    .any(|token| token.starts_with("--vielfachevonzahlen=") && token.contains('2'))
+        }));
     }
 
     #[test]
     fn fraction_global_vielfache_adds_equal_fraction_side_effect_like_python() {
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "vielfache", "2/3"]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--universum=verhaeltnisgleicherzahl")));
+        let calls =
+            build_reta_calls_from_prompt_tokens(&strings(&["universum", "vielfache", "2/3"]));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--universum=verhaeltnisgleicherzahl")
+        }));
     }
 
     #[test]
@@ -10023,21 +10247,20 @@ mod tests {
     #[test]
     fn repeated_denominator_range_with_equal_fraction_keeps_side_effects() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["universum", "3/5-5/5"]));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--gebrochenuniversum=5")
-            && call
-                .iter()
-                .any(|token| token == "--vorhervonausschnitt=3,4,5")
-            && call
-                .iter()
-                .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--universum=verhaeltnisgleicherzahl")
-            && call
-                .iter()
-                .any(|token| token == "--vorhervonausschnitt=5")));
+        assert!(calls.iter().any(|call| {
+            call.iter().any(|token| token == "--gebrochenuniversum=5")
+                && call
+                    .iter()
+                    .any(|token| token == "--vorhervonausschnitt=3,4,5")
+                && call
+                    .iter()
+                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=1")
+        }));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--universum=verhaeltnisgleicherzahl")
+                && call.iter().any(|token| token == "--vorhervonausschnitt=5")
+        }));
     }
 
     #[test]
@@ -10130,24 +10353,24 @@ mod tests {
         assert!(calls[0]
             .iter()
             .any(|token| token == "--bedeutung=primzahlkreuz"));
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--oberesmaximum=1029"));
+        assert!(calls[0].iter().any(|token| token == "--oberesmaximum=1029"));
     }
 
     #[test]
     fn groesse_command_emits_second_python_reta_execute_call() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["groesse", "12"]));
         assert_eq!(calls.len(), 2);
-        assert!(calls
-            .iter()
-            .any(|call| call.iter().any(|token| token == "--strukturgroesse=organisation")));
-        assert!(calls
-            .iter()
-            .any(|call| call.iter().any(|token| token == "--strukturgroesse=strukturgroesse")
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--strukturgroesse=organisation")
+        }));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--strukturgroesse=strukturgroesse")
                 && call
                     .iter()
-                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2")));
+                    .any(|token| token == "--spaltenreihenfolgeundnurdiese=1,2")
+        }));
     }
 
     #[test]
@@ -10178,22 +10401,29 @@ mod tests {
         );
 
         let calls = build_reta_calls_from_prompt_tokens(&expanded);
-        assert!(calls
-            .iter()
-            .any(|call| call.iter().any(|token| token == "--menschliches=motivation")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--menschliches=motivation")
+        }));
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--galaxie=thomas")));
-        assert!(calls.iter().all(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=2,3,4,6,12")));
+        assert!(calls.iter().all(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=2,3,4,6,12")
+        }));
     }
 
     #[test]
     fn bare_fraction_row_expands_to_python_default_fraction_commands() {
         let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["2/3"]));
-        for expected in ["2/3", "mulpri", "a", "t", "w", "u", "B", "G", "E", "groesse"] {
-            assert!(expanded.contains(&expected.to_string()), "missing {expected} in {expanded:?}");
+        for expected in [
+            "2/3", "mulpri", "a", "t", "w", "u", "B", "G", "E", "groesse",
+        ] {
+            assert!(
+                expanded.contains(&expected.to_string()),
+                "missing {expected} in {expanded:?}"
+            );
         }
 
         let calls = build_reta_calls_from_prompt_tokens(&expanded);
@@ -10215,7 +10445,9 @@ mod tests {
             ]),
         );
         assert!(expanded.iter().any(|token| token == "-ausgabe"));
-        assert!(expanded.iter().any(|token| token == "--keineueberschriften"));
+        assert!(expanded
+            .iter()
+            .any(|token| token == "--keineueberschriften"));
 
         let calls = build_reta_calls_from_prompt_tokens(&expanded);
         assert!(!calls.is_empty());
@@ -10230,15 +10462,16 @@ mod tests {
         assert_eq!(expanded, strings(&["a", "t", "12"]));
         let calls = build_reta_calls_from_prompt_tokens(&expanded);
         assert_eq!(calls.len(), 2);
-        assert!(calls
-            .iter()
-            .any(|call| call.iter().any(|token| token == "--menschliches=motivation")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--menschliches=motivation")
+        }));
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--galaxie=thomas")));
-        assert!(calls.iter().all(|call| call
+        assert!(calls
             .iter()
-            .any(|token| token == "--vorhervonausschnitt=12")));
+            .all(|call| call.iter().any(|token| token == "--vorhervonausschnitt=12")));
     }
 
     #[test]
@@ -10259,9 +10492,7 @@ mod tests {
     fn reciprocal_concept_runs_for_integer_rows_like_python() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["12", "EIGRweisheit"]));
         assert_eq!(calls.len(), 1);
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--konzept2=weisheit"));
+        assert!(calls[0].iter().any(|token| token == "--konzept2=weisheit"));
         assert!(calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=0"));
@@ -10366,14 +10597,20 @@ mod tests {
 
     #[test]
     fn python_eval_style_row_collections_accept_concat_union_and_star_unpacking() {
-        assert_eq!(python_row_spec_to_numbers("[1,2]+[2,4]"), Some(vec![1, 2, 4]));
-        assert_eq!(python_row_spec_to_numbers("{1,2}|{2,5}"), Some(vec![1, 2, 5]));
-        assert_eq!(python_row_spec_to_numbers("[*range(1,4),7]"), Some(vec![1, 2, 3, 7]));
+        assert_eq!(
+            python_row_spec_to_numbers("[1,2]+[2,4]"),
+            Some(vec![1, 2, 4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("{1,2}|{2,5}"),
+            Some(vec![1, 2, 5])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[*range(1,4),7]"),
+            Some(vec![1, 2, 3, 7])
+        );
 
-        let calls = build_reta_calls_from_prompt_tokens(&strings(&[
-            "emotion",
-            "[1,2]+[2,4]",
-        ]));
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "[1,2]+[2,4]"]));
         assert_eq!(calls.len(), 1);
         assert!(calls[0]
             .iter()
@@ -10432,9 +10669,7 @@ mod tests {
     fn fraction_inline_vielfache_uses_python_gebrochen_allowed_numbers() {
         let calls = build_reta_calls_from_prompt_tokens(&strings(&["emotion", "v2/3"]));
         assert_eq!(calls.len(), 1);
-        assert!(calls[0]
-            .iter()
-            .any(|token| token == "--gebrochenemotion=2"));
+        assert!(calls[0].iter().any(|token| token == "--gebrochenemotion=2"));
         assert!(calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=3,6,9,12,15,18,21"));
@@ -10448,9 +10683,10 @@ mod tests {
         assert!(calls
             .iter()
             .any(|call| call.iter().any(|token| token == "--gebrochenemotion=3")));
-        assert!(calls.iter().any(|call| call
-            .iter()
-            .any(|token| token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22")));
+        assert!(calls.iter().any(|call| {
+            call.iter()
+                .any(|token| token == "--vorhervonausschnitt=2,4,6,8,10,12,14,16,18,20,22")
+        }));
         assert!(!calls
             .iter()
             .flat_map(|call| call.iter())
@@ -10502,12 +10738,20 @@ mod tests {
         );
     }
 
-
     #[test]
     fn python_eval_style_rows_follow_python_integer_operator_semantics_deeper() {
-        assert_eq!(python_row_spec_to_numbers("[-7//3, -7%3, 7//3, 7%3]"), Some(vec![1, 2]));
-        assert_eq!(python_row_spec_to_numbers("[-2**2, (-2)**2]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[0b1010 & 0x6, 1_2 << 1, ~-3]"), Some(vec![2, 24]));
+        assert_eq!(
+            python_row_spec_to_numbers("[-7//3, -7%3, 7//3, 7%3]"),
+            Some(vec![1, 2])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[-2**2, (-2)**2]"),
+            Some(vec![4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[0b1010 & 0x6, 1_2 << 1, ~-3]"),
+            Some(vec![2, 24])
+        );
     }
 
     #[test]
@@ -10516,18 +10760,36 @@ mod tests {
             python_row_spec_to_numbers("[n if n & 1 else 10 for n in range(5) if True]"),
             Some(vec![1, 3, 10])
         );
-        assert_eq!(python_row_spec_to_numbers("({1,2,3} - {2}) & {1,3,4}"), Some(vec![1, 3]));
-        assert_eq!(python_row_spec_to_numbers("{1,2,3} ^ {3,4}"), Some(vec![1, 2, 4]));
+        assert_eq!(
+            python_row_spec_to_numbers("({1,2,3} - {2}) & {1,3,4}"),
+            Some(vec![1, 3])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("{1,2,3} ^ {3,4}"),
+            Some(vec![1, 2, 4])
+        );
     }
 
     #[test]
     fn python_eval_style_rows_preserve_sequence_duplicates_before_final_set_conversion_deeper() {
         assert_eq!(python_row_spec_to_numbers("[sum([1,1,2])]"), Some(vec![4]));
         assert_eq!(python_row_spec_to_numbers("[len([1,1,2])]"), Some(vec![3]));
-        assert_eq!(python_row_spec_to_numbers("[len(set([1,1,2]))]"), Some(vec![2]));
-        assert_eq!(python_row_spec_to_numbers("[sum([n for n in [1,1,2]])]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[sum(n for n in [1,1,2])]"), Some(vec![4]));
-        assert_eq!(python_row_spec_to_numbers("[sum([1,2,3], 10)]"), Some(vec![16]));
+        assert_eq!(
+            python_row_spec_to_numbers("[len(set([1,1,2]))]"),
+            Some(vec![2])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[sum([n for n in [1,1,2]])]"),
+            Some(vec![4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[sum(n for n in [1,1,2])]"),
+            Some(vec![4])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[sum([1,2,3], 10)]"),
+            Some(vec![16])
+        );
     }
 
     #[test]
@@ -10551,9 +10813,18 @@ mod tests {
         assert_eq!(python_row_spec_to_numbers("[]"), Some(Vec::new()));
         assert_eq!(python_row_spec_to_numbers("[0]"), Some(Vec::new()));
         assert_eq!(python_row_spec_to_numbers("5-3"), Some(Vec::new()));
-        assert_eq!(python_row_spec_to_numbers("[*divmod(17,5)]"), Some(vec![2, 3]));
-        assert_eq!(python_row_spec_to_numbers("[*map(abs, [-2,3])]"), Some(vec![2, 3]));
-        assert_eq!(python_row_spec_to_numbers("[*filter(None, [-2,0,3])]"), Some(vec![3]));
+        assert_eq!(
+            python_row_spec_to_numbers("[*divmod(17,5)]"),
+            Some(vec![2, 3])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[*map(abs, [-2,3])]"),
+            Some(vec![2, 3])
+        );
+        assert_eq!(
+            python_row_spec_to_numbers("[*filter(None, [-2,0,3])]"),
+            Some(vec![3])
+        );
         assert_eq!(
             python_row_spec_to_numbers("[n for n in sorted([3,1,2], reverse=True) if n > 1]"),
             Some(vec![2, 3])
@@ -10590,7 +10861,10 @@ mod tests {
             python_row_spec_to_numbers("[[10,20,30][1], range(10)[-1], ([1,2]+[3])[2]]"),
             Some(vec![3, 9, 20])
         );
-        assert_eq!(python_row_spec_to_numbers("[*range(10)[2:8:2]]"), Some(vec![2, 4, 6]));
+        assert_eq!(
+            python_row_spec_to_numbers("[*range(10)[2:8:2]]"),
+            Some(vec![2, 4, 6])
+        );
         assert_eq!(
             python_row_spec_to_numbers("[math.gcd(84,30), math.isqrt(80), math.comb(5,2)]"),
             Some(vec![6, 8, 10])
@@ -10652,7 +10926,9 @@ mod tests {
             Some(vec![2, 4])
         );
         assert_eq!(
-            python_row_spec_to_numbers("[k + v for k,v in {n:n*n for n in range(1,4)}.items() if v > 1]"),
+            python_row_spec_to_numbers(
+                "[k + v for k,v in {n:n*n for n in range(1,4)}.items() if v > 1]"
+            ),
             Some(vec![6, 12])
         );
         assert_eq!(
@@ -10668,7 +10944,4 @@ mod tests {
             Some(vec![3, 5, 7])
         );
     }
-
-
-
 }

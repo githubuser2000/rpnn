@@ -1,10 +1,10 @@
 use std::env;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::io::{self, IsTerminal, Read, Write};
 use std::os::raw::c_char;
 use std::path::PathBuf;
 
-use libloading::{Library, Symbol, library_filename};
+use libloading::{library_filename, Library, Symbol};
 
 #[repr(C)]
 struct RetaFfiResponse {
@@ -24,6 +24,10 @@ type RetaRunArgvFn = unsafe extern "C" fn(
 ) -> RetaFfiResponse;
 
 type RetaFreeStringFn = unsafe extern "C" fn(ptr: *mut c_char);
+type RetaAbiVersionFn = unsafe extern "C" fn() -> u32;
+
+const EXPECTED_RETA_ABI_VERSION: u32 = 1;
+const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
 
 fn main() {
     std::process::exit(real_main());
@@ -42,10 +46,32 @@ fn real_main() -> i32 {
     };
 
     unsafe {
+        let abi_version: Symbol<'_, RetaAbiVersionFn> = match library.get(b"reta_abi_version") {
+            Ok(symbol) => symbol,
+            Err(error) => {
+                let _ = writeln!(
+                    io::stderr(),
+                    "reta launcher failed: missing symbol reta_abi_version: {error}"
+                );
+                return 127;
+            }
+        };
+        let actual_abi = abi_version();
+        if actual_abi != EXPECTED_RETA_ABI_VERSION {
+            let _ = writeln!(
+                io::stderr(),
+                "reta launcher failed: incompatible libreta ABI {actual_abi}, expected {EXPECTED_RETA_ABI_VERSION}"
+            );
+            return 127;
+        }
+
         let run: Symbol<'_, RetaRunArgvFn> = match library.get(b"reta_run_argv") {
             Ok(symbol) => symbol,
             Err(error) => {
-                let _ = writeln!(io::stderr(), "reta launcher failed: missing symbol reta_run_argv: {error}");
+                let _ = writeln!(
+                    io::stderr(),
+                    "reta launcher failed: missing symbol reta_run_argv: {error}"
+                );
                 return 127;
             }
         };
@@ -53,7 +79,10 @@ fn real_main() -> i32 {
         let free: Symbol<'_, RetaFreeStringFn> = match library.get(b"reta_free_string") {
             Ok(symbol) => symbol,
             Err(error) => {
-                let _ = writeln!(io::stderr(), "reta launcher failed: missing symbol reta_free_string: {error}");
+                let _ = writeln!(
+                    io::stderr(),
+                    "reta launcher failed: missing symbol reta_free_string: {error}"
+                );
                 return 127;
             }
         };
@@ -119,7 +148,10 @@ fn load_reta_library() -> Result<Library, String> {
     for candidate in reta_library_candidates() {
         let display = candidate.display().to_string();
         match unsafe { Library::new(&candidate) } {
-            Ok(library) => return Ok(library),
+            Ok(library) => match validate_reta_library_abi(&library) {
+                Ok(()) => return Ok(library),
+                Err(error) => errors.push(format!("{display}: {error}")),
+            },
             Err(error) => errors.push(format!("{display}: {error}")),
         }
     }
@@ -127,7 +159,16 @@ fn load_reta_library() -> Result<Library, String> {
     let fallback_name = library_filename("reta");
     let fallback_display = fallback_name.to_string_lossy().into_owned();
     match unsafe { Library::new(&fallback_name) } {
-        Ok(library) => Ok(library),
+        Ok(library) => match validate_reta_library_abi(&library) {
+            Ok(()) => Ok(library),
+            Err(error) => {
+                errors.push(format!("{fallback_display}: {error}"));
+                Err(format!(
+                    "could not load compatible libreta shared library; tried {}",
+                    errors.join(" | ")
+                ))
+            }
+        },
         Err(error) => {
             errors.push(format!("{fallback_display}: {error}"));
             Err(format!(
@@ -135,6 +176,22 @@ fn load_reta_library() -> Result<Library, String> {
                 errors.join(" | ")
             ))
         }
+    }
+}
+
+fn validate_reta_library_abi(library: &Library) -> Result<(), String> {
+    let abi_version = unsafe {
+        library
+            .get::<RetaAbiVersionFn>(b"reta_abi_version")
+            .map_err(|error| format!("missing symbol reta_abi_version: {error}"))?
+    };
+    let actual = unsafe { abi_version() };
+    if actual == EXPECTED_RETA_ABI_VERSION {
+        Ok(())
+    } else {
+        Err(format!(
+            "incompatible libreta ABI {actual}, expected {EXPECTED_RETA_ABI_VERSION}"
+        ))
     }
 }
 
@@ -180,9 +237,26 @@ unsafe fn take_owned_string(ptr: *mut c_char, free: &Symbol<'_, RetaFreeStringFn
         return String::new();
     }
 
-    let text = unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned();
-    unsafe { free(ptr); }
+    let text = unsafe { read_c_string_lossy_bounded(ptr, MAX_FFI_STRING_BYTES) }
+        .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
+    unsafe {
+        free(ptr);
+    }
     text
+}
+
+unsafe fn read_c_string_lossy_bounded(
+    ptr: *const c_char,
+    max_bytes: usize,
+) -> Result<String, String> {
+    for len in 0..max_bytes {
+        let byte = unsafe { *ptr.add(len) };
+        if byte == 0 {
+            let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+            return Ok(String::from_utf8_lossy(bytes).into_owned());
+        }
+    }
+    Err(format!(
+        "C string is longer than {max_bytes} bytes or not NUL-terminated"
+    ))
 }

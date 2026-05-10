@@ -52,39 +52,54 @@ pub fn run_rpe_from_env() -> i32 {
     run_rpe(std::env::args().collect())
 }
 
+fn ffi_guard_i32<F>(name: &str, f: F) -> i32
+where
+    F: FnOnce() -> i32,
+{
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(exit_code) => exit_code,
+        Err(_) => {
+            eprintln!("panic inside {name}");
+            101
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
-    let kind = match kind {
-        1 => PromptFrontendKind::Rp,
-        2 => PromptFrontendKind::Rpl,
-        3 => PromptFrontendKind::Rpb,
-        4 => PromptFrontendKind::Rpe,
-        _ => PromptFrontendKind::Auto,
-    };
-    run_with_kind(std::env::args().collect(), kind)
+    ffi_guard_i32("retaprompt_run_kind_from_env", || {
+        let kind = match kind {
+            1 => PromptFrontendKind::Rp,
+            2 => PromptFrontendKind::Rpl,
+            3 => PromptFrontendKind::Rpb,
+            4 => PromptFrontendKind::Rpe,
+            _ => PromptFrontendKind::Auto,
+        };
+        run_with_kind(std::env::args().collect(), kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_auto_from_env() -> i32 {
-    run_auto_from_env()
+    ffi_guard_i32("retaprompt_run_auto_from_env", run_auto_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_rp_from_env() -> i32 {
-    run_rp_from_env()
+    ffi_guard_i32("retaprompt_run_rp_from_env", run_rp_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_rpl_from_env() -> i32 {
-    run_rpl_from_env()
+    ffi_guard_i32("retaprompt_run_rpl_from_env", run_rpl_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_rpb_from_env() -> i32 {
-    run_rpb_from_env()
+    ffi_guard_i32("retaprompt_run_rpb_from_env", run_rpb_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_run_rpe_from_env() -> i32 {
-    run_rpe_from_env()
+    ffi_guard_i32("retaprompt_run_rpe_from_env", run_rpe_from_env)
 }

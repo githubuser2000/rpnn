@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::io::{self, IsTerminal};
 use std::os::raw::c_char;
 use std::path::PathBuf;
@@ -51,7 +51,7 @@ pub mod shared {
 pub mod domain {
     pub mod python_source_of_truth {
         use std::collections::BTreeMap;
-        use std::ffi::{CStr, CString};
+        use std::ffi::CString;
         use std::os::raw::c_char;
         use std::sync::{Mutex, OnceLock};
 
@@ -66,15 +66,18 @@ pub mod domain {
         type FreeStringFn = unsafe extern "C" fn(*mut c_char);
 
         static ALL_MAIN_ALIAS_GROUPS_CACHE: OnceLock<Vec<PythonAliasGroup>> = OnceLock::new();
-        static PARAMETER_ALIAS_GROUPS_CACHE: OnceLock<Mutex<BTreeMap<String, Vec<PythonAliasGroup>>>> =
-            OnceLock::new();
+        static PARAMETER_ALIAS_GROUPS_CACHE: OnceLock<
+            Mutex<BTreeMap<String, Vec<PythonAliasGroup>>>,
+        > = OnceLock::new();
         static MAIN_ALIAS_RESOLUTION_CACHE: OnceLock<BTreeMap<String, String>> = OnceLock::new();
 
         pub fn all_main_alias_groups(
             _words: &crate::shared::words_py::Words,
         ) -> Vec<PythonAliasGroup> {
             ALL_MAIN_ALIAS_GROUPS_CACHE
-                .get_or_init(|| load_alias_groups_from_json(b"reta_all_main_alias_groups_json", None))
+                .get_or_init(|| {
+                    load_alias_groups_from_json(b"reta_all_main_alias_groups_json", None)
+                })
                 .clone()
         }
 
@@ -183,29 +186,30 @@ pub mod domain {
 
         fn to_c_string_lossy(text: &str) -> CString {
             let sanitized = text.replace('\0', "�");
-            CString::new(sanitized)
-                .expect("sanitized alias string must not contain interior null bytes")
+            CString::new(sanitized).unwrap_or_else(|_| CString::default())
         }
 
         unsafe fn take_owned_string(ptr: *mut c_char, free: FreeStringFn) -> String {
             if ptr.is_null() {
                 return String::new();
             }
-            let owned = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+            let owned =
+                unsafe { crate::read_c_string_lossy_bounded(ptr, crate::MAX_FFI_STRING_BYTES) }
+                    .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
             unsafe { free(ptr) };
             owned
         }
     }
 }
 
-#[path = "../../../src/prompt/tokenize.rs"]
-pub mod tokenize;
-#[path = "../../../src/prompt/semantic_choices.rs"]
-pub mod semantic_choices;
-#[path = "../../../src/prompt/python_like.rs"]
-pub mod python_like;
 #[path = "../../../src/prompt/commands.rs"]
 pub mod commands;
+#[path = "../../../src/prompt/python_like.rs"]
+pub mod python_like;
+#[path = "../../../src/prompt/semantic_choices.rs"]
+pub mod semantic_choices;
+#[path = "../../../src/prompt/tokenize.rs"]
+pub mod tokenize;
 
 #[derive(Debug, Clone, Default)]
 pub struct RetaRunResult {
@@ -255,14 +259,19 @@ type RetaRunArgvFn = unsafe extern "C" fn(
 ) -> RetaFfiResponse;
 
 type RetaFreeStringFn = unsafe extern "C" fn(*mut c_char);
+type RetaAbiVersionFn = unsafe extern "C" fn() -> u32;
 type RetaSharedWordsJsonFn = unsafe extern "C" fn() -> *mut c_char;
+
+const EXPECTED_RETA_ABI_VERSION: u32 = 1;
+const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
 type RetaAllMainAliasGroupsJsonFn = unsafe extern "C" fn() -> *mut c_char;
 type RetaParameterAliasGroupsForMainJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
 
 static RETA_RUN_ARGV_FN: OnceLock<Result<RetaRunArgvFn, String>> = OnceLock::new();
 static RETA_FREE_STRING_FN: OnceLock<Result<RetaFreeStringFn, String>> = OnceLock::new();
 static RETA_SHARED_WORDS_JSON_FN: OnceLock<Result<RetaSharedWordsJsonFn, String>> = OnceLock::new();
-static RETA_ALL_MAIN_ALIAS_GROUPS_JSON_FN: OnceLock<Result<RetaAllMainAliasGroupsJsonFn, String>> = OnceLock::new();
+static RETA_ALL_MAIN_ALIAS_GROUPS_JSON_FN: OnceLock<Result<RetaAllMainAliasGroupsJsonFn, String>> =
+    OnceLock::new();
 static RETA_PARAMETER_ALIAS_GROUPS_FOR_MAIN_JSON_FN: OnceLock<
     Result<RetaParameterAliasGroupsForMainJsonFn, String>,
 > = OnceLock::new();
@@ -294,8 +303,14 @@ where
         }
     };
 
-    let argv_cstrings = args.iter().map(|arg| to_c_string_lossy(arg)).collect::<Vec<_>>();
-    let argv_ptrs = argv_cstrings.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
+    let argv_cstrings = args
+        .iter()
+        .map(|arg| to_c_string_lossy(arg))
+        .collect::<Vec<_>>();
+    let argv_ptrs = argv_cstrings
+        .iter()
+        .map(|arg| arg.as_ptr())
+        .collect::<Vec<_>>();
 
     let response = unsafe {
         run(
@@ -336,7 +351,9 @@ fn load_shared_words_snapshot() -> shared::words_py::Words {
     let free = match reta_free_string_fn() {
         Ok(free) => free,
         Err(message) => {
-            eprintln!("retaprompt_commands could not resolve reta_free_string while loading words: {message}");
+            eprintln!(
+                "retaprompt_commands could not resolve reta_free_string while loading words: {message}"
+            );
             return shared::words_py::Words::empty();
         }
     };
@@ -359,15 +376,15 @@ fn detect_terminal_width() -> Option<usize> {
         .filter(|width| *width > 0)
 }
 
-static RETA_LIBRARY: OnceLock<Result<usize, String>> = OnceLock::new();
+static RETA_LIBRARY: OnceLock<Result<&'static Library, String>> = OnceLock::new();
 
 fn reta_library() -> Result<&'static Library, String> {
-    match RETA_LIBRARY.get_or_init(|| {
-        load_reta_library().map(|library| Box::leak(Box::new(library)) as *mut Library as usize)
-    }) {
-        Ok(ptr) => Ok(unsafe { &*(*ptr as *const Library) }),
-        Err(message) => Err(message.clone()),
-    }
+    RETA_LIBRARY
+        .get_or_init(|| {
+            let library = load_reta_library()?;
+            Ok(Box::leak(Box::new(library)))
+        })
+        .clone()
 }
 
 fn load_reta_library() -> Result<Library, String> {
@@ -375,7 +392,10 @@ fn load_reta_library() -> Result<Library, String> {
     for candidate in library_candidates("reta", "RETA_LIB_PATH") {
         let display = candidate.display().to_string();
         match unsafe { Library::new(&candidate) } {
-            Ok(library) => return Ok(library),
+            Ok(library) => match validate_reta_library_abi(&library) {
+                Ok(()) => return Ok(library),
+                Err(error) => errors.push(format!("{display}: {error}")),
+            },
             Err(error) => errors.push(format!("{display}: {error}")),
         }
     }
@@ -383,6 +403,22 @@ fn load_reta_library() -> Result<Library, String> {
         "could not load libreta.so; tried {}",
         errors.join(" | ")
     ))
+}
+
+fn validate_reta_library_abi(library: &Library) -> Result<(), String> {
+    let abi_version = unsafe {
+        library
+            .get::<RetaAbiVersionFn>(b"reta_abi_version")
+            .map_err(|error| format!("missing symbol reta_abi_version: {error}"))?
+    };
+    let actual = unsafe { abi_version() };
+    if actual == EXPECTED_RETA_ABI_VERSION {
+        Ok(())
+    } else {
+        Err(format!(
+            "incompatible libreta ABI {actual}, expected {EXPECTED_RETA_ABI_VERSION}"
+        ))
+    }
 }
 
 fn reta_run_argv_fn() -> Result<RetaRunArgvFn, String> {
@@ -435,21 +471,28 @@ fn reta_all_main_alias_groups_json_fn() -> Result<RetaAllMainAliasGroupsJsonFn, 
                 library
                     .get::<RetaAllMainAliasGroupsJsonFn>(b"reta_all_main_alias_groups_json")
                     .map(|symbol| *symbol)
-                    .map_err(|error| format!("missing symbol reta_all_main_alias_groups_json: {error}"))
+                    .map_err(|error| {
+                        format!("missing symbol reta_all_main_alias_groups_json: {error}")
+                    })
             }
         })
         .clone()
 }
 
-fn reta_parameter_alias_groups_for_main_json_fn() -> Result<RetaParameterAliasGroupsForMainJsonFn, String> {
+fn reta_parameter_alias_groups_for_main_json_fn(
+) -> Result<RetaParameterAliasGroupsForMainJsonFn, String> {
     RETA_PARAMETER_ALIAS_GROUPS_FOR_MAIN_JSON_FN
         .get_or_init(|| {
             let library = reta_library()?;
             unsafe {
                 library
-                    .get::<RetaParameterAliasGroupsForMainJsonFn>(b"reta_parameter_alias_groups_for_main_json")
+                    .get::<RetaParameterAliasGroupsForMainJsonFn>(
+                        b"reta_parameter_alias_groups_for_main_json",
+                    )
                     .map(|symbol| *symbol)
-                    .map_err(|error| format!("missing symbol reta_parameter_alias_groups_for_main_json: {error}"))
+                    .map_err(|error| {
+                        format!("missing symbol reta_parameter_alias_groups_for_main_json: {error}")
+                    })
             }
         })
         .clone()
@@ -506,23 +549,32 @@ unsafe fn take_owned_string(ptr: *mut c_char, free: RetaFreeStringFn) -> String 
     if ptr.is_null() {
         return String::new();
     }
-    let owned = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+
+    let owned = unsafe { read_c_string_lossy_bounded(ptr, MAX_FFI_STRING_BYTES) }
+        .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
     unsafe { free(ptr) };
     owned
 }
 
+unsafe fn read_c_string_lossy_bounded(
+    ptr: *const c_char,
+    max_bytes: usize,
+) -> Result<String, String> {
+    for len in 0..max_bytes {
+        let byte = unsafe { *ptr.add(len) };
+        if byte == 0 {
+            let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+            return Ok(String::from_utf8_lossy(bytes).into_owned());
+        }
+    }
+    Err(format!(
+        "C string is longer than {max_bytes} bytes or not NUL-terminated"
+    ))
+}
 
 pub use commands::{
-    commands_text,
-    compile_command,
-    compile_command_with_state,
-    execute_command,
-    help_text,
-    take_auto_prompt_command,
-    EditModeKind,
-    PromptCommand,
-    PromptOutput,
-    SessionState,
+    commands_text, compile_command, compile_command_with_state, execute_command, help_text,
+    take_auto_prompt_command, EditModeKind, PromptCommand, PromptOutput, SessionState,
 };
 pub use python_like::PromptModus;
 
@@ -638,7 +690,10 @@ pub fn run_current_executable(argv: Vec<String>) -> i32 {
     match PromptCommandFrontendKind::from_argv(&argv) {
         Some(kind) => run_kind(argv, kind),
         None => {
-            let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
+            let arg0 = argv
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "<unknown>".to_string());
             eprintln!(
                 "retaprompt_commands cannot infer command frontend kind from executable name: {arg0}"
             );
@@ -701,7 +756,10 @@ pub fn run_input_kind_from_abi_value(kind: i32) -> i32 {
     1
 }
 
-fn parse_command_startup_args(argv: &[String], kind: PromptCommandFrontendKind) -> CommandStartupArgs {
+fn parse_command_startup_args(
+    argv: &[String],
+    kind: PromptCommandFrontendKind,
+) -> CommandStartupArgs {
     let mut startup = CommandStartupArgs {
         show_help: false,
         exact_mode: kind.default_exact_mode(argv),
@@ -752,7 +810,8 @@ fn run_command_one_shot_frontend(argv: Vec<String>, kind: PromptCommandFrontendK
         return 0;
     }
 
-    let program_name = program_name_from_argv(&argv).unwrap_or_else(|| kind.program_name().to_string());
+    let program_name =
+        program_name_from_argv(&argv).unwrap_or_else(|| kind.program_name().to_string());
     let mut input = startup
         .command_text
         .unwrap_or_else(|| startup.trailing_args.join(" "));
@@ -903,8 +962,7 @@ fn should_append_exact_suffix(input: &str) -> bool {
     if tokenized.tokens.iter().any(|token| {
         matches!(
             token.as_str(),
-            "s"
-                | "S"
+            "s" | "S"
                 | "l"
                 | "o"
                 | "BefehlSpeichernDavor"
@@ -1015,39 +1073,59 @@ fn print_command_output(state: &mut SessionState, output: PromptOutput) {
     }
 }
 
+fn ffi_guard_i32<F>(name: &str, f: F) -> i32
+where
+    F: FnOnce() -> i32,
+{
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(exit_code) => exit_code,
+        Err(_) => {
+            eprintln!("panic inside {name}");
+            101
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_kind_from_env(kind: i32) -> i32 {
-    run_kind_from_abi_value(kind)
+    ffi_guard_i32("retaprompt_commands_run_kind_from_env", || {
+        run_kind_from_abi_value(kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_current_executable_from_env() -> i32 {
-    run_current_executable_from_env()
+    ffi_guard_i32(
+        "retaprompt_commands_run_current_executable_from_env",
+        run_current_executable_from_env,
+    )
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_rp_from_env() -> i32 {
-    run_rp_from_env()
+    ffi_guard_i32("retaprompt_commands_run_rp_from_env", run_rp_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_rpl_from_env() -> i32 {
-    run_rpl_from_env()
+    ffi_guard_i32("retaprompt_commands_run_rpl_from_env", run_rpl_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_rpb_from_env() -> i32 {
-    run_rpb_from_env()
+    ffi_guard_i32("retaprompt_commands_run_rpb_from_env", run_rpb_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_run_rpe_from_env() -> i32 {
-    run_rpe_from_env()
+    ffi_guard_i32("retaprompt_commands_run_rpe_from_env", run_rpe_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_commands_input_run_kind_from_env(kind: i32) -> i32 {
-    run_input_kind_from_abi_value(kind)
+    ffi_guard_i32("retaprompt_commands_input_run_kind_from_env", || {
+        run_input_kind_from_abi_value(kind)
+    })
 }
 
 #[cfg(test)]

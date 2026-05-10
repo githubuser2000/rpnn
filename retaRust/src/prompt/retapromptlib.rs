@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use super::app::{
-    run_prompt_command_frontend_with_profile, run_prompt_frontend, run_prompt_frontend_with_profile,
-    run_prompt_input_frontend_with_profile, run_rp_one_shot,
+    run_prompt_command_frontend_with_profile, run_prompt_frontend,
+    run_prompt_frontend_with_profile, run_prompt_input_frontend_with_profile, run_rp_one_shot,
 };
 use super::frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
 
@@ -303,82 +303,129 @@ pub fn retaprompt_commands_run_rpe_from_env_abi() -> i32 {
     run_command_rpe_from_env()
 }
 
+fn ffi_guard_i32<F>(name: &str, f: F) -> i32
+where
+    F: FnOnce() -> i32,
+{
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(exit_code) => exit_code,
+        Err(_) => {
+            eprintln!("panic inside {name}");
+            101
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_kind_from_env(kind: i32) -> i32 {
-    retaprompt_run_kind_from_env(kind)
+    ffi_guard_i32("reta_retaprompt_run_kind_from_env", || {
+        retaprompt_run_kind_from_env(kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_auto_from_env() -> i32 {
-    run_retaprompt_auto_from_env()
+    ffi_guard_i32("reta_retaprompt_run_auto_from_env", || {
+        run_retaprompt_auto_from_env()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rp_from_env() -> i32 {
-    retaprompt_run_rp_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_run_rp_from_env", || {
+        retaprompt_run_rp_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rpl_from_env() -> i32 {
-    retaprompt_run_rpl_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_run_rpl_from_env", || {
+        retaprompt_run_rpl_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rpb_from_env() -> i32 {
-    retaprompt_run_rpb_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_run_rpb_from_env", || {
+        retaprompt_run_rpb_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_run_rpe_from_env() -> i32 {
-    retaprompt_run_rpe_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_run_rpe_from_env", || {
+        retaprompt_run_rpe_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_current_executable_from_env() -> i32 {
-    run_input_current_executable_from_env()
+    ffi_guard_i32(
+        "reta_retaprompt_input_run_current_executable_from_env",
+        || run_input_current_executable_from_env(),
+    )
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_any_current_executable_from_env() -> i32 {
-    run_input_any_current_executable_from_env()
+    ffi_guard_i32(
+        "reta_retaprompt_input_run_any_current_executable_from_env",
+        || run_input_any_current_executable_from_env(),
+    )
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_launcher_kind_from_env(kind: i32) -> i32 {
-    run_input_launcher_kind_from_env(kind)
+    ffi_guard_i32("reta_retaprompt_input_run_launcher_kind_from_env", || {
+        run_input_launcher_kind_from_env(kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_rp_from_env() -> i32 {
-    retaprompt_input_run_rp_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_input_run_rp_from_env", || {
+        retaprompt_input_run_rp_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_rpl_from_env() -> i32 {
-    retaprompt_input_run_rpl_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_input_run_rpl_from_env", || {
+        retaprompt_input_run_rpl_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_input_run_rpe_from_env() -> i32 {
-    retaprompt_input_run_rpe_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_input_run_rpe_from_env", || {
+        retaprompt_input_run_rpe_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_commands_run_rp_from_env() -> i32 {
-    retaprompt_commands_run_rp_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_commands_run_rp_from_env", || {
+        retaprompt_commands_run_rp_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_commands_run_rpl_from_env() -> i32 {
-    retaprompt_commands_run_rpl_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_commands_run_rpl_from_env", || {
+        retaprompt_commands_run_rpl_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_commands_run_rpb_from_env() -> i32 {
-    retaprompt_commands_run_rpb_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_commands_run_rpb_from_env", || {
+        retaprompt_commands_run_rpb_from_env_abi()
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_retaprompt_commands_run_rpe_from_env() -> i32 {
-    retaprompt_commands_run_rpe_from_env_abi()
+    ffi_guard_i32("reta_retaprompt_commands_run_rpe_from_env", || {
+        retaprompt_commands_run_rpe_from_env_abi()
+    })
 }

@@ -1013,15 +1013,19 @@ fn BereichToNumbers2_EinBereich(
     maxZahl: Option<i64>,
     vielfache: bool,
 ) {
-    let (target, mut ein_bereich): (&mut BTreeSet<i64>, String) = if EinBereich.len() > 1 && EinBereich.starts_with('-') {
-        (hinfort, EinBereich[1..].to_string())
-    } else if !EinBereich.is_empty() && !EinBereich.starts_with('-') {
-        (dazu, EinBereich.to_string())
-    } else {
-        return;
-    };
+    let (target, mut ein_bereich): (&mut BTreeSet<i64>, String) =
+        if EinBereich.len() > 1 && EinBereich.starts_with('-') {
+            (hinfort, EinBereich[1..].to_string())
+        } else if !EinBereich.is_empty() && !EinBereich.starts_with('-') {
+            (dazu, EinBereich.to_string())
+        } else {
+            return;
+        };
 
-    let parts = ein_bereich.split('+').map(|s| s.to_string()).collect::<Vec<_>>();
+    let parts = ein_bereich
+        .split('+')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
     if is_ascii_decimal(&ein_bereich) {
         ein_bereich = format!("{0}-{0}", ein_bereich);
     } else if !parts.is_empty() && is_ascii_decimal(&parts[0]) {
@@ -1032,7 +1036,10 @@ fn BereichToNumbers2_EinBereich(
         }
     }
 
-    let BereichCouple = ein_bereich.split('-').map(|s| s.to_string()).collect::<Vec<_>>();
+    let BereichCouple = ein_bereich
+        .split('-')
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
     BereichToNumbers2_EinBereich_Menge(&BereichCouple, maxZahl, target, vielfache);
 }
 
@@ -1140,7 +1147,6 @@ fn BereichToNumbers2_EinBereich_Menge_vielfache(
         }
     }
 }
-
 
 /// Python `center.chunks`: return successive `n` sized chunks.
 ///
@@ -1276,12 +1282,7 @@ impl PythonPairSet {
         }
 
         let mask = self.table.len() - 1;
-        if self
-            .fill
-            .saturating_add(source.len())
-            .saturating_mul(5)
-            >= mask.saturating_mul(3)
-        {
+        if self.fill.saturating_add(source.len()).saturating_mul(5) >= mask.saturating_mul(3) {
             self.resize(self.used.saturating_add(source.len()).saturating_mul(2));
         }
 
@@ -1318,7 +1319,6 @@ pub fn multiples(a: i64, mul1: bool) -> Vec<(i64, i64)> {
     }
     out
 }
-
 
 /// Python `multis.mult`: render multiplication pairs for every decimal input.
 pub fn mult<T: ToString>(liste: &[T]) -> Vec<String> {
@@ -1385,10 +1385,9 @@ where
     let mut new_dict: BTreeMap<i64, Vec<String>> = BTreeMap::new();
     for (key, value_list) in d {
         for value in value_list {
-            let int_val = value
-                .to_string()
-                .parse::<i64>()
-                .expect("invalid literal for int() in invert_dict_B");
+            let Ok(int_val) = value.to_string().parse::<i64>() else {
+                continue;
+            };
             let str_key = key.to_string();
             let entry = new_dict.entry(int_val).or_default();
             if !entry.iter().any(|existing| existing == &str_key) {
@@ -1509,9 +1508,9 @@ pub fn moduloA_text<T: ToString>(zahlen: &[T]) -> String {
     let mut out = String::new();
     for arg in zahlen {
         let arg_text = arg.to_string();
-        let arg_int = arg_text
-            .parse::<i64>()
-            .expect("invalid literal for int() in moduloA");
+        let Ok(arg_int) = arg_text.parse::<i64>() else {
+            continue;
+        };
         for var in 2..26 {
             let mod_value = arg_int % var;
             let complement = var - mod_value;
@@ -1536,8 +1535,14 @@ mod rust_center_tests {
 
     #[test]
     fn generator_literals_match_python_shape() {
-        assert_eq!(strAsGeneratorToListOfNumStrs("[1,2,2]"), Some(BTreeSet::from([1, 2])));
-        assert_eq!(strAsGeneratorToListOfNumStrs("(3,4)"), Some(BTreeSet::from([3, 4])));
+        assert_eq!(
+            strAsGeneratorToListOfNumStrs("[1,2,2]"),
+            Some(BTreeSet::from([1, 2]))
+        );
+        assert_eq!(
+            strAsGeneratorToListOfNumStrs("(3,4)"),
+            Some(BTreeSet::from([3, 4]))
+        );
         assert_eq!(strAsGeneratorToListOfNumStrs("{}"), Some(BTreeSet::new()));
         assert_eq!(strAsGeneratorToListOfNumStrs(" [1]"), None);
     }
@@ -1553,21 +1558,39 @@ mod rust_center_tests {
 
     #[test]
     fn bereich_to_numbers_core_cases_follow_python() {
-        assert_eq!(BereichToNumbers2("1-3", false, 1028, false), BTreeSet::from([1, 2, 3]));
-        assert_eq!(BereichToNumbers2("5+1", false, 1028, false), BTreeSet::from([4, 6]));
-        assert_eq!(BereichToNumbers2("1-3,-2", false, 1028, false), BTreeSet::from([1, 3]));
-        assert_eq!(BereichToNumbers2("v2", false, 10, false), BTreeSet::from([2, 4, 6, 8, 10]));
+        assert_eq!(
+            BereichToNumbers2("1-3", false, 1028, false),
+            BTreeSet::from([1, 2, 3])
+        );
+        assert_eq!(
+            BereichToNumbers2("5+1", false, 1028, false),
+            BTreeSet::from([4, 6])
+        );
+        assert_eq!(
+            BereichToNumbers2("1-3,-2", false, 1028, false),
+            BTreeSet::from([1, 3])
+        );
+        assert_eq!(
+            BereichToNumbers2("v2", false, 10, false),
+            BTreeSet::from([2, 4, 6, 8, 10])
+        );
     }
 
     #[test]
     fn remaining_center_number_helpers_follow_python_shapes() {
-        assert_eq!(chunks(&[1, 2, 3, 4, 5], 2), vec![vec![1, 2], vec![3, 4], vec![5]]);
+        assert_eq!(
+            chunks(&[1, 2, 3, 4, 5], 2),
+            vec![vec![1, 2], vec![3, 4], vec![5]]
+        );
         assert!(textHatZiffer("abc2"));
         assert_eq!(multiples(12, true), vec![(4, 3), (6, 2), (12, 1)]);
         assert_eq!(teiler("12").1, BTreeSet::from([2, 3, 4, 6, 12]));
         assert_eq!(primfaktoren(24, false), vec![2, 2, 2, 3]);
         assert_eq!(primfaktoren(24, true), vec![2, 2, 2, 3]);
-        assert_eq!(primRepeat(vec![2, 2, 2, 3]), vec!["2^3".to_string(), "3".to_string()]);
+        assert_eq!(
+            primRepeat(vec![2, 2, 2, 3]),
+            vec!["2^3".to_string(), "3".to_string()]
+        );
         assert_eq!(primRepeat2(vec![2, 2, 2, 3]), vec![(2, 3), (3, 1)]);
     }
 

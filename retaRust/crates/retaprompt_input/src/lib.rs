@@ -30,33 +30,28 @@ pub mod commands {
     pub use retaprompt_commands::commands::*;
 }
 
+#[path = "../../../src/prompt/app.rs"]
+pub mod app;
+#[path = "../../../src/prompt/completion.rs"]
+pub mod completion;
 #[path = "../../../src/prompt/frontend_profile.rs"]
 pub mod frontend_profile;
+#[path = "../../../src/prompt/frontends.rs"]
+pub mod frontends;
 #[path = "../../../src/prompt/history.rs"]
 pub mod history;
 #[path = "../../../src/prompt/preset.rs"]
 pub mod preset;
-#[path = "../../../src/prompt/completion.rs"]
-pub mod completion;
 #[path = "../../../src/prompt/tui.rs"]
 pub mod tui;
-#[path = "../../../src/prompt/app.rs"]
-pub mod app;
-#[path = "../../../src/prompt/frontends.rs"]
-pub mod frontends;
 
 pub use app::{
-    run_prompt_frontend,
-    run_prompt_frontend_from_env,
-    run_prompt_frontend_with_profile,
-    run_prompt_frontend_with_profile_from_env,
-    run_prompt_input_frontend_with_profile,
+    run_prompt_frontend, run_prompt_frontend_from_env, run_prompt_frontend_with_profile,
+    run_prompt_frontend_with_profile_from_env, run_prompt_input_frontend_with_profile,
 };
 pub use frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
 pub use frontends::{
-    run_rp_frontend_from_env,
-    run_rpb_frontend_from_env,
-    run_rpe_frontend_from_env,
+    run_rp_frontend_from_env, run_rpb_frontend_from_env, run_rpe_frontend_from_env,
     run_rpl_frontend_from_env,
 };
 
@@ -161,7 +156,10 @@ pub fn run_current_executable(argv: Vec<String>) -> i32 {
     match PromptInputFrontendKind::from_argv(&argv) {
         Some(kind) => run_kind(argv, kind),
         None => {
-            let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
+            let arg0 = argv
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "<unknown>".to_string());
             eprintln!(
                 "retaprompt_input cannot infer input frontend kind from executable name: {arg0}"
             );
@@ -192,10 +190,11 @@ pub fn run_any_current_executable(argv: Vec<String>) -> i32 {
     match PromptLauncherKind::from_argv(&argv) {
         Some(kind) => run_launcher_kind(argv, kind),
         None => {
-            let arg0 = argv.first().cloned().unwrap_or_else(|| "<unknown>".to_string());
-            eprintln!(
-                "retaprompt_input cannot infer launcher kind from executable name: {arg0}"
-            );
+            let arg0 = argv
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "<unknown>".to_string());
+            eprintln!("retaprompt_input cannot infer launcher kind from executable name: {arg0}");
             eprintln!("expected one of: rp, rpl, rpb, rpe");
             1
         }
@@ -250,37 +249,60 @@ pub fn run_launcher_kind_from_abi_value(kind: i32) -> i32 {
     }
 }
 
+fn ffi_guard_i32<F>(name: &str, f: F) -> i32
+where
+    F: FnOnce() -> i32,
+{
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(exit_code) => exit_code,
+        Err(_) => {
+            eprintln!("panic inside {name}");
+            101
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_kind_from_env(kind: i32) -> i32 {
-    run_kind_from_abi_value(kind)
+    ffi_guard_i32("retaprompt_input_run_kind_from_env", || {
+        run_kind_from_abi_value(kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_current_executable_from_env() -> i32 {
-    run_current_executable_from_env()
+    ffi_guard_i32(
+        "retaprompt_input_run_current_executable_from_env",
+        run_current_executable_from_env,
+    )
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_any_current_executable_from_env() -> i32 {
-    run_any_current_executable_from_env()
+    ffi_guard_i32(
+        "retaprompt_input_run_any_current_executable_from_env",
+        run_any_current_executable_from_env,
+    )
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_launcher_kind_from_env(kind: i32) -> i32 {
-    run_launcher_kind_from_abi_value(kind)
+    ffi_guard_i32("retaprompt_input_run_launcher_kind_from_env", || {
+        run_launcher_kind_from_abi_value(kind)
+    })
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_rp_from_env() -> i32 {
-    run_rp_from_env()
+    ffi_guard_i32("retaprompt_input_run_rp_from_env", run_rp_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_rpl_from_env() -> i32 {
-    run_rpl_from_env()
+    ffi_guard_i32("retaprompt_input_run_rpl_from_env", run_rpl_from_env)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_rpe_from_env() -> i32 {
-    run_rpe_from_env()
+    ffi_guard_i32("retaprompt_input_run_rpe_from_env", run_rpe_from_env)
 }
