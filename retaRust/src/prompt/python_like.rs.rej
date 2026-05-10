@@ -1,0 +1,22 @@
+--- src/prompt/python_like.rs
++++ src/prompt/python_like.rs
+@@ -7798,7 +7798,8 @@ pub fn build_reta_calls_from_prompt_tokens(tokens: &[String]) -> Vec<Vec<String>
+     if normalized.iter().any(|t| {
+         matches!(
+             t.as_str(),
+-            "help"
++            "HELP"
++                | "help"
+                 | "hilfe"
+                 | "befehle"
+                 | "kurzbefehle"
+@@ -7961,7 +7962,8 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
+     if normalized.iter().any(|t| {
+         matches!(
+             t.as_str(),
+-            "help"
++            "HELP"
++                | "help"
+                 | "hilfe"
+                 | "befehle"
+                 | "kurzbefehle"

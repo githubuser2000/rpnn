@@ -277,7 +277,8 @@ fn should_append_exact_suffix(input: &str) -> bool {
 
     !matches!(
         first,
-        "help"
+        "HELP"
+            | "help"
             | "hilfe"
             | "befehle"
             | "kurzbefehle"
@@ -1081,6 +1082,7 @@ mod tests {
             "S",
             "l",
             "o",
+            "HELP",
             "help",
             "shell echo hi",
             "python print(1)",

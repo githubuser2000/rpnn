@@ -25,6 +25,7 @@ use super::semantic_choices::{
 };
 
 pub const RP_META_COMMANDS: &[&str] = &[
+    "HELP",
     "help",
     "hilfe",
     "befehle",
@@ -650,6 +651,7 @@ fn completion_bypasses_stored_context(trimmed: &str, tokens: &[String]) -> bool 
             | "exit"
             | "quit"
             | "ende"
+            | "HELP"
             | "help"
             | "hilfe"
             | "befehle"
@@ -1271,6 +1273,7 @@ fn ordered_prompt_commands() -> Vec<String> {
     let mut seen = BTreeSet::new();
 
     for item in [
+        "HELP",
         "help",
         "hilfe",
         "kurzbefehle",

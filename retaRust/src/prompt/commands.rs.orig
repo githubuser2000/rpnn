@@ -156,7 +156,7 @@ fn compile_normalized_control_command(tokens: &[String]) -> Option<PromptCommand
     match tokens {
         [single] => match single.as_str() {
             "q" | ":q" | "exit" | "quit" | "ende" => Some(PromptCommand::Exit),
-            "HELP" | "help" | "hilfe" => Some(PromptCommand::PrintHelp),
+            "help" | "hilfe" => Some(PromptCommand::PrintHelp),
             "befehle" | "kurzbefehle" => Some(PromptCommand::PrintCommands),
             "BefehlSpeichernDavor" => Some(PromptCommand::SaveBefore),
             "BefehlSpeichernDanach" => Some(PromptCommand::SaveAfter),
@@ -185,7 +185,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
 
     match trimmed {
         "q" | ":q" | "exit" | "quit" | "ende" => return Ok(PromptCommand::Exit),
-        "HELP" | "help" | "hilfe" => return Ok(PromptCommand::PrintHelp),
+        "help" | "hilfe" => return Ok(PromptCommand::PrintHelp),
         "befehle" | "kurzbefehle" => return Ok(PromptCommand::PrintCommands),
         "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
         "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
@@ -476,7 +476,6 @@ fn raw_input_bypasses_stored_merge(trimmed: &str, tokens: &[String]) -> bool {
             | "exit"
             | "quit"
             | "ende"
-            | "HELP"
             | "help"
             | "hilfe"
             | "befehle"
@@ -1976,7 +1975,7 @@ pub fn help_text() -> String {
         "  loggen | nichtloggen          Logging umschalten",
         "",
         "Meta-Befehle:",
-        "  HELP | help | hilfe     Diese Hilfe",
+        "  help | hilfe            Diese Hilfe",
         "  befehle | kurzbefehle   Befehlsübersicht",
         "  :ui | :preview          Vollbild-Vorschau mit ratatui",
         "  :history                Zeigt die Sitzungs-History",
@@ -2023,7 +2022,7 @@ pub fn commands_text() -> String {
     let mut lines = vec![
         "Bekannte rp-Kommandos:".to_string(),
         String::new(),
-        "  HELP, help, hilfe, befehle, kurzbefehle".to_string(),
+        "  help, hilfe, befehle, kurzbefehle".to_string(),
         "  :ui, :preview, :history".to_string(),
         "  :mode vi, :mode emacs".to_string(),
         "  clear, leeren".to_string(),
@@ -2653,9 +2652,6 @@ mod tests {
     #[test]
     fn one_letter_help_alias_is_control_after_python_alias_expansion() {
         let command = compile_command("h", PromptModus::Normal).unwrap();
-        assert!(matches!(command, PromptCommand::PrintHelp));
-
-        let command = compile_command("HELP", PromptModus::Normal).unwrap();
         assert!(matches!(command, PromptCommand::PrintHelp));
     }
 

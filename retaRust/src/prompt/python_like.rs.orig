@@ -151,7 +151,7 @@ fn build_prompt_words() -> PromptWords {
         "primfaktorzerlegung",
         "prim24",
         "primfaktorzerlegungModulo24",
-        "HELP",
+        "help",
         "hilfe",
         "abc",
         "abcd",
@@ -1462,7 +1462,7 @@ pub fn replace_prompt_alias(token: &str) -> String {
         "t" => "thomas".to_string(),
         "r" => "richtung".to_string(),
         "v" => "vielfache".to_string(),
-        "h" => "HELP".to_string(),
+        "h" => "help".to_string(),
         "w" => "teiler".to_string(),
         "S" => "BefehlSpeichernDanach".to_string(),
         "s" => "BefehlSpeichernDavor".to_string(),
@@ -9087,14 +9087,6 @@ mod tests {
         assert!(txt.hasWithoutABC(&string_set(&["x"])));
         txt.set_liste(&strings(&["abc", "x"]));
         assert!(!txt.hasWithoutABC(&string_set(&["x"])));
-    }
-
-
-    #[test]
-    fn prompt_help_alias_matches_python_uppercase_help() {
-        assert_eq!(super::replace_prompt_alias("h"), "HELP");
-        assert!(super::prompt_words().befehle_set.contains("HELP"));
-        assert!(!super::prompt_words().befehle_set.contains("help"));
     }
 
     #[test]

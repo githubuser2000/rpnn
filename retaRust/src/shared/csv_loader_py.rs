@@ -325,3 +325,99 @@ impl Program {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod csv_source_guard_tests {
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::Path;
+
+    const RETA_CSV_SOURCE_MANIFEST: &str = include_str!("../../tools/reta_csv_source_manifest.tsv");
+
+    #[derive(Clone, Debug)]
+    struct CsvManifestEntry {
+        name: &'static str,
+        bytes: usize,
+        fnv1a64: u64,
+    }
+
+    fn fnv1a64(data: &[u8]) -> u64 {
+        let mut value = 0xcbf29ce484222325u64;
+        for byte in data {
+            value ^= u64::from(*byte);
+            value = value.wrapping_mul(0x100000001b3);
+        }
+        value
+    }
+
+    fn parse_manifest() -> Vec<CsvManifestEntry> {
+        RETA_CSV_SOURCE_MANIFEST
+            .lines()
+            .filter(|line| {
+                let trimmed = line.trim();
+                !trimmed.is_empty() && !trimmed.starts_with('#') && !trimmed.starts_with("file\t")
+            })
+            .map(|line| {
+                let mut parts = line.split('\t');
+                let name = parts.next().expect("manifest file column missing");
+                let bytes = parts
+                    .next()
+                    .expect("manifest bytes column missing")
+                    .parse::<usize>()
+                    .expect("manifest bytes must be usize");
+                let fnv1a64 = u64::from_str_radix(
+                    parts.next().expect("manifest fnv1a64 column missing"),
+                    16,
+                )
+                .expect("manifest fnv1a64 must be hexadecimal u64");
+                CsvManifestEntry { name, bytes, fnv1a64 }
+            })
+            .collect()
+    }
+
+    fn assert_csv_dir_matches_reta_manifest(relative_dir: &str, manifest: &[CsvManifestEntry]) {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let csv_dir = root.join(relative_dir);
+        let expected_names = manifest
+            .iter()
+            .map(|entry| entry.name.to_string())
+            .collect::<BTreeSet<_>>();
+        let actual_names = fs::read_dir(&csv_dir)
+            .unwrap_or_else(|err| panic!("cannot read {csv_dir:?}: {err}"))
+            .filter_map(|entry| {
+                let entry = entry.expect("csv directory entry must be readable");
+                let path = entry.path();
+                (path.extension().and_then(|ext| ext.to_str()) == Some("csv"))
+                    .then(|| entry.file_name().to_string_lossy().into_owned())
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            actual_names, expected_names,
+            "{relative_dir} must contain exactly the reta.py source CSV files"
+        );
+
+        for entry in manifest {
+            let path = csv_dir.join(entry.name);
+            let data = fs::read(&path).unwrap_or_else(|err| panic!("cannot read {path:?}: {err}"));
+            assert_eq!(
+                data.len(),
+                entry.bytes,
+                "{path:?} byte length drifted away from reta.py CSV source"
+            );
+            assert_eq!(
+                fnv1a64(&data),
+                entry.fnv1a64,
+                "{path:?} content drifted away from reta.py CSV source"
+            );
+        }
+    }
+
+    #[test]
+    fn checked_in_csv_files_match_reta_py_source_manifest() {
+        let manifest = parse_manifest();
+        assert_eq!(manifest.len(), 79, "reta.py source CSV inventory changed");
+        assert_csv_dir_matches_reta_manifest("csv", &manifest);
+        assert_csv_dir_matches_reta_manifest("python_reference/csv", &manifest);
+    }
+}
