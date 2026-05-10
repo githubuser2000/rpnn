@@ -38,11 +38,11 @@ link_launcher() {
     -Wl,-rpath,'$ORIGIN/../lib'
 }
 
-link_launcher tools/launchers/reta.c "$TARGET_DIR/reta" reta
-link_launcher tools/launchers/rp.c  "$TARGET_DIR/rp"  retaprompt_input
-link_launcher tools/launchers/rpl.c "$TARGET_DIR/rpl" retaprompt_input
-link_launcher tools/launchers/rpe.c "$TARGET_DIR/rpe" retaprompt_input
-link_launcher tools/launchers/rpb.c "$TARGET_DIR/rpb" retaprompt_commands
+link_launcher tools/launchers/reta.c "$TARGET_DIR/rreta" reta
+link_launcher tools/launchers/rp.c  "$TARGET_DIR/rrp"  retaprompt_input
+link_launcher tools/launchers/rpl.c "$TARGET_DIR/rrpl" retaprompt_input
+link_launcher tools/launchers/rpe.c "$TARGET_DIR/rrpe" retaprompt_input
+link_launcher tools/launchers/rpb.c "$TARGET_DIR/rrpb" retaprompt_commands
 
 copy_runtime_data() {
   if [[ -d csv ]]; then
@@ -53,9 +53,11 @@ copy_runtime_data() {
 
 copy_runtime_data
 
-for a in rreta rrp rrpl rrpe rrpb
+[ "${PROFILE}" = "release" ] && for a in rreta rrp rrpl rrpe rrpb
 do
-	cargo run --${PROFILE} --bin $a -- -h
-done
+	cargo run --release --bin $a -- -h
+done for a in rreta rrp rrpl rrpe rrpb
+do
+	cargo run --bin $a -- -h
 
 echo "Build complete: $TARGET_DIR"
