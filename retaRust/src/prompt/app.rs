@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultHinter, DefaultValidator, Emacs, FileBackedHistory, KeyCode,
+    ColumnarMenu, DefaultValidator, Emacs, FileBackedHistory, KeyCode,
     KeyModifiers, Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
     Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
 };
@@ -13,7 +13,8 @@ use super::commands::{
     EditModeKind, PromptCommand, PromptOutput, SessionState,
 };
 use super::completion::{
-    build_default_completer_with_runtime, new_completion_runtime_handle,
+    build_default_completer_with_runtime, build_default_hinter_with_runtime,
+    new_completion_runtime_handle,
     set_completion_runtime_context, CompletionRuntimeHandle,
 };
 use super::history::{
@@ -895,6 +896,16 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
         KeyCode::Right,
         menu_aware_navigation(ReedlineEvent::MenuRight, ReedlineEvent::Right),
     );
+    keybindings.add_binding(
+        KeyModifiers::CONTROL,
+        KeyCode::Right,
+        ReedlineEvent::HistoryHintWordComplete,
+    );
+    keybindings.add_binding(
+        KeyModifiers::ALT,
+        KeyCode::Right,
+        ReedlineEvent::HistoryHintWordComplete,
+    );
 }
 
 #[allow(non_snake_case)]
@@ -913,7 +924,7 @@ fn newSession(
     let completion_enabled = !matches!(prompt_mode, PromptModus::LoeschenSelect);
     let mut editor = Reedline::create()
         .with_history(history)
-        .with_hinter(Box::new(DefaultHinter::default()))
+        .with_hinter(build_default_hinter_with_runtime(completion_runtime.clone()))
         .with_validator(Box::new(DefaultValidator));
 
     if completion_enabled {

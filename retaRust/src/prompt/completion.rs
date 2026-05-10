@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use reedline::{Completer as ReedlineCompleter, Span, Suggestion};
+use reedline::{Completer as ReedlineCompleter, Hinter, History, SearchQuery, Span, Suggestion};
 
 use crate::domain::python_source_of_truth::{
     all_main_alias_groups, parameter_alias_groups_for_main, resolve_parameter_main_alias,
@@ -94,6 +94,12 @@ pub type CompletionRuntimeHandle = Arc<Mutex<CompletionRuntimeState>>;
 #[derive(Clone, Debug)]
 struct PromptContextCompleter {
     runtime: CompletionRuntimeHandle,
+}
+
+#[derive(Clone, Debug)]
+struct PromptContextHinter {
+    runtime: CompletionRuntimeHandle,
+    current_hint: String,
 }
 
 #[derive(Clone, Debug)]
@@ -243,6 +249,31 @@ pub fn build_default_completer_with_runtime(
     Box::new(PromptContextCompleter { runtime })
 }
 
+pub fn build_default_hinter_with_runtime(runtime: CompletionRuntimeHandle) -> Box<dyn Hinter> {
+    Box::new(PromptContextHinter {
+        runtime,
+        current_hint: String::new(),
+    })
+}
+
+pub fn autosuggestion_for_input(input: &str) -> Option<String> {
+    autosuggestion_for_input_in_mode_with_context(input, PromptModus::Normal, &[], &[])
+}
+
+pub fn autosuggestion_for_input_in_mode_with_context(
+    input: &str,
+    prompt_mode: PromptModus,
+    stored_prefix_tokens: &[String],
+    stored_commands: &[String],
+) -> Option<String> {
+    autosuggestion_from_context_candidates(
+        input,
+        prompt_mode,
+        stored_prefix_tokens,
+        stored_commands,
+    )
+}
+
 pub fn candidates_for_prefix(prefix: &str) -> Vec<String> {
     filter_candidate_values(&prompt_metadata().vocabulary, prefix, false)
 }
@@ -306,6 +337,158 @@ impl ReedlineCompleter for PromptContextCompleter {
         })
         .collect()
     }
+}
+
+impl Hinter for PromptContextHinter {
+    fn handle(
+        &mut self,
+        line: &str,
+        pos: usize,
+        history: &dyn History,
+        use_ansi_coloring: bool,
+        _cwd: &str,
+    ) -> String {
+        self.current_hint.clear();
+
+        let Some(before_cursor) = safe_line_end_prefix(line, pos) else {
+            return String::new();
+        };
+
+        let runtime_state = self
+            .runtime
+            .lock()
+            .map(|state| state.clone())
+            .unwrap_or_default();
+
+        if let Some(hint) = autosuggestion_from_context_candidates(
+            before_cursor,
+            runtime_state.prompt_mode,
+            &runtime_state.stored_prefix_tokens,
+            &runtime_state.stored_commands,
+        ) {
+            self.current_hint = hint;
+            return render_autosuggestion_hint(&self.current_hint, use_ansi_coloring);
+        }
+
+        if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
+            self.current_hint = hint;
+            return render_autosuggestion_hint(&self.current_hint, use_ansi_coloring);
+        }
+
+        String::new()
+    }
+
+    fn complete_hint(&self) -> String {
+        self.current_hint.clone()
+    }
+
+    fn next_hint_token(&self) -> String {
+        first_autosuggestion_token(&self.current_hint)
+    }
+}
+
+fn autosuggestion_from_context_candidates(
+    before_cursor: &str,
+    prompt_mode: PromptModus,
+    stored_prefix_tokens: &[String],
+    stored_commands: &[String],
+) -> Option<String> {
+    if before_cursor.trim().is_empty() {
+        return None;
+    }
+
+    completion_candidates_for_line_in_mode_with_context(
+        before_cursor,
+        prompt_mode,
+        stored_prefix_tokens,
+        stored_commands,
+    )
+    .into_iter()
+    .filter_map(|candidate| suffix_hint_for_candidate(before_cursor, &candidate))
+    .find(|hint| !hint.trim().is_empty())
+}
+
+fn suffix_hint_for_candidate(
+    before_cursor: &str,
+    candidate: &CompletionCandidate,
+) -> Option<String> {
+    if candidate.replace_start > before_cursor.len()
+        || !before_cursor.is_char_boundary(candidate.replace_start)
+    {
+        return None;
+    }
+
+    let mut completed = String::with_capacity(
+        candidate.replace_start + candidate.value.len() + usize::from(candidate.append_whitespace),
+    );
+    completed.push_str(&before_cursor[..candidate.replace_start]);
+    completed.push_str(&candidate.value);
+    if candidate.append_whitespace {
+        completed.push(' ');
+    }
+
+    if completed.len() <= before_cursor.len() || !completed.starts_with(before_cursor) {
+        return None;
+    }
+
+    Some(completed[before_cursor.len()..].to_string())
+}
+
+fn autosuggestion_from_history(before_cursor: &str, history: &dyn History) -> Option<String> {
+    if before_cursor.trim().is_empty() {
+        return None;
+    }
+
+    let entries = history
+        .search(SearchQuery::last_with_prefix(
+            before_cursor.to_string(),
+            history.session(),
+        ))
+        .ok()?;
+
+    entries.into_iter().find_map(|entry| {
+        let command_line = entry.command_line;
+        if command_line.len() <= before_cursor.len() || !command_line.starts_with(before_cursor) {
+            return None;
+        }
+
+        let suffix = command_line[before_cursor.len()..].to_string();
+        (!suffix.trim().is_empty()).then_some(suffix)
+    })
+}
+
+fn render_autosuggestion_hint(hint: &str, use_ansi_coloring: bool) -> String {
+    if use_ansi_coloring && !hint.is_empty() {
+        format!("\x1b[90m{hint}\x1b[0m")
+    } else {
+        hint.to_string()
+    }
+}
+
+fn first_autosuggestion_token(hint: &str) -> String {
+    let mut out = String::new();
+    let mut saw_non_whitespace = false;
+
+    for ch in hint.chars() {
+        if ch.is_whitespace() {
+            if saw_non_whitespace {
+                break;
+            }
+            out.push(ch);
+        } else {
+            saw_non_whitespace = true;
+            out.push(ch);
+        }
+    }
+
+    out
+}
+
+fn safe_line_end_prefix(line: &str, pos: usize) -> Option<&str> {
+    if pos != line.len() {
+        return None;
+    }
+    Some(safe_prefix(line, pos))
 }
 
 fn completion_candidates_for_line(before_cursor: &str) -> Vec<CompletionCandidate> {
@@ -1605,6 +1788,7 @@ fn with_negative_variants_and_any(values: &[&'static str]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{
+        autosuggestion_for_input, autosuggestion_for_input_in_mode_with_context,
         candidates_for_input, candidates_for_input_in_mode_with_context, normalize_completion_text,
         PromptModus,
     };
@@ -1932,6 +2116,51 @@ mod tests {
     fn value_parameter_lookup_is_case_insensitive_like_python_completion() {
         let values = candidates_for_input("reta -zeilen --Typ=s");
         assert!(contains_normalized(&values, "sonne"));
+    }
+
+    #[test]
+    fn autosuggestion_uses_python_like_top_level_completion() {
+        assert_eq!(autosuggestion_for_input("he").as_deref(), Some("lp "));
+    }
+
+    #[test]
+    fn autosuggestion_uses_current_reta_section_context() {
+        assert_eq!(
+            autosuggestion_for_input("reta -zeilen --ze").as_deref(),
+            Some("it=")
+        );
+    }
+
+    #[test]
+    fn autosuggestion_supports_stored_prefix_context() {
+        assert_eq!(
+            autosuggestion_for_input_in_mode_with_context(
+                "--ze",
+                PromptModus::Normal,
+                &["reta".to_string(), "-zeilen".to_string()],
+                &[],
+            )
+            .as_deref(),
+            Some("it=")
+        );
+    }
+
+    #[test]
+    fn autosuggestion_does_not_insert_fuzzy_replacements_that_are_not_suffixes() {
+        assert_eq!(autosuggestion_for_input("unv"), None);
+    }
+
+    #[test]
+    fn autosuggestion_is_disabled_in_delete_select_mode_like_python_completer() {
+        assert_eq!(
+            autosuggestion_for_input_in_mode_with_context(
+                "reta -zeilen --ze",
+                PromptModus::LoeschenSelect,
+                &[],
+                &[],
+            ),
+            None
+        );
     }
 
     #[test]
