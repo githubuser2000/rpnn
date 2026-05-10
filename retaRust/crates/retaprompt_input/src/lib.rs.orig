@@ -45,6 +45,9 @@ pub mod preset;
 #[path = "../../../src/prompt/tui.rs"]
 pub mod tui;
 
+#[cfg(test)]
+mod completion_python_parity_tests;
+
 pub use app::{
     run_prompt_frontend, run_prompt_frontend_from_env, run_prompt_frontend_with_profile,
     run_prompt_frontend_with_profile_from_env, run_prompt_input_frontend_with_profile,

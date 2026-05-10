@@ -197,19 +197,19 @@ pub fn retaprompt_run_kind_from_env(kind: i32) -> i32 {
 
 fn input_kind_from_program_name(program_name: &str) -> Option<PromptFrontendKind> {
     match program_name {
-        "rp" => Some(PromptFrontendKind::Rp),
-        "rpl" => Some(PromptFrontendKind::Rpl),
-        "rpe" => Some(PromptFrontendKind::Rpe),
+        "rp" | "rrp" => Some(PromptFrontendKind::Rp),
+        "rpl" | "rrpl" => Some(PromptFrontendKind::Rpl),
+        "rpe" | "rrpe" => Some(PromptFrontendKind::Rpe),
         _ => None,
     }
 }
 
 fn launcher_kind_from_program_name(program_name: &str) -> Option<PromptFrontendKind> {
     match program_name {
-        "rp" => Some(PromptFrontendKind::Rp),
-        "rpl" => Some(PromptFrontendKind::Rpl),
-        "rpb" => Some(PromptFrontendKind::Rpb),
-        "rpe" => Some(PromptFrontendKind::Rpe),
+        "rp" | "rrp" => Some(PromptFrontendKind::Rp),
+        "rpl" | "rrpl" => Some(PromptFrontendKind::Rpl),
+        "rpb" | "rrpb" => Some(PromptFrontendKind::Rpb),
+        "rpe" | "rrpe" => Some(PromptFrontendKind::Rpe),
         _ => None,
     }
 }

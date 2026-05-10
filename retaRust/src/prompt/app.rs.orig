@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultValidator, Emacs, FileBackedHistory, KeyCode,
+    ColumnarMenu, DefaultValidator, Emacs, KeyCode,
     KeyModifiers, Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
     Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
 };
@@ -18,8 +18,9 @@ use super::completion::{
     set_completion_runtime_context, CompletionRuntimeHandle,
 };
 use super::history::{
-    default_history_path, default_log_path, should_append_history_string_like_python,
-    should_scrub_history_string_after_reedline_append_like_python,
+    default_history_path, default_log_path, persistent_prompt_history_enabled,
+    should_append_history_string_like_python,
+    should_scrub_history_string_after_reedline_append_like_python, PromptToolkitFileHistory,
 };
 use super::python_like::{libreta_prompt_custom_split, PromptModus};
 use super::frontend_profile::PromptFrontendProfile;
@@ -277,7 +278,8 @@ fn should_append_exact_suffix(input: &str) -> bool {
 
     !matches!(
         first,
-        "help"
+        "HELP"
+            | "help"
             | "hilfe"
             | "befehle"
             | "kurzbefehle"
@@ -614,7 +616,7 @@ fn run_interactive_loop(
     let mut editor = match newSession(
         &history_path,
         state.current_mode(),
-        state.logging_enabled,
+        persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
         state.prompt_mode,
         &completion_runtime,
     ) {
@@ -662,7 +664,7 @@ fn run_interactive_loop(
                 editor = match newSession(
                     &history_path,
                     state.current_mode(),
-                    state.logging_enabled,
+                    persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                     state.prompt_mode,
                     &completion_runtime,
                 ) {
@@ -691,7 +693,14 @@ fn run_interactive_loop(
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
-                let history_line_scrubbed = promptInput(state, &input, Some(&history_path), &log_path);
+                let persistent_history_enabled =
+                    persistent_prompt_history_enabled(&state.program_name, state.logging_enabled);
+                let history_line_scrubbed = promptInput(
+                    state,
+                    &input,
+                    persistent_history_enabled.then_some(&history_path),
+                    &log_path,
+                );
 
                 let compile_input = if exact_mode_enabled {
                     apply_exact_mode_to_input(&input)
@@ -727,7 +736,7 @@ fn run_interactive_loop(
                             editor = match newSession(
                                 &history_path,
                                 state.current_mode(),
-                                state.logging_enabled,
+                                persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                                 state.prompt_mode,
                                 &completion_runtime,
                             ) {
@@ -800,7 +809,7 @@ fn run_interactive_loop(
                     editor = match newSession(
                         &history_path,
                         state.current_mode(),
-                        state.logging_enabled,
+                        persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                         state.prompt_mode,
                         &completion_runtime,
                     ) {
@@ -917,18 +926,20 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
 fn newSession(
     history_path: &PathBuf,
     mode: EditModeKind,
-    _logging_enabled: bool,
+    persistent_history_enabled: bool,
     prompt_mode: PromptModus,
     completion_runtime: &CompletionRuntimeHandle,
 ) -> Result<Reedline, String> {
-    let history = Box::new(
-        FileBackedHistory::with_file(2_000, history_path.clone())
-            .map_err(|err| format!("History-Datei konnte nicht geöffnet werden: {err}"))?,
-    );
+    let history = if persistent_history_enabled {
+        PromptToolkitFileHistory::with_file(2_000, history_path.clone())
+    } else {
+        PromptToolkitFileHistory::in_memory(2_000)
+    }
+    .map_err(|err| format!("History konnte nicht initialisiert werden: {err}"))?;
 
     let completion_enabled = !matches!(prompt_mode, PromptModus::LoeschenSelect);
     let mut editor = Reedline::create()
-        .with_history(history)
+        .with_history(Box::new(history))
         .with_hinter(build_default_hinter_with_runtime(completion_runtime.clone()))
         .with_validator(Box::new(DefaultValidator));
 
@@ -967,12 +978,20 @@ fn newSession(
 }
 
 fn append_log_line(path: &PathBuf, kind: &str, text: &str) {
+    if std::env::var_os("RETA_PROMPT_SESSION_LOG").is_none() {
+        return;
+    }
+
     use std::io::Write;
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
 
     if let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
@@ -1081,6 +1100,7 @@ mod tests {
             "S",
             "l",
             "o",
+            "HELP",
             "help",
             "shell echo hi",
             "python print(1)",

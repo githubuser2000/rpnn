@@ -1,4 +1,4 @@
-use super::frontend_profile::PromptFrontendProfile;
+use super::frontend_profile::{PromptFrontendKind, PromptFrontendProfile};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PromptFrontendPreset {
@@ -7,6 +7,7 @@ pub struct PromptFrontendPreset {
     pub default_exact_mode: bool,
     pub one_shot: bool,
     pub emacs_output_mode: bool,
+    pub persistent_history: bool,
 }
 
 impl PromptFrontendPreset {
@@ -26,6 +27,7 @@ impl PromptFrontendPreset {
             default_exact_mode: profile.default_exact_mode(argv),
             one_shot: profile.one_shot,
             emacs_output_mode: profile.emacs_output_mode(),
+            persistent_history: matches!(profile.kind, PromptFrontendKind::Rpl),
         }
     }
 }

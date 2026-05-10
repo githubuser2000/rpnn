@@ -603,10 +603,10 @@ impl PromptCommandFrontendKind {
             .and_then(|name| name.to_str())
             .unwrap_or(program_name);
         match base {
-            "rp" => Some(Self::Rp),
-            "rpl" => Some(Self::Rpl),
-            "rpb" => Some(Self::Rpb),
-            "rpe" => Some(Self::Rpe),
+            "rp" | "rrp" => Some(Self::Rp),
+            "rpl" | "rrpl" => Some(Self::Rpl),
+            "rpb" | "rrpb" => Some(Self::Rpb),
+            "rpe" | "rrpe" => Some(Self::Rpe),
             _ => None,
         }
     }

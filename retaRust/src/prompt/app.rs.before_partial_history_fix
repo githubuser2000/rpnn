@@ -3,25 +3,27 @@ use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultValidator, Emacs, KeyCode, KeyModifiers, Keybindings, MenuBuilder, Prompt,
-    PromptEditMode, PromptHistorySearch, Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
+    ColumnarMenu, DefaultValidator, Emacs, KeyCode,
+    KeyModifiers, Keybindings, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
+    Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
 };
 
 use super::commands::{
-    compile_command_with_state, execute_command, help_text, take_auto_prompt_command, EditModeKind,
-    PromptCommand, PromptOutput, SessionState,
+    compile_command_with_state, execute_command, help_text, take_auto_prompt_command,
+    EditModeKind, PromptCommand, PromptOutput, SessionState,
 };
 use super::completion::{
     build_default_completer_with_runtime, build_default_hinter_with_runtime,
-    new_completion_runtime_handle, set_completion_runtime_context, CompletionRuntimeHandle,
+    new_completion_runtime_handle,
+    set_completion_runtime_context, CompletionRuntimeHandle,
 };
-use super::frontend_profile::PromptFrontendProfile;
 use super::history::{
     default_history_path, default_log_path, should_append_history_string_like_python,
     should_scrub_history_string_after_reedline_append_like_python, PromptToolkitFileHistory,
 };
-use super::preset::PromptFrontendPreset;
 use super::python_like::{libreta_prompt_custom_split, PromptModus};
+use super::frontend_profile::PromptFrontendProfile;
+use super::preset::PromptFrontendPreset;
 use super::tui::launch_preview_ui;
 
 #[derive(Clone, Debug)]
@@ -34,6 +36,7 @@ struct StartupArgs {
     command_text: Option<String>,
     trailing_args: Vec<String>,
 }
+
 
 #[derive(Clone, Debug)]
 struct RpPrompt {
@@ -78,10 +81,7 @@ fn prompt_placeholder_text(state: &SessionState) -> Option<String> {
     }
 
     const MAX_PROMPT_PLACEHOLDER_CHARS: usize = 72;
-    let mut shortened = text
-        .chars()
-        .take(MAX_PROMPT_PLACEHOLDER_CHARS)
-        .collect::<String>();
+    let mut shortened = text.chars().take(MAX_PROMPT_PLACEHOLDER_CHARS).collect::<String>();
     if text.chars().count() > MAX_PROMPT_PLACEHOLDER_CHARS {
         shortened.push('…');
     }
@@ -176,7 +176,9 @@ fn apply_exact_mode_to_input(input: &str) -> String {
         return trimmed.to_string();
     }
 
-    format!("{trimmed} keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
+    format!(
+        "{trimmed} keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+    )
 }
 
 fn input_starts_with_reta(input: &str) -> bool {
@@ -260,7 +262,8 @@ fn should_append_exact_suffix(input: &str) -> bool {
     if tokens.iter().any(|token| {
         matches!(
             token.as_str(),
-            "s" | "S"
+            "s"
+                | "S"
                 | "l"
                 | "o"
                 | "BefehlSpeichernDavor"
@@ -401,18 +404,12 @@ pub fn run_prompt_frontend_with_profile(argv: Vec<String>, profile: PromptFronte
     run_prompt_frontend_with_preset(argv, preset)
 }
 
-pub fn run_prompt_input_frontend_with_profile(
-    argv: Vec<String>,
-    profile: PromptFrontendProfile,
-) -> i32 {
+pub fn run_prompt_input_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
     let preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
     run_prompt_frontend_with_preset(argv, preset)
 }
 
-pub fn run_prompt_command_frontend_with_profile(
-    argv: Vec<String>,
-    profile: PromptFrontendProfile,
-) -> i32 {
+pub fn run_prompt_command_frontend_with_profile(argv: Vec<String>, profile: PromptFrontendProfile) -> i32 {
     let mut preset = PromptFrontendPreset::from_profile_and_argv(profile, &argv);
     preset.one_shot = true;
     run_prompt_frontend_with_preset(argv, preset)
@@ -462,9 +459,7 @@ fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPres
     }
 
     if effective_one_shot {
-        let input = startup
-            .command_text
-            .unwrap_or_else(|| startup.trailing_args.join(" "));
+        let input = startup.command_text.unwrap_or_else(|| startup.trailing_args.join(" "));
         return run_one_shot(input, &log_path, preset.emacs_output_mode, &mut state);
     }
 
@@ -473,7 +468,6 @@ fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPres
         log_path,
         startup.exact_mode,
         preset.emacs_output_mode,
-        preset.persistent_history,
         &mut state,
     )
 }
@@ -534,11 +528,7 @@ fn run_one_shot(
 
     if matches!(&compiled, PromptCommand::Exit) {
         if state.logging_enabled {
-            append_log_line(
-                log_path,
-                "session",
-                "exit command received in one-shot mode",
-            );
+            append_log_line(log_path, "session", "exit command received in one-shot mode");
         }
         return 0;
     }
@@ -612,7 +602,6 @@ fn run_interactive_loop(
     log_path: PathBuf,
     exact_mode_enabled: bool,
     emacs_output_mode: bool,
-    persistent_history_allowed: bool,
     state: &mut SessionState,
 ) -> i32 {
     let completion_runtime = new_completion_runtime_handle();
@@ -626,8 +615,7 @@ fn run_interactive_loop(
     let mut editor = match newSession(
         &history_path,
         state.current_mode(),
-        persistent_history_allowed,
-        state.logging_enabled,
+        persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
         state.prompt_mode,
         &completion_runtime,
     ) {
@@ -675,8 +663,7 @@ fn run_interactive_loop(
                 editor = match newSession(
                     &history_path,
                     state.current_mode(),
-                    persistent_history_allowed,
-                    state.logging_enabled,
+                    persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                     state.prompt_mode,
                     &completion_runtime,
                 ) {
@@ -705,7 +692,14 @@ fn run_interactive_loop(
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
-                let history_line_scrubbed = promptInput(state, &input, None, &log_path);
+                let persistent_history_enabled =
+                    persistent_prompt_history_enabled(&state.program_name, state.logging_enabled);
+                let history_line_scrubbed = promptInput(
+                    state,
+                    &input,
+                    persistent_history_enabled.then_some(&history_path),
+                    &log_path,
+                );
 
                 let compile_input = if exact_mode_enabled {
                     apply_exact_mode_to_input(&input)
@@ -741,8 +735,7 @@ fn run_interactive_loop(
                             editor = match newSession(
                                 &history_path,
                                 state.current_mode(),
-                                persistent_history_allowed,
-                                state.logging_enabled,
+                                persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                                 state.prompt_mode,
                                 &completion_runtime,
                             ) {
@@ -815,8 +808,7 @@ fn run_interactive_loop(
                     editor = match newSession(
                         &history_path,
                         state.current_mode(),
-                        persistent_history_allowed,
-                        state.logging_enabled,
+                        persistent_prompt_history_enabled(&state.program_name, state.logging_enabled),
                         state.prompt_mode,
                         &completion_runtime,
                     ) {
@@ -872,10 +864,7 @@ fn completion_menu_event(next_event: ReedlineEvent) -> ReedlineEvent {
     ])
 }
 
-fn menu_aware_navigation(
-    menu_event: ReedlineEvent,
-    fallback_event: ReedlineEvent,
-) -> ReedlineEvent {
+fn menu_aware_navigation(menu_event: ReedlineEvent, fallback_event: ReedlineEvent) -> ReedlineEvent {
     ReedlineEvent::UntilFound(vec![menu_event, fallback_event])
 }
 
@@ -955,9 +944,7 @@ fn newSession(
     let completion_enabled = !matches!(prompt_mode, PromptModus::LoeschenSelect);
     let mut editor = Reedline::create()
         .with_history(Box::new(history))
-        .with_hinter(build_default_hinter_with_runtime(
-            completion_runtime.clone(),
-        ))
+        .with_hinter(build_default_hinter_with_runtime(completion_runtime.clone()))
         .with_validator(Box::new(DefaultValidator));
 
     if completion_enabled {
@@ -1038,9 +1025,8 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 mod tests {
     use super::{
         apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, record_prompt_input,
-        remove_last_history_line_matching,
-        scrub_prompt_history_line_if_python_togglehistory_would_skip, should_append_exact_suffix,
-        should_record_prompt_history, PromptCommand, SessionState,
+        remove_last_history_line_matching, scrub_prompt_history_line_if_python_togglehistory_would_skip,
+        should_append_exact_suffix, should_record_prompt_history, PromptCommand, SessionState,
     };
 
     #[test]
@@ -1076,13 +1062,11 @@ mod tests {
         ));
 
         std::fs::write(&path, "12 emotion\nnichtloggen\n12 emotion\n").unwrap();
-        assert!(
-            scrub_prompt_history_line_if_python_togglehistory_would_skip(
-                &path,
-                false,
-                "12 emotion"
-            )
-        );
+        assert!(scrub_prompt_history_line_if_python_togglehistory_would_skip(
+            &path,
+            false,
+            "12 emotion"
+        ));
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
             "12 emotion\nnichtloggen\n"
@@ -1127,10 +1111,7 @@ mod tests {
             "math 1+1",
             ":ui",
         ] {
-            assert!(
-                !should_append_exact_suffix(input),
-                "{input} must not get exact suffix"
-            );
+            assert!(!should_append_exact_suffix(input), "{input} must not get exact suffix");
             assert_eq!(apply_exact_mode_to_input(input), input);
         }
     }
@@ -1142,9 +1123,10 @@ mod tests {
             "-zeilen".to_string(),
             "--zaehlung=12".to_string(),
         ]);
-        let PromptCommand::Reta(argv) =
-            apply_rpe_emacs_output_to_command(command, "reta -zeilen --zaehlung=12")
-        else {
+        let PromptCommand::Reta(argv) = apply_rpe_emacs_output_to_command(
+            command,
+            "reta -zeilen --zaehlung=12",
+        ) else {
             panic!("rpe must preserve reta command kind");
         };
         assert_eq!(argv[0], "reta");

@@ -75,10 +75,10 @@ impl PromptFrontendProfile {
 
     pub fn from_program_name(program_name: &str, fallback_vi_mode: bool) -> Self {
         match program_name {
-            "rp" => Self::rp(),
-            "rpl" => Self::rpl(),
-            "rpb" => Self::rpb(),
-            "rpe" => Self::rpe(),
+            "rp" | "rrp" => Self::rp(),
+            "rpl" | "rrpl" => Self::rpl(),
+            "rpb" | "rrpb" => Self::rpb(),
+            "rpe" | "rrpe" => Self::rpe(),
             _ => Self {
                 kind: PromptFrontendKind::Auto,
                 program_name: "rp",

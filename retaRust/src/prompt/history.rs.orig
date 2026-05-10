@@ -206,34 +206,24 @@ pub struct PromptToolkitFileHistory {
     entries: VecDeque<String>,
     pending_entries: Vec<String>,
     file: Option<PathBuf>,
-    append_enabled: bool,
 }
 
 impl PromptToolkitFileHistory {
     pub fn in_memory(capacity: usize) -> ReedlineResult<Self> {
-        Self::from_entries(capacity, Vec::new(), None, false)
+        Self::from_entries(capacity, Vec::new(), None)
     }
 
     pub fn with_file(capacity: usize, file: PathBuf) -> ReedlineResult<Self> {
-        Self::with_file_and_append_policy(capacity, file, true)
-    }
-
-    pub fn with_file_and_append_policy(
-        capacity: usize,
-        file: PathBuf,
-        append_enabled: bool,
-    ) -> ReedlineResult<Self> {
         let entries = std::fs::read_to_string(&file)
             .map(|raw| parse_prompt_toolkit_history_text(&raw))
             .unwrap_or_default();
-        Self::from_entries(capacity, entries, Some(file), append_enabled)
+        Self::from_entries(capacity, entries, Some(file))
     }
 
     fn from_entries(
         capacity: usize,
         entries: Vec<String>,
         file: Option<PathBuf>,
-        append_enabled: bool,
     ) -> ReedlineResult<Self> {
         if capacity == usize::MAX {
             return Err(ReedlineError(ReedlineErrorVariants::OtherHistoryError(
@@ -254,7 +244,6 @@ impl PromptToolkitFileHistory {
             entries: retained_entries,
             pending_entries: Vec::new(),
             file,
-            append_enabled,
         })
     }
 
@@ -273,25 +262,12 @@ impl PromptToolkitFileHistory {
             || query.filter.exit_successful.is_some()
             || query.filter.session.is_some()
     }
-
-    fn append_entry_to_file(file_path: &PathBuf, entry: &str) -> std::io::Result<()> {
-        if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(file_path)?;
-        file.write_all(format_prompt_toolkit_history_entry(entry).as_bytes())?;
-        file.flush()
-    }
 }
 
 impl History for PromptToolkitFileHistory {
     fn save(&mut self, h: HistoryItem) -> ReedlineResult<HistoryItem> {
         let entry = h.command_line;
-        if !self.append_enabled
-            || !should_append_history_string_like_python(true, &entry)
+        if !should_append_history_string_like_python(true, &entry)
             || self.entries.back() == Some(&entry)
             || self.capacity == 0
         {
@@ -302,8 +278,8 @@ impl History for PromptToolkitFileHistory {
             self.entries.pop_front();
         }
         self.entries.push_back(entry.clone());
-        if let Some(file_path) = &self.file {
-            Self::append_entry_to_file(file_path, &entry).map_err(ReedlineError::from)?;
+        if self.file.is_some() {
+            self.pending_entries.push(entry.clone());
         }
         Ok(Self::construct_entry(
             Some(HistoryItemId::new((self.entries.len() - 1) as i64)),
@@ -480,10 +456,7 @@ mod tests {
     #[test]
     fn prompt_toolkit_history_parser_can_salvage_old_session_input_logs() {
         let raw = "[1710000000] session: start\n[1710000001] input: 12 emotion\n[1710000002] output-meta: ignored\n";
-        assert_eq!(
-            parse_prompt_toolkit_history_text(raw),
-            vec!["12 emotion".to_string()]
-        );
+        assert_eq!(parse_prompt_toolkit_history_text(raw), vec!["12 emotion".to_string()]);
     }
 
     #[test]
@@ -512,76 +485,32 @@ mod tests {
     }
 
     #[test]
-    fn file_history_appends_immediately_when_enabled() {
-        use reedline::{History, HistoryItem};
-
-        let path = std::env::temp_dir().join(format!(
-            "reta_prompt_history_enabled_{}_{}.txt",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let _ = std::fs::remove_file(&path);
-        let mut history =
-            super::PromptToolkitFileHistory::with_file_and_append_policy(32, path.clone(), true)
-                .unwrap();
-        let _ = history
-            .save(HistoryItem::from_command_line("r6".to_string()))
-            .unwrap();
-        let raw = std::fs::read_to_string(&path).unwrap();
-        assert!(raw.contains("\n+r6\n"));
-        let _ = std::fs::remove_file(&path);
-    }
-
-    #[test]
-    fn file_history_reads_but_does_not_append_when_disabled() {
-        use reedline::{History, HistoryItem};
-
-        let path = std::env::temp_dir().join(format!(
-            "reta_prompt_history_disabled_{}_{}.txt",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::write(&path, "\n# old\n+r6\n").unwrap();
-        let mut history =
-            super::PromptToolkitFileHistory::with_file_and_append_policy(32, path.clone(), false)
-                .unwrap();
-        assert_eq!(history.entries.back().map(String::as_str), Some("r6"));
-        let _ = history
-            .save(HistoryItem::from_command_line("12".to_string()))
-            .unwrap();
-        let raw = std::fs::read_to_string(&path).unwrap();
-        assert!(raw.contains("\n+r6\n"));
-        assert!(!raw.contains("\n+12\n"));
-        let _ = std::fs::remove_file(&path);
-    }
-
-    #[test]
     fn toggle_history_append_rules_match_python_togglehistory() {
         assert!(should_append_history_string_like_python(true, "12 emotion"));
-        assert!(!should_append_history_string_like_python(
-            false,
-            "12 emotion"
-        ));
+        assert!(!should_append_history_string_like_python(false, "12 emotion"));
         assert!(!should_append_history_string_like_python(true, ""));
         assert!(!should_append_history_string_like_python(true, "loggen"));
-        assert!(!should_append_history_string_like_python(
-            true,
-            "12 nichtloggen"
-        ));
+        assert!(!should_append_history_string_like_python(true, "12 nichtloggen"));
         assert!(contains_history_toggle_token_like_python("12 loggen"));
     }
 
     #[test]
     fn reedline_scrub_predicate_matches_python_togglehistory_append_rules() {
-        assert!(!should_scrub_history_string_after_reedline_append_like_python(true, "12 emotion"));
-        assert!(should_scrub_history_string_after_reedline_append_like_python(false, "12 emotion"));
-        assert!(should_scrub_history_string_after_reedline_append_like_python(true, "nichtloggen"));
-        assert!(!should_scrub_history_string_after_reedline_append_like_python(false, ""));
+        assert!(!should_scrub_history_string_after_reedline_append_like_python(
+            true,
+            "12 emotion"
+        ));
+        assert!(should_scrub_history_string_after_reedline_append_like_python(
+            false,
+            "12 emotion"
+        ));
+        assert!(should_scrub_history_string_after_reedline_append_like_python(
+            true,
+            "nichtloggen"
+        ));
+        assert!(!should_scrub_history_string_after_reedline_append_like_python(
+            false,
+            ""
+        ));
     }
 }

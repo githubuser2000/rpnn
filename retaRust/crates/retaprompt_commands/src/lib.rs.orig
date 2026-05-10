@@ -976,7 +976,8 @@ fn should_append_exact_suffix(input: &str) -> bool {
 
     !matches!(
         first,
-        "help"
+        "HELP"
+            | "help"
             | "hilfe"
             | "befehle"
             | "kurzbefehle"
@@ -1182,6 +1183,7 @@ mod tests {
             apply_exact_mode_to_input("reta -zeilen --zaehlung=12"),
             "reta -zeilen --zaehlung=12"
         );
+        assert_eq!(apply_exact_mode_to_input("HELP"), "HELP");
         assert_eq!(apply_exact_mode_to_input("help"), "help");
         assert_eq!(apply_exact_mode_to_input("s"), "s");
     }
