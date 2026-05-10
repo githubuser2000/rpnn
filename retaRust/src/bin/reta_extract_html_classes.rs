@@ -281,7 +281,7 @@ fn strip_tags_and_collapse_ws(html: &str) -> String {
         match ch {
             '<' => in_tag = true,
             '>' => in_tag = false,
-            ch if in_tag => {}
+            _ if in_tag => {}
             ch if ch.is_whitespace() => {
                 if !last_was_ws {
                     out.push(' ');
