@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
 use std::io::Write;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 
 use reedline::{
-    CommandLineSearch, History, HistoryItem, HistoryItemId, HistorySessionId, ReedlineError,
-    ReedlineErrorVariants, Result as ReedlineResult, SearchDirection, SearchQuery,
+    FileBackedHistory, History, HistoryItem, HistoryItemId, HistorySessionId,
+    Result as ReedlineResult, SearchQuery,
 };
 
 use super::python_like::libreta_prompt_custom_split;
@@ -203,15 +203,22 @@ pub fn format_prompt_toolkit_history_entry(command: &str) -> String {
 #[derive(Debug)]
 pub struct PromptToolkitFileHistory {
     capacity: usize,
+    // Kept as a small mirror for tests and diagnostics.  Navigation/search is
+    // delegated to reedline::FileBackedHistory because Reedline's arrow-key
+    // browsing uses an internal `not_command_line` filter that external custom
+    // History implementations cannot inspect.
     entries: VecDeque<String>,
-    pending_entries: Vec<String>,
+    inner: FileBackedHistory,
     file: Option<PathBuf>,
     append_enabled: bool,
+    memory_enabled: bool,
 }
 
 impl PromptToolkitFileHistory {
     pub fn in_memory(capacity: usize) -> ReedlineResult<Self> {
-        Self::from_entries(capacity, Vec::new(), None, false)
+        // rp/rrp should not touch ~/.ReTaPromptHistory, but it may still keep a
+        // per-session in-memory history.
+        Self::from_entries_with_policy(capacity, Vec::new(), None, false, true)
     }
 
     pub fn with_file(capacity: usize, file: PathBuf) -> ReedlineResult<Self> {
@@ -226,52 +233,50 @@ impl PromptToolkitFileHistory {
         let entries = std::fs::read_to_string(&file)
             .map(|raw| parse_prompt_toolkit_history_text(&raw))
             .unwrap_or_default();
-        Self::from_entries(capacity, entries, Some(file), append_enabled)
+        // rpl/rrpl always reads the file.  If `nichtloggen` disabled logging,
+        // newly typed commands are not added while disabled.
+        Self::from_entries_with_policy(capacity, entries, Some(file), append_enabled, append_enabled)
     }
 
-    fn from_entries(
+    fn from_entries_with_policy(
         capacity: usize,
         entries: Vec<String>,
         file: Option<PathBuf>,
         append_enabled: bool,
+        memory_enabled: bool,
     ) -> ReedlineResult<Self> {
-        if capacity == usize::MAX {
-            return Err(ReedlineError(ReedlineErrorVariants::OtherHistoryError(
-                "History capacity too large to be addressed safely",
-            )));
-        }
-
+        let mut inner = FileBackedHistory::new(capacity)?;
         let mut retained_entries = VecDeque::new();
+
         for entry in entries {
-            if retained_entries.len() == capacity {
-                retained_entries.pop_front();
+            let saved = inner.save(HistoryItem::from_command_line(entry.clone()))?;
+            if saved.id.is_some() {
+                Self::push_mirror_entry(capacity, &mut retained_entries, saved.command_line);
             }
-            retained_entries.push_back(entry);
         }
 
         Ok(Self {
             capacity,
             entries: retained_entries,
-            pending_entries: Vec::new(),
+            inner,
             file,
             append_enabled,
+            memory_enabled,
         })
     }
 
-    fn construct_entry(id: Option<HistoryItemId>, command_line: String) -> HistoryItem {
-        let mut item = HistoryItem::from_command_line(command_line);
-        item.id = id;
-        item
+    fn push_mirror_entry(capacity: usize, entries: &mut VecDeque<String>, entry: String) {
+        if capacity == 0 || entries.back() == Some(&entry) {
+            return;
+        }
+        if entries.len() == capacity {
+            entries.pop_front();
+        }
+        entries.push_back(entry);
     }
 
-    fn unsupported_extra_filter(query: &SearchQuery) -> bool {
-        query.start_time.is_some()
-            || query.end_time.is_some()
-            || query.filter.hostname.is_some()
-            || query.filter.cwd_exact.is_some()
-            || query.filter.cwd_prefix.is_some()
-            || query.filter.exit_successful.is_some()
-            || query.filter.session.is_some()
+    fn remember_saved_entry(&mut self, entry: String) {
+        Self::push_mirror_entry(self.capacity, &mut self.entries, entry);
     }
 
     fn append_entry_to_file(file_path: &PathBuf, entry: &str) -> std::io::Result<()> {
@@ -289,149 +294,68 @@ impl PromptToolkitFileHistory {
 
 impl History for PromptToolkitFileHistory {
     fn save(&mut self, h: HistoryItem) -> ReedlineResult<HistoryItem> {
-        let entry = h.command_line;
-        if !self.append_enabled
-            || !should_append_history_string_like_python(true, &entry)
-            || self.entries.back() == Some(&entry)
-            || self.capacity == 0
-        {
-            return Ok(Self::construct_entry(None, entry));
+        let entry = h.command_line.clone();
+        if !self.memory_enabled || !should_append_history_string_like_python(true, &entry) {
+            return Ok(h);
         }
 
-        if self.entries.len() == self.capacity {
-            self.entries.pop_front();
-        }
-        self.entries.push_back(entry.clone());
-        if let Some(file_path) = &self.file {
-            Self::append_entry_to_file(file_path, &entry).map_err(ReedlineError::from)?;
-        }
-        Ok(Self::construct_entry(
-            Some(HistoryItemId::new((self.entries.len() - 1) as i64)),
-            entry,
-        ))
-    }
-
-    fn load(&self, id: HistoryItemId) -> ReedlineResult<HistoryItem> {
-        Ok(Self::construct_entry(
-            Some(id),
-            self.entries
-                .get(id.0 as usize)
-                .ok_or(ReedlineError(ReedlineErrorVariants::OtherHistoryError(
-                    "Item does not exist",
-                )))?
-                .clone(),
-        ))
-    }
-
-    fn count(&self, query: SearchQuery) -> ReedlineResult<i64> {
-        Ok(self.search(query)?.len() as i64)
-    }
-
-    fn search(&self, query: SearchQuery) -> ReedlineResult<Vec<HistoryItem>> {
-        if Self::unsupported_extra_filter(&query) {
-            return Ok(Vec::new());
-        }
-
-        let start = query.start_id.map(|id| id.0).unwrap_or(-1) + 1;
-        let end = query
-            .end_id
-            .map(|id| id.0.saturating_sub(1))
-            .unwrap_or(self.entries.len() as i64 - 1);
-
-        if self.entries.is_empty() || start > end || end < 0 {
-            return Ok(Vec::new());
-        }
-
-        let start = start.max(0) as usize;
-        let end = end.min(self.entries.len() as i64 - 1) as usize;
-        let limit = query.limit.unwrap_or(i64::MAX).max(0) as usize;
-
-        let matches_filter = |command: &str| match &query.filter.command_line {
-            Some(CommandLineSearch::Prefix(prefix)) => command.starts_with(prefix),
-            Some(CommandLineSearch::Substring(needle)) => command.contains(needle),
-            Some(CommandLineSearch::Exact(exact)) => command == exact,
-            None => true,
-        };
-
-        let range = start..=end;
-        let iter: Box<dyn Iterator<Item = usize>> = match query.direction {
-            SearchDirection::Backward => Box::new(range.rev()),
-            SearchDirection::Forward => Box::new(range),
-        };
-
-        let mut out = Vec::new();
-        for index in iter {
-            let Some(command) = self.entries.get(index) else {
-                continue;
-            };
-            if matches_filter(command) {
-                out.push(Self::construct_entry(
-                    Some(HistoryItemId::new(index as i64)),
-                    command.clone(),
-                ));
-                if out.len() >= limit {
-                    break;
+        let saved = self.inner.save(h)?;
+        if saved.id.is_some() {
+            self.remember_saved_entry(saved.command_line.clone());
+            if self.append_enabled {
+                if let Some(file_path) = &self.file {
+                    Self::append_entry_to_file(file_path, &saved.command_line)
+                        .map_err(reedline::ReedlineError::from)?;
                 }
             }
         }
-        Ok(out)
+        Ok(saved)
+    }
+
+    fn load(&self, id: HistoryItemId) -> ReedlineResult<HistoryItem> {
+        self.inner.load(id)
+    }
+
+    fn count(&self, query: SearchQuery) -> ReedlineResult<i64> {
+        self.inner.count(query)
+    }
+
+    fn search(&self, query: SearchQuery) -> ReedlineResult<Vec<HistoryItem>> {
+        self.inner.search(query)
     }
 
     fn update(
         &mut self,
-        _id: HistoryItemId,
-        _updater: &dyn Fn(HistoryItem) -> HistoryItem,
+        id: HistoryItemId,
+        updater: &dyn Fn(HistoryItem) -> HistoryItem,
     ) -> ReedlineResult<()> {
-        Err(ReedlineError(
-            ReedlineErrorVariants::HistoryFeatureUnsupported {
-                history: "PromptToolkitFileHistory",
-                feature: "updating entries",
-            },
-        ))
+        self.inner.update(id, updater)
     }
 
     fn clear(&mut self) -> ReedlineResult<()> {
+        self.inner.clear()?;
         self.entries.clear();
-        self.pending_entries.clear();
         if let Some(file) = &self.file {
             if file.exists() {
-                std::fs::remove_file(file).map_err(ReedlineError::from)?;
+                std::fs::remove_file(file).map_err(reedline::ReedlineError::from)?;
             }
         }
         Ok(())
     }
 
-    fn delete(&mut self, _h: HistoryItemId) -> ReedlineResult<()> {
-        Err(ReedlineError(
-            ReedlineErrorVariants::HistoryFeatureUnsupported {
-                history: "PromptToolkitFileHistory",
-                feature: "removing entries",
-            },
-        ))
+    fn delete(&mut self, h: HistoryItemId) -> ReedlineResult<()> {
+        self.inner.delete(h)
     }
 
     fn sync(&mut self) -> std::io::Result<()> {
-        let Some(file_path) = &self.file else {
-            return Ok(());
-        };
-        if self.pending_entries.is_empty() {
-            return Ok(());
-        }
-        if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(file_path)?;
-        for entry in self.pending_entries.drain(..) {
-            file.write_all(format_prompt_toolkit_history_entry(&entry).as_bytes())?;
-        }
-        file.flush()
+        // File writes happen immediately in save().  Keeping sync() a no-op
+        // prevents the old drop-time rewrite/truncate behavior and avoids
+        // losing commands when the editor is rebuilt repeatedly.
+        Ok(())
     }
 
     fn session(&self) -> Option<HistorySessionId> {
-        None
+        self.inner.session()
     }
 }
 
@@ -584,4 +508,65 @@ mod tests {
         assert!(should_scrub_history_string_after_reedline_append_like_python(true, "nichtloggen"));
         assert!(!should_scrub_history_string_after_reedline_append_like_python(false, ""));
     }
+    #[test]
+    fn prompt_toolkit_file_history_browses_the_full_list_in_reverse_order() {
+        use reedline::{History, HistoryItem};
+
+        let path = std::env::temp_dir().join(format!(
+            "reta_prompt_history_full_list_{}_{}.txt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_file(&path);
+
+        let mut history =
+            super::PromptToolkitFileHistory::with_file_and_append_policy(32, path.clone(), true)
+                .unwrap();
+        history
+            .save(HistoryItem::from_command_line("r6".to_string()))
+            .unwrap();
+        history
+            .save(HistoryItem::from_command_line("reta -zeilen --alles".to_string()))
+            .unwrap();
+        history
+            .save(HistoryItem::from_command_line("12".to_string()))
+            .unwrap();
+
+        let raw = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            super::parse_prompt_toolkit_history_text(&raw),
+            vec![
+                "r6".to_string(),
+                "reta -zeilen --alles".to_string(),
+                "12".to_string(),
+            ]
+        );
+
+        let reopened =
+            super::PromptToolkitFileHistory::with_file_and_append_policy(32, path.clone(), true)
+                .unwrap();
+        let browsed = reopened
+            .search(reedline::SearchQuery::everything(
+                reedline::SearchDirection::Backward,
+                None,
+            ))
+            .unwrap()
+            .into_iter()
+            .map(|item| item.command_line)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            browsed,
+            vec![
+                "12".to_string(),
+                "reta -zeilen --alles".to_string(),
+                "r6".to_string(),
+            ]
+        );
+
+        let _ = std::fs::remove_file(&path);
+    }
+
 }
