@@ -2144,7 +2144,7 @@ fn semantic_specs() -> &'static [PromptSemanticSpec] {
                 },
                 PromptSemanticSpec {
                     names: &["richtung"],
-                    integer_para: "--primzahlwirkung=galaxieabsicht",
+                    integer_para: "--primzahlwirkung=Galaxieabsicht",
                     reciprocal_whole_para: None,
                     integer_cols: "",
                     reciprocal_whole_cols: "",
@@ -10156,7 +10156,7 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert!(calls[0]
             .iter()
-            .any(|token| token == "--primzahlwirkung=galaxieabsicht"));
+            .any(|token| token == "--primzahlwirkung=Galaxieabsicht"));
         assert!(!calls[0]
             .iter()
             .any(|token| token.starts_with("--spaltenreihenfolgeundnurdiese=")));
