@@ -56,8 +56,8 @@ copy_runtime_data
 [ "${PROFILE}" = "release" ] && for a in rreta rrp rrpl rrpe rrpb
 do
 	cargo run --release --bin $a -- -h
-done for a in rreta rrp rrpl rrpe rrpb
+done || for a in rreta rrp rrpl rrpe rrpb
 do
 	cargo run --bin $a -- -h
-
+done
 echo "Build complete: $TARGET_DIR"
