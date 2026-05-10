@@ -100,7 +100,13 @@ struct PromptContextCompleter {
 #[derive(Clone, Debug)]
 struct PromptContextHinter {
     runtime: CompletionRuntimeHandle,
-    current_hint: String,
+    current_hint: AutosuggestionHint,
+}
+
+#[derive(Clone, Debug, Default)]
+struct AutosuggestionHint {
+    display: String,
+    insert: String,
 }
 
 #[derive(Clone, Debug)]
@@ -268,7 +274,7 @@ pub fn build_default_completer_with_runtime(
 pub fn build_default_hinter_with_runtime(runtime: CompletionRuntimeHandle) -> Box<dyn Hinter> {
     Box::new(PromptContextHinter {
         runtime,
-        current_hint: String::new(),
+        current_hint: AutosuggestionHint::default(),
     })
 }
 
@@ -288,6 +294,7 @@ pub fn autosuggestion_for_input_in_mode_with_context(
         stored_prefix_tokens,
         stored_commands,
     )
+    .map(|hint| hint.display)
 }
 
 pub fn candidates_for_prefix(prefix: &str) -> Vec<String> {
@@ -364,7 +371,7 @@ impl Hinter for PromptContextHinter {
         use_ansi_coloring: bool,
         _cwd: &str,
     ) -> String {
-        self.current_hint.clear();
+        self.current_hint = AutosuggestionHint::default();
 
         let Some(before_cursor) = safe_line_end_prefix(line, pos) else {
             return String::new();
@@ -382,24 +389,42 @@ impl Hinter for PromptContextHinter {
             &runtime_state.stored_prefix_tokens,
             &runtime_state.stored_commands,
         ) {
+            let display = hint.display.clone();
             self.current_hint = hint;
-            return render_autosuggestion_hint(&self.current_hint, use_ansi_coloring);
+            return render_autosuggestion_hint(&display, use_ansi_coloring);
         }
 
         if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
-            self.current_hint = hint;
-            return render_autosuggestion_hint(&self.current_hint, use_ansi_coloring);
+            self.current_hint = AutosuggestionHint::insertable(hint);
+            return render_autosuggestion_hint(&self.current_hint.display, use_ansi_coloring);
         }
 
         String::new()
     }
 
     fn complete_hint(&self) -> String {
-        self.current_hint.clone()
+        self.current_hint.insert.clone()
     }
 
     fn next_hint_token(&self) -> String {
-        first_autosuggestion_token(&self.current_hint)
+        first_autosuggestion_token(&self.current_hint.insert)
+    }
+}
+
+impl AutosuggestionHint {
+    fn insertable(text: impl Into<String>) -> Self {
+        let text = text.into();
+        Self {
+            display: text.clone(),
+            insert: text,
+        }
+    }
+
+    fn display_only(text: impl Into<String>) -> Self {
+        Self {
+            display: text.into(),
+            insert: String::new(),
+        }
     }
 }
 
@@ -408,7 +433,7 @@ fn autosuggestion_from_context_candidates(
     prompt_mode: PromptModus,
     stored_prefix_tokens: &[String],
     stored_commands: &[String],
-) -> Option<String> {
+) -> Option<AutosuggestionHint> {
     if before_cursor.trim().is_empty() {
         return None;
     }
@@ -420,8 +445,19 @@ fn autosuggestion_from_context_candidates(
         stored_commands,
     )
     .into_iter()
-    .filter_map(|candidate| suffix_hint_for_candidate(before_cursor, &candidate))
-    .find(|hint| !hint.trim().is_empty())
+    .filter_map(|candidate| autosuggestion_hint_for_candidate(before_cursor, &candidate))
+    .find(|hint| !hint.display.trim().is_empty())
+}
+
+fn autosuggestion_hint_for_candidate(
+    before_cursor: &str,
+    candidate: &CompletionCandidate,
+) -> Option<AutosuggestionHint> {
+    if let Some(hint) = suffix_hint_for_candidate(before_cursor, candidate) {
+        return Some(AutosuggestionHint::insertable(hint));
+    }
+
+    structural_dash_replacement_hint_for_candidate(before_cursor, candidate)
 }
 
 fn suffix_hint_for_candidate(
@@ -448,6 +484,46 @@ fn suffix_hint_for_candidate(
     }
 
     Some(completed[before_cursor.len()..].to_string())
+}
+
+fn structural_dash_replacement_hint_for_candidate(
+    before_cursor: &str,
+    candidate: &CompletionCandidate,
+) -> Option<AutosuggestionHint> {
+    if candidate.replace_start > before_cursor.len()
+        || !before_cursor.is_char_boundary(candidate.replace_start)
+    {
+        return None;
+    }
+
+    let typed_fragment = &before_cursor[candidate.replace_start..];
+    if typed_fragment.trim().is_empty() || typed_fragment.chars().any(char::is_whitespace) {
+        return None;
+    }
+    if !is_structural_dash_candidate(&candidate.value) {
+        return None;
+    }
+
+    let normalized_typed = normalize_dash_insensitive_fragment(typed_fragment);
+    if normalized_typed.is_empty() {
+        return None;
+    }
+
+    let normalized_candidate = normalize_dash_insensitive_fragment(&candidate.value);
+    if !normalized_candidate.starts_with(&normalized_typed) {
+        return None;
+    }
+
+    let mut canonical = candidate.value.clone();
+    if candidate.append_whitespace {
+        canonical.push(' ');
+    }
+
+    if normalize_completion_text(typed_fragment) == normalize_completion_text(&canonical) {
+        return None;
+    }
+
+    Some(AutosuggestionHint::display_only(format!(" → {canonical}")))
 }
 
 fn autosuggestion_from_history(before_cursor: &str, history: &dyn History) -> Option<String> {
@@ -2393,6 +2469,24 @@ mod tests {
 
         let values = candidates_for_input("reta -zeilen ---zeit=h");
         assert!(contains_normalized(&values, "--zeit=heute"));
+    }
+
+    #[test]
+    fn autosuggestion_shows_main_switches_even_without_dash_prefix() {
+        assert_eq!(autosuggestion_for_input("reta ze").as_deref(), Some(" → -zeilen "));
+        assert_eq!(autosuggestion_for_input("reta --ze").as_deref(), Some(" → -zeilen "));
+    }
+
+    #[test]
+    fn autosuggestion_shows_parameter_switches_even_without_dash_prefix() {
+        assert_eq!(
+            autosuggestion_for_input("reta -zeilen zeit").as_deref(),
+            Some(" → --zeit=")
+        );
+        assert_eq!(
+            autosuggestion_for_input("reta -zeilen ---zeit").as_deref(),
+            Some(" → --zeit=")
+        );
     }
 
     #[test]

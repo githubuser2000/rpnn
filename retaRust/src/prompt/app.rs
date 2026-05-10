@@ -915,8 +915,8 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
         KeyCode::Right,
         ReedlineEvent::UntilFound(vec![
             ReedlineEvent::MenuRight,
-            ReedlineEvent::HistoryHintComplete,
             ReedlineEvent::Menu(COMPLETION_MENU_NAME.to_string()),
+            ReedlineEvent::HistoryHintComplete,
             ReedlineEvent::Right,
         ]),
     );
