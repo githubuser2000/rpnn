@@ -244,7 +244,9 @@ impl RetaRunResult {
 #[repr(C)]
 struct RetaFfiResponse {
     stdout_text: *mut c_char,
+    stdout_len: usize,
     stderr_text: *mut c_char,
+    stderr_len: usize,
     exit_code: i32,
 }
 
@@ -262,8 +264,9 @@ type RetaFreeStringFn = unsafe extern "C" fn(*mut c_char);
 type RetaAbiVersionFn = unsafe extern "C" fn() -> u32;
 type RetaSharedWordsJsonFn = unsafe extern "C" fn() -> *mut c_char;
 
-const EXPECTED_RETA_ABI_VERSION: u32 = 1;
+const EXPECTED_RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
+const MAX_FFI_RESPONSE_BYTES: usize = 1024 * 1024 * 1024;
 type RetaAllMainAliasGroupsJsonFn = unsafe extern "C" fn() -> *mut c_char;
 type RetaParameterAliasGroupsForMainJsonFn = unsafe extern "C" fn(*const c_char) -> *mut c_char;
 
@@ -324,8 +327,8 @@ where
         )
     };
 
-    let stderr = unsafe { take_owned_string(response.stderr_text, free) };
-    let stdout = unsafe { take_owned_string(response.stdout_text, free) };
+    let stderr = unsafe { take_owned_response_string(response.stderr_text, response.stderr_len, free) };
+    let stdout = unsafe { take_owned_response_string(response.stdout_text, response.stdout_len, free) };
 
     RetaRunResult {
         stdout,
@@ -554,6 +557,31 @@ unsafe fn take_owned_string(ptr: *mut c_char, free: RetaFreeStringFn) -> String 
         .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
     unsafe { free(ptr) };
     owned
+}
+
+unsafe fn take_owned_response_string(ptr: *mut c_char, len: usize, free: RetaFreeStringFn) -> String {
+    if ptr.is_null() {
+        return String::new();
+    }
+
+    let owned = unsafe { read_c_string_lossy_with_known_len(ptr, len, MAX_FFI_RESPONSE_BYTES) }
+        .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
+    unsafe { free(ptr) };
+    owned
+}
+
+unsafe fn read_c_string_lossy_with_known_len(
+    ptr: *const c_char,
+    len: usize,
+    max_bytes: usize,
+) -> Result<String, String> {
+    if len > max_bytes {
+        return Err(format!(
+            "C string response length {len} exceeds maximum {max_bytes} bytes"
+        ));
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+    Ok(String::from_utf8_lossy(bytes).into_owned())
 }
 
 unsafe fn read_c_string_lossy_bounded(

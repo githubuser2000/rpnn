@@ -9,7 +9,9 @@ use libloading::{library_filename, Library, Symbol};
 #[repr(C)]
 struct RetaFfiResponse {
     stdout_text: *mut c_char,
+    stdout_len: usize,
     stderr_text: *mut c_char,
+    stderr_len: usize,
     exit_code: i32,
 }
 
@@ -26,8 +28,8 @@ type RetaRunArgvFn = unsafe extern "C" fn(
 type RetaFreeStringFn = unsafe extern "C" fn(ptr: *mut c_char);
 type RetaAbiVersionFn = unsafe extern "C" fn() -> u32;
 
-const EXPECTED_RETA_ABI_VERSION: u32 = 1;
-const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
+const EXPECTED_RETA_ABI_VERSION: u32 = 2;
+const MAX_FFI_RESPONSE_BYTES: usize = 1024 * 1024 * 1024;
 
 fn main() {
     std::process::exit(real_main());
@@ -109,12 +111,12 @@ fn real_main() -> i32 {
             io::stdin().is_terminal() as u8,
         );
 
-        let stderr_text = take_owned_string(response.stderr_text, &free);
+        let stderr_text = take_owned_response_string(response.stderr_text, response.stderr_len, &free);
         if !stderr_text.is_empty() {
             let _ = write!(io::stderr().lock(), "{stderr_text}");
         }
 
-        let stdout_text = take_owned_string(response.stdout_text, &free);
+        let stdout_text = take_owned_response_string(response.stdout_text, response.stdout_len, &free);
         if !stdout_text.is_empty() {
             let _ = write!(io::stdout().lock(), "{stdout_text}");
         }
@@ -232,12 +234,16 @@ fn to_c_string_lossy(text: &str) -> CString {
     CString::new(sanitized).expect("sanitized launcher string must not contain interior null bytes")
 }
 
-unsafe fn take_owned_string(ptr: *mut c_char, free: &Symbol<'_, RetaFreeStringFn>) -> String {
+unsafe fn take_owned_response_string(
+    ptr: *mut c_char,
+    len: usize,
+    free: &Symbol<'_, RetaFreeStringFn>,
+) -> String {
     if ptr.is_null() {
         return String::new();
     }
 
-    let text = unsafe { read_c_string_lossy_bounded(ptr, MAX_FFI_STRING_BYTES) }
+    let text = unsafe { read_c_string_lossy_with_known_len(ptr, len, MAX_FFI_RESPONSE_BYTES) }
         .unwrap_or_else(|message| format!("<invalid libreta string: {message}>"));
     unsafe {
         free(ptr);
@@ -245,18 +251,16 @@ unsafe fn take_owned_string(ptr: *mut c_char, free: &Symbol<'_, RetaFreeStringFn
     text
 }
 
-unsafe fn read_c_string_lossy_bounded(
+unsafe fn read_c_string_lossy_with_known_len(
     ptr: *const c_char,
+    len: usize,
     max_bytes: usize,
 ) -> Result<String, String> {
-    for len in 0..max_bytes {
-        let byte = unsafe { *ptr.add(len) };
-        if byte == 0 {
-            let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
-            return Ok(String::from_utf8_lossy(bytes).into_owned());
-        }
+    if len > max_bytes {
+        return Err(format!(
+            "C string response length {len} exceeds maximum {max_bytes} bytes"
+        ));
     }
-    Err(format!(
-        "C string is longer than {max_bytes} bytes or not NUL-terminated"
-    ))
+    let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+    Ok(String::from_utf8_lossy(bytes).into_owned())
 }

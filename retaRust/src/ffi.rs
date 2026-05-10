@@ -8,7 +8,7 @@ use serde_json;
 
 use crate::{build_cli_request, run_reta, RetaRuntime};
 
-pub const RETA_ABI_VERSION: u32 = 1;
+pub const RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_ARGC: usize = 4096;
 const MAX_FFI_STRING_BYTES: usize = 16 * 1024 * 1024;
 
@@ -17,7 +17,9 @@ static FFI_ALLOCATIONS: OnceLock<Mutex<BTreeSet<usize>>> = OnceLock::new();
 #[repr(C)]
 pub struct RetaFfiResponse {
     pub stdout_text: *mut c_char,
+    pub stdout_len: usize,
     pub stderr_text: *mut c_char,
+    pub stderr_len: usize,
     pub exit_code: i32,
 }
 
@@ -86,16 +88,28 @@ unsafe fn reta_run_argv_impl(
     );
 
     match run_reta(request) {
-        Ok(response) => RetaFfiResponse {
-            stdout_text: into_c_string(response.rendered_text),
-            stderr_text: into_c_string(response.stderr_text),
-            exit_code: response.exit_code,
-        },
-        Err(error) => RetaFfiResponse {
-            stdout_text: into_c_string(String::new()),
-            stderr_text: into_c_string(format!("reta failed: {error}\n")),
-            exit_code: error.exit_code(),
-        },
+        Ok(response) => {
+            let (stdout_text, stdout_len) = into_c_string_with_len(response.rendered_text);
+            let (stderr_text, stderr_len) = into_c_string_with_len(response.stderr_text);
+            RetaFfiResponse {
+                stdout_text,
+                stdout_len,
+                stderr_text,
+                stderr_len,
+                exit_code: response.exit_code,
+            }
+        }
+        Err(error) => {
+            let (stdout_text, stdout_len) = into_c_string_with_len(String::new());
+            let (stderr_text, stderr_len) = into_c_string_with_len(format!("reta failed: {error}\n"));
+            RetaFfiResponse {
+                stdout_text,
+                stdout_len,
+                stderr_text,
+                stderr_len,
+                exit_code: error.exit_code(),
+            }
+        }
     }
 }
 
@@ -229,9 +243,13 @@ where
 }
 
 fn ffi_error_response<S: Into<String>>(exit_code: i32, stderr_text: S) -> RetaFfiResponse {
+    let (stdout_text, stdout_len) = into_c_string_with_len(String::new());
+    let (stderr_text, stderr_len) = into_c_string_with_len(stderr_text.into());
     RetaFfiResponse {
-        stdout_text: into_c_string(String::new()),
-        stderr_text: into_c_string(stderr_text.into()),
+        stdout_text,
+        stdout_len,
+        stderr_text,
+        stderr_len,
         exit_code,
     }
 }
@@ -261,9 +279,14 @@ fn unregister_ffi_allocation(ptr: *mut c_char) -> bool {
 }
 
 fn into_c_string(text: String) -> *mut c_char {
+    into_c_string_with_len(text).0
+}
+
+fn into_c_string_with_len(text: String) -> (*mut c_char, usize) {
     let sanitized = text.replace('\0', "�");
+    let len = sanitized.len();
     let c_string = CString::new(sanitized).unwrap_or_else(|_| {
         CString::new("internal error while building CString").unwrap_or_else(|_| CString::default())
     });
-    register_ffi_allocation(c_string.into_raw())
+    (register_ffi_allocation(c_string.into_raw()), len)
 }
