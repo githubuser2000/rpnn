@@ -2,7 +2,7 @@ use reta::domain::python_html_meta::html_meta_for_column;
 use reta::domain::python_html_meta_exact::{all_exact_html_json, exact_html_json_for_column};
 use reta::domain::python_source_of_truth::{
     all_main_alias_groups, canonicalize_pair, column_numbers_for_pair, exact_meta_for_column,
-    parameter_alias_groups_for_main, reverse_map_canonical_pairs,
+    parameter_alias_groups_for_main, resolve_parameter_main_alias, reverse_map_canonical_pairs,
 };
 use reta::shared::words_py::Words;
 use std::collections::{BTreeMap, BTreeSet};
@@ -18,7 +18,8 @@ fn json_string(s: &str) -> String {
 fn json_string_array(items: &[String]) -> String {
     format!(
         "[{}]",
-        items.iter()
+        items
+            .iter()
             .map(|s| json_string(s))
             .collect::<Vec<_>>()
             .join(",")
@@ -28,13 +29,13 @@ fn json_string_array(items: &[String]) -> String {
 fn json_i64_array(items: &[i64]) -> String {
     format!(
         "[{}]",
-        items.iter()
+        items
+            .iter()
             .map(|n| n.to_string())
             .collect::<Vec<_>>()
             .join(",")
     )
 }
-
 
 fn html_json_or_fallback(words: &Words, column_number: i64) -> String {
     if let Some(raw) = exact_html_json_for_column(column_number) {
@@ -151,6 +152,7 @@ Aufruf:
   {program_name} column-json <spaltennummer>
   {program_name} reverse <spaltennummer>
   {program_name} html <spaltennummer>
+  {program_name} html-json <spaltennummer>
   {program_name} html-all-json
 
 Befehle:
@@ -202,9 +204,10 @@ Befehle:
       Zeigt nur die kanonischen Paare aus der Rückwärtsabbildung
       für eine Spaltennummer.
 
-  html <spaltennummer>
+  html <spaltennummer> | html-json <spaltennummer>
       Zeigt die HTML-Meta als JSON. Wenn exakte Python-Referenzdaten
-      vorhanden sind, werden diese unverändert ausgegeben.
+      vorhanden sind, werden diese unverändert ausgegeben. `html-json`
+      ist der Python-kompatible Befehlsname; `html` bleibt als Rust-Alias.
 
   html-all-json
       Gibt alle bekannten HTML-Meta-JSON-Zeilen aus.
@@ -225,6 +228,7 @@ Beispiele:
   {program_name} column-json 240
   {program_name} reverse 240
   {program_name} html 240
+  {program_name} html-json 240
   {program_name} html-all-json
 "#
     )
@@ -256,46 +260,67 @@ fn print_params(words: &Words, main_name: &str) {
     }
 }
 
-fn print_pairs(words: &Words, main_name: &str) {
-    for group in parameter_alias_groups_for_main(words, main_name) {
-        let cols = column_numbers_for_pair(words, main_name, &group.canonical);
-        if !cols.is_empty() {
-            println!("{} / {} => {:?}", main_name, group.canonical, cols);
+fn canonical_main_or_exit(words: &Words, main_name: &str) -> String {
+    match resolve_parameter_main_alias(words, main_name) {
+        Some(canonical) => canonical,
+        None => {
+            eprintln!("Unbekannter Hauptparameter: {main_name}");
+            std::process::exit(2);
         }
     }
 }
 
-fn print_pairs_json(words: &Words, main_name: &str) {
+fn print_pairs(words: &Words, main_name: &str) {
+    let canonical_main = canonical_main_or_exit(words, main_name);
+    for group in parameter_alias_groups_for_main(words, &canonical_main) {
+        let cols = column_numbers_for_pair(words, &canonical_main, &group.canonical);
+        if !cols.is_empty() {
+            println!("{} / {} => {:?}", canonical_main, group.canonical, cols);
+        }
+    }
+}
+
+fn pairs_json_string(words: &Words, main_name: &str) -> String {
+    let canonical_main = canonical_main_or_exit(words, main_name);
     let mut out = vec![];
-    for group in parameter_alias_groups_for_main(words, main_name) {
-        let cols = column_numbers_for_pair(words, main_name, &group.canonical);
+    for group in parameter_alias_groups_for_main(words, &canonical_main) {
+        let cols = column_numbers_for_pair(words, &canonical_main, &group.canonical);
         if !cols.is_empty() {
             out.push(format!(
                 "{{\"main\":{},\"parameter\":{},\"columns\":{}}}",
-                json_string(main_name),
+                json_string(&canonical_main),
                 json_string(&group.canonical),
                 json_i64_array(&cols)
             ));
         }
     }
-    println!("[{}]", out.join(","));
+    format!("[{}]", out.join(","))
 }
 
-fn print_main_columns(words: &Words, main_name: &str) {
+fn print_pairs_json(words: &Words, main_name: &str) {
+    println!("{}", pairs_json_string(words, main_name));
+}
+
+fn main_columns(words: &Words, main_name: &str) -> Vec<i64> {
+    let canonical_main = canonical_main_or_exit(words, main_name);
     let mut all = BTreeSet::new();
-    for group in parameter_alias_groups_for_main(words, main_name) {
-        for c in column_numbers_for_pair(words, main_name, &group.canonical) {
+    for group in parameter_alias_groups_for_main(words, &canonical_main) {
+        for c in column_numbers_for_pair(words, &canonical_main, &group.canonical) {
             all.insert(c);
         }
     }
-    let cols: Vec<i64> = all.into_iter().collect();
-    println!("main_columns={:?}", cols);
+    all.into_iter().collect()
 }
 
-fn print_main_json(words: &Words, main_name: &str) {
+fn print_main_columns(words: &Words, main_name: &str) {
+    println!("main_columns={:?}", main_columns(words, main_name));
+}
+
+fn main_json_string(words: &Words, main_name: &str) -> String {
+    let canonical_main = canonical_main_or_exit(words, main_name);
     let mut main_aliases = vec![];
     for group in all_main_alias_groups(words) {
-        if group.canonical == main_name {
+        if group.canonical == canonical_main {
             main_aliases = group.aliases;
             break;
         }
@@ -304,8 +329,8 @@ fn print_main_json(words: &Words, main_name: &str) {
     let mut all = BTreeSet::new();
     let mut pairs = vec![];
 
-    for group in parameter_alias_groups_for_main(words, main_name) {
-        let cols = column_numbers_for_pair(words, main_name, &group.canonical);
+    for group in parameter_alias_groups_for_main(words, &canonical_main) {
+        let cols = column_numbers_for_pair(words, &canonical_main, &group.canonical);
         for c in &cols {
             all.insert(*c);
         }
@@ -321,13 +346,17 @@ fn print_main_json(words: &Words, main_name: &str) {
 
     let all_cols: Vec<i64> = all.into_iter().collect();
 
-    println!(
+    format!(
         "{{\"main\":{},\"aliases\":{},\"columns\":{},\"pairs\":[{}]}}",
-        json_string(main_name),
+        json_string(&canonical_main),
         json_string_array(&main_aliases),
         json_i64_array(&all_cols),
         pairs.join(",")
-    );
+    )
+}
+
+fn print_main_json(words: &Words, main_name: &str) {
+    println!("{}", main_json_string(words, main_name));
 }
 
 fn print_pair(words: &Words, main_name: &str, parameter_name: &str) {
@@ -346,7 +375,7 @@ fn print_pair(words: &Words, main_name: &str, parameter_name: &str) {
     }
 }
 
-fn print_pair_json(words: &Words, main_name: &str, parameter_name: &str) {
+fn pair_json_string(words: &Words, main_name: &str, parameter_name: &str) -> String {
     match canonicalize_pair(words, main_name, parameter_name) {
         Some((canonical_main, canonical_parameter)) => {
             let mut main_aliases = vec![];
@@ -366,22 +395,16 @@ fn print_pair_json(words: &Words, main_name: &str, parameter_name: &str) {
             }
 
             let cols = column_numbers_for_pair(words, &canonical_main, &canonical_parameter);
-            let html_json_parts: Vec<String> = cols
-    .iter()
-    .map(|col| html_meta_json_for_column(words, *col))
-    .collect();
-
-println!(
-    "{{\"input_main\":{},\"input_parameter\":{},\"canonical_main\":{},\"canonical_parameter\":{},\"main_aliases\":{},\"parameter_aliases\":{},\"columns\":{},\"html\":[{}]}}",
-    json_string(main_name),
-    json_string(parameter_name),
-    json_string(&canonical_main),
-    json_string(&canonical_parameter),
-    json_string_array(&main_aliases),
-    json_string_array(&parameter_aliases),
-    json_i64_array(&cols),
-    html_json_parts.join(",")
-);
+            format!(
+                "{{\"input_main\":{},\"input_parameter\":{},\"canonical_main\":{},\"canonical_parameter\":{},\"main_aliases\":{},\"parameter_aliases\":{},\"columns\":{}}}",
+                json_string(main_name),
+                json_string(parameter_name),
+                json_string(&canonical_main),
+                json_string(&canonical_parameter),
+                json_string_array(&main_aliases),
+                json_string_array(&parameter_aliases),
+                json_i64_array(&cols)
+            )
         }
         None => {
             eprintln!("Unbekanntes Paar: {} / {}", main_name, parameter_name);
@@ -390,11 +413,17 @@ println!(
     }
 }
 
+fn print_pair_json(words: &Words, main_name: &str, parameter_name: &str) {
+    println!("{}", pair_json_string(words, main_name, parameter_name));
+}
+
 fn print_pair_html(words: &Words, main_name: &str, parameter_name: &str) {
     match canonicalize_pair(words, main_name, parameter_name) {
         Some((canonical_main, canonical_parameter)) => {
             println!("canonical={} / {}", canonical_main, canonical_parameter);
-            for column_number in column_numbers_for_pair(words, &canonical_main, &canonical_parameter) {
+            for column_number in
+                column_numbers_for_pair(words, &canonical_main, &canonical_parameter)
+            {
                 println!("column={}", column_number);
                 match html_meta_for_column(words, column_number) {
                     Some(meta) => {
@@ -416,44 +445,36 @@ fn print_pair_html(words: &Words, main_name: &str, parameter_name: &str) {
     }
 }
 
-
-fn print_pair_html_json(words: &Words, main_name: &str, parameter_name: &str) {
+fn pair_html_json_string(words: &Words, main_name: &str, parameter_name: &str) -> String {
     match canonicalize_pair(words, main_name, parameter_name) {
         Some((canonical_main, canonical_parameter)) => {
             let cols = column_numbers_for_pair(words, &canonical_main, &canonical_parameter);
-           let main_aliases = all_main_alias_groups(words)
-    .into_iter()
-    .find(|group| group.canonical == canonical_main)
-    .map(|group| group.aliases)
-    .unwrap_or_default();
-
-let parameter_aliases = parameter_alias_groups_for_main(words, &canonical_main)
-    .into_iter()
-    .find(|group| group.canonical == canonical_parameter)
-    .map(|group| group.aliases)
-    .unwrap_or_default();
-
-let html_json_parts: Vec<String> = cols
-    .iter()
-    .map(|col| html_meta_json_for_column(words, *col))
-    .collect();
-            println!(
-    "{{\"input_main\":{},\"input_parameter\":{},\"canonical_main\":{},\"canonical_parameter\":{},\"main_aliases\":{},\"parameter_aliases\":{},\"columns\":{},\"html\":[{}]}}",
-    json_string(main_name),
-    json_string(parameter_name),
-    json_string(&canonical_main),
-    json_string(&canonical_parameter),
-    json_string_array(&main_aliases),
-    json_string_array(&parameter_aliases),
-    json_i64_array(&cols),
-    html_json_parts.join(",")
-);
-       }
+            let html_json_parts: Vec<String> = cols
+                .iter()
+                .map(|col| html_meta_json_for_column(words, *col))
+                .collect();
+            format!(
+                "{{\"input_main\":{},\"input_parameter\":{},\"canonical_main\":{},\"canonical_parameter\":{},\"columns\":{},\"html\":[{}]}}",
+                json_string(main_name),
+                json_string(parameter_name),
+                json_string(&canonical_main),
+                json_string(&canonical_parameter),
+                json_i64_array(&cols),
+                html_json_parts.join(",")
+            )
+        }
         None => {
             eprintln!("Unbekanntes Paar: {} / {}", main_name, parameter_name);
             std::process::exit(2);
         }
     }
+}
+
+fn print_pair_html_json(words: &Words, main_name: &str, parameter_name: &str) {
+    println!(
+        "{}",
+        pair_html_json_string(words, main_name, parameter_name)
+    );
 }
 
 fn print_column(words: &Words, column_number: i64) {
@@ -473,7 +494,7 @@ fn print_column(words: &Words, column_number: i64) {
     println!("summary_pairs={:?}", summary_pairs);
 }
 
-fn print_column_json(words: &Words, column_number: i64) {
+fn column_json_string(words: &Words, column_number: i64) -> String {
     let meta = exact_meta_for_column(words, column_number);
 
     if meta.is_empty() {
@@ -509,11 +530,16 @@ fn print_column_json(words: &Words, column_number: i64) {
         })
         .collect::<Vec<_>>()
         .join(",");
+    let html_json = html_json_or_fallback(words, column_number);
 
-    println!(
-        "{{\"column_number\":{},\"matches\":[{}],\"summary_pairs\":[{}]}}",
-        column_number, match_json, summary_json
-    );
+    format!(
+        "{{\"column_number\":{},\"matches\":[{}],\"summary_pairs\":[{}],\"html\":{}}}",
+        column_number, match_json, summary_json, html_json
+    )
+}
+
+fn print_column_json(words: &Words, column_number: i64) {
+    println!("{}", column_json_string(words, column_number));
 }
 
 fn print_reverse(words: &Words, column_number: i64) {
@@ -646,9 +672,9 @@ fn main() {
             let column_number = parse_i64_or_exit(&argv[2], "spaltennummer");
             print_reverse(&words, column_number);
         }
-        "html" => {
+        "html" | "html-json" => {
             if argv.len() != 3 {
-                eprintln!("Erwartet: {} html <spaltennummer>", program_name);
+                eprintln!("Erwartet: {} html-json <spaltennummer>", program_name);
                 std::process::exit(2);
             }
             let column_number = parse_i64_or_exit(&argv[2], "spaltennummer");
@@ -689,7 +715,36 @@ mod tests {
         assert!(text.contains("column-json"));
         assert!(text.contains("reverse"));
         assert!(text.contains("html"));
+        assert!(text.contains("html-json"));
+        assert!(text.contains("html-all-json"));
         assert!(text.contains("--help"));
+    }
+
+    #[test]
+    fn pair_json_keeps_python_shape_without_html_payload() {
+        let words = Words::new();
+        let json = pair_json_string(&words, "Menschliches", "Motive");
+        assert!(json.contains(r#""input_main":"Menschliches""#));
+        assert!(json.contains(r#""columns":"#));
+        assert!(!json.contains(r#""html":"#));
+    }
+
+    #[test]
+    fn column_json_includes_python_html_payload() {
+        let words = Words::new();
+        let json = column_json_string(&words, 2);
+        assert!(json.contains(r#""summary_pairs":"#));
+        assert!(json.contains(r#""html":"#));
+    }
+
+    #[test]
+    fn pair_html_json_keeps_python_shape_with_html_payload() {
+        let words = Words::new();
+        let json = pair_html_json_string(&words, "Menschliches", "Motive");
+        assert!(json.contains(r#""canonical_main":"#));
+        assert!(json.contains(r#""columns":"#));
+        assert!(json.contains(r#""html":"#));
+        assert!(!json.contains(r#""main_aliases":"#));
     }
 
     #[test]

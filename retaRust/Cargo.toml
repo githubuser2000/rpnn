@@ -33,6 +33,10 @@ path = "src/bin/generate4readme.rs"
 name = "reta_domain_probe"
 path = "src/bin/reta_domain_probe.rs"
 
+[[bin]]
+name = "reta_extract_html_classes"
+path = "src/bin/reta_extract_html_classes.rs"
+
 
 [workspace]
 members = [

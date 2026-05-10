@@ -16,3 +16,7 @@ retaprompt_commands = { path = "../retaprompt_commands" }
 reedline = "0.47.0"
 ratatui = { version = "0.30.0", features = ["crossterm"] }
 crossterm = "0.29.0"
+
+[[bin]]
+name = "retaprompt_completion_probe"
+path = "src/bin/retaprompt_completion_probe.rs"
