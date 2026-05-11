@@ -670,16 +670,52 @@ fn is_prompt_exit_token(token: &str) -> bool {
     matches!(token, "ende" | "exit" | "quit" | "q" | ":q")
 }
 
+fn is_python_prompt_no_output_marker_token(token: &str) -> bool {
+    matches!(
+        token,
+        "keineAusgabeWelcherBefehlEsWar"
+            | "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+    )
+}
+
 fn is_python_prompt_known_command_token(token: &str) -> bool {
     let words = prompt_words();
     words.befehle_set.contains(token) || is_15or16_command(token)
 }
 
-fn python_prompt_fallback_display_text(original_trimmed: &str, effective_tokens: &[String]) -> String {
-    if effective_tokens.is_empty() {
+fn python_prompt_fallback_visible_tokens(
+    original_trimmed: &str,
+    effective_tokens: &[String],
+) -> Vec<String> {
+    let visible = effective_tokens
+        .iter()
+        .filter(|token| !is_python_prompt_no_output_marker_token(token))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !visible.is_empty() {
+        return visible;
+    }
+
+    let original_tokens = raw_prompt_tokens_like_python(original_trimmed)
+        .into_iter()
+        .filter(|token| !is_python_prompt_no_output_marker_token(token))
+        .collect::<Vec<_>>();
+    if !original_tokens.is_empty() {
+        return original_tokens;
+    }
+
+    effective_tokens.to_vec()
+}
+
+fn python_prompt_fallback_display_text(
+    original_trimmed: &str,
+    effective_tokens: &[String],
+) -> String {
+    let visible_tokens = python_prompt_fallback_visible_tokens(original_trimmed, effective_tokens);
+    if visible_tokens.is_empty() {
         original_trimmed.to_string()
     } else {
-        effective_tokens.join(" ")
+        visible_tokens.join(" ")
     }
 }
 
@@ -690,7 +726,9 @@ fn compile_python_prompt_fallback_message(
     if effective_tokens.is_empty() {
         return None;
     }
-    if effective_tokens
+
+    let visible_tokens = python_prompt_fallback_visible_tokens(original_trimmed, effective_tokens);
+    if visible_tokens
         .first()
         .map(|token| is_prompt_exit_token(token))
         .unwrap_or(false)
@@ -699,7 +737,7 @@ fn compile_python_prompt_fallback_message(
     }
 
     let display_text = python_prompt_fallback_display_text(original_trimmed, effective_tokens);
-    let text = if effective_tokens
+    let text = if visible_tokens
         .iter()
         .any(|token| is_python_prompt_known_command_token(token))
     {
@@ -2598,6 +2636,41 @@ mod tests {
                 );
             }
             other => panic!("expected Python out1 fallback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_no_output_marker_is_hidden_in_python_out1_message() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state(
+            "teiler keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+            &state,
+        )
+        .unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(
+                    output.text,
+                    "Dies ('teiler') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+                );
+            }
+            other => panic!("expected Python out1 fallback without marker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_no_output_marker_does_not_make_unknown_text_a_known_command() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state(
+            "keinbefehl keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar",
+            &state,
+        )
+        .unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.text, "Das ist kein Befehl! -> 'keinbefehl'");
+            }
+            other => panic!("expected Python out2 fallback without marker, got {other:?}"),
         }
     }
 
