@@ -2,15 +2,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::domain::python_html_meta::{HtmlDeclMeta, html_meta_for_column};
+use crate::domain::python_html_meta::{html_meta_for_column, HtmlDeclMeta};
 use crate::domain::python_source_of_truth::{
     all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main,
 };
-use crate::shared::lib4tables_enum_py::{ST, tableTags2_for_column};
+use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
 use crate::shared::words_py::Words;
-use hypher::{Lang, hyphenate};
+use hypher::{hyphenate, Lang};
 
-use crate::shared::reta_program_types::{Program, dedup_preserve_order_i64};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
 
 struct PyLikeIntExprParser<'a> {
     chars: Vec<char>,
@@ -626,7 +626,11 @@ impl Program {
             ]);
         }
 
-        if tags.is_empty() { None } else { Some(tags) }
+        if tags.is_empty() {
+            None
+        } else {
+            Some(tags)
+        }
     }
 
     pub(crate) fn register_visible_column_metadata_exact_py(&mut self, original_col: i64) {
@@ -690,7 +694,11 @@ impl Program {
             self.textWidth
         };
 
-        if certain <= 0 { 0 } else { certain as usize }
+        if certain <= 0 {
+            0
+        } else {
+            certain as usize
+        }
     }
 
     pub(crate) fn prepare_cell_work_py(&self, cell: &str, certaintextwidth: usize) -> Vec<String> {
@@ -744,41 +752,87 @@ impl Program {
         };
         selected_cols = dedup_preserve_order_i64(selected_cols);
 
-        let this: &Program = &*self;
-        let prepared_rows: Vec<Option<(Vec<String>, i64)>> =
-            Self::output_parallel_map_indexed_py(selected_rows.len(), 8, |selected_idx| {
-                let row_no = selected_rows[selected_idx];
-                if row_no < 0 {
-                    return None;
+        // The selected columns and wrap widths are fixed for every row in this
+        // preparation pass.  Compute the widths once here instead of rebuilding
+        // the effective --breiten view for every single cell below.
+        let display_widths: Vec<usize> = (1..=selected_cols.len())
+            .map(|row_to_display| {
+                self.prepare4out_width_for_display_col_py(row_to_display, selected_cols.len())
+            })
+            .collect();
+
+        let prepare_row = |row_no: i64| -> Option<(i64, Vec<String>)> {
+            if row_no < 0 {
+                return None;
+            }
+            let idx = row_no as usize;
+            if idx >= relitable.len() {
+                return None;
+            }
+
+            let mut new2Lines: Vec<String> = Vec::new();
+            let mut row_to_display = 0usize;
+            for original_col in selected_cols.iter().copied() {
+                if original_col < 0 {
+                    continue;
                 }
-                let idx = row_no as usize;
-                if idx >= relitable.len() {
-                    return None;
+                let col_idx = original_col as usize;
+                if let Some(cell) = relitable[idx].get(col_idx) {
+                    row_to_display += 1;
+                    let certaintextwidth = display_widths
+                        .get(row_to_display.saturating_sub(1))
+                        .copied()
+                        .unwrap_or(0);
+                    let prepared = if certaintextwidth == 0 {
+                        cell.trim().to_string()
+                    } else {
+                        Self::wrap_text_py(cell.trim(), certaintextwidth).join("\n")
+                    };
+                    new2Lines.push(prepared);
+                }
+            }
+            Some((row_no, new2Lines))
+        };
+
+        let ranges = Self::output_parallel_ranges_py(selected_rows.len(), 4);
+        if ranges.len() <= 1 {
+            for row_no in selected_rows.iter().copied() {
+                if let Some((old_row_no, prepared_row)) = prepare_row(row_no) {
+                    newTable.push(prepared_row);
+                    old2newTable.push(old_row_no);
+                }
+            }
+        } else {
+            let prepared_rows: Vec<(i64, Vec<String>)> = std::thread::scope(|scope| {
+                let mut handles = Vec::new();
+                for (start, end) in ranges {
+                    let selected_rows = &selected_rows;
+                    let prepare_row = &prepare_row;
+                    handles.push(scope.spawn(move || {
+                        let mut local_rows: Vec<(i64, Vec<String>)> = Vec::new();
+                        for row_no in selected_rows[start..end].iter().copied() {
+                            if let Some(prepared_row) = prepare_row(row_no) {
+                                local_rows.push(prepared_row);
+                            }
+                        }
+                        local_rows
+                    }));
                 }
 
-                let mut new2Lines: Vec<String> = vec![];
-                let mut row_to_display = 0usize;
-                for original_col in selected_cols.iter().copied() {
-                    if original_col < 0 {
-                        continue;
-                    }
-                    let col_idx = original_col as usize;
-                    if let Some(cell) = relitable[idx].get(col_idx) {
-                        row_to_display += 1;
-                        let certaintextwidth = this.prepare4out_width_for_display_col_py(
-                            row_to_display,
-                            selected_cols.len(),
-                        );
-                        let prepared = this.prepare_cell_work_py(cell, certaintextwidth).join("\n");
-                        new2Lines.push(prepared);
+                let mut rows: Vec<(i64, Vec<String>)> = Vec::new();
+                for handle in handles {
+                    match handle.join() {
+                        Ok(mut local_rows) => rows.append(&mut local_rows),
+                        Err(payload) => std::panic::resume_unwind(payload),
                     }
                 }
-                Some((new2Lines, row_no))
+                rows
             });
 
-        for prepared in prepared_rows.into_iter().flatten() {
-            newTable.push(prepared.0);
-            old2newTable.push(prepared.1);
+            for (old_row_no, prepared_row) in prepared_rows {
+                newTable.push(prepared_row);
+                old2newTable.push(old_row_no);
+            }
         }
 
         if newTable.is_empty() {
@@ -1584,36 +1638,40 @@ impl Program {
                 innen_aussen.insert(n, (innen, aussen, ein_fach_vorkommen));
             }
             if param_lines.iter().any(|p| p == "aussenerste") {
-                num_range_yes_z.extend(
-                    innen_aussen.iter().filter_map(
-                        |(n, t)| {
-                            if t.0 && t.2 { Some(*n) } else { None }
-                        },
-                    ),
-                );
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.0 && t.2 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "innenerste") {
-                num_range_yes_z.extend(
-                    innen_aussen.iter().filter_map(
-                        |(n, t)| {
-                            if t.1 && t.2 { Some(*n) } else { None }
-                        },
-                    ),
-                );
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.1 && t.2 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "aussenalle") {
-                num_range_yes_z.extend(
-                    innen_aussen
-                        .iter()
-                        .filter_map(|(n, t)| if t.0 { Some(*n) } else { None }),
-                );
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.0 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             if param_lines.iter().any(|p| p == "innenalle") {
-                num_range_yes_z.extend(
-                    innen_aussen
-                        .iter()
-                        .filter_map(|(n, t)| if t.1 { Some(*n) } else { None }),
-                );
+                num_range_yes_z.extend(innen_aussen.iter().filter_map(|(n, t)| {
+                    if t.1 {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                }));
             }
             let if_primtyp_at_all = !num_range_yes_z.is_empty();
             num_range = Self::cutset_py(if_primtyp_at_all, &num_range, &num_range_yes_z);
@@ -2222,47 +2280,6 @@ impl Program {
             start = end;
         }
         ranges
-    }
-
-    fn output_parallel_map_indexed_py<T, F>(
-        total_rows: usize,
-        min_rows_per_worker: usize,
-        map_row: F,
-    ) -> Vec<T>
-    where
-        T: Send,
-        F: Fn(usize) -> T + Sync,
-    {
-        if total_rows == 0 {
-            return Vec::new();
-        }
-        let ranges = Self::output_parallel_ranges_py(total_rows, min_rows_per_worker);
-        if ranges.len() <= 1 {
-            return (0..total_rows).map(map_row).collect();
-        }
-
-        std::thread::scope(|scope| {
-            let map_row = &map_row;
-            let mut handles = Vec::new();
-            for (start, end) in ranges {
-                handles.push(scope.spawn(move || {
-                    let mut chunk = Vec::with_capacity(end - start);
-                    for row_idx in start..end {
-                        chunk.push(map_row(row_idx));
-                    }
-                    chunk
-                }));
-            }
-
-            let mut rows = Vec::with_capacity(total_rows);
-            for handle in handles {
-                match handle.join() {
-                    Ok(mut chunk) => rows.append(&mut chunk),
-                    Err(payload) => std::panic::resume_unwind(payload),
-                }
-            }
-            rows
-        })
     }
 
     fn render_structured_rows_ordered_py<F>(
