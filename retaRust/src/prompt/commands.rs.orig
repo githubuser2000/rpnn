@@ -1,3 +1,4 @@
+use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::{run_reta_from_args, RetaRunResult};
 
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
@@ -156,7 +157,7 @@ fn compile_normalized_control_command(tokens: &[String]) -> Option<PromptCommand
     match tokens {
         [single] => match single.as_str() {
             "q" | ":q" | "exit" | "quit" | "ende" => Some(PromptCommand::Exit),
-            "help" | "hilfe" => Some(PromptCommand::PrintHelp),
+            "HELP" | "help" | "hilfe" => Some(PromptCommand::PrintHelp),
             "befehle" | "kurzbefehle" => Some(PromptCommand::PrintCommands),
             "BefehlSpeichernDavor" => Some(PromptCommand::SaveBefore),
             "BefehlSpeichernDanach" => Some(PromptCommand::SaveAfter),
@@ -185,7 +186,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
 
     match trimmed {
         "q" | ":q" | "exit" | "quit" | "ende" => return Ok(PromptCommand::Exit),
-        "help" | "hilfe" => return Ok(PromptCommand::PrintHelp),
+        "HELP" | "help" | "hilfe" => return Ok(PromptCommand::PrintHelp),
         "befehle" | "kurzbefehle" => return Ok(PromptCommand::PrintCommands),
         "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
         "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
@@ -476,6 +477,7 @@ fn raw_input_bypasses_stored_merge(trimmed: &str, tokens: &[String]) -> bool {
             | "exit"
             | "quit"
             | "ende"
+            | "HELP"
             | "help"
             | "hilfe"
             | "befehle"
@@ -912,31 +914,23 @@ fn run_nested_prompt_input(
 }
 
 
-fn prompt_parallel_worker_count_py(total: usize) -> usize {
-    if total <= 1 {
-        return 1;
-    }
-    std::thread::available_parallelism()
-        .map(|value| value.get())
-        .unwrap_or(1)
-        .min(total)
-        .max(1)
-}
-
 fn run_reta_batch_ordered_parallel_py(
     argvs: Vec<Vec<String>>,
 ) -> Result<Vec<RetaRunResult>, String> {
     let total = argvs.len();
-    let worker_count = prompt_parallel_worker_count_py(total);
-    if worker_count <= 1 {
+    let Some((guard, ranges)) =
+        parallel_runtime::reserve_ranges(ParallelArea::PromptBatch, total, 1)
+    else {
         return Ok(argvs.into_iter().map(run_reta_from_args).collect());
-    }
+    };
 
-    let chunk_size = (total + worker_count - 1) / worker_count;
     std::thread::scope(|scope| -> Result<Vec<RetaRunResult>, String> {
+        let _budget_guard = guard;
         let mut handles = Vec::new();
-        for chunk in argvs.chunks(chunk_size) {
+        for (start, end) in ranges {
+            let chunk = &argvs[start..end];
             handles.push(scope.spawn(move || {
+                let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                 chunk
                     .iter()
                     .map(run_reta_from_args)
@@ -1975,7 +1969,7 @@ pub fn help_text() -> String {
         "  loggen | nichtloggen          Logging umschalten",
         "",
         "Meta-Befehle:",
-        "  help | hilfe            Diese Hilfe",
+        "  HELP | help | hilfe     Diese Hilfe",
         "  befehle | kurzbefehle   Befehlsübersicht",
         "  :ui | :preview          Vollbild-Vorschau mit ratatui",
         "  :history                Zeigt die Sitzungs-History",
@@ -2022,7 +2016,7 @@ pub fn commands_text() -> String {
     let mut lines = vec![
         "Bekannte rp-Kommandos:".to_string(),
         String::new(),
-        "  help, hilfe, befehle, kurzbefehle".to_string(),
+        "  HELP, help, hilfe, befehle, kurzbefehle".to_string(),
         "  :ui, :preview, :history".to_string(),
         "  :mode vi, :mode emacs".to_string(),
         "  clear, leeren".to_string(),
@@ -2652,6 +2646,9 @@ mod tests {
     #[test]
     fn one_letter_help_alias_is_control_after_python_alias_expansion() {
         let command = compile_command("h", PromptModus::Normal).unwrap();
+        assert!(matches!(command, PromptCommand::PrintHelp));
+
+        let command = compile_command("HELP", PromptModus::Normal).unwrap();
         assert!(matches!(command, PromptCommand::PrintHelp));
     }
 

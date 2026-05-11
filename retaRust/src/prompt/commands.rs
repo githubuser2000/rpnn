@@ -6,7 +6,7 @@ use super::python_like::{
     libreta_prompt_custom_split,
     prepare_prompt_big_output_for_stored_reta,
     python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptGrosseAusgabe,
+    prepare_prompt_big_output_for_stored_rows, prompt_words, is_15or16_command, PromptGrosseAusgabe,
     PromptLoescheVorSpeicherungBefehle, PromptModus,
     PromptSonderBefehlAktion, PromptVonGrosserAusgabeSonderBefehlAusgaben,
 };
@@ -270,8 +270,14 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
             &effective_tokens,
         ));
     }
-    if let Some(enabled) = PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &effective_tokens, false).loggingCommand {
+    if let Some(enabled) =
+        PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &effective_tokens, false).loggingCommand
+    {
         return Ok(PromptCommand::ToggleLogging(enabled));
+    }
+
+    if let Some(output) = compile_python_prompt_fallback_message(trimmed, &effective_tokens) {
+        return Ok(PromptCommand::Immediate(output));
     }
 
     Err(format!(
@@ -658,6 +664,57 @@ fn append_sonder_logging_toggle_like_python(
         }
         other => PromptCommand::Sequence(vec![other, PromptCommand::ToggleLogging(enabled)]),
     }
+}
+
+fn is_prompt_exit_token(token: &str) -> bool {
+    matches!(token, "ende" | "exit" | "quit" | "q" | ":q")
+}
+
+fn is_python_prompt_known_command_token(token: &str) -> bool {
+    let words = prompt_words();
+    words.befehle_set.contains(token) || is_15or16_command(token)
+}
+
+fn python_prompt_fallback_display_text(original_trimmed: &str, effective_tokens: &[String]) -> String {
+    if effective_tokens.is_empty() {
+        original_trimmed.to_string()
+    } else {
+        effective_tokens.join(" ")
+    }
+}
+
+fn compile_python_prompt_fallback_message(
+    original_trimmed: &str,
+    effective_tokens: &[String],
+) -> Option<PromptOutput> {
+    if effective_tokens.is_empty() {
+        return None;
+    }
+    if effective_tokens
+        .first()
+        .map(|token| is_prompt_exit_token(token))
+        .unwrap_or(false)
+    {
+        return None;
+    }
+
+    let display_text = python_prompt_fallback_display_text(original_trimmed, effective_tokens);
+    let text = if effective_tokens
+        .iter()
+        .any(|token| is_python_prompt_known_command_token(token))
+    {
+        format!(
+            "Dies ('{display_text}') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+        )
+    } else {
+        format!("Das ist kein Befehl! -> '{display_text}'")
+    };
+
+    Some(PromptOutput {
+        title: "prompt".to_string(),
+        text,
+        exit_code: 0,
+    })
 }
 
 fn compose_input_with_stored_placeholder(
@@ -2526,6 +2583,49 @@ mod tests {
         ));
         assert_eq!(state.prompt_mode, super::PromptModus::Normal);
         assert_eq!(state.pending_show_stored_suffix, None);
+    }
+
+    #[test]
+    fn prompt_known_command_without_output_uses_python_out1_message() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("teiler", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.exit_code, 0);
+                assert_eq!(
+                    output.text,
+                    "Dies ('teiler') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+                );
+            }
+            other => panic!("expected Python out1 fallback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_short_alias_without_output_is_reported_after_python_replacement() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("w", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(
+                    output.text,
+                    "Dies ('teiler') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+                );
+            }
+            other => panic!("expected Python out1 fallback for w alias, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prompt_unknown_text_uses_python_out2_message() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("keinbefehl", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert_eq!(output.text, "Das ist kein Befehl! -> 'keinbefehl'");
+            }
+            other => panic!("expected Python out2 fallback, got {other:?}"),
+        }
     }
 
     #[test]
