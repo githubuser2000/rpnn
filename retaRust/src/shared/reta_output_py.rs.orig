@@ -7,7 +7,6 @@ use crate::domain::python_source_of_truth::{
     all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main,
 };
 use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
-use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
 
@@ -795,17 +794,21 @@ impl Program {
             Some((row_no, new2Lines))
         };
 
-        if let Some((guard, ranges)) =
-            parallel_runtime::reserve_ranges(ParallelArea::Output, selected_rows.len(), 4)
-        {
+        let ranges = Self::output_parallel_ranges_py(selected_rows.len(), 4);
+        if ranges.len() <= 1 {
+            for row_no in selected_rows.iter().copied() {
+                if let Some((old_row_no, prepared_row)) = prepare_row(row_no) {
+                    newTable.push(prepared_row);
+                    old2newTable.push(old_row_no);
+                }
+            }
+        } else {
             let prepared_rows: Vec<(i64, Vec<String>)> = std::thread::scope(|scope| {
-                let _budget_guard = guard;
                 let mut handles = Vec::new();
                 for (start, end) in ranges {
                     let selected_rows = &selected_rows;
                     let prepare_row = &prepare_row;
                     handles.push(scope.spawn(move || {
-                        let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                         let mut local_rows: Vec<(i64, Vec<String>)> = Vec::new();
                         for row_no in selected_rows[start..end].iter().copied() {
                             if let Some(prepared_row) = prepare_row(row_no) {
@@ -829,13 +832,6 @@ impl Program {
             for (old_row_no, prepared_row) in prepared_rows {
                 newTable.push(prepared_row);
                 old2newTable.push(old_row_no);
-            }
-        } else {
-            for row_no in selected_rows.iter().copied() {
-                if let Some((old_row_no, prepared_row)) = prepare_row(row_no) {
-                    newTable.push(prepared_row);
-                    old2newTable.push(old_row_no);
-                }
             }
         }
 
@@ -2254,6 +2250,38 @@ impl Program {
         false
     }
 
+    fn output_parallel_ranges_py(
+        total_rows: usize,
+        min_rows_per_worker: usize,
+    ) -> Vec<(usize, usize)> {
+        if total_rows == 0 {
+            return Vec::new();
+        }
+        if total_rows <= 1 || total_rows < min_rows_per_worker.saturating_mul(2) {
+            return vec![(0, total_rows)];
+        }
+        let max_workers_by_grain = (total_rows + min_rows_per_worker - 1) / min_rows_per_worker;
+        let worker_count = std::thread::available_parallelism()
+            .map(|value| value.get())
+            .unwrap_or(1)
+            .min(max_workers_by_grain)
+            .min(total_rows)
+            .max(1);
+        if worker_count <= 1 {
+            return vec![(0, total_rows)];
+        }
+
+        let chunk_size = (total_rows + worker_count - 1) / worker_count;
+        let mut ranges = Vec::new();
+        let mut start = 0usize;
+        while start < total_rows {
+            let end = start.saturating_add(chunk_size).min(total_rows);
+            ranges.push((start, end));
+            start = end;
+        }
+        ranges
+    }
+
     fn render_structured_rows_ordered_py<F>(
         newTable: &[Vec<String>],
         min_rows_per_worker: usize,
@@ -2262,9 +2290,8 @@ impl Program {
     where
         F: Fn(usize, &Vec<String>) -> Option<StructuredRowRenderPy> + Sync,
     {
-        let Some((guard, ranges)) =
-            parallel_runtime::reserve_ranges(ParallelArea::Output, newTable.len(), min_rows_per_worker)
-        else {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), min_rows_per_worker);
+        if ranges.len() <= 1 {
             let mut rows = Vec::new();
             for (row_idx, row) in newTable.iter().enumerate() {
                 if let Some(rendered) = render_row(row_idx, row) {
@@ -2272,15 +2299,13 @@ impl Program {
                 }
             }
             return rows;
-        };
+        }
 
         std::thread::scope(|scope| {
-            let _budget_guard = guard;
             let render_row = &render_row;
             let mut handles = Vec::new();
             for (start, end) in ranges {
                 handles.push(scope.spawn(move || {
-                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                     let mut rows = Vec::new();
                     for (offset, row) in newTable[start..end].iter().enumerate() {
                         let row_idx = start + offset;
@@ -2294,9 +2319,8 @@ impl Program {
 
             let mut rows = Vec::new();
             for handle in handles {
-                match handle.join() {
-                    Ok(mut rendered) => rows.append(&mut rendered),
-                    Err(payload) => std::panic::resume_unwind(payload),
+                if let Ok(mut rendered) = handle.join() {
+                    rows.append(&mut rendered);
                 }
             }
             rows
@@ -2304,7 +2328,8 @@ impl Program {
     }
 
     fn max_cell_widths_parallel_py(newTable: &[Vec<String>], col_count: usize) -> Vec<usize> {
-        let compute_serial = || {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), 32);
+        if ranges.len() <= 1 {
             let mut max_cell_widths: Vec<usize> = vec![0; col_count];
             for row in newTable {
                 for col_idx in 0..col_count {
@@ -2319,21 +2344,13 @@ impl Program {
                     }
                 }
             }
-            max_cell_widths
-        };
-
-        let Some((guard, ranges)) =
-            parallel_runtime::reserve_ranges(ParallelArea::Widths, newTable.len(), 32)
-        else {
-            return compute_serial();
-        };
+            return max_cell_widths;
+        }
 
         std::thread::scope(|scope| {
-            let _budget_guard = guard;
             let mut handles = Vec::new();
             for (start, end) in ranges {
                 handles.push(scope.spawn(move || {
-                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                     let mut local_widths: Vec<usize> = vec![0; col_count];
                     for row in &newTable[start..end] {
                         for col_idx in 0..col_count {
@@ -2354,15 +2371,12 @@ impl Program {
 
             let mut max_cell_widths: Vec<usize> = vec![0; col_count];
             for handle in handles {
-                match handle.join() {
-                    Ok(local_widths) => {
-                        for (col_idx, width) in local_widths.into_iter().enumerate() {
-                            if width > max_cell_widths[col_idx] {
-                                max_cell_widths[col_idx] = width;
-                            }
+                if let Ok(local_widths) = handle.join() {
+                    for (col_idx, width) in local_widths.into_iter().enumerate() {
+                        if width > max_cell_widths[col_idx] {
+                            max_cell_widths[col_idx] = width;
                         }
                     }
-                    Err(payload) => std::panic::resume_unwind(payload),
                 }
             }
             max_cell_widths
@@ -2491,9 +2505,8 @@ impl Program {
         chunk_end: usize,
         num_prefix_width: usize,
     ) -> Vec<String> {
-        let Some((guard, ranges)) =
-            parallel_runtime::reserve_ranges(ParallelArea::Output, newTable.len(), 16)
-        else {
+        let ranges = Self::output_parallel_ranges_py(newTable.len(), 16);
+        if ranges.len() <= 1 {
             return self.render_shell_chunk_range_py(
                 finallyDisplayLines,
                 newTable,
@@ -2504,14 +2517,12 @@ impl Program {
                 0,
                 newTable.len(),
             );
-        };
+        }
 
         std::thread::scope(|scope| {
-            let _budget_guard = guard;
             let mut handles = Vec::new();
             for (row_start, row_end) in ranges {
                 handles.push(scope.spawn(move || {
-                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                     self.render_shell_chunk_range_py(
                         finallyDisplayLines,
                         newTable,
@@ -2527,9 +2538,8 @@ impl Program {
 
             let mut one_chunk_lines = Vec::new();
             for handle in handles {
-                match handle.join() {
-                    Ok(mut rendered) => one_chunk_lines.append(&mut rendered),
-                    Err(payload) => std::panic::resume_unwind(payload),
+                if let Ok(mut rendered) = handle.join() {
+                    one_chunk_lines.append(&mut rendered);
                 }
             }
             one_chunk_lines

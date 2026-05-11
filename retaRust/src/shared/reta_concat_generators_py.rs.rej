@@ -1,0 +1,110 @@
+--- src/shared/reta_concat_generators_py.rs
++++ src/shared/reta_concat_generators_py.rs
+@@ -1,13 +1,12 @@
+ #![allow(dead_code)]
+ #![allow(non_snake_case)]
+ 
+-use std::cell::Cell;
+ use std::cmp::Ordering;
+ use std::collections::{BTreeMap, BTreeSet};
+-use std::thread;
+ 
+ use indexmap::{IndexMap, IndexSet};
+ 
++use crate::shared::parallel_runtime::{self, ParallelArea};
+ use crate::shared::lib4tables_enum_py::ST;
+ use crate::shared::reta_program_types::{Generated2Selection, GeneratorPairSelection, PairStr, Program};
+ use crate::shared::reta_generators_inventory_py::{
+@@ -98,91 +97,12 @@ struct ModalGeneratedColumnPy {
+     tags: Vec<ST>,
+ }
+ 
+-thread_local! {
+-    static GENERATOR_PARALLEL_DEPTH_PY: Cell<usize> = const { Cell::new(0) };
+-}
+-
+-fn generator_parallel_enabled_py() -> bool {
+-    match std::env::var("RETA_GENERATORS_PARALLEL") {
+-        Ok(value) => matches!(
+-            value.trim().to_ascii_lowercase().as_str(),
+-            "1" | "true" | "yes" | "on"
+-        ),
+-        Err(_) => false,
+-    }
+-}
+-
+-fn generator_parallel_workers_py(len: usize) -> usize {
+-    if len <= 1 {
+-        return 1;
+-    }
+-    if std::env::var_os("RETA_GENERATORS_SERIAL").is_some() {
+-        return 1;
+-    }
+-    if !generator_parallel_enabled_py() {
+-        return 1;
+-    }
+-    if GENERATOR_PARALLEL_DEPTH_PY.with(|depth| depth.get() > 0) {
+-        return 1;
+-    }
+-    let min_items = std::env::var("RETA_GENERATORS_PARALLEL_MIN")
+-        .ok()
+-        .and_then(|value| value.parse::<usize>().ok())
+-        .filter(|value| *value > 0)
+-        .unwrap_or(512);
+-    if len < min_items {
+-        return 1;
+-    }
+-    let available = thread::available_parallelism()
+-        .map(|value| value.get())
+-        .unwrap_or(1);
+-    available.min(len)
+-}
+-
+ fn parallel_map_indexed_py<T, F>(len: usize, f: F) -> Vec<T>
+ where
+     T: Send,
+     F: Fn(usize) -> T + Sync,
+ {
+-    if len == 0 {
+-        return Vec::new();
+-    }
+-    let workers = generator_parallel_workers_py(len);
+-    if workers <= 1 {
+-        return (0..len).map(f).collect();
+-    }
+-
+-    let chunk_size = (len + workers - 1) / workers;
+-    thread::scope(|scope| {
+-        let f_ref = &f;
+-        let mut handles = Vec::new();
+-        let mut start = 0usize;
+-        while start < len {
+-            let end = (start + chunk_size).min(len);
+-            handles.push(scope.spawn(move || {
+-                GENERATOR_PARALLEL_DEPTH_PY.with(|depth| {
+-                    let previous_depth = depth.get();
+-                    depth.set(previous_depth + 1);
+-                    let mut chunk = Vec::with_capacity(end - start);
+-                    for index in start..end {
+-                        chunk.push(f_ref(index));
+-                    }
+-                    depth.set(previous_depth);
+-                    chunk
+-                })
+-            }));
+-            start = end;
+-        }
+-
+-        let mut out = Vec::with_capacity(len);
+-        for handle in handles {
+-            match handle.join() {
+-                Ok(mut chunk) => out.append(&mut chunk),
+-                Err(payload) => std::panic::resume_unwind(payload),
+-            }
+-        }
+-        out
+-    })
++    parallel_runtime::parallel_map_indexed(ParallelArea::Generators, len, 512, f)
+ }
+ 
+ impl Program {

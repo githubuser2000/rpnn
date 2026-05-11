@@ -8,7 +8,14 @@ use std::sync::OnceLock;
 
 use libloading::{library_filename, Library};
 
+#[path = "../../../src/shared/parallel_runtime.rs"]
+pub mod parallel_runtime;
+
 pub mod shared {
+    pub mod parallel_runtime {
+        pub use crate::parallel_runtime::*;
+    }
+
     pub mod words_py {
         use indexmap::IndexMap;
         use serde::{Deserialize, Serialize};

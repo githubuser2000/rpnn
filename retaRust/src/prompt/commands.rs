@@ -1,3 +1,4 @@
+use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::{run_reta_from_args, RetaRunResult};
 
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
@@ -913,31 +914,23 @@ fn run_nested_prompt_input(
 }
 
 
-fn prompt_parallel_worker_count_py(total: usize) -> usize {
-    if total <= 1 {
-        return 1;
-    }
-    std::thread::available_parallelism()
-        .map(|value| value.get())
-        .unwrap_or(1)
-        .min(total)
-        .max(1)
-}
-
 fn run_reta_batch_ordered_parallel_py(
     argvs: Vec<Vec<String>>,
 ) -> Result<Vec<RetaRunResult>, String> {
     let total = argvs.len();
-    let worker_count = prompt_parallel_worker_count_py(total);
-    if worker_count <= 1 {
+    let Some((guard, ranges)) =
+        parallel_runtime::reserve_ranges(ParallelArea::PromptBatch, total, 1)
+    else {
         return Ok(argvs.into_iter().map(run_reta_from_args).collect());
-    }
+    };
 
-    let chunk_size = (total + worker_count - 1) / worker_count;
     std::thread::scope(|scope| -> Result<Vec<RetaRunResult>, String> {
+        let _budget_guard = guard;
         let mut handles = Vec::new();
-        for chunk in argvs.chunks(chunk_size) {
+        for (start, end) in ranges {
+            let chunk = &argvs[start..end];
             handles.push(scope.spawn(move || {
+                let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                 chunk
                     .iter()
                     .map(run_reta_from_args)

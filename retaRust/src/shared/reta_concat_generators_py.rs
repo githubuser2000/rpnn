@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use indexmap::{IndexMap, IndexSet};
 
 use crate::shared::lib4tables_enum_py::ST;
+use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::shared::reta_generators_inventory_py::{
     GeneratorPairSpec, GENERATED1_SPECS, GENERATED2_SPECS, METAKONKRET_SPECS,
 };
@@ -99,6 +100,22 @@ struct ModalEntryPy {
     i_origS: Vec<usize>,
     modalS: Vec<Vec<String>>,
     vervielfachter: Vec<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct ModalGeneratedColumnPy {
+    cells: Vec<String>,
+    meta_name: String,
+    parameter_groups: Vec<Vec<PairStr>>,
+    tags: Vec<ST>,
+}
+
+fn parallel_map_indexed_py<T, F>(len: usize, f: F) -> Vec<T>
+where
+    T: Send,
+    F: Fn(usize) -> T + Sync,
+{
+    parallel_runtime::parallel_map_indexed(ParallelArea::Generators, len, 512, f)
 }
 
 impl Program {
@@ -2615,82 +2632,63 @@ impl Program {
     }
 
     pub fn concatLovePolygon(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&9) {
-            return;
-        }
-        let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
-            let a = self.zellenwert_py(i, 8);
+        if !rowsAsNumbers.contains(&9) { return; }
+        let this: &Program = &*self;
+        let zeilenInhalte: Vec<String> = parallel_map_indexed_py(this.relitable.len(), |i| {
+            let a = this.zellenwert_py(i, 8);
             if !a.trim().is_empty() {
-                zeilenInhalte.push(format!(
+                format!(
                     "{} der eigenen Strukturgröße ({}) auf dich bei gleichförmigen Polygonen",
                     a,
-                    self.zellenwert_py(i, 4)
-                ));
+                    this.zellenwert_py(i, 4)
+                )
             } else {
-                zeilenInhalte.push(String::new());
+                String::new()
             }
-        }
-        let spalte =
-            self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(9));
-        self.set_generated_spalten_tags_exact_py(
-            spalte,
-            &[ST::sternPolygon, ST::galaxie, ST::gleichfoermigesPolygon],
-        );
+        });
+        let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(9));
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie, ST::gleichfoermigesPolygon]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
     pub fn concatGleichheitFreiheitDominieren(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&132) {
-            return;
-        }
-        let mut zeilenInhalte: Vec<String> = vec![];
+        if !rowsAsNumbers.contains(&132) { return; }
         let row_end = self.generator_row_end_py();
-        for i in 0..=row_end {
+        let this: &Program = &*self;
+        let zeilenInhalte: Vec<String> = parallel_map_indexed_py(row_end + 1, |i| {
             if i == 0 {
-                zeilenInhalte.push(
-                    "Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string(),
-                );
+                "Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert".to_string()
             } else {
-                zeilenInhalte.push(self.gleichheitFreiheitVergleich(i as i64));
+                this.gleichheitFreiheitVergleich(i as i64)
             }
-        }
-        let spalte =
-            self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(132));
+        });
+        let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(132));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
     pub fn concatGeistEmotionEnergieMaterieTopologie(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&242) {
-            return;
-        }
-        let mut zeilenInhalte: Vec<String> = vec![];
+        if !rowsAsNumbers.contains(&242) { return; }
         let row_end = self.generator_row_end_py();
-        for i in 0..=row_end {
+        let this: &Program = &*self;
+        let zeilenInhalte: Vec<String> = parallel_map_indexed_py(row_end + 1, |i| {
             if i == 0 {
-                zeilenInhalte.push(
-                    "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art"
-                        .to_string(),
-                );
+                "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art".to_string()
             } else {
-                zeilenInhalte.push(self.geistEmotionEnergieMaterieTopologie(i as i64));
+                this.geistEmotionEnergieMaterieTopologie(i as i64)
             }
-        }
-        let spalte =
-            self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(242));
+        });
+        let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(242));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
     pub fn concatPrimCreativityType(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&64) {
-            return;
-        }
-        let mut zeilenInhalte: Vec<String> = vec![];
-        for i in 0..self.relitable.len() {
-            let primCreativityType = self.primCreativity_exact_py(i as i64);
-            let wert = if i == 0 {
+        if !rowsAsNumbers.contains(&64) { return; }
+        let this: &Program = &*self;
+        let zeilenInhalte: Vec<String> = parallel_map_indexed_py(this.relitable.len(), |i| {
+            let primCreativityType = this.primCreativity_exact_py(i as i64);
+            if i == 0 {
                 "Evolutions-Züchtungs-Kreativität".to_string()
             } else if primCreativityType == 0 {
                 "0. Primzahl 1".to_string()
@@ -2700,30 +2698,23 @@ impl Program {
                 "2. Sonnenzahl, aber keine Primzahl".to_string()
             } else {
                 "3. Mondzahl".to_string()
-            };
-            zeilenInhalte.push(wert);
-        }
-        let spalte =
-            self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+            }
+        });
+        let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
     pub fn concatMondExponzierenLogarithmusTyp(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&64) {
-            return;
-        }
-        let hardcodedCouple = [
-            (44usize, "Mond-Typ eines Sternpolygons"),
-            (56usize, "Mond-Typ eines gleichförmigen Polygons"),
-        ];
+        if !rowsAsNumbers.contains(&64) { return; }
+        let hardcodedCouple = [(44usize, "Mond-Typ eines Sternpolygons"), (56usize, "Mond-Typ eines gleichförmigen Polygons")];
+        let row_end = self.generator_row_end_py();
         for (rownum, rowheading) in hardcodedCouple {
-            let mut zeilenInhalte: Vec<String> = vec![];
-            let row_end = self.generator_row_end_py();
-            for i in 0..=row_end {
-                let moonTypesOf1Num = self.moonNumber(i as i64);
+            let this: &Program = &*self;
+            let zeilenInhalte: Vec<String> = parallel_map_indexed_py(row_end + 1, move |i| {
+                let moonTypesOf1Num = this.moonNumber(i as i64);
                 if i == 0 {
-                    zeilenInhalte.push(rowheading.to_string());
+                    rowheading.to_string()
                 } else {
                     let mut into: Vec<String> = vec![];
                     if moonTypesOf1Num.0.is_empty() {
@@ -2735,35 +2726,27 @@ impl Program {
                         }
                         let basis = moonTypesOf1Num.0[k] as usize;
                         let exponentMinus2 = moonTypesOf1Num.1[k] as usize;
-                        let insert = self
-                            .zellenwert_py(basis, rownum)
-                            .replace("<SG>", &self.zellenwert_py(i, 4))
-                            .replace("&lt;SG&gt;", &self.zellenwert_py(i, 4));
+                        let insert = this.zellenwert_py(basis, rownum)
+                            .replace("<SG>", &this.zellenwert_py(i, 4))
+                            .replace("&lt;SG&gt;", &this.zellenwert_py(i, 4));
                         into.push(insert);
                         into.push(" - ".to_string());
-                        into.push(self.zellenwert_py(exponentMinus2 + 2, 10));
+                        into.push(this.zellenwert_py(exponentMinus2 + 2, 10));
                         into.push(" | ".to_string());
-                        into.push(self.zellenwert_py(i, 10));
+                        into.push(this.zellenwert_py(i, 10));
                         into.push(" + ".to_string());
-                        into.push(self.zellenwert_py(i, 11));
+                        into.push(this.zellenwert_py(i, 11));
                         into.push(", ".to_string());
-                        into.push(self.zellenwert_py(exponentMinus2 + 2, 85));
+                        into.push(this.zellenwert_py(exponentMinus2 + 2, 85));
                     }
-                    zeilenInhalte.push(into.join(""));
+                    into.join("")
                 }
-            }
-            let spalte =
-                self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+            });
+            let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
             if rownum == 44 {
-                self.set_generated_spalten_tags_exact_py(
-                    spalte,
-                    &[ST::sternPolygon, ST::universum, ST::galaxie],
-                );
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum, ST::galaxie]);
             } else {
-                self.set_generated_spalten_tags_exact_py(
-                    spalte,
-                    &[ST::gleichfoermigesPolygon, ST::universum, ST::galaxie],
-                );
+                self.set_generated_spalten_tags_exact_py(spalte, &[ST::gleichfoermigesPolygon, ST::universum, ST::galaxie]);
             }
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
@@ -2796,22 +2779,23 @@ impl Program {
                     multis.entry(ergebnis).or_default().push(*ursprungsZeile);
                 }
             }
-            for z in 2..=row_end {
+            if row_end < 2 {
+                continue;
+            }
+            let this: &Program = &*self;
+            let updates: Vec<(usize, String)> = parallel_map_indexed_py(row_end - 1, |offset| {
+                let z = offset + 2;
                 let mut xx = false;
-                let mut teile: Vec<String> = if !self.zellenwert_py(z, s).trim().is_empty() {
-                    if self.outType == "html" {
-                        vec![
-                            "<li>".to_string(),
-                            self.zellenwert_py(z, s),
-                            "</li>".to_string(),
-                        ]
-                    } else if self.outType == "bbcode" {
-                        vec!["[*]".to_string(), self.zellenwert_py(z, s)]
+                let mut teile: Vec<String> = if !this.zellenwert_py(z, s).trim().is_empty() {
+                    if this.outType == "html" {
+                        vec!["<li>".to_string(), this.zellenwert_py(z, s), "</li>".to_string()]
+                    } else if this.outType == "bbcode" {
+                        vec!["[*]".to_string(), this.zellenwert_py(z, s)]
                     } else {
-                        vec![self.zellenwert_py(z, s), " | ".to_string()]
+                        vec![this.zellenwert_py(z, s), " | ".to_string()]
                     }
                 } else {
-                    vec![self.zellenwert_py(z, s)]
+                    vec![this.zellenwert_py(z, s)]
                 };
 
                 if let Some(ursZeilen) = multis.get(&z) {
@@ -2825,11 +2809,11 @@ impl Program {
                             && format!("[*]{}", aktuell) != basis
                             && !basis.is_empty()
                         {
-                            if self.outType == "html" {
+                            if this.outType == "html" {
                                 teile.push("<li>".to_string());
                                 teile.push(basis);
                                 teile.push("</li>".to_string());
-                            } else if self.outType == "bbcode" {
+                            } else if this.outType == "bbcode" {
                                 teile.push("[*]".to_string());
                                 teile.push(basis);
                             } else {
@@ -2840,10 +2824,10 @@ impl Program {
                         }
                     }
                 }
-                if self.outType == "html" {
+                if this.outType == "html" {
                     teile.insert(0, "<ul>".to_string());
                     teile.push("</ul>".to_string());
-                } else if self.outType == "bbcode" {
+                } else if this.outType == "bbcode" {
                     teile.insert(0, "[list]".to_string());
                     teile.push("[/list]".to_string());
                 }
@@ -2856,6 +2840,9 @@ impl Program {
                 } else {
                     teile.join("")
                 };
+                (z, endwert)
+            });
+            for (z, endwert) in updates {
                 self.setze_zellenwert_py(z, s, endwert);
             }
         }
@@ -2866,10 +2853,11 @@ impl Program {
         lastPrimAnswers.get(&i).cloned().unwrap_or_default()
     }
 
-    pub fn spalteFuerGegenInnenAussenSeitlichPrim(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if self.boolAndTupleSet1Options_exact_py().is_empty() {
-            return;
-        }
+    fn spalte_fuer_gegen_column_exact_py(
+        &self,
+        kk: Option<usize>,
+        history_seed: &[String],
+    ) -> (Vec<String>, Vec<String>) {
         fn prim_answer(oldPrimAmounts: i64, primAmounts: i64, i: i64) -> String {
             if i > 3 {
                 if primAmounts != oldPrimAmounts {
@@ -2892,69 +2880,99 @@ impl Program {
             }
         }
 
-        let extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
-        let mut vergangenheit: Vec<String> = vec![];
-        for kk in extraSpalten {
-            let mut zeilenInhalte: Vec<String> = vec![];
-            let mut primAmounts = 0i64;
-            let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
-            let row_end = self.generator_row_end_py();
-            for i in 0..=row_end {
-                let mut into = if i != 0 {
-                    vec![String::new()]
-                } else {
-                    vec![
-                        "Primzahlwirkung (7, Richtung) ".to_string(),
-                        match kk {
-                            Some(k) => format!("{}", self.zellenwert_py(0, k)),
-                            None => "Richtung-Richtung".to_string(),
-                        },
-                    ]
-                };
-                let oldPrimAmounts = primAmounts;
-                if self.couldBePrimeNumberPrimzahlkreuz(i as i64) {
-                    primAmounts += 1;
-                }
-                if self.primCreativity_exact_py(i as i64) == 1 {
-                    into = vec![prim_answer(oldPrimAmounts, primAmounts, i as i64)];
-                    lastPrimAnswers.insert(i as i64, into.join(""));
-                } else if i > 1 {
-                    for couple in self.primRepeat(self.primFak(i as i64)) {
-                        let basisantwort = Self::PrimAnswer2(&lastPrimAnswers, couple.0);
-                        if couple.1 == 1 {
-                            into.push(basisantwort);
-                            into.push(" + ".to_string());
-                        } else if let Some(sp) = kk {
-                            into.push(self.zellenwert_py(couple.1 as usize, sp));
-                            into.push(" * ".to_string());
-                            into.push(basisantwort);
-                            into.push(" + ".to_string());
-                        } else {
-                            into.push("[".to_string());
-                            into.push(
-                                vergangenheit
-                                    .get(couple.1 as usize)
-                                    .cloned()
-                                    .unwrap_or_default(),
-                            );
-                            into.push("] * letztendlich: ".to_string());
-                            into.push(basisantwort);
-                            into.push(" + ".to_string());
-                        }
-                    }
-                    if into.last().map(|s| s == " + ").unwrap_or(false) {
-                        into.pop();
-                    }
-                } else if i == 1 {
-                    into = vec![prim_answer(oldPrimAmounts, primAmounts, 1)];
-                }
-                let joined = into.join("");
-                if kk.is_none() {
-                    vergangenheit.push(joined.clone());
-                }
-                zeilenInhalte.push(joined);
+        let mut zeilenInhalte: Vec<String> = vec![];
+        let mut primAmounts = 0i64;
+        let mut lastPrimAnswers: BTreeMap<i64, String> = BTreeMap::new();
+        let mut vergangenheit: Vec<String> = history_seed.to_vec();
+        let row_end = self.generator_row_end_py();
+        for i in 0..=row_end {
+            let mut into = if i != 0 {
+                vec![String::new()]
+            } else {
+                vec![
+                    "Primzahlwirkung (7, Richtung) ".to_string(),
+                    match kk {
+                        Some(k) => format!("{}", self.zellenwert_py(0, k)),
+                        None => "Richtung-Richtung".to_string(),
+                    },
+                ]
+            };
+            let oldPrimAmounts = primAmounts;
+            if self.couldBePrimeNumberPrimzahlkreuz(i as i64) {
+                primAmounts += 1;
             }
-            let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, "Primzahlwirkung (7, Richtung)");
+            if self.primCreativity_exact_py(i as i64) == 1 {
+                into = vec![prim_answer(oldPrimAmounts, primAmounts, i as i64)];
+                lastPrimAnswers.insert(i as i64, into.join(""));
+            } else if i > 1 {
+                for couple in self.primRepeat(self.primFak(i as i64)) {
+                    let basisantwort = Self::PrimAnswer2(&lastPrimAnswers, couple.0);
+                    if couple.1 == 1 {
+                        into.push(basisantwort);
+                        into.push(" + ".to_string());
+                    } else if let Some(sp) = kk {
+                        into.push(self.zellenwert_py(couple.1 as usize, sp));
+                        into.push(" * ".to_string());
+                        into.push(basisantwort);
+                        into.push(" + ".to_string());
+                    } else {
+                        into.push("[".to_string());
+                        into.push(vergangenheit.get(couple.1 as usize).cloned().unwrap_or_default());
+                        into.push("] * letztendlich: ".to_string());
+                        into.push(basisantwort);
+                        into.push(" + ".to_string());
+                    }
+                }
+                if into.last().map(|s| s == " + ").unwrap_or(false) {
+                    into.pop();
+                }
+            } else if i == 1 {
+                into = vec![prim_answer(oldPrimAmounts, primAmounts, 1)];
+            }
+            let joined = into.join("");
+            if kk.is_none() {
+                vergangenheit.push(joined.clone());
+            }
+            zeilenInhalte.push(joined);
+        }
+        (zeilenInhalte, vergangenheit)
+    }
+
+    pub fn spalteFuerGegenInnenAussenSeitlichPrim(&mut self, rowsAsNumbers: &mut Vec<i64>) {
+        if self.boolAndTupleSet1Options_exact_py().is_empty() {
+            return;
+        }
+
+        let extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
+        let mut ordered_columns: Vec<Option<Vec<String>>> = vec![None; extraSpalten.len()];
+        let mut parallel_jobs: Vec<(usize, Option<usize>, Vec<String>)> = vec![];
+        let mut vergangenheit: Vec<String> = vec![];
+
+        for (index, kk) in extraSpalten.iter().copied().enumerate() {
+            if kk.is_none() {
+                let (column, next_history) = self.spalte_fuer_gegen_column_exact_py(kk, &vergangenheit);
+                ordered_columns[index] = Some(column);
+                vergangenheit = next_history;
+            } else {
+                parallel_jobs.push((index, kk, vergangenheit.clone()));
+            }
+        }
+
+        let this: &Program = &*self;
+        let computed_columns: Vec<(usize, Vec<String>)> = parallel_map_indexed_py(
+            parallel_jobs.len(),
+            |job_index| {
+                let (index, kk, history_snapshot) = &parallel_jobs[job_index];
+                let (column, _unchanged_history) = this.spalte_fuer_gegen_column_exact_py(*kk, history_snapshot);
+                (*index, column)
+            },
+        );
+        for (index, column) in computed_columns {
+            ordered_columns[index] = Some(column);
+        }
+
+        for column in ordered_columns.into_iter().flatten() {
+            let spalte = self.fuege_spalte_hinzu_py(column, "Primzahlwirkung (7, Richtung)");
             self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
@@ -3188,23 +3206,12 @@ impl Program {
         );
     }
 
-    pub fn readConcatCsv(
-        &mut self,
-        rowsAsNumbers: &mut Vec<i64>,
-        concatTableSelection: Vec<i64>,
-        concatTable: i64,
-    ) -> Vec<i64> {
+    pub fn readConcatCsv(&mut self, rowsAsNumbers: &mut Vec<i64>, concatTableSelection: Vec<i64>, concatTable: i64) -> Vec<i64> {
         let mut concatCSVspalten: Vec<i64> = vec![];
-        if concatTableSelection.is_empty() {
-            return concatCSVspalten;
-        }
-        if self.readConcatCSV_choseCsvFile(concatTable).is_none() {
-            return concatCSVspalten;
-        }
+        if concatTableSelection.is_empty() { return concatCSVspalten; }
+        if self.readConcatCSV_choseCsvFile(concatTable).is_none() { return concatCSVspalten; }
         let rawTableToAdd = self.readOneCSVAndReturn(concatTable);
-        if rawTableToAdd.is_empty() {
-            return concatCSVspalten;
-        }
+        if rawTableToAdd.is_empty() { return concatCSVspalten; }
         let gebr_table = rawTableToAdd.clone();
         let mut tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(concatTable, rawTableToAdd);
         if concatTable == 1 {
@@ -3232,17 +3239,24 @@ impl Program {
         }
         let maxlen = tableToAdd.iter().map(|r| r.len()).max().unwrap_or(0);
         for i in 0..target_rows {
-            if tableToAdd[i].len() < maxlen {
-                tableToAdd[i].resize(maxlen, String::new());
-            }
-            if i != 0 && (2..=9).contains(&concatTable) {
-                tableToAdd[i] = self.readConcatCsv_tabelleDazuColchange_py(
+            if tableToAdd[i].len() < maxlen { tableToAdd[i].resize(maxlen, String::new()); }
+        }
+        if (2..=9).contains(&concatTable) && target_rows > 1 {
+            let this: &Program = &*self;
+            let transformed_rows: Vec<Vec<String>> = parallel_map_indexed_py(target_rows - 1, |offset| {
+                let i = offset + 1;
+                this.readConcatCsv_tabelleDazuColchange_py(
                     i,
                     tableToAdd[i].clone(),
                     concatTable,
                     &gebr_table,
-                );
+                )
+            });
+            for (offset, row) in transformed_rows.into_iter().enumerate() {
+                tableToAdd[offset + 1] = row;
             }
+        }
+        for i in 0..target_rows {
             let start = self.relitable[i].len() as i64;
             self.relitable[i].extend(tableToAdd[i].clone());
             if i == 0 {
@@ -3252,23 +3266,13 @@ impl Program {
                         && concatTableSelection.contains(&(u as i64 + 2));
                     let selected_concat1_column = concatTable == 1;
                     if selected_concat_fraction_column || selected_concat1_column {
-                        let selectedSpalten =
-                            start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
+                        let selectedSpalten = start + u as i64 + if (2..=9).contains(&concatTable) { 1 } else { 0 };
                         Self::push_unique_i64_py(rowsAsNumbers, selectedSpalten);
                         concatCSVspalten.push(selectedSpalten);
                         let concat_tags = self.concat_table_generated_tags_exact_py(concatTable);
                         self.set_generated_spalten_tags_exact_py(selectedSpalten, &concat_tags);
-                        let heading = tableToAdd
-                            .get(0)
-                            .and_then(|row| row.get(u))
-                            .cloned()
-                            .unwrap_or_default();
-                        self.readConcatCsv_SetHtmlParamaters(
-                            concatTable,
-                            &heading,
-                            u,
-                            selectedSpalten,
-                        );
+                        let heading = tableToAdd.get(0).and_then(|row| row.get(u)).cloned().unwrap_or_default();
+                        self.readConcatCsv_SetHtmlParamaters(concatTable, &heading, u, selectedSpalten);
                     }
                 }
             }
@@ -3413,6 +3417,156 @@ impl Program {
         }
     }
 
+    fn concat_modallogik_column_exact_py(
+        &self,
+        selection: GeneratorPairSelection,
+        reliTableCopy: &Vec<Vec<String>>,
+        row_end: usize,
+        distances: &[i64],
+    ) -> ModalGeneratedColumnPy {
+        let concept = (selection.left, selection.right);
+        let concept0 = concept.0 as usize;
+        let concept1 = concept.1 as usize;
+        let mut into_items: Vec<Vec<String>> = vec![vec![]; reliTableCopy.len()];
+        let mut cells: Vec<String> = vec![String::new(); reliTableCopy.len()];
+        let mut einMalVorkommen: Vec<usize> = vec![];
+
+        for (i, cols) in reliTableCopy.iter().enumerate() {
+            if i == 0 {
+                cells[i] = format!("Generiert: {}", cols.get(concept0).cloned().unwrap_or_default());
+            } else if cols.get(concept0).map(|s| !s.trim().is_empty()).unwrap_or(false) {
+                if !einMalVorkommen.contains(&i) {
+                    einMalVorkommen.push(i);
+                }
+            }
+        }
+
+        let mut vorkommenVielfacher: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
+        for &einVorkommen in &einMalVorkommen {
+            let mut vielfacher = 1usize;
+            let mut ergebnis = vielfacher * einVorkommen;
+            Self::vorkommenNvielfacherPerItsProduct(
+                einVorkommen,
+                ergebnis,
+                vielfacher,
+                &mut vorkommenVielfacher,
+            );
+            while ergebnis < reliTableCopy.len() {
+                vielfacher += 1;
+                ergebnis = vielfacher * einVorkommen;
+                Self::vorkommenNvielfacherPerItsProduct(
+                    einVorkommen,
+                    ergebnis,
+                    vielfacher,
+                    &mut vorkommenVielfacher,
+                );
+            }
+        }
+
+        let mut vorkommenVielfacher_B: BTreeMap<usize, BTreeMap<i64, ModalEntryPy>> = BTreeMap::new();
+        for i in 1..=row_end {
+            for &distanceFromLine in distances {
+                self.prepareModalIntoTable(
+                    distanceFromLine,
+                    i,
+                    &vorkommenVielfacher,
+                    &mut vorkommenVielfacher_B,
+                    reliTableCopy,
+                );
+            }
+        }
+
+        for i in 1..=row_end {
+            for &distanceFromLine in distances {
+                let Some(entry_by_dist) = vorkommenVielfacher_B.get(&i).and_then(|m| m.get(&distanceFromLine)) else {
+                    continue;
+                };
+                for (modalOperatoren, &vervielfachter) in entry_by_dist
+                    .modalS
+                    .iter()
+                    .zip(entry_by_dist.vervielfachter.iter())
+                {
+                    let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
+                        reliTableCopy
+                            .get(vervielfachter)
+                            .and_then(|r| r.get(concept0))
+                            .cloned()
+                            .unwrap_or_default()
+                    } else {
+                        reliTableCopy
+                            .get(vervielfachter)
+                            .and_then(|r| r.get(concept1))
+                            .cloned()
+                            .unwrap_or_default()
+                    };
+                    if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
+                        continue;
+                    }
+                    let basis_content = if reliTableCopy
+                        .get(1)
+                        .and_then(|r| r.get(97))
+                        .map(|s| s == &modalOperatoren[0])
+                        .unwrap_or(false)
+                    {
+                        intoItsContent.clone()
+                    } else {
+                        self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
+                    };
+                    let mut item = format!(
+                        "{}{} {} {}",
+                        self.modal_text_by_distance_exact_py(distanceFromLine),
+                        modalOperatoren[0],
+                        basis_content,
+                        modalOperatoren[1]
+                    );
+                    if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
+                        item.push_str(", nicht: ");
+                        item.push_str(&modalOperatoren[2..].join(", "));
+                        item.push_str(" (das alles nicht): ");
+                        let c0 = reliTableCopy
+                            .get(vervielfachter)
+                            .and_then(|r| r.get(concept0))
+                            .cloned()
+                            .unwrap_or_default();
+                        item.push_str(&self.modal_replace_zuerst_zweites_py(c0));
+                    }
+                    into_items[i].push(item);
+                }
+            }
+            let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+            let fill_ = if conditionNvs1perN {
+                reliTableCopy.get(i).and_then(|r| r.get(197)).cloned().unwrap_or_default()
+            } else {
+                reliTableCopy.get(i).and_then(|r| r.get(4)).cloned().unwrap_or_default()
+            };
+            if !into_items[i].is_empty() {
+                into_items[i].push(format!(
+                    "Alles nur bezogen auf die selbe Strukturgröße einer {}",
+                    fill_
+                ));
+            }
+        }
+
+        for i in 1..=row_end {
+            cells[i] = self.wrap_items_exact_py(&into_items[i], false);
+        }
+
+        let meta_name = self.generator_pair_selection_meta_name_exact_py(&selection, concept.0);
+        let parameter_groups = self.generated1_parameter_groups_exact_py(&selection, concept.0);
+        let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
+        let tags = if conditionNvs1perN {
+            vec![ST::gleichfoermigesPolygon, ST::galaxie]
+        } else {
+            vec![ST::sternPolygon, ST::galaxie]
+        };
+        ModalGeneratedColumnPy {
+            cells,
+            meta_name,
+            parameter_groups,
+            tags,
+        }
+    }
+
     pub fn concatModallogik(&mut self, rowsAsNumbers: &mut Vec<i64>) {
         let mut conceptSelections = self.generated1_selections_exact_py();
         // Python macht `conceptsRowsSetOfTuple2 = list(conceptsRowsSetOfTuple); ...sort()`.
@@ -3422,171 +3576,25 @@ impl Program {
             return;
         }
         let reliTableCopy = self.relitable.clone();
+        let row_end = self.generator_row_end_py();
         let distances: [i64; 9] = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+        let this: &Program = &*self;
+        let generated_columns: Vec<ModalGeneratedColumnPy> = parallel_map_indexed_py(
+            conceptSelections.len(),
+            |index| {
+                this.concat_modallogik_column_exact_py(
+                    conceptSelections[index].clone(),
+                    &reliTableCopy,
+                    row_end,
+                    &distances,
+                )
+            },
+        );
 
-        for selection in conceptSelections {
-            let concept = (selection.left, selection.right);
-            let concept0 = concept.0 as usize;
-            let concept1 = concept.1 as usize;
-            let mut into_items: Vec<Vec<String>> = vec![vec![]; reliTableCopy.len()];
-            let mut cells: Vec<String> = vec![String::new(); reliTableCopy.len()];
-            let mut einMalVorkommen: Vec<usize> = vec![];
-
-            for (i, cols) in reliTableCopy.iter().enumerate() {
-                if i == 0 {
-                    cells[i] = format!(
-                        "Generiert: {}",
-                        cols.get(concept0).cloned().unwrap_or_default()
-                    );
-                } else if cols
-                    .get(concept0)
-                    .map(|s| !s.trim().is_empty())
-                    .unwrap_or(false)
-                {
-                    if !einMalVorkommen.contains(&i) {
-                        einMalVorkommen.push(i);
-                    }
-                }
-            }
-
-            let mut vorkommenVielfacher: BTreeMap<usize, Vec<(usize, usize)>> = BTreeMap::new();
-            for &einVorkommen in &einMalVorkommen {
-                let mut vielfacher = 1usize;
-                let mut ergebnis = vielfacher * einVorkommen;
-                Self::vorkommenNvielfacherPerItsProduct(
-                    einVorkommen,
-                    ergebnis,
-                    vielfacher,
-                    &mut vorkommenVielfacher,
-                );
-                while ergebnis < reliTableCopy.len() {
-                    vielfacher += 1;
-                    ergebnis = vielfacher * einVorkommen;
-                    Self::vorkommenNvielfacherPerItsProduct(
-                        einVorkommen,
-                        ergebnis,
-                        vielfacher,
-                        &mut vorkommenVielfacher,
-                    );
-                }
-            }
-
-            let mut vorkommenVielfacher_B: BTreeMap<usize, BTreeMap<i64, ModalEntryPy>> =
-                BTreeMap::new();
-            let row_end = self.generator_row_end_py();
-            for i in 1..=row_end {
-                for &distanceFromLine in &distances {
-                    self.prepareModalIntoTable(
-                        distanceFromLine,
-                        i,
-                        &vorkommenVielfacher,
-                        &mut vorkommenVielfacher_B,
-                        &reliTableCopy,
-                    );
-                }
-            }
-
-            for i in 1..=row_end {
-                for &distanceFromLine in &distances {
-                    let Some(entry_by_dist) = vorkommenVielfacher_B
-                        .get(&i)
-                        .and_then(|m| m.get(&distanceFromLine))
-                    else {
-                        continue;
-                    };
-                    for (modalOperatoren, &vervielfachter) in entry_by_dist
-                        .modalS
-                        .iter()
-                        .zip(entry_by_dist.vervielfachter.iter())
-                    {
-                        let intoItsContent = if distanceFromLine.abs() % 2 == 0 {
-                            reliTableCopy
-                                .get(vervielfachter)
-                                .and_then(|r| r.get(concept0))
-                                .cloned()
-                                .unwrap_or_default()
-                        } else {
-                            reliTableCopy
-                                .get(vervielfachter)
-                                .and_then(|r| r.get(concept1))
-                                .cloned()
-                                .unwrap_or_default()
-                        };
-                        if intoItsContent.is_empty() || modalOperatoren.len() < 2 {
-                            continue;
-                        }
-                        let basis_content = if reliTableCopy
-                            .get(1)
-                            .and_then(|r| r.get(97))
-                            .map(|s| s == &modalOperatoren[0])
-                            .unwrap_or(false)
-                        {
-                            intoItsContent.clone()
-                        } else {
-                            self.modal_replace_zuerst_zweites_py(intoItsContent.clone())
-                        };
-                        let mut item = format!(
-                            "{}{} {} {}",
-                            self.modal_text_by_distance_exact_py(distanceFromLine),
-                            modalOperatoren[0],
-                            basis_content,
-                            modalOperatoren[1]
-                        );
-                        if distanceFromLine.abs() % 2 == 1 && modalOperatoren.len() > 2 {
-                            item.push_str(", nicht: ");
-                            item.push_str(&modalOperatoren[2..].join(", "));
-                            item.push_str(" (das alles nicht): ");
-                            let c0 = reliTableCopy
-                                .get(vervielfachter)
-                                .and_then(|r| r.get(concept0))
-                                .cloned()
-                                .unwrap_or_default();
-                            item.push_str(&self.modal_replace_zuerst_zweites_py(c0));
-                        }
-                        into_items[i].push(item);
-                    }
-                }
-                let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
-                let fill_ = if conditionNvs1perN {
-                    reliTableCopy
-                        .get(i)
-                        .and_then(|r| r.get(197))
-                        .cloned()
-                        .unwrap_or_default()
-                } else {
-                    reliTableCopy
-                        .get(i)
-                        .and_then(|r| r.get(4))
-                        .cloned()
-                        .unwrap_or_default()
-                };
-                if !into_items[i].is_empty() {
-                    into_items[i].push(format!(
-                        "Alles nur bezogen auf die selbe Strukturgröße einer {}",
-                        fill_
-                    ));
-                }
-            }
-
-            for i in 1..=self.generator_row_end_py() {
-                cells[i] = self.wrap_items_exact_py(&into_items[i], false);
-            }
-
-            let meta_name = self.generator_pair_selection_meta_name_exact_py(&selection, concept.0);
-            let spalte = self.fuege_spalte_hinzu_py(cells, &meta_name);
-            self.set_generated_spalten_parameter_exact_py(
-                spalte,
-                self.generated1_parameter_groups_exact_py(&selection, concept.0),
-            );
-            let conditionNvs1perN = matches!(concept.0, 62 | 63 | 358..=367 | 371..=374);
-            if conditionNvs1perN {
-                self.set_generated_spalten_tags_exact_py(
-                    spalte,
-                    &[ST::gleichfoermigesPolygon, ST::galaxie],
-                );
-            } else {
-                self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie]);
-            }
+        for generated in generated_columns {
+            let spalte = self.fuege_spalte_hinzu_py(generated.cells, &generated.meta_name);
+            self.set_generated_spalten_parameter_exact_py(spalte, generated.parameter_groups);
+            self.set_generated_spalten_tags_exact_py(spalte, &generated.tags);
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -3652,12 +3660,7 @@ impl Program {
 
         let relitableCopy = self.relitable.clone();
         let row_end = self.generator_row_end_py();
-        let kombi_namen = [
-            "Motiv -> Motiv",
-            "Motiv -> Strukur",
-            "Struktur -> Motiv",
-            "Struktur -> Strukur",
-        ];
+        let kombi_namen = ["Motiv -> Motiv", "Motiv -> Strukur", "Struktur -> Motiv", "Struktur -> Strukur"];
         let kombi_namen2 = ["GalGal", "GalUni", "UniGal", "UniUni"];
         let poly_namen = ["Sternpolygone", "gleichförmige Polygone"];
         let poly_keys = ["stern", "gleichf"];
@@ -3675,9 +3678,7 @@ impl Program {
                 wants_primcsv = true;
                 continue;
             }
-            if let Some((poly_idx, _poly_name, kombis, is_gebr)) =
-                self.generated2_exact_coords_py(code)
-            {
+            if let Some((poly_idx, _poly_name, kombis, is_gebr)) = self.generated2_exact_coords_py(code) {
                 for kombi_idx in kombis {
                     requested_coords.insert((poly_idx, kombi_idx, is_gebr));
                 }
@@ -3688,22 +3689,23 @@ impl Program {
             if let Some(csv_name) = self.concat_csv_name_py(1) {
                 if let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csv_name) {
                     tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(1, tableToAdd);
-                    let mut into: Vec<String> =
-                        vec!["Primzahlvielfache, nicht generiert".to_string()];
-                    for zeile in tableToAdd.into_iter().skip(1).take(row_end) {
+                    let mut into: Vec<String> = vec!["Primzahlvielfache, nicht generiert".to_string()];
+                    let prim_rows: Vec<Vec<String>> = tableToAdd.into_iter().skip(1).take(row_end).collect();
+                    let this: &Program = &*self;
+                    let prim_cells: Vec<String> = parallel_map_indexed_py(prim_rows.len(), |row_index| {
                         let mut items: Vec<String> = vec![];
-                        for zelle in zeile {
+                        for zelle in &prim_rows[row_index] {
                             if zelle.trim().len() > 3 {
-                                items.push(zelle);
+                                items.push(zelle.clone());
                             }
                         }
-                        into.push(self.wrap_items_exact_py(&items, true));
-                    }
+                        this.wrap_items_exact_py(&items, true)
+                    });
+                    into.extend(prim_cells);
                     while into.len() <= row_end {
                         into.push(String::new());
                     }
-                    let spalte =
-                        self.fuege_spalte_hinzu_py(into, "Primzahlvielfache, nicht generiert");
+                    let spalte = self.fuege_spalte_hinzu_py(into, "Primzahlvielfache, nicht generiert");
                     self.register_generated2_spalte_exact_py("PrimCSV", spalte);
                     Self::push_unique_i64_py(rowsAsNumbers, spalte);
                 }
@@ -3716,19 +3718,10 @@ impl Program {
         let mut transzendentalien: [Vec<String>; 2] = [vec![], vec![]];
         for cols in &relitableCopy {
             for zwei in 0..=1usize {
-                let motivation_col = if zwei == 0 {
-                    hard_coded_couple.0
-                } else {
-                    hard_coded_couple.1
-                };
-                let transzendentalien_col = if zwei == 0 {
-                    transzendentalien_nrezi.0
-                } else {
-                    transzendentalien_nrezi.1
-                };
+                let motivation_col = if zwei == 0 { hard_coded_couple.0 } else { hard_coded_couple.1 };
+                let transzendentalien_col = if zwei == 0 { transzendentalien_nrezi.0 } else { transzendentalien_nrezi.1 };
                 motivation[zwei].push(cols.get(motivation_col).cloned().unwrap_or_default());
-                transzendentalien[zwei]
-                    .push(cols.get(transzendentalien_col).cloned().unwrap_or_default());
+                transzendentalien[zwei].push(cols.get(transzendentalien_col).cloned().unwrap_or_default());
             }
         }
 
@@ -3742,99 +3735,84 @@ impl Program {
         let uni_csv = self.readOneCSVAndReturn(4);
         let gal_csv = self.readOneCSVAndReturn(2);
 
-        let mut kombis_all: [Vec<(
-            (String, String),
-            (String, String),
-            (String, String),
-            (String, String),
-        )>; 2] = [vec![], vec![]];
+        let mut kombis_all: [Vec<((String, String), (String, String), (String, String), (String, String))>; 2] = [vec![], vec![]];
         for zwei in 0..=1usize {
             for i in 0..self.relitable.len() {
                 kombis_all[zwei].push((
                     (motivation[zwei][i].clone(), motivation[zwei][i].clone()),
-                    (
-                        motivation[zwei][i].clone(),
-                        transzendentalien[zwei][i].clone(),
-                    ),
-                    (
-                        transzendentalien[zwei][i].clone(),
-                        motivation[zwei][i].clone(),
-                    ),
-                    (
-                        transzendentalien[zwei][i].clone(),
-                        transzendentalien[zwei][i].clone(),
-                    ),
+                    (motivation[zwei][i].clone(), transzendentalien[zwei][i].clone()),
+                    (transzendentalien[zwei][i].clone(), motivation[zwei][i].clone()),
+                    (transzendentalien[zwei][i].clone(), transzendentalien[zwei][i].clone()),
                 ));
             }
         }
 
+        let mut coord_jobs: Vec<(usize, usize, bool)> = Vec::new();
         for brr in 0..=1usize {
             for zwei in 0..=1usize {
                 for null_bis_drei in 0..=3usize {
                     let coord = (zwei, null_bis_drei, brr == 1);
-                    if !requested_coords.contains(&coord) {
-                        continue;
+                    if requested_coords.contains(&coord) {
+                        coord_jobs.push(coord);
                     }
-                    let ganz_oder_gebr = if brr == 0 {
-                        ""
-                    } else {
-                        ", mit Faktoren aus gebrochen-rationalen Zahlen"
-                    };
-                    let heading = format!(
-                        "generierte Multiplikationen {} {}{}",
-                        poly_namen[zwei], kombi_namen[null_bis_drei], ganz_oder_gebr,
-                    );
-                    let mut into: Vec<String> = vec![heading.clone()];
-                    for i in 1..=row_end {
+                }
+            }
+        }
+
+        let this: &Program = &*self;
+        let coord_columns: Vec<((usize, usize, bool), String, Vec<String>)> = parallel_map_indexed_py(
+            coord_jobs.len(),
+            |job_index| {
+                let coord = coord_jobs[job_index];
+                let (zwei, null_bis_drei, is_gebr) = coord;
+                let ganz_oder_gebr = if is_gebr { ", mit Faktoren aus gebrochen-rationalen Zahlen" } else { "" };
+                let heading = format!(
+                    "generierte Multiplikationen {} {}{}",
+                    poly_namen[zwei],
+                    kombi_namen[null_bis_drei],
+                    ganz_oder_gebr,
+                );
+                let mut into: Vec<String> = vec![heading.clone()];
+                let row_cells: Vec<String> = (1..=row_end)
+                    .map(|i| {
                         let mut teile: Vec<String> = vec![];
-                        if self.outType == "html" {
+                        if this.outType == "html" {
                             teile.push("<ul>".to_string());
-                        } else if self.outType == "bbcode" {
+                        } else if this.outType == "bbcode" {
                             teile.push("[list]".to_string());
                         }
-                        if brr == 0 {
-                            let mut multipless = self.center_multiples_py(i as i64, true);
+                        if !is_gebr {
+                            let mut multipless = this.center_multiples_py(i as i64, true);
                             multipless.sort();
                             for (k, multi) in multipless.iter().enumerate() {
-                                if k > 0 && self.outType != "html" && self.outType != "bbcode" {
+                                if k > 0 && this.outType != "html" && this.outType != "bbcode" {
                                     teile.push(", außerdem: ".to_string());
                                 }
                                 let lhsrhs = match null_bis_drei {
                                     0 => (
-                                        &kombis_all[zwei][multi.0 as usize].0 .0,
-                                        &kombis_all[zwei][multi.1 as usize].0 .1,
+                                        &kombis_all[zwei][multi.0 as usize].0.0,
+                                        &kombis_all[zwei][multi.1 as usize].0.1,
                                     ),
                                     1 => (
-                                        &kombis_all[zwei][multi.0 as usize].1 .0,
-                                        &kombis_all[zwei][multi.1 as usize].1 .1,
+                                        &kombis_all[zwei][multi.0 as usize].1.0,
+                                        &kombis_all[zwei][multi.1 as usize].1.1,
                                     ),
                                     2 => (
-                                        &kombis_all[zwei][multi.0 as usize].2 .0,
-                                        &kombis_all[zwei][multi.1 as usize].2 .1,
+                                        &kombis_all[zwei][multi.0 as usize].2.0,
+                                        &kombis_all[zwei][multi.1 as usize].2.1,
                                     ),
                                     _ => (
-                                        &kombis_all[zwei][multi.0 as usize].3 .0,
-                                        &kombis_all[zwei][multi.1 as usize].3 .1,
+                                        &kombis_all[zwei][multi.0 as usize].3.0,
+                                        &kombis_all[zwei][multi.1 as usize].3.1,
                                     ),
                                 };
                                 let lhs = lhsrhs.0.trim();
                                 let rhs = lhsrhs.1.trim();
-                                let lhs_display = if lhs.len() > 3 {
-                                    lhs.to_string()
-                                } else {
-                                    "...".to_string()
-                                };
-                                let rhs_display = if rhs.len() > 3 {
-                                    rhs.to_string()
-                                } else {
-                                    "...".to_string()
-                                };
-                                if self.outType == "html" {
-                                    teile.push(format!(
-                                        "<li>({}) * ({})</li>",
-                                        lhs_display, rhs_display
-                                    ));
-                                } else if self.outType == "bbcode" {
+                                let lhs_display = if lhs.len() > 3 { lhs.to_string() } else { "...".to_string() };
+                                let rhs_display = if rhs.len() > 3 { rhs.to_string() } else { "...".to_string() };
+                                if this.outType == "html" {
+                                    teile.push(format!("<li>({}) * ({})</li>", lhs_display, rhs_display));
+                                } else if this.outType == "bbcode" {
                                     teile.push(format!("[*]({}) * ({})", lhs_display, rhs_display));
                                 } else {
                                     teile.push(format!("({}) * ({})", lhs_display, rhs_display));
@@ -3849,98 +3827,65 @@ impl Program {
                                 .cloned()
                                 .unwrap_or_default();
                             for (k, multi) in multipless.iter().enumerate() {
-                                let csv_von = if null_bis_drei >= 2 {
-                                    &uni_csv
-                                } else {
-                                    &gal_csv
-                                };
-                                let csv_bis = if null_bis_drei == 1 || null_bis_drei == 3 {
-                                    &uni_csv
-                                } else {
-                                    &gal_csv
-                                };
+                                let csv_von = if null_bis_drei >= 2 { &uni_csv } else { &gal_csv };
+                                let csv_bis = if null_bis_drei == 1 || null_bis_drei == 3 { &uni_csv } else { &gal_csv };
                                 let gal_or_uni_tuple = if zwei == 0 {
                                     gal_or_uni_n_or_invers[null_bis_drei].0
                                 } else {
                                     gal_or_uni_n_or_invers[null_bis_drei].1
                                 };
 
-                                let von = self
-                                    .spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
-                                        multi.0,
-                                        gal_or_uni_tuple,
-                                        csv_von,
-                                        !(null_bis_drei >= 2),
-                                    );
-                                let bis = self
-                                    .spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
-                                        multi.1,
-                                        gal_or_uni_tuple,
-                                        csv_bis,
-                                        !(null_bis_drei == 1 || null_bis_drei == 3),
-                                    );
-                                let Some(von) = von else {
-                                    continue;
-                                };
-                                let Some(bis) = bis else {
-                                    continue;
-                                };
+                                let von = this.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                                    multi.0,
+                                    gal_or_uni_tuple,
+                                    csv_von,
+                                    !(null_bis_drei >= 2),
+                                );
+                                let bis = this.spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie_py(
+                                    multi.1,
+                                    gal_or_uni_tuple,
+                                    csv_bis,
+                                    !(null_bis_drei == 1 || null_bis_drei == 3),
+                                );
+                                let Some(von) = von else { continue; };
+                                let Some(bis) = bis else { continue; };
                                 let von = von.trim();
                                 let bis = bis.trim();
                                 if von.len() <= 3 || bis.len() <= 3 {
                                     continue;
                                 }
-                                if k > 0
-                                    && self.outType != "html"
-                                    && self.outType != "bbcode"
-                                    && !teile.is_empty()
-                                {
+                                if k > 0 && this.outType != "html" && this.outType != "bbcode" && !teile.is_empty() {
                                     teile.push("| außerdem: ".to_string());
                                 }
-                                let frac1 = self.py_frac_display_exact(multi.0);
-                                let frac2 = self.py_frac_display_exact(multi.1);
-                                let br = if self.outType == "html"
-                                    && (von.len() > 30 || bis.len() > 30)
-                                {
-                                    "<br>"
+                                let frac1 = this.py_frac_display_exact(multi.0);
+                                let frac2 = this.py_frac_display_exact(multi.1);
+                                let br = if this.outType == "html" && (von.len() > 30 || bis.len() > 30) { "<br>" } else { " " };
+                                if this.outType == "html" {
+                                    teile.push(format!("<li>\"{}\"{}({})*({}){}\"{}\"\"</li>", von, br, frac1, frac2, br, bis));
+                                } else if this.outType == "bbcode" {
+                                    teile.push(format!("[*]\"{}\"{}({})*({}){}\"{}\"\"", von, br, frac1, frac2, br, bis));
                                 } else {
-                                    " "
-                                };
-                                if self.outType == "html" {
-                                    teile.push(format!(
-                                        "<li>\"{}\"{}({})*({}){}\"{}\"\"</li>",
-                                        von, br, frac1, frac2, br, bis
-                                    ));
-                                } else if self.outType == "bbcode" {
-                                    teile.push(format!(
-                                        "[*]\"{}\"{}({})*({}){}\"{}\"\"",
-                                        von, br, frac1, frac2, br, bis
-                                    ));
-                                } else {
-                                    teile.push(format!(
-                                        "\"\"{}\"{}({})*({}){}\"{}\"\"",
-                                        von, br, frac1, frac2, br, bis
-                                    ));
+                                    teile.push(format!("\"\"{}\"{}({})*({}){}\"{}\"\"", von, br, frac1, frac2, br, bis));
                                 }
                             }
                         }
-                        if self.outType == "html" {
+                        if this.outType == "html" {
                             teile.push("</ul>".to_string());
-                        } else if self.outType == "bbcode" {
+                        } else if this.outType == "bbcode" {
                             teile.push("[/list]".to_string());
                         }
-                        into.push(teile.join(""));
-                    }
-                    let spalte = self.fuege_spalte_hinzu_py(into, &heading);
-                    self.register_generated2_coord_metadata_exact_py(
-                        coord,
-                        spalte,
-                        &koord2parameter,
-                        &koord2tag,
-                    );
-                    Self::push_unique_i64_py(rowsAsNumbers, spalte);
-                }
-            }
+                        teile.join("")
+                    })
+                    .collect();
+                into.extend(row_cells);
+                (coord, heading, into)
+            },
+        );
+
+        for (coord, heading, into) in coord_columns {
+            let spalte = self.fuege_spalte_hinzu_py(into, &heading);
+            self.register_generated2_coord_metadata_exact_py(coord, spalte, &koord2parameter, &koord2tag);
+            Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
 
@@ -3962,7 +3907,7 @@ impl Program {
         let mut weiter1b = 0usize;
         let mut weiter2a = 0usize;
         let mut weiter2b = 0usize;
-        let mut col_main: Vec<String> = vec![];
+        let mut col_main_inputs: Vec<(i64, Vec<String>, Vec<String>, Vec<String>)> = vec![];
 
         for num in 0..=row_end as i64 {
             contra_contra2.entry(num).or_default();
@@ -3992,10 +3937,7 @@ impl Program {
                         };
                         if let Some(gegen) = maybe_gegen {
                             contra_contra.insert(num, gegen);
-                            Self::push_unique_i64_vec_py(
-                                contra_contra2.entry(num).or_default(),
-                                gegen,
-                            );
+                            Self::push_unique_i64_vec_py(contra_contra2.entry(num).or_default(), gegen);
                             into1.push(format!("gegen {}", gegen));
                         }
                     } else if matches!(num, 5 | 11) {
@@ -4051,80 +3993,71 @@ impl Program {
                     keine_primzahl2 = true;
                 }
                 let mut paare: Vec<(i64, i64)> = Vec::new();
-                let mut menge: Vec<(i64, i64)> = Vec::new();
+let mut menge: Vec<(i64, i64)> = Vec::new();
 
-                for couple in self.primMultiple_pairs_py(num) {
-                    let mut pair = [couple.0, couple.1];
-                    pair.sort();
-                    let ordered = (pair[0], pair[1]);
-                    if !menge.contains(&ordered) {
-                        menge.push(ordered);
+for couple in self.primMultiple_pairs_py(num) {
+    let mut pair = [couple.0, couple.1];
+    pair.sort();
+    let ordered = (pair[0], pair[1]);
+    if !menge.contains(&ordered) {
+        menge.push(ordered);
+    }
+}
+paare.extend(menge);
+
+for couple_a in paare {
+    if couple_a.1 != 1 && couple_a.0 != 1 {
+        // Python iteriert immer über `(coupleA, (coupleA[1], coupleA[0]))`.
+        // Auch Quadratpaare laufen dadurch zweimal durch; dedupliziert wird
+        // erst danach über OrderedSet-/Dict-Äquivalente.
+        let pair_variants: Vec<(i64, i64)> = vec![couple_a, (couple_a.1, couple_a.0)];
+
+        for couple in pair_variants {
+            let positions: Vec<usize> = if couple.0 != couple.1 {
+                vec![1usize, 0usize]
+            } else {
+                vec![1usize]
+            };
+
+            for first_or_second in positions {
+                let chosen = if first_or_second == 1 { couple.1 } else { couple.0 };
+                let other = if first_or_second == 1 { couple.0 } else { couple.1 };
+
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(chosen)
+                    || couple.0 % 2 == 0
+                    || couple.1 % 2 == 0
+                {
+                    if let Some(base) = contra_contra.get(&chosen).copied() {
+                        let gegen3 = other * base;
+                        contra_contra.insert(num, gegen3);
+                        Self::push_unique_i64_vec_py(
+                            contra_contra2.entry(num).or_default(),
+                            gegen3,
+                        );
+                        into1.push(format!("gegen {}", gegen3));
                     }
                 }
-                paare.extend(menge);
 
-                for couple_a in paare {
-                    if couple_a.1 != 1 && couple_a.0 != 1 {
-                        // Python iteriert immer über `(coupleA, (coupleA[1], coupleA[0]))`.
-                        // Auch Quadratpaare laufen dadurch zweimal durch; dedupliziert wird
-                        // erst danach über OrderedSet-/Dict-Äquivalente.
-                        let pair_variants: Vec<(i64, i64)> =
-                            vec![couple_a, (couple_a.1, couple_a.0)];
-
-                        for couple in pair_variants {
-                            let positions: Vec<usize> = if couple.0 != couple.1 {
-                                vec![1usize, 0usize]
-                            } else {
-                                vec![1usize]
-                            };
-
-                            for first_or_second in positions {
-                                let chosen = if first_or_second == 1 {
-                                    couple.1
-                                } else {
-                                    couple.0
-                                };
-                                let other = if first_or_second == 1 {
-                                    couple.0
-                                } else {
-                                    couple.1
-                                };
-
-                                if self.couldBePrimeNumberPrimzahlkreuz_fuer_innen(chosen)
-                                    || couple.0 % 2 == 0
-                                    || couple.1 % 2 == 0
-                                {
-                                    if let Some(base) = contra_contra.get(&chosen).copied() {
-                                        let gegen3 = other * base;
-                                        contra_contra.insert(num, gegen3);
-                                        Self::push_unique_i64_vec_py(
-                                            contra_contra2.entry(num).or_default(),
-                                            gegen3,
-                                        );
-                                        into1.push(format!("gegen {}", gegen3));
-                                    }
-                                }
-
-                                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(couple.1)
-                                    || couple.1 % 3 == 0
-                                    || couple.0 % 3 == 0
-                                {
-                                    if let Some(base) = pro_pro.get(&chosen).copied() {
-                                        let pro3 = other * base;
-                                        pro_pro.insert(num, pro3);
-                                        Self::push_unique_i64_vec_py(
-                                            pro_pro2.entry(num).or_default(),
-                                            pro3,
-                                        );
-                                        into2.push(format!("pro {}", pro3));
-                                    }
-                                }
-                            }
-                        }
+                if self.couldBePrimeNumberPrimzahlkreuz_fuer_aussen(couple.1)
+                    || couple.1 % 3 == 0
+                    || couple.0 % 3 == 0
+                {
+                    if let Some(base) = pro_pro.get(&chosen).copied() {
+                        let pro3 = other * base;
+                        pro_pro.insert(num, pro3);
+                        Self::push_unique_i64_vec_py(
+                            pro_pro2.entry(num).or_default(),
+                            pro3,
+                        );
+                        into2.push(format!("pro {}", pro3));
                     }
                 }
             }
-
+        }
+    }
+}
+}
+                
             let text206 = dreli
                 .get(num as usize)
                 .and_then(|row| row.get(206))
@@ -4137,8 +4070,14 @@ impl Program {
             }
             into1 = Self::dedup_preserve_order_strings_py(into1);
             into2 = Self::dedup_preserve_order_strings_py(into2);
-            col_main.push(self.concat1_main_cell_exact_py(num, into, into1, into2));
+            col_main_inputs.push((num, into, into1, into2));
         }
+
+        let this: &Program = &*self;
+        let col_main: Vec<String> = parallel_map_indexed_py(col_main_inputs.len(), |index| {
+            let (num, into, into1, into2) = &col_main_inputs[index];
+            this.concat1_main_cell_exact_py(*num, into.clone(), into1.clone(), into2.clone())
+        });
 
         let mut reverse_pro: BTreeMap<i64, Vec<i64>> = BTreeMap::new();
         let mut reverse_contra: BTreeMap<i64, Vec<i64>> = BTreeMap::new();
@@ -4152,12 +4091,13 @@ impl Program {
                 Self::push_unique_i64_vec_py(reverse_contra.entry(*value).or_default(), *key);
             }
         }
-        let mut col_reverse: Vec<String> = vec![];
-        for num in 0..=row_end as i64 {
+        let this: &Program = &*self;
+        let col_reverse: Vec<String> = parallel_map_indexed_py(row_end + 1, |num_usize| {
+            let num = num_usize as i64;
             let pro2: Vec<i64> = reverse_pro.get(&num).cloned().unwrap_or_default();
             let contra2: Vec<i64> = reverse_contra.get(&num).cloned().unwrap_or_default();
-            col_reverse.push(self.concat1_reverse_cell_exact_py(num, pro2, contra2, &dreli));
-        }
+            this.concat1_reverse_cell_exact_py(num, pro2, contra2, &dreli)
+        });
 
         let heading = self.primzahlkreuz_heading_exact_py().to_string();
         let spalte_main = self.fuege_spalte_hinzu_py(col_main, &heading);
@@ -4260,24 +4200,28 @@ impl Program {
                 if self.generator_row_end_py() >= 1 {
                     into.push(String::new());
                 }
-                for i in 2..=self.generator_row_end_py() {
-                    let neue2KoordNeue2Vorwoerter = self
-                        .spalteMetaKonkret_vorwort_behandlung_exact_py(
+                let row_end = self.generator_row_end_py();
+                if row_end >= 2 {
+                    let this: &Program = &*self;
+                    let cells: Vec<String> = parallel_map_indexed_py(row_end - 1, |offset| {
+                        let i = offset + 2;
+                        let neue2KoordNeue2Vorwoerter = this.spalteMetaKonkret_vorwort_behandlung_exact_py(
                             metavariable,
                             ifInvers,
                             transzendentalienSpalten,
                             i as i64,
                             metaOrWhat,
                         );
-                    let cell = self.spalteMetaKonkret_main_inserting_text_exact_py(
-                        bothRows,
-                        i,
-                        ifInvers,
-                        &neue2KoordNeue2Vorwoerter,
-                        transzendentalienSpalten,
-                        &gebr_univ_table,
-                    );
-                    into.push(cell);
+                        this.spalteMetaKonkret_main_inserting_text_exact_py(
+                            bothRows,
+                            i,
+                            ifInvers,
+                            &neue2KoordNeue2Vorwoerter,
+                            transzendentalienSpalten,
+                            &gebr_univ_table,
+                        )
+                    });
+                    into.extend(cells);
                 }
                 let spalte = self.fuege_spalte_hinzu_py(into, &heading);
                 self.spalteMetaKonkretTheorieAbstrakt_SetHtmlParameters(
@@ -4294,18 +4238,18 @@ impl Program {
     }
 
     pub fn createSpalteGestirn(&mut self, rowsAsNumbers: &mut Vec<i64>) {
-        if !rowsAsNumbers.contains(&64) {
-            return;
-        }
-        let mut zeilenInhalte: Vec<String> = vec![];
+        if !rowsAsNumbers.contains(&64) { return; }
         let row_end = self.generator_row_end_py();
-        zeilenInhalte.push("Gestirn".to_string());
-        let mut line1: Vec<String> = vec![];
-        line1.push("Sonne (keine Potenzen)".to_string());
-        zeilenInhalte.push(line1.join(""));
-        for i in 2..=row_end {
+        let this: &Program = &*self;
+        let zeilenInhalte: Vec<String> = parallel_map_indexed_py(row_end + 1, |i| {
+            if i == 0 {
+                return "Gestirn".to_string();
+            }
+            if i == 1 {
+                return "Sonne (keine Potenzen)".to_string();
+            }
             let mut line1: Vec<String> = vec![];
-            if !self.moonNumber(i as i64).1.is_empty() {
+            if !this.moonNumber(i as i64).1.is_empty() {
                 line1.push("Mond (Potenzen)".to_string());
             } else {
                 line1.push("Sonne (keine Potenzen)".to_string());
@@ -4314,20 +4258,13 @@ impl Program {
                 line1.push("Planet (2*n)".to_string());
             }
             if i % 3 == 0 {
-                line1.push(
-                    "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht"
-                        .to_string(),
-                );
+                line1.push("wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 verdreht".to_string());
             }
-            zeilenInhalte.push(line1.join(", und außerdem "));
-        }
-        let spalte =
-            self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
+            line1.join(", und außerdem ")
+        });
+        let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
         self.set_generated_spalten_parameter_exact_from_data_dict_py(spalte, 0, "64");
-        self.set_generated_spalten_tags_exact_py(
-            spalte,
-            &[ST::sternPolygon, ST::universum, ST::galaxie],
-        );
+        self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum, ST::galaxie]);
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 

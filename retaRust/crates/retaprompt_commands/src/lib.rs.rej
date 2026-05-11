@@ -1,0 +1,12 @@
+--- crates/retaprompt_commands/src/lib.rs
++++ crates/retaprompt_commands/src/lib.rs
+@@ -204,6 +204,9 @@ pub mod tokenize;
+ pub mod semantic_choices;
+ #[path = "../../../src/prompt/python_like.rs"]
+ pub mod python_like;
++#[path = "../../../src/shared/parallel_runtime.rs"]
++pub mod parallel_runtime;
++
+ #[path = "../../../src/prompt/commands.rs"]
+ pub mod commands;
+ 

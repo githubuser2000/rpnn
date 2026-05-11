@@ -1,0 +1,37 @@
+--- src/shared/reta_output_py.rs
++++ src/shared/reta_output_py.rs
+@@ -1968,34 +1969,6 @@ fn split_long_word_py(word: &str, width: usize) -> Vec<String> {
+         false
+     }
+ 
+-    fn output_parallel_ranges_py(total_rows: usize, min_rows_per_worker: usize) -> Vec<(usize, usize)> {
+-        if total_rows == 0 {
+-            return Vec::new();
+-        }
+-        if total_rows <= 1 || total_rows < min_rows_per_worker.saturating_mul(2) {
+-            return vec![(0, total_rows)];
+-        }
+-        let max_workers_by_grain = (total_rows + min_rows_per_worker - 1) / min_rows_per_worker;
+-        let worker_count = std::thread::available_parallelism()
+-            .map(|value| value.get())
+-            .unwrap_or(1)
+-            .min(max_workers_by_grain)
+-            .min(total_rows)
+-            .max(1);
+-        if worker_count <= 1 {
+-            return vec![(0, total_rows)];
+-        }
+-
+-        let chunk_size = (total_rows + worker_count - 1) / worker_count;
+-        let mut ranges = Vec::new();
+-        let mut start = 0usize;
+-        while start < total_rows {
+-            let end = start.saturating_add(chunk_size).min(total_rows);
+-            ranges.push((start, end));
+-            start = end;
+-        }
+-        ranges
+-    }
+ 
+     fn render_structured_rows_ordered_py<F>(
+         newTable: &[Vec<String>],
