@@ -1,0 +1,59 @@
+--- src/prompt/completion.rs	2026-05-11 12:05:44.709296882 +0000
++++ src/prompt/completion.rs	2026-05-11 12:08:04.958116610 +0000
+@@ -147,6 +195,7 @@
+ #[derive(Clone, Debug)]
+ struct PromptContextHinter {
+     runtime: CompletionRuntimeHandle,
++    right_arrow_state: RightArrowAutosuggestState,
+     current_hint: AutosuggestionHint,
+ }
+ 
+@@ -320,8 +370,19 @@
+ }
+ 
+ pub fn build_default_hinter_with_runtime(runtime: CompletionRuntimeHandle) -> Box<dyn Hinter> {
++    build_default_hinter_with_runtime_and_right_state(
++        runtime,
++        new_right_arrow_autosuggest_state(),
++    )
++}
++
++pub fn build_default_hinter_with_runtime_and_right_state(
++    runtime: CompletionRuntimeHandle,
++    right_arrow_state: RightArrowAutosuggestState,
++) -> Box<dyn Hinter> {
+     Box::new(PromptContextHinter {
+         runtime,
++        right_arrow_state,
+         current_hint: AutosuggestionHint::default(),
+     })
+ }
+@@ -420,6 +481,12 @@
+         _cwd: &str,
+     ) -> String {
+         self.current_hint = AutosuggestionHint::default();
++        self.right_arrow_state
++            .update(RightArrowAutosuggestSnapshot::default());
++
++        if pos != line.len() {
++            return String::new();
++        }
+ 
+         let Some(before_cursor) = safe_line_end_prefix(line, pos) else {
+             return String::new();
+@@ -438,12 +505,15 @@
+             &runtime_state.stored_commands,
+         ) {
+             let display = hint.display.clone();
++            self.right_arrow_state.update(hint.right_arrow_snapshot());
+             self.current_hint = hint;
+             return render_autosuggestion_hint(&display, use_ansi_coloring);
+         }
+ 
+         if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
+             self.current_hint = AutosuggestionHint::insertable(hint);
++            self.right_arrow_state
++                .update(self.current_hint.right_arrow_snapshot());
+             return render_autosuggestion_hint(&self.current_hint.display, use_ansi_coloring);
+         }
+ 

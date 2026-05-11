@@ -3,8 +3,9 @@ use std::path::PathBuf;
 
 use reedline::{
     default_emacs_keybindings, default_vi_insert_keybindings, default_vi_normal_keybindings,
-    ColumnarMenu, DefaultValidator, Emacs, KeyCode, KeyModifiers, Keybindings, MenuBuilder, Prompt,
-    PromptEditMode, PromptHistorySearch, Reedline, ReedlineEvent, ReedlineMenu, Signal, Vi,
+    ColumnarMenu, DefaultValidator, EditCommand, EditMode, Emacs, KeyCode, KeyModifiers, Keybindings,
+    MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch, Reedline,
+    ReedlineEvent, ReedlineMenu, ReedlineRawEvent, Signal, Vi,
 };
 
 use super::commands::{
@@ -12,8 +13,10 @@ use super::commands::{
     PromptCommand, PromptOutput, SessionState,
 };
 use super::completion::{
-    build_default_completer_with_runtime, build_default_hinter_with_runtime,
-    new_completion_runtime_handle, set_completion_runtime_context, CompletionRuntimeHandle,
+    build_default_completer_with_runtime, build_default_hinter_with_runtime_and_right_state,
+    new_completion_runtime_handle, new_right_arrow_autosuggest_state,
+    set_completion_runtime_context, CompletionRuntimeHandle, RightArrowAcceptAction,
+    RightArrowAutosuggestSnapshot, RightArrowAutosuggestState,
 };
 use super::frontend_profile::PromptFrontendProfile;
 use super::history::{
@@ -616,6 +619,7 @@ fn run_interactive_loop(
     state: &mut SessionState,
 ) -> i32 {
     let completion_runtime = new_completion_runtime_handle();
+    let right_arrow_state = new_right_arrow_autosuggest_state();
     set_completion_runtime_context(
         &completion_runtime,
         state.prompt_mode,
@@ -630,6 +634,7 @@ fn run_interactive_loop(
         state.logging_enabled,
         state.prompt_mode,
         &completion_runtime,
+        right_arrow_state.clone(),
     ) {
         Ok(editor) => editor,
         Err(err) => {
@@ -679,6 +684,7 @@ fn run_interactive_loop(
                     state.logging_enabled,
                     state.prompt_mode,
                     &completion_runtime,
+                    right_arrow_state.clone(),
                 ) {
                     Ok(editor) => editor,
                     Err(err) => {
@@ -745,6 +751,7 @@ fn run_interactive_loop(
                                 state.logging_enabled,
                                 state.prompt_mode,
                                 &completion_runtime,
+                                right_arrow_state.clone(),
                             ) {
                                 Ok(editor) => editor,
                                 Err(err) => {
@@ -819,6 +826,7 @@ fn run_interactive_loop(
                         state.logging_enabled,
                         state.prompt_mode,
                         &completion_runtime,
+                        right_arrow_state.clone(),
                     ) {
                         Ok(editor) => editor,
                         Err(err) => {
@@ -879,6 +887,65 @@ fn menu_aware_navigation(
     ReedlineEvent::UntilFound(vec![menu_event, fallback_event])
 }
 
+fn cursor_move_right_event() -> ReedlineEvent {
+    ReedlineEvent::Edit(vec![EditCommand::MoveRight { select: false }])
+}
+
+fn right_arrow_event(snapshot: RightArrowAutosuggestSnapshot) -> ReedlineEvent {
+    if !snapshot.cursor_at_end {
+        return cursor_move_right_event();
+    }
+
+    match snapshot.accept_action {
+        RightArrowAcceptAction::Insert(text) if !text.is_empty() => {
+            ReedlineEvent::UntilFound(vec![
+                ReedlineEvent::HistoryHintComplete,
+                cursor_move_right_event(),
+            ])
+        }
+        RightArrowAcceptAction::ReplaceRange {
+            replace_start,
+            replace_len,
+            replacement,
+        } => ReedlineEvent::Edit(vec![
+            EditCommand::MoveToPosition {
+                position: replace_start,
+                select: false,
+            },
+            EditCommand::ReplaceChars(replace_len, replacement),
+        ]),
+        _ => cursor_move_right_event(),
+    }
+}
+
+struct RightAwareEditMode {
+    inner: Box<dyn EditMode>,
+    right_arrow_state: RightArrowAutosuggestState,
+}
+
+impl RightAwareEditMode {
+    fn new(inner: Box<dyn EditMode>, right_arrow_state: RightArrowAutosuggestState) -> Self {
+        Self {
+            inner,
+            right_arrow_state,
+        }
+    }
+}
+
+impl EditMode for RightAwareEditMode {
+    fn parse_event(&mut self, event: ReedlineRawEvent) -> ReedlineEvent {
+        match self.inner.parse_event(event) {
+            ReedlineEvent::Right => right_arrow_event(self.right_arrow_state.snapshot()),
+            event => event,
+        }
+    }
+
+    fn edit_mode(&self) -> PromptEditMode {
+        self.inner.edit_mode()
+    }
+
+}
+
 fn add_completion_keybindings(keybindings: &mut Keybindings) {
     keybindings.add_binding(
         KeyModifiers::NONE,
@@ -910,16 +977,7 @@ fn add_completion_keybindings(keybindings: &mut Keybindings) {
         KeyCode::Left,
         menu_aware_navigation(ReedlineEvent::MenuLeft, ReedlineEvent::Left),
     );
-    keybindings.add_binding(
-        KeyModifiers::NONE,
-        KeyCode::Right,
-        ReedlineEvent::UntilFound(vec![
-            ReedlineEvent::MenuRight,
-            ReedlineEvent::Menu(COMPLETION_MENU_NAME.to_string()),
-            ReedlineEvent::HistoryHintComplete,
-            ReedlineEvent::Right,
-        ]),
-    );
+    keybindings.add_binding(KeyModifiers::NONE, KeyCode::Right, ReedlineEvent::Right);
     keybindings.add_binding(
         KeyModifiers::CONTROL,
         KeyCode::Right,
@@ -940,6 +998,7 @@ fn newSession(
     logging_enabled: bool,
     prompt_mode: PromptModus,
     completion_runtime: &CompletionRuntimeHandle,
+    right_arrow_state: RightArrowAutosuggestState,
 ) -> Result<Reedline, String> {
     let history = if persistent_history_allowed {
         PromptToolkitFileHistory::with_file_and_append_policy(
@@ -955,8 +1014,9 @@ fn newSession(
     let completion_enabled = !matches!(prompt_mode, PromptModus::LoeschenSelect);
     let mut editor = Reedline::create()
         .with_history(Box::new(history))
-        .with_hinter(build_default_hinter_with_runtime(
+        .with_hinter(build_default_hinter_with_runtime_and_right_state(
             completion_runtime.clone(),
+            right_arrow_state.clone(),
         ))
         .with_validator(Box::new(DefaultValidator));
 
@@ -976,7 +1036,10 @@ fn newSession(
             if completion_enabled {
                 add_completion_keybindings(&mut keybindings);
             }
-            let edit_mode = Box::new(Emacs::new(keybindings));
+            let edit_mode = Box::new(RightAwareEditMode::new(
+                Box::new(Emacs::new(keybindings)),
+                right_arrow_state.clone(),
+            ));
             editor.with_edit_mode(edit_mode)
         }
         EditModeKind::Vi => {
@@ -986,7 +1049,10 @@ fn newSession(
                 add_completion_keybindings(&mut insert_keybindings);
                 add_completion_keybindings(&mut normal_keybindings);
             }
-            let edit_mode = Box::new(Vi::new(insert_keybindings, normal_keybindings));
+            let edit_mode = Box::new(RightAwareEditMode::new(
+                Box::new(Vi::new(insert_keybindings, normal_keybindings)),
+                right_arrow_state.clone(),
+            ));
             editor.with_edit_mode(edit_mode)
         }
     };

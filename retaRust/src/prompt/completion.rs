@@ -92,6 +92,54 @@ impl Default for CompletionRuntimeState {
 
 pub type CompletionRuntimeHandle = Arc<Mutex<CompletionRuntimeState>>;
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RightArrowAutosuggestSnapshot {
+    pub cursor_at_end: bool,
+    pub accept_action: RightArrowAcceptAction,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RightArrowAcceptAction {
+    None,
+    Insert(String),
+    ReplaceRange {
+        replace_start: usize,
+        replace_len: usize,
+        replacement: String,
+    },
+}
+
+impl Default for RightArrowAcceptAction {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RightArrowAutosuggestState {
+    inner: Arc<Mutex<RightArrowAutosuggestSnapshot>>,
+}
+
+impl RightArrowAutosuggestState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn snapshot(&self) -> RightArrowAutosuggestSnapshot {
+        self.inner.lock().map(|state| state.clone()).unwrap_or_default()
+    }
+
+    fn update(&self, snapshot: RightArrowAutosuggestSnapshot) {
+        if let Ok(mut state) = self.inner.lock() {
+            *state = snapshot;
+        }
+    }
+}
+
+pub fn new_right_arrow_autosuggest_state() -> RightArrowAutosuggestState {
+    RightArrowAutosuggestState::new()
+}
+
 #[derive(Clone, Debug)]
 struct PromptContextCompleter {
     runtime: CompletionRuntimeHandle,
@@ -100,6 +148,7 @@ struct PromptContextCompleter {
 #[derive(Clone, Debug)]
 struct PromptContextHinter {
     runtime: CompletionRuntimeHandle,
+    right_arrow_state: RightArrowAutosuggestState,
     current_hint: AutosuggestionHint,
 }
 
@@ -107,6 +156,7 @@ struct PromptContextHinter {
 struct AutosuggestionHint {
     display: String,
     insert: String,
+    accept_action: RightArrowAcceptAction,
 }
 
 #[derive(Clone, Debug)]
@@ -272,8 +322,19 @@ pub fn build_default_completer_with_runtime(
 }
 
 pub fn build_default_hinter_with_runtime(runtime: CompletionRuntimeHandle) -> Box<dyn Hinter> {
+    build_default_hinter_with_runtime_and_right_state(
+        runtime,
+        new_right_arrow_autosuggest_state(),
+    )
+}
+
+pub fn build_default_hinter_with_runtime_and_right_state(
+    runtime: CompletionRuntimeHandle,
+    right_arrow_state: RightArrowAutosuggestState,
+) -> Box<dyn Hinter> {
     Box::new(PromptContextHinter {
         runtime,
+        right_arrow_state,
         current_hint: AutosuggestionHint::default(),
     })
 }
@@ -372,6 +433,8 @@ impl Hinter for PromptContextHinter {
         _cwd: &str,
     ) -> String {
         self.current_hint = AutosuggestionHint::default();
+        self.right_arrow_state
+            .update(RightArrowAutosuggestSnapshot::default());
 
         let Some(before_cursor) = safe_line_end_prefix(line, pos) else {
             return String::new();
@@ -390,12 +453,15 @@ impl Hinter for PromptContextHinter {
             &runtime_state.stored_commands,
         ) {
             let display = hint.display.clone();
+            self.right_arrow_state.update(hint.right_arrow_snapshot());
             self.current_hint = hint;
             return render_autosuggestion_hint(&display, use_ansi_coloring);
         }
 
         if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
             self.current_hint = AutosuggestionHint::insertable(hint);
+            self.right_arrow_state
+                .update(self.current_hint.right_arrow_snapshot());
             return render_autosuggestion_hint(&self.current_hint.display, use_ansi_coloring);
         }
 
@@ -416,14 +482,32 @@ impl AutosuggestionHint {
         let text = text.into();
         Self {
             display: text.clone(),
-            insert: text,
+            insert: text.clone(),
+            accept_action: RightArrowAcceptAction::Insert(text),
         }
     }
 
-    fn display_only(text: impl Into<String>) -> Self {
+    fn replacement(
+        display: impl Into<String>,
+        replace_start: usize,
+        replace_len: usize,
+        replacement: impl Into<String>,
+    ) -> Self {
         Self {
-            display: text.into(),
+            display: display.into(),
             insert: String::new(),
+            accept_action: RightArrowAcceptAction::ReplaceRange {
+                replace_start,
+                replace_len,
+                replacement: replacement.into(),
+            },
+        }
+    }
+
+    fn right_arrow_snapshot(&self) -> RightArrowAutosuggestSnapshot {
+        RightArrowAutosuggestSnapshot {
+            cursor_at_end: true,
+            accept_action: self.accept_action.clone(),
         }
     }
 }
@@ -523,7 +607,12 @@ fn structural_dash_replacement_hint_for_candidate(
         return None;
     }
 
-    Some(AutosuggestionHint::display_only(format!(" → {canonical}")))
+    Some(AutosuggestionHint::replacement(
+        format!(" → {canonical}"),
+        candidate.replace_start,
+        typed_fragment.len(),
+        canonical,
+    ))
 }
 
 fn autosuggestion_from_history(before_cursor: &str, history: &dyn History) -> Option<String> {
@@ -2088,8 +2177,9 @@ fn with_negative_variants_and_any(values: &[&'static str]) -> Vec<String> {
 mod tests {
     use super::{
         autosuggestion_for_input, autosuggestion_for_input_in_mode_with_context,
-        candidates_for_input, candidates_for_input_in_mode_with_context, normalize_completion_text,
-        PromptModus,
+        autosuggestion_from_context_candidates, candidates_for_input,
+        candidates_for_input_in_mode_with_context, normalize_completion_text, PromptModus,
+        RightArrowAcceptAction,
     };
 
     fn contains_normalized(values: &[String], expected: &str) -> bool {
@@ -2492,6 +2582,37 @@ mod tests {
     #[test]
     fn autosuggestion_does_not_insert_fuzzy_replacements_that_are_not_suffixes() {
         assert_eq!(autosuggestion_for_input("unv"), None);
+    }
+
+    #[test]
+    fn right_arrow_accepts_plain_inline_hint_as_insert() {
+        let hint = autosuggestion_from_context_candidates("he", PromptModus::Normal, &[], &[])
+            .expect("expected inline hint");
+        assert_eq!(hint.display, "lp ");
+        assert_eq!(
+            hint.accept_action,
+            RightArrowAcceptAction::Insert("lp ".to_string())
+        );
+    }
+
+    #[test]
+    fn right_arrow_accepts_dash_hint_as_direct_replacement() {
+        let hint = autosuggestion_from_context_candidates(
+            "reta -zeilen zeit",
+            PromptModus::Normal,
+            &[],
+            &[],
+        )
+        .expect("expected structural dash hint");
+        assert_eq!(hint.display, " → --zeit=");
+        assert_eq!(
+            hint.accept_action,
+            RightArrowAcceptAction::ReplaceRange {
+                replace_start: "reta -zeilen ".len(),
+                replace_len: "zeit".len(),
+                replacement: "--zeit=".to_string(),
+            }
+        );
     }
 
     #[test]
