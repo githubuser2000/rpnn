@@ -134,6 +134,11 @@ pub extern "C" fn reta_shared_words_json() -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn reta_architecture_snapshot_json() -> *mut c_char {
+    ffi_json_result(|| serde_json::to_string(&crate::shared_architecture().snapshot_ref()))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(
