@@ -281,8 +281,8 @@ fn reta_section_switch_tokens_for_regex() -> &'static [&'static str] {
     RETAPROMPT_RETA_SECTION_SWITCHES
 }
 
-fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
-    let mut inventory = BTreeMap::new();
+fn zeilen_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
+    let mut inventory = IndexMap::new();
 
     // Python regExReplace baut fuer -zeilen zuerst
     // {zeilenPara: {''} for zeilenPara in i18n.haupt2neben['zeilen']}
@@ -318,8 +318,8 @@ fn zeilen_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     inventory
 }
 
-fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
-    let mut inventory = BTreeMap::new();
+fn ausgabe_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
+    let mut inventory = IndexMap::new();
 
     // Python regExReplace gibt nur --art echte Werte aus i18n.ausgabeArt.
     // breite/breiten sind in der Completion numerisch, in der Regex-Expansion
@@ -339,9 +339,9 @@ fn ausgabe_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     inventory
 }
 
-fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
+fn kombination_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
     let words = shared_words();
-    let mut inventory = BTreeMap::new();
+    let mut inventory = IndexMap::new();
     let mut galaxie = Vec::new();
     let mut galaxie_seen = BTreeSet::new();
     for values in words.kombiParaNdataMatrix.values() {
@@ -368,30 +368,60 @@ fn kombination_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> 
     inventory
 }
 
-fn spalten_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
-    let words = shared_words();
-    let mut inventory = BTreeMap::new();
+fn push_unique_exact_string(target: &mut Vec<String>, value: String) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
 
-    for main_group in all_main_alias_groups(words) {
-        let mut parameter_aliases = Vec::new();
-        let mut seen = BTreeSet::new();
-        for parameter_group in parameter_alias_groups_for_main(words, &main_group.canonical) {
-            for alias in parameter_group.aliases {
-                let trimmed = alias.trim();
-                if !trimmed.is_empty() {
-                    push_unique_preserving_normalized(
-                        &mut parameter_aliases,
-                        &mut seen,
-                        trimmed.to_string(),
-                    );
+fn push_unique_exact_str(target: &mut Vec<String>, value: &str) {
+    push_unique_exact_string(target, value.to_string());
+}
+
+fn spalten_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
+    let words = shared_words();
+
+    // Python baut das Inventar fuer `retaPrompt.regExReplace()` nicht direkt
+    // aus `paraNdataMatrix`, sondern aus `retaProgram.dataDict[0]`. Die
+    // Reihenfolge der Spalten-Keys in diesem Dict ist wichtig fuer `*`:
+    // `--Bedeutung=*` beginnt in Python mit den Werten der zuerst gesehenen
+    // Bedeutung-Spalte 107, also `Mechanismen_der_Zuechtung,...`, und nicht
+    // mit der Reihenfolge der spaeteren `paraNdataMatrix`-Eintraege.
+    let mut by_column: IndexMap<i64, Vec<(String, String)>> = IndexMap::new();
+    for entry in &words.paraNdataMatrix {
+        let Some(column_values) = entry.datas.first() else {
+            continue;
+        };
+        let parameter_names = if entry.parameterNames.is_empty() {
+            vec![String::new()]
+        } else {
+            entry.parameterNames.clone()
+        };
+
+        for value in column_values {
+            let PyValue::Int(column_number) = value else {
+                continue;
+            };
+            let pairs = by_column.entry(*column_number).or_default();
+            for main_name in &entry.parameterMainNames {
+                for parameter_name in &parameter_names {
+                    if !pairs
+                        .iter()
+                        .any(|(main, parameter)| main == main_name && parameter == parameter_name)
+                    {
+                        pairs.push((main_name.clone(), parameter_name.clone()));
+                    }
                 }
             }
         }
+    }
 
-        for alias in main_group.aliases {
-            let trimmed = alias.trim();
-            if !trimmed.is_empty() {
-                inventory.insert(trimmed.to_string(), parameter_aliases.clone());
+    let mut inventory: IndexMap<String, Vec<String>> = IndexMap::new();
+    for (_column_number, pairs) in by_column {
+        for (main_name, parameter_name) in pairs {
+            let values = inventory.entry(main_name).or_default();
+            if !parameter_name.is_empty() {
+                push_unique_exact_str(values, &parameter_name);
             }
         }
     }
@@ -399,18 +429,18 @@ fn spalten_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
     inventory
 }
 
-fn reta_section_parameter_inventory_for_regex(section: &str) -> BTreeMap<String, Vec<String>> {
+fn reta_section_parameter_inventory_for_regex(section: &str) -> IndexMap<String, Vec<String>> {
     match section {
         "-zeilen" => zeilen_parameter_inventory_for_regex(),
         "-ausgabe" => ausgabe_parameter_inventory_for_regex(),
         "-kombination" => kombination_parameter_inventory_for_regex(),
         "-spalten" => spalten_parameter_inventory_for_regex(),
-        _ => BTreeMap::new(),
+        _ => IndexMap::new(),
     }
 }
 
-fn reta_global_parameter_inventory_for_regex() -> BTreeMap<String, Vec<String>> {
-    let mut inventory = BTreeMap::new();
+fn reta_global_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
+    let mut inventory = IndexMap::new();
     for section in reta_section_switch_tokens_for_regex() {
         for (parameter, values) in reta_section_parameter_inventory_for_regex(section) {
             inventory.entry(parameter).or_insert(values);
@@ -1117,7 +1147,6 @@ fn collapse_python_style_equals_tokens(tokens: &[String]) -> Vec<String> {
 
 fn expand_rhs_regex_pieces(pieces: &[&str], allowed_values: &[String]) -> Vec<String> {
     let mut out = Vec::new();
-    let mut seen = BTreeSet::new();
 
     for piece in pieces {
         let trimmed = piece.trim();
@@ -1129,11 +1158,11 @@ fn expand_rhs_regex_pieces(pieces: &[&str], allowed_values: &[String]) -> Vec<St
                 if special_fragment_matches_candidate(value, &matcher)
                     || special_fragment_matches_candidate(&format!("={value}"), &matcher)
                 {
-                    push_unique_preserving_normalized(&mut out, &mut seen, value.clone());
+                    push_unique_exact_str(&mut out, value);
                 }
             }
         } else {
-            push_unique_preserving_normalized(&mut out, &mut seen, trimmed.to_string());
+            push_unique_exact_str(&mut out, trimmed);
         }
     }
 
@@ -1151,15 +1180,21 @@ fn expand_reta_equals_regex_like_token(
 
     let left_core = left.trim().strip_prefix("--").unwrap_or(left.trim());
     let inventory = reta_section_parameter_inventory_for_regex(section);
+    let left_matcher = if left_core.trim().is_empty() {
+        None
+    } else {
+        parse_special_fragment_matcher(left_core)
+    };
+    let left_selects_by_pattern = left_core.trim().is_empty() || left_matcher.is_some();
 
     let parameter_names = if left_core.trim().is_empty() {
         inventory.keys().cloned().collect::<Vec<_>>()
-    } else if let Some(matcher) = parse_special_fragment_matcher(left_core) {
+    } else if let Some(matcher) = &left_matcher {
         inventory
             .keys()
             .filter(|parameter| {
-                special_fragment_matches_candidate(parameter, &matcher)
-                    || special_fragment_matches_candidate(&format!("--{parameter}"), &matcher)
+                special_fragment_matches_candidate(parameter, matcher)
+                    || special_fragment_matches_candidate(&format!("--{parameter}"), matcher)
             })
             .cloned()
             .collect::<Vec<_>>()
@@ -1185,26 +1220,74 @@ fn expand_reta_equals_regex_like_token(
     });
 
     let mut out = Vec::new();
-    let mut seen = BTreeSet::new();
     for parameter in parameter_names {
         let allowed_values = inventory.get(&parameter).cloned().unwrap_or_default();
-        let values = expand_rhs_regex_pieces(&right_pieces, &allowed_values);
+        let values = if rhs_contains_regex_or_glob {
+            expand_rhs_regex_pieces(&right_pieces, &allowed_values)
+        } else if left_selects_by_pattern {
+            let mut filtered = Vec::new();
+            for piece in &right_pieces {
+                let trimmed = piece.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if allowed_values.iter().any(|value| value == trimmed)
+                    || (allowed_values.is_empty() && all_selected_parameters_are_value_less)
+                {
+                    push_unique_exact_str(&mut filtered, trimmed);
+                }
+            }
+            filtered
+        } else {
+            let mut direct = Vec::new();
+            for piece in &right_pieces {
+                let trimmed = piece.trim();
+                if !trimmed.is_empty() {
+                    push_unique_exact_str(&mut direct, trimmed);
+                }
+            }
+            direct
+        };
+
         if values.is_empty() {
             if allowed_values.is_empty()
                 && (!rhs_contains_regex_or_glob || all_selected_parameters_are_value_less)
             {
-                push_unique_preserving_normalized(&mut out, &mut seen, format!("--{parameter}"));
+                push_unique_exact_string(&mut out, format!("--{parameter}"));
             }
             continue;
         }
-        push_unique_preserving_normalized(
-            &mut out,
-            &mut seen,
-            format!("--{parameter}={}", values.join(",")),
-        );
+        push_unique_exact_string(&mut out, format!("--{parameter}={}", values.join(",")));
     }
 
     out
+}
+
+fn should_insert_default_zeilen_for_reta_spalten_rhs_star(
+    left: &str,
+    right: &str,
+    current_section: Option<&str>,
+) -> bool {
+    if current_section != Some("-spalten") {
+        return false;
+    }
+    if !right.split(',').any(|piece| piece.trim() == "*") {
+        return false;
+    }
+    let left_core = left.trim().strip_prefix("--").unwrap_or(left.trim());
+    !left_core.trim().is_empty() && parse_special_fragment_matcher(left_core).is_none()
+}
+
+fn ensure_default_zeilen_before_spalten(tokens: &mut Vec<String>) {
+    if tokens.first().map(String::as_str) != Some("reta") {
+        return;
+    }
+    if tokens.iter().any(|token| token == "-zeilen") {
+        return;
+    }
+    if let Some(spalten_index) = tokens.iter().position(|token| token == "-spalten") {
+        tokens.insert(spalten_index, "-zeilen".to_string());
+    }
 }
 
 pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
@@ -1219,6 +1302,7 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
     let mut current_section: Option<&str> = None;
     let mut out = Vec::new();
     let mut changed = false;
+    let mut insert_default_zeilen_for_rhs_star = false;
 
     for token in tokens {
         if token == "reta" {
@@ -1233,6 +1317,12 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
 
         let expanded = if let Some((left, right)) = token.split_once('=') {
             if input_is_reta || left.starts_with("--") {
+                insert_default_zeilen_for_rhs_star |= input_is_reta
+                    && should_insert_default_zeilen_for_reta_spalten_rhs_star(
+                        left,
+                        right,
+                        current_section,
+                    );
                 expand_reta_equals_regex_like_token(left, right, current_section)
             } else {
                 Vec::new()
@@ -1255,11 +1345,15 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
         }
     }
 
-    if changed {
+    let mut result = if changed {
         collapse_python_style_equals_tokens(&out)
     } else {
         out
+    };
+    if insert_default_zeilen_for_rhs_star {
+        ensure_default_zeilen_before_spalten(&mut result);
     }
+    result
 }
 
 /// Python `retaPrompt.lastRetaHauptPara`: return the last main `reta`
