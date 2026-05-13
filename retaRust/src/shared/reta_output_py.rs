@@ -437,9 +437,36 @@ impl Program {
         spalte_for_metadata: Option<i64>,
         html_col_idx: usize,
         content: Option<&str>,
-        row_number: Option<i64>,
+        _row_number: Option<i64>,
         is_header: bool,
     ) -> String {
+        let mut attrs = String::new();
+
+        // Critical size guard: the normal CLI HTML output must not attach
+        // header/column metadata to body cells.  Some data rows can fail
+        // row-number parsing and therefore have `row_number == None`; that
+        // must still never make them header cells.  Only the explicit
+        // `is_header` flag may enable the large `p1_... p2_... p4_...`
+        // header class string.
+        if !is_header {
+            if html_col_idx == 0 || html_col_idx == 1 {
+                if Self::html_cell_content_is_even_exact_py(content) {
+                    attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
+                } else if html_col_idx == 0 {
+                    attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
+                }
+            } else if let Some(spalte_for_metadata) = spalte_for_metadata {
+                if self
+                    .html_python_cell_parts_exact_py(spalte_for_metadata)
+                    .map(|(_, _, has_symbole)| has_symbole)
+                    .unwrap_or(false)
+                {
+                    attrs.push_str(Self::html_symbol_attrs_exact_py());
+                }
+            }
+            return attrs;
+        }
+
         let Some(spalte_for_metadata) = spalte_for_metadata else {
             return String::new();
         };
@@ -447,25 +474,20 @@ impl Program {
         let Some((p1_part, p2_part, has_symbole)) =
             self.html_python_cell_parts_exact_py(spalte_for_metadata)
         else {
-            return if is_header {
-                Self::html_exact_header_attrs_py(&Words::new(), Some(html_col_idx as u32), html_col_idx)
-            } else {
-                String::new()
-            };
+            return Self::html_exact_header_attrs_py(
+                &Words::new(),
+                Some(html_col_idx as u32),
+                html_col_idx,
+            );
         };
 
-        let mut attrs = String::new();
-        let zeile_value = if is_header { 0 } else { row_number.unwrap_or(0) };
-        if zeile_value == 0 {
-            attrs.push_str(&format!(
-                r#" class="z_{} r_{} p1_{}, p2_{} p4_{}""#,
-                zeile_value,
-                html_col_idx,
-                Self::html_escape_attr_value_py(&p1_part),
-                Self::html_escape_attr_value_py(&p2_part),
-                Self::html_escape_attr_value_py(&self.html_p4_values_exact_py(spalte_for_metadata))
-            ));
-        }
+        attrs.push_str(&format!(
+            r#" class="z_0 r_{} p1_{}, p2_{} p4_{}""#,
+            html_col_idx,
+            Self::html_escape_attr_value_py(&p1_part),
+            Self::html_escape_attr_value_py(&p2_part),
+            Self::html_escape_attr_value_py(&self.html_p4_values_exact_py(spalte_for_metadata))
+        ));
 
         if html_col_idx == 0 || html_col_idx == 1 {
             if Self::html_cell_content_is_even_exact_py(content) {
@@ -2583,7 +2605,7 @@ impl Program {
                         if this.should_skip_structured_row_py(row, row_number) {
                             return None;
                         }
-                        let is_header = row_number.is_none();
+                        let is_header = row_idx == 0 && row_number.is_none();
                         let mut cells: Vec<String> = vec![];
                         if this.nummeriere {
                             let prefix_raw = this.row_prefix_text_py(row_number, is_header);
@@ -3002,6 +3024,10 @@ mod tests {
 
         let body_attrs = program.html_python_cell_attrs_exact_py(Some(0), 2, None, Some(1), false);
         assert_eq!(body_attrs, "");
+
+        let body_attrs_without_parseable_row_number =
+            program.html_python_cell_attrs_exact_py(Some(0), 2, None, None, false);
+        assert_eq!(body_attrs_without_parseable_row_number, "");
     }
 
     #[test]
