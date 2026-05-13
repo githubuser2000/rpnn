@@ -7428,7 +7428,7 @@ impl I18nSubset {
             parameterMainNames: vec!["['kontinuum']".to_string()],
             parameterNames: vec!["M".to_string(), "m".to_string(), "Dreizehn".to_string()],
             datas: vec![
-                vec![PyAtom::Int(493)],
+                vec![PyAtom::Int(493), PyAtom::Int(744)],
                 vec![],
                 vec![],
                 vec![],
@@ -11656,7 +11656,7 @@ pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
     (
         ParametersMain.kontinuum,
         ("M", "m", _("Dreizehn"),),
-        {493},
+        {493, 744},
     ),
     (
         ParametersMain.kontinuum,

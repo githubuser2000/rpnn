@@ -1,0 +1,6 @@
+#!/bin/sh
+cd ~/myRepos/reta
+libs/changeVersion.sh
+git add -A
+git commit -m "${1}"
+cd -

@@ -1,0 +1,52 @@
+{
+  "category": "ExecutionNetworkCategory",
+  "channel_category": "ChannelCategory",
+  "channels": [
+    "HalfDuplexChannel",
+    "FullDuplexChannel"
+  ],
+  "class": "ExecutionNetworkBundle",
+  "config": {
+    "bounded_queue_size": null,
+    "class": "ExecutionNetworkConfig",
+    "max_workers": 56,
+    "preserve_input_order": true,
+    "queue_discipline": "fifo",
+    "resolved_available_workers": 56,
+    "start_method": null,
+    "use_processes": false
+  },
+  "morphisms": [
+    "enqueue_task",
+    "dequeue_task",
+    "dispatch_task",
+    "collect_result",
+    "deterministic_reduce",
+    "acquire_resource",
+    "release_resource",
+    "send_message",
+    "receive_message"
+  ],
+  "processor_cores": 56,
+  "queues": [
+    "FifoTaskQueue",
+    "LifoTaskStack",
+    "PriorityTaskQueue"
+  ],
+  "scheduler_category": "SchedulerCategory",
+  "semaphores": {
+    "cpu": {
+      "class": "ResourceSemaphore",
+      "value": 56
+    },
+    "file_io": {
+      "class": "ResourceSemaphore",
+      "value": 4
+    },
+    "output": {
+      "class": "ResourceSemaphore",
+      "value": 1
+    }
+  },
+  "universal_property": "parallel_chunks_glue_deterministically_to_serial_result"
+}

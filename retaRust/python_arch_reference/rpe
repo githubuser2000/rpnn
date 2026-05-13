@@ -1,0 +1,17 @@
+#!/usr/bin/env pypy3
+# -*- coding: utf-8 -*-
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "libs"))
+toAdd = sys.argv[1:]
+if sys.argv[1:2] != ["reta"]:
+    flag = True
+else:
+    flag = False
+sys.argv = [sys.argv[0]]+["-vi","-e","-befehl"]
+if flag:
+    sys.argv += ["-ausgabe","--art=emacs", "--keineueberschriften"]+toAdd + ["e"]
+else:
+    sys.argv += toAdd + ["-ausgabe","--art=emacs", "--keineueberschriften"]
+import retaPrompt
+retaPrompt.start()

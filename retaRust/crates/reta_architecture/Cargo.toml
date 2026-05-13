@@ -1,0 +1,13 @@
+[package]
+name = "reta_architecture"
+version = "0.6.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "reta_architecture"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

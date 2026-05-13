@@ -1,0 +1,2466 @@
+.docname {Reta Netzwerke und Datenbankarchitektur}
+.doclang {de}
+.doctype {docs}
+
+.tableofcontents
+
+# Netzwerke, Queues, Datenströme, Duplex-Kanäle, Semaphoren und Datenbank im architekturveränderten `reta`
+
+Ich lese `Fifi` als **FIFO**.
+
+Der neue Stand ist im Kern so:
+
+```text
+Mathematische Kernarchitektur:
+Topologien, Morphismen, universelle Eigenschaften,
+Prägarben, Garben, Kategorien, Funktoren, natürliche Transformationen
+
+bleibt rein.
+
+Darüber neu:
+Execution-/Netzwerkmechanik
+Persistenz-/Datenbankmechanik
+Audit-/Cache-/Prozess-Batch-Schicht
+```
+
+Das Entscheidende: **Es wurde durch diese Netzwerk- und Datenbankschicht nichts aus den mathematischen Kernschichten entfernt.**  
+Die alten Topologien, Morphismen, Prägarben, Garben, Kategorien, Funktoren und natürlichen Transformationen bleiben erhalten. Es kamen neue Kategorien, Funktoren und natürliche Transformationen hinzu.
+
+Der aktuelle Stand ist:
+
+```text
+26 Kategorien
+77 Funktoren
+42 natürliche Transformationen
+```
+
+Vorher, vor Netzwerk/Persistenz und dritter Prozessrunde, war der Kernstand:
+
+```text
+22 Kategorien
+62 Funktoren
+29 natürliche Transformationen
+```
+
+Also:
+
+```text
++ 4 Kategorien
++ 15 Funktoren
++ 13 natürliche Transformationen
+```
+
+---
+
+# 1. Welche Netzwerke sind dazugekommen?
+
+Es ist **kein TCP/IP-Netzwerk** und kein externer Server dazugekommen.  
+Es ist ein **internes Ausführungsnetzwerk** für Tasks, Queues, Prozessausführung, Kanäle, Resultate und deterministisches Gluing.
+
+Die neue Datei ist:
+
+```text
+reta_architecture/execution_network.py
+```
+
+Darin liegt die neue Runtime-Kapsel:
+
+```text
+ExecutionNetworkCategory
+SchedulerCategory
+ChannelCategory
+```
+
+---
+
+# 2. Was ist im Execution-Netzwerk drin?
+
+## 2.1 `ExecutionTask`
+
+Ein Task ist eine lokale ausführbare Arbeitseinheit.
+
+```text
+ExecutionTask
+```
+
+enthält:
+
+```text
+index
+payload
+operation
+priority
+callable_path
+metadata
+```
+
+Bedeutung:
+
+```text
+Ein Morphismus oder eine reine Teilberechnung wird als ausführbarer Task verpackt.
+```
+
+Beispiel:
+
+```text
+Chunk 17 einer Zeilenfilterung
+Chunk 3 einer Primfaktorberechnung
+Chunk 8 einer CSV-Dekodierung
+Chunk 4 einer Spaltenprojektion
+```
+
+Wichtig ist `index`. Dadurch können Ergebnisse nach paralleler Ausführung wieder in Originalreihenfolge geklebt werden.
+
+---
+
+## 2.2 `ExecutionResult`
+
+Ein Ergebnis eines Tasks.
+
+```text
+ExecutionResult
+```
+
+enthält:
+
+```text
+task_index
+value
+operation
+metadata
+```
+
+Bedeutung:
+
+```text
+Worker-Prozess hat lokalen Task gerechnet.
+Ergebnis wird noch nicht global als Wahrheit genommen.
+```
+
+Erst danach kommt:
+
+```text
+deterministic_reduce
+```
+
+---
+
+## 2.3 `ExecutionRunResult`
+
+Das ist der komplette Ausführungslauf.
+
+```text
+ExecutionRunResult
+```
+
+enthält:
+
+```text
+values
+results
+config
+workers
+task_count
+queue_discipline
+mode
+```
+
+Die wichtigste Eigenschaft darin ist:
+
+```text
+parallel_or_serial_task_cover_glues_to_the_same_ordered_result
+```
+
+Also:
+
+```text
+seriell gerechnet
+=
+prozessparallel gerechnet + deterministisch reduziert
+```
+
+---
+
+# 3. Welche Queues, FIFO/LIFO/Stack/Priority sind dazugekommen?
+
+In `execution_network.py` gibt es jetzt drei Scheduler-Formen.
+
+---
+
+## 3.1 FIFO Queue
+
+```python
+FifoTaskQueue
+```
+
+Operationen:
+
+```text
+push
+pop
+```
+
+Verhalten:
+
+```text
+first in, first out
+```
+
+Das ist die Standarddisziplin.
+
+Sinnvoll für:
+
+```text
+Tabellenchunks
+Zeilenchunks
+CSV-Zeilen
+Spaltenprojektionen
+Breitenberechnung
+Arithmetik-Batches
+```
+
+Beispiel:
+
+```text
+Task 0 rein
+Task 1 rein
+Task 2 rein
+
+raus:
+Task 0
+Task 1
+Task 2
+```
+
+Das ist die sicherste Standardform, weil sie fair und leicht nachvollziehbar ist.
+
+---
+
+## 3.2 LIFO Stack
+
+```python
+LifoTaskStack
+```
+
+Operationen:
+
+```text
+push
+pop
+```
+
+Verhalten:
+
+```text
+last in, first out
+```
+
+Sinnvoll für:
+
+```text
+Stack-artige Verarbeitung
+Tiefensuche
+Nested Completion
+rekursive Abhängigkeitsauflösung
+Trace-Navigation
+```
+
+Beispiel:
+
+```text
+Task 0 rein
+Task 1 rein
+Task 2 rein
+
+raus:
+Task 2
+Task 1
+Task 0
+```
+
+Wichtig: LIFO ist vorhanden, aber nicht automatisch überall verwendet. Für Tabellenchunks bleibt FIFO normalerweise besser.
+
+---
+
+## 3.3 Priority Queue
+
+```python
+PriorityTaskQueue
+```
+
+Operationen:
+
+```text
+push
+pop
+```
+
+Verhalten:
+
+```text
+niedrigere priority zuerst,
+bei gleicher priority nach index
+```
+
+Sinnvoll für:
+
+```text
+Prompt-Aufgaben vor Batch-Aufgaben
+kleine schnelle Jobs vor langen Jobs
+Validierungsjobs mit hoher Priorität
+sichtbare Ausgabe vor Audit-Nachbereitung
+```
+
+Beispiel:
+
+```text
+priority 0: Prompt-Antwort
+priority 1: sichtbare Tabelle
+priority 2: Audit
+priority 3: Cache-Nachbereitung
+```
+
+Diese Queue ist jetzt als Architekturmechanik vorhanden, aber die konkrete Runtime nutzt aktuell vor allem FIFO für Prozesschunks.
+
+---
+
+# 4. Welche Datenströme sind dazugekommen?
+
+Es gibt jetzt mehrere interne Datenströme.
+
+## 4.1 Task-Strom
+
+```text
+ExecutionTask
+        ↓
+ExecutionQueue / FifoTaskQueue / LifoTaskStack / PriorityTaskQueue
+        ↓
+dispatch_task
+        ↓
+ExecutionResult
+```
+
+Dieser Strom beschreibt:
+
+```text
+lokale Arbeitseinheiten werden geordnet,
+ausgeführt,
+als Ergebnisse gesammelt.
+```
+
+---
+
+## 4.2 Resultat-Strom
+
+```text
+ExecutionResult
+        ↓
+deterministic_reduce
+        ↓
+OrderedResultSection
+```
+
+Das ist der wichtigste Strom.
+
+Er verhindert, dass parallele Prozessfertigstellung die Ausgabe-Reihenfolge verändert.
+
+Also nicht:
+
+```text
+wer zuerst fertig ist, kommt zuerst in die Tabelle
+```
+
+sondern:
+
+```text
+nach task_index / Originalindex sortieren
+dann kleben
+```
+
+---
+
+## 4.3 Prozess-Chunk-Strom
+
+In:
+
+```text
+reta_architecture/parallel_execution.py
+```
+
+werden Chunks erzeugt:
+
+```text
+Daten
+        ↓
+_chunks(...)
+        ↓
+ExecutionTask pro Chunk
+        ↓
+Prozesspool
+        ↓
+ExecutionResult
+        ↓
+deterministische Reduktion
+```
+
+Der zentrale interne Helfer ist:
+
+```python
+_pool_map_ordered(...)
+```
+
+Der nutzt jetzt, wenn möglich:
+
+```text
+ExecutionNetworkConfig
+ExecutionTask
+execute_tasks_deterministically
+```
+
+Also:
+
+```text
+parallel_execution.py benutzt execution_network.py
+```
+
+---
+
+## 4.4 Persistenz-Batch-Strom
+
+In:
+
+```text
+reta_architecture/persistence.py
+```
+
+gibt es Batch-Vorbereitung:
+
+```text
+viele Sektionen / Snapshots / Cache-Werte
+        ↓
+prozessparallel JSON + SHA-256 Digest vorbereiten
+        ↓
+seriell in SQLite schreiben
+```
+
+Wichtig:
+
+```text
+Die Vorbereitung kann parallel sein.
+Die SQLite-Schreiboperation bleibt seriell.
+```
+
+Das ist richtig, weil parallele DB-Schreibzugriffe sonst leicht Locking-Probleme erzeugen.
+
+---
+
+## 4.5 Audit-Strom
+
+```text
+ExecutionRunResult / Validation / Cache / Persistence
+        ↓
+record_audit_event
+        ↓
+audit_events
+```
+
+Das ist der Nachweisstrom:
+
+```text
+Was wurde ausgeführt?
+Was wurde validiert?
+Was wurde persistiert?
+Was wurde gecached?
+```
+
+---
+
+# 5. Welche Bidirektionalitäten / Half-Duplex / Full-Duplex sind dazugekommen?
+
+In:
+
+```text
+reta_architecture/execution_network.py
+```
+
+gibt es zwei Kanaltypen.
+
+---
+
+## 5.1 `HalfDuplexChannel`
+
+```python
+HalfDuplexChannel
+```
+
+Interne Queues:
+
+```text
+requests
+responses
+```
+
+Operationen:
+
+```text
+send_request
+receive_request
+send_response
+receive_response
+```
+
+Bedeutung:
+
+```text
+Request/Response-Kommunikation.
+Eine Richtung ist logisch aktiv, dann die andere.
+```
+
+Typisches Muster:
+
+```text
+Main -> Worker: berechne Chunk 12
+Worker -> Main: Ergebnis Chunk 12
+```
+
+Das passt zu:
+
+```text
+klassischer Prozessarbeit
+einfachen Worker-Aufträgen
+CLI-Kommandos
+```
+
+---
+
+## 5.2 `FullDuplexChannel`
+
+```python
+FullDuplexChannel
+```
+
+Interne Queues:
+
+```text
+a_to_b
+b_to_a
+```
+
+Operationen:
+
+```text
+send_a_to_b
+receive_a_to_b
+send_b_to_a
+receive_b_to_a
+```
+
+Bedeutung:
+
+```text
+zwei unabhängige Richtungen gleichzeitig
+```
+
+Gedacht für:
+
+```text
+Supervisor <-> Worker
+retaPrompt <-> laufender Job
+Progress-Meldungen
+Cancel/Abort-Signale
+interaktive Steuerung
+```
+
+Beispiel:
+
+```text
+Prompt -> Worker: starte Tabellenlauf
+Worker -> Prompt: Fortschritt 30 %
+Prompt -> Worker: abbrechen
+Worker -> Prompt: abgebrochen
+```
+
+Aktuell sind diese Kanäle als Architekturmechanik vorhanden. Sie sind noch keine externe Socket-Kommunikation.
+
+---
+
+# 6. Welche Semaphoren sind dazugekommen?
+
+Es gibt:
+
+```python
+ResourceSemaphore
+```
+
+und im Bundle:
+
+```text
+cpu_semaphore
+file_io_semaphore
+output_semaphore
+```
+
+Konkret in:
+
+```python
+ExecutionNetworkBundle
+```
+
+---
+
+## 6.1 CPU-Semaphor
+
+```text
+cpu_semaphore = ResourceSemaphore(config.max_workers)
+```
+
+Sinn:
+
+```text
+CPU-Arbeit auf konfigurierte Workerzahl begrenzen.
+```
+
+---
+
+## 6.2 File-IO-Semaphor
+
+```text
+file_io_semaphore = ResourceSemaphore(max(1, min(4, config.max_workers)))
+```
+
+Sinn:
+
+```text
+Dateizugriffe nicht unbegrenzt parallelisieren.
+```
+
+Gerade bei Manifest-Hashing oder CSV-Zugriffen kann zu viel paralleles IO langsamer werden.
+
+---
+
+## 6.3 Output-Semaphor
+
+```text
+output_semaphore = ResourceSemaphore(1)
+```
+
+Sinn:
+
+```text
+sichtbare Ausgabe nicht vermischen.
+```
+
+Also:
+
+```text
+nur ein Ausgabepfad gleichzeitig
+```
+
+---
+
+## Ehrlicher technischer Hinweis zu den Semaphoren
+
+`ResourceSemaphore` verwendet aktuell intern:
+
+```python
+threading.BoundedSemaphore
+```
+
+Das ist ein lokaler In-Process-Semaphor, kein echter geteilter `multiprocessing.Semaphore` zwischen mehreren Prozessen.
+
+Die tatsächliche Prozessanzahl wird durch:
+
+```text
+multiprocessing.Pool(processes=workers)
+```
+
+begrenzt.
+
+Das heißt:
+
+```text
+Prozessparallelisierung: ja
+gemeinsam zwischen Prozessen geteilter Semaphor: nein, aktuell nicht
+```
+
+Für echte prozessübergreifende Semaphoren müsste man später gezielt auf:
+
+```python
+multiprocessing.BoundedSemaphore
+```
+
+oder Manager-/Shared-State-Mechanik gehen. Aktuell ist das nicht nötig, weil SQLite-Writes seriell bleiben und Prozesspools ohnehin begrenzt sind.
+
+---
+
+# 7. Welche Datenbank ist dazugekommen?
+
+Es ist eine SQLite-Persistenzschicht dazugekommen.
+
+Datei:
+
+```text
+reta_architecture/persistence.py
+```
+
+Kategorie:
+
+```text
+PersistenceCategory
+```
+
+Standardmäßig:
+
+```text
+:memory:
+```
+
+Also keine Datei, sondern Speicher-Datenbank.
+
+Für echte Datei-Persistenz:
+
+```bash
+RETA_PERSISTENCE_DB=/pfad/reta_audit.sqlite
+```
+
+oder:
+
+```bash
+RETA_AUDIT_DB=/pfad/reta_audit.sqlite
+```
+
+Programmgesteuert:
+
+```python
+bootstrap_persistence(db_path="reta_audit.sqlite")
+```
+
+---
+
+# 8. Was ist in der Datenbank drin?
+
+Die Datenbank hat sechs Tabellen.
+
+---
+
+## 8.1 `open_contexts`
+
+Schema:
+
+```text
+context_hash TEXT PRIMARY KEY
+context_json TEXT NOT NULL
+created_at REAL NOT NULL
+```
+
+Speichert:
+
+```text
+offene Kontexte
+Kontext-Snapshots
+Kontext-Hashes
+```
+
+Beispielinhalt:
+
+```json
+{
+  "language": "de",
+  "main_parameters": ["Religionen"],
+  "scopes": ["spalten"]
+}
+```
+
+Bedeutung:
+
+```text
+Das ist die Persistenzform eines offenen Kontextes.
+```
+
+Wichtig: Die Datenbank definiert die Topologie nicht. Sie speichert nur konkrete Kontextinstanzen.
+
+---
+
+## 8.2 `local_sections`
+
+Schema:
+
+```text
+section_hash TEXT PRIMARY KEY
+kind TEXT NOT NULL
+name TEXT NOT NULL
+context_hash TEXT
+payload_json TEXT NOT NULL
+created_at REAL NOT NULL
+```
+
+Index:
+
+```text
+idx_local_sections_kind_name(kind, name)
+```
+
+Speichert:
+
+```text
+lokale Prägarben-Sektionen
+CSV-Sektionen
+Prompt-Sektionen
+i18n-Sektionen
+lokale Rohdaten
+```
+
+Beispiele:
+
+```text
+kind = "csv"
+name = "en-religion.csv"
+
+kind = "prompt"
+name = "current-command"
+
+kind = "row_range"
+name = "primzahlen"
+```
+
+Payload liegt als JSON.
+
+---
+
+## 8.3 `sheaf_snapshots`
+
+Schema:
+
+```text
+snapshot_hash TEXT PRIMARY KEY
+sheaf_name TEXT NOT NULL
+context_hash TEXT
+payload_json TEXT NOT NULL
+created_at REAL NOT NULL
+```
+
+Index:
+
+```text
+idx_sheaf_snapshots_name(sheaf_name)
+```
+
+Speichert:
+
+```text
+Garben-Snapshots
+ParameterSemanticsSheaf-Snapshots
+GeneratedColumnsSheaf-Snapshots
+TableOutputSheaf-Snapshots
+HtmlReferenceSheaf-Snapshots
+```
+
+Beispiele:
+
+```text
+sheaf_name = "ParameterSemanticsSheaf"
+sheaf_name = "GeneratedColumnsSheaf"
+sheaf_name = "TableOutputSheaf"
+```
+
+Wichtig: Das ist ein Snapshot. Die Garbe selbst bleibt im Code und in der Architektur definiert.
+
+---
+
+## 8.4 `execution_runs`
+
+Schema:
+
+```text
+run_hash TEXT PRIMARY KEY
+operation TEXT NOT NULL
+context_hash TEXT
+task_count INTEGER NOT NULL
+payload_json TEXT NOT NULL
+created_at REAL NOT NULL
+```
+
+Index:
+
+```text
+idx_execution_runs_operation(operation)
+```
+
+Speichert:
+
+```text
+Ausführungsläufe
+prozessparallele Runs
+Task-Anzahl
+Operation
+Resultat-/Run-Payload
+```
+
+Beispiele:
+
+```text
+operation = "prepare_rows"
+operation = "filter_numbers:prime_multiples"
+operation = "factor_pairs"
+operation = "normalize_column_buckets"
+```
+
+Das ist wichtig für Audit:
+
+```text
+Welche Operation wurde mit wie vielen Tasks ausgeführt?
+```
+
+---
+
+## 8.5 `audit_events`
+
+Schema:
+
+```text
+event_id INTEGER PRIMARY KEY AUTOINCREMENT
+event_type TEXT NOT NULL
+subject TEXT NOT NULL
+payload_hash TEXT NOT NULL
+payload_json TEXT NOT NULL
+created_at REAL NOT NULL
+```
+
+Index:
+
+```text
+idx_audit_events_type_subject(event_type, subject)
+```
+
+Speichert:
+
+```text
+Audit-Ereignisse
+Validierungsereignisse
+Persistenzereignisse
+Prozesslauf-Ereignisse
+Cache-Ereignisse
+```
+
+Beispiele:
+
+```text
+event_type = "validation"
+subject = "architecture"
+
+event_type = "execution"
+subject = "row_filter"
+
+event_type = "cache"
+subject = "table_generation"
+```
+
+---
+
+## 8.6 `cache_entries`
+
+Schema:
+
+```text
+cache_key TEXT PRIMARY KEY
+value_hash TEXT NOT NULL
+value_json TEXT NOT NULL
+valid INTEGER NOT NULL DEFAULT 1
+created_at REAL NOT NULL
+updated_at REAL NOT NULL
+```
+
+Speichert:
+
+```text
+Cache-Einträge
+materialisierte Ergebnisse
+JSON-Werte
+Gültigkeitsflag
+Prüfsumme
+```
+
+Operationen:
+
+```text
+cache_put
+cache_get
+cache_put_many
+invalidate_cache
+```
+
+Die wichtigste Regel:
+
+```text
+Ein Cache-Hit darf nur verwendet werden,
+wenn Kontext- und Payload-Hashes passen.
+```
+
+---
+
+# 9. Welche Batch-Datenbankfunktionen kamen dazu?
+
+Neben Einzeloperationen gibt es jetzt Batch-Funktionen:
+
+```text
+persist_sections_batch
+persist_sheaf_snapshots_batch
+cache_put_many
+```
+
+Diese machen:
+
+```text
+JSON/Digest-Vorbereitung prozessparallel
+SQLite-Schreiben seriell
+```
+
+Das ist der richtige Schnitt.
+
+Nicht parallelisiert wird:
+
+```text
+gleichzeitiges Schreiben vieler Prozesse in SQLite
+```
+
+Parallelisiert wird:
+
+```text
+SHA-256 berechnen
+JSON vorbereiten
+Payloads serialisieren
+```
+
+---
+
+# 10. Welche Prozessparallelisierung ist jetzt zusätzlich dazugekommen?
+
+In:
+
+```text
+reta_architecture/parallel_execution.py
+```
+
+gibt es jetzt deutlich mehr Prozesshelfer.
+
+Bereits vorhandene und jetzt weiter integrierte Prozesspfade:
+
+```text
+prepare_rows_in_processes
+decode_religion_rows_in_processes
+decode_kombi_rows_in_processes
+select_columns_in_processes
+max_cell_text_len_in_processes
+prepare_kombi_join_tables_in_processes
+```
+
+Dritte Runde zusätzlich:
+
+```text
+moon_numbers_in_processes
+prime_factors_in_processes
+filter_numbers_in_processes
+factor_pairs_in_processes
+normalize_column_buckets_in_processes
+```
+
+Zusätzlich in anderen Modulen:
+
+```text
+RepoManifest.from_tree parallelisiert Datei-/Manifest-Einträge
+persist_sections_batch
+persist_sheaf_snapshots_batch
+cache_put_many
+```
+
+---
+
+# 11. Welche konkreten Daten werden jetzt prozessparallel bearbeitet?
+
+## 11.1 Religion-CSV-Zellendekodierung
+
+```text
+decode_religion_rows_in_processes
+```
+
+Datenstrom:
+
+```text
+Religion-CSV-Zeilen
+        ↓
+Chunks
+        ↓
+HTML/BBCode/Text-Dekodierung
+        ↓
+Originalreihenfolge
+```
+
+---
+
+## 11.2 Kombi-CSV-Zellenvorbereitung
+
+```text
+decode_kombi_rows_in_processes
+```
+
+Datenstrom:
+
+```text
+Kombi-CSV-Zeilen
+        ↓
+Chunks
+        ↓
+Kombi-Zahlen parsen
+        ↓
+Zellen dekorieren
+        ↓
+Originalreihenfolge
+```
+
+---
+
+## 11.3 Spaltenprojektion
+
+```text
+select_columns_in_processes
+```
+
+Datenstrom:
+
+```text
+Tabelle
+        ↓
+Chunks nach Zeilen
+        ↓
+nur gewünschte Spalten auswählen
+        ↓
+Tabelle in Originalreihenfolge
+```
+
+---
+
+## 11.4 Zellbreiten-Scan
+
+```text
+max_cell_text_len_in_processes
+```
+
+Datenstrom:
+
+```text
+Tabelle
+        ↓
+Chunks
+        ↓
+lokale Maximalbreiten
+        ↓
+globale Maximalbreiten
+```
+
+---
+
+## 11.5 Kombi-Join-Teiltabellen
+
+```text
+prepare_kombi_join_tables_in_processes
+```
+
+Datenstrom:
+
+```text
+Kombi-Zeilenauswahl
+        ↓
+Chunks
+        ↓
+Teiltabellen auswählen
+        ↓
+geordnetes Join-Ergebnis
+```
+
+---
+
+## 11.6 Moon-Zahlen
+
+```text
+moon_numbers_in_processes
+```
+
+Datenstrom:
+
+```text
+Zahlen
+        ↓
+Chunks
+        ↓
+moonNumber(number)
+        ↓
+geordnete Paare (number, moon_type)
+        ↓
+serielle Zustandsaktualisierung
+```
+
+Wichtig: Die mutable Zählung bleibt seriell. Nur der teure Test pro Zahl läuft parallel.
+
+---
+
+## 11.7 Primfaktoren
+
+```text
+prime_factors_in_processes
+```
+
+Datenstrom:
+
+```text
+Zahlen
+        ↓
+Chunks
+        ↓
+primFak(number)
+        ↓
+geordnete Paare (number, prime_factors)
+```
+
+---
+
+## 11.8 Zahlenfilter
+
+```text
+filter_numbers_in_processes
+```
+
+Modi:
+
+```text
+sonne_mit_mondanteil
+prime_multiples
+ordinary_multiples
+modulo
+moon
+```
+
+Datenstrom:
+
+```text
+Zahlenmenge
+        ↓
+Chunks
+        ↓
+lokale Filtermenge
+        ↓
+Vereinigung der Mengen
+```
+
+---
+
+## 11.9 Faktorpaare
+
+```text
+factor_pairs_in_processes
+```
+
+Datenstrom:
+
+```text
+Zahlen
+        ↓
+Chunks
+        ↓
+factor_pairs(number)
+        ↓
+geordnete Paare (number, factor_pairs)
+```
+
+---
+
+## 11.10 Spaltenbucket-Normalisierung
+
+```text
+normalize_column_buckets_in_processes
+```
+
+Datenstrom:
+
+```text
+positive Spaltenmengen
+negative Spaltenmengen
+        ↓
+Bucket-Paare
+        ↓
+prozessparallele Differenzbildung
+        ↓
+serielle finale Dict-Montage
+```
+
+Regel:
+
+```text
+positive - negative = effektive positive Spalten
+```
+
+---
+
+## 11.11 Repository-Manifest
+
+In:
+
+```text
+reta_architecture/package_integrity.py
+```
+
+neu:
+
+```text
+_manifest_entries_parallel
+```
+
+Datenstrom:
+
+```text
+Dateiliste
+        ↓
+Chunks
+        ↓
+Dateigröße + SHA-256 + CSV-Zeilenanzahl
+        ↓
+sortierte Manifest-Einträge
+        ↓
+globaler Manifest-Digest
+```
+
+Wichtig:
+
+```text
+Serieller Manifest-Digest
+=
+prozessparalleler Manifest-Digest
+```
+
+---
+
+# 12. In welchen Dateien steckt das alles?
+
+## Netzwerkmechanik
+
+```text
+reta_architecture/execution_network.py
+```
+
+Enthält:
+
+```text
+ExecutionTask
+ExecutionResult
+ExecutionRunResult
+ExecutionNetworkConfig
+ExecutionNetworkBundle
+FifoTaskQueue
+LifoTaskStack
+PriorityTaskQueue
+ResourceSemaphore
+HalfDuplexChannel
+FullDuplexChannel
+execute_tasks_deterministically
+deterministic_reduce
+```
+
+---
+
+## Prozessparallelisierung
+
+```text
+reta_architecture/parallel_execution.py
+```
+
+Enthält:
+
+```text
+ParallelExecutionConfig
+ParallelRowsResult
+ParallelOperationResult
+decode_religion_rows_in_processes
+decode_kombi_rows_in_processes
+select_columns_in_processes
+max_cell_text_len_in_processes
+prepare_kombi_join_tables_in_processes
+prepare_rows_in_processes
+moon_numbers_in_processes
+prime_factors_in_processes
+filter_numbers_in_processes
+factor_pairs_in_processes
+normalize_column_buckets_in_processes
+```
+
+---
+
+## Datenbank/Persistenz
+
+```text
+reta_architecture/persistence.py
+```
+
+Enthält:
+
+```text
+PersistenceConfig
+PersistedRecord
+PersistenceBundle
+bootstrap_persistence
+initialise_persistence_schema
+persist_context
+persist_section
+load_section
+persist_sheaf_snapshot
+load_sheaf_snapshot
+persist_execution_run
+record_audit_event
+query_audit_events
+cache_put
+cache_get
+invalidate_cache
+cache_put_many
+persist_sections_batch
+persist_sheaf_snapshots_batch
+stable_digest
+```
+
+---
+
+## Kategorie-Theorie-Metadaten
+
+```text
+reta_architecture/category_theory.py
+```
+
+Enthält die neuen:
+
+```text
+Kategorien
+Funktoren
+natürlichen Transformationen
+```
+
+---
+
+## Verwendung in Runtime-Modulen
+
+Die Prozesspfade werden genutzt in:
+
+```text
+reta_architecture/program_workflow.py
+reta_architecture/combi_join.py
+reta_architecture/table_preparation.py
+reta_architecture/table_output.py
+reta_architecture/row_filtering.py
+reta_architecture/arithmetic.py
+reta_architecture/universal.py
+reta_architecture/package_integrity.py
+reta_architecture/persistence.py
+```
+
+---
+
+# 13. Was ist dadurch NICHT mehr vorhanden?
+
+Kurz und hart:
+
+```text
+Keine Topologie ist weggefallen.
+Kein Kern-Morphismus ist weggefallen.
+Keine universelle Kerneigenschaft ist weggefallen.
+Keine Prägarbe ist weggefallen.
+Keine Garbe ist weggefallen.
+Keine alte Kategorie ist weggefallen.
+Keine alte natürliche Transformation ist weggefallen.
+```
+
+Es wurde **nicht ersetzt**, sondern **überbaut und erweitert**.
+
+Die alten Kernschichten bleiben:
+
+```text
+reta_architecture/topology.py
+reta_architecture/presheaves.py
+reta_architecture/sheaves.py
+reta_architecture/morphisms.py
+reta_architecture/universal.py
+```
+
+Und sie bleiben rein.
+
+Das ist sehr wichtig.
+
+---
+
+# 14. Was ist bewusst NICHT in die mathematischen Schichten gewandert?
+
+Nicht in `topology.py`:
+
+```text
+Queues
+Stacks
+Semaphoren
+Prozesspools
+Datenbanklogik
+Channels
+```
+
+Nicht in `presheaves.py`:
+
+```text
+SQLite-Schreiben
+ProcessPool
+FIFO/LIFO-Mechanik
+```
+
+Nicht in `sheaves.py`:
+
+```text
+Cache-Invalidierung
+Audit-Events
+Worker-Kommunikation
+```
+
+Nicht in `morphisms.py`:
+
+```text
+Threading
+Queue-Dispatch
+Datenbank-Transaktionen
+```
+
+Nicht in `universal.py`, außer als sauberer optionaler Prozesspfad für Spaltenbucket-Normalisierung:
+
+```text
+normalize_column_buckets
+```
+
+bleibt semantisch dieselbe universelle Operation. Der Prozesspfad ist nur eine Ausführungsoptimierung.
+
+---
+
+# 15. Welche Topologien gibt es deswegen neu?
+
+Streng mathematisch ist keine neue klassische `RetaContextTopology` entstanden.
+
+Aber in der Kategorie-Theorie-Schicht gibt es neue topologieartige Runtime-Räume:
+
+```text
+ExecutionNetworkCategory
+SchedulerCategory
+ChannelCategory
+PersistenceCategory
+```
+
+Die kann man als neue Architektur-Topologien lesen:
+
+```text
+Ausführungs-Topologie
+Scheduler-Topologie
+Kanal-Topologie
+Persistenz-/Audit-Topologie
+```
+
+Aber sie sind **nicht** Teil der ursprünglichen semantischen Kontexttopologie.
+
+Sie liegen darüber.
+
+---
+
+# 16. Neue Morphismen durch Netzwerk und DB
+
+## 16.1 Execution-Morphismen
+
+```text
+enqueue_task
+dequeue_task
+dispatch_task
+deterministic_reduce
+```
+
+Bedeutung:
+
+```text
+Task einreihen
+Task entnehmen
+Task ausführen
+Ergebnisse deterministisch kleben
+```
+
+---
+
+## 16.2 Scheduler-Morphismen
+
+```text
+push
+pop
+acquire_resource
+release_resource
+```
+
+Bedeutung:
+
+```text
+Task in FIFO/LIFO/Priority-Struktur einfügen
+Task entnehmen
+Ressource reservieren
+Ressource freigeben
+```
+
+---
+
+## 16.3 Channel-Morphismen
+
+```text
+send_message
+receive_message
+stream_progress
+cancel_message
+```
+
+Bedeutung:
+
+```text
+Nachricht senden
+Nachricht empfangen
+Fortschritt rückwärts streamen
+Cancel/Abort-Signal senden
+```
+
+---
+
+## 16.4 Persistence-Morphismen
+
+In der Kategorie:
+
+```text
+persist_section
+load_section
+persist_sheaf_snapshot
+persist_execution_run
+record_audit_event
+cache_put
+cache_get
+invalidate_cache
+```
+
+Zusätzlich im Code:
+
+```text
+persist_sections_batch
+persist_sheaf_snapshots_batch
+cache_put_many
+query_audit_events
+persist_context
+load_sheaf_snapshot
+```
+
+---
+
+# 17. Neue universelle Eigenschaften
+
+Die wichtigsten neuen universellen Eigenschaften sind:
+
+## 17.1 Parallel = seriell
+
+```text
+parallel_chunks_glue_deterministically_to_serial_result
+```
+
+Bedeutung:
+
+```text
+Prozessparallel gerechnet + nach Originalindex reduziert
+=
+seriell gerechnet
+```
+
+Das ist die wichtigste neue Ausführungseigenschaft.
+
+---
+
+## 17.2 Scheduler verändert nur Reihenfolge, nicht Bedeutung
+
+```text
+Scheduler-Disziplin und Ressourcenbegrenzung
+ändern nur die Ausführungsreihenfolge,
+nicht das deterministisch geklebte Resultat.
+```
+
+Also:
+
+```text
+FIFO/LIFO/Priority dürfen Semantik nicht verändern.
+```
+
+---
+
+## 17.3 Kanaltransport verändert Prompt-Sektion nicht
+
+```text
+ChannelPromptNaturalityTransformation
+```
+
+Bedeutung:
+
+```text
+Prompt-Befehl direkt als Rohkommando
+=
+Prompt-Befehl über Channel transportiert
+```
+
+Wenn der Inhalt gleich ist, muss die lokale Prompt-Sektion gleich sein.
+
+---
+
+## 17.4 Persistenz-Roundtrip für Prägarben
+
+```text
+PresheafPersistenceRoundTripTransformation
+```
+
+Bedeutung:
+
+```text
+persist_section
+        ↓
+load_section
+        ↓
+gleiche lokale Sektion,
+wenn Hash gleich ist
+```
+
+Kurz:
+
+```text
+load(persist(local_section)) == local_section
+```
+
+bei gleicher Prüfsumme.
+
+---
+
+## 17.5 Persistenz-Roundtrip für Garben
+
+```text
+SheafPersistenceRoundTripTransformation
+```
+
+Bedeutung:
+
+```text
+load(persist(sheaf_snapshot)) == sheaf_snapshot
+```
+
+bei gleicher Prüfsumme.
+
+---
+
+## 17.6 Cache darf nur bei gleicher Bedeutung gelten
+
+```text
+CacheCoherenceTransformation
+```
+
+Bedeutung:
+
+```text
+Cache-Hit
+=
+erneutes universelles Gluing
+```
+
+aber nur bei identischen:
+
+```text
+Kontext-Hashes
+Sektions-Hashes
+Payload-Hashes
+```
+
+---
+
+## 17.7 Prozess-Audit und Tabellenzustand müssen zusammenpassen
+
+```text
+ProcessExecutionAuditNaturalityTransformation
+```
+
+Bedeutung:
+
+```text
+persistierter Prozesslauf
+und
+persistierter Tabellenzustand
+beschreiben denselben deterministisch reduzierten Lauf
+```
+
+---
+
+# 18. Neue Prägarben und Garben?
+
+Es gibt keine neue zentrale Klasse wie:
+
+```text
+DatabasePresheaf
+DatabaseSheaf
+```
+
+im Sinne einer eigenen mathematischen Prägarbe/Garbe.
+
+Aber es gibt neue **prägarbenartige und garbenartige Persistenzformen**:
+
+## 18.1 Prägarbenartig
+
+```text
+PersistentLocalSection
+```
+
+in:
+
+```text
+local_sections
+```
+
+Das ist die gespeicherte Form von:
+
+```text
+LocalSection
+FilesystemPresheaf-Sektion
+PromptStatePresheaf-Sektion
+```
+
+---
+
+## 18.2 Garbenartig
+
+```text
+PersistentSheafSnapshot
+```
+
+in:
+
+```text
+sheaf_snapshots
+```
+
+Das ist die gespeicherte Form von:
+
+```text
+ParameterSemanticsSheaf
+GeneratedColumnsSheaf
+TableOutputSheaf
+HtmlReferenceSheaf
+SheafBundle
+```
+
+---
+
+## 18.3 Execution-artig
+
+```text
+PersistentExecutionRun
+```
+
+in:
+
+```text
+execution_runs
+```
+
+Das ist die gespeicherte Form von:
+
+```text
+ExecutionRunResult
+ParallelOperationResult
+Tabellen-/Prozesslauf
+```
+
+---
+
+## 18.4 Audit-artig
+
+```text
+AuditEvent
+```
+
+in:
+
+```text
+audit_events
+```
+
+Das ist die gespeicherte Form von:
+
+```text
+Validierung
+Ausführung
+Cache
+Persistenzereignis
+```
+
+---
+
+# 19. Neue mathematische Kategorien
+
+Es kamen vier Kategorien dazu.
+
+## 19.1 `ExecutionNetworkCategory`
+
+Objekte:
+
+```text
+ExecutionTask
+ExecutionQueue
+ExecutionRunResult
+ExecutionNetworkBundle
+```
+
+Morphismen:
+
+```text
+enqueue_task
+dequeue_task
+dispatch_task
+deterministic_reduce
+```
+
+Rolle:
+
+```text
+reine Ausführungsnetzwerke über den mathematischen Schichten
+```
+
+---
+
+## 19.2 `SchedulerCategory`
+
+Objekte:
+
+```text
+FifoQueue
+LifoStack
+PriorityQueue
+ResourceSemaphore
+```
+
+Morphismen:
+
+```text
+push
+pop
+acquire_resource
+release_resource
+```
+
+Rolle:
+
+```text
+FIFO/LIFO/Priority/Semaphoren als Runtime-Mechanik
+```
+
+---
+
+## 19.3 `ChannelCategory`
+
+Objekte:
+
+```text
+HalfDuplexChannel
+FullDuplexChannel
+ChannelMessage
+```
+
+Morphismen:
+
+```text
+send_message
+receive_message
+stream_progress
+cancel_message
+```
+
+Rolle:
+
+```text
+Kommunikation zwischen Supervisor, Worker und Prompt
+```
+
+---
+
+## 19.4 `PersistenceCategory`
+
+Objekte:
+
+```text
+PersistentLocalSection
+PersistentSheafSnapshot
+PersistentExecutionRun
+AuditEvent
+CacheEntry
+```
+
+Morphismen:
+
+```text
+persist_section
+load_section
+persist_sheaf_snapshot
+persist_execution_run
+record_audit_event
+cache_put
+cache_get
+invalidate_cache
+```
+
+Rolle:
+
+```text
+SQLite-Materialisierung, Audit und Cache
+```
+
+---
+
+# 20. Neue Funktoren
+
+Seit Netzwerk/Persistenz und dritter Prozessrunde gibt es 15 neue Funktoren.
+
+## 20.1 Netzwerk/Persistenz-Funktoren
+
+```text
+TableChunkExecutionFunctor
+ExecutionResultGluingFunctor
+SchedulerResourceFunctor
+ChannelPromptFunctor
+PresheafPersistenceFunctor
+SheafPersistenceFunctor
+TableStatePersistenceFunctor
+AuditValidationPersistenceFunctor
+CacheMaterializationFunctor
+PersistenceAuditFunctor
+```
+
+### Bedeutung
+
+```text
+Tabellenchunks -> ExecutionTasks
+ExecutionResults -> Tabellen-Sektionen
+Scheduler -> ExecutionNetwork
+Channels -> Prompt-Sektionen
+Prägarben -> SQLite
+Garben -> SQLite
+Tabellenzustände -> SQLite
+Validierung -> Audit
+Cache -> Tabellenpfad
+Persistenz -> Validierung/Audit
+```
+
+---
+
+## 20.2 Dritte Prozessrunde-Funktoren
+
+```text
+RowFilterProcessFunctor
+ArithmeticBatchExecutionFunctor
+PackageIntegrityExecutionFunctor
+PersistenceBatchPreparationFunctor
+ProcessExecutionAuditFunctor
+```
+
+### Bedeutung
+
+```text
+Zeilenfilter -> Prozesschunks
+Arithmetikbatches -> Prozesschunks
+Paketmanifest -> Prozesschunks
+Persistenzbatch-Vorbereitung -> Prozesschunks
+Prozessausführung -> Audit/Persistenz
+```
+
+---
+
+# 21. Neue natürliche Transformationen
+
+Seit Netzwerk/Persistenz und dritter Prozessrunde gibt es 13 neue natürliche Transformationen.
+
+## 21.1 Netzwerk/Persistenz-Transformationen
+
+```text
+ParallelExecutionNaturalityTransformation
+SchedulerExecutionNaturalityTransformation
+ChannelPromptNaturalityTransformation
+PresheafPersistenceRoundTripTransformation
+SheafPersistenceRoundTripTransformation
+TableStatePersistenceTransformation
+CacheCoherenceTransformation
+AuditPersistenceValidationTransformation
+```
+
+### Bedeutung
+
+```text
+Parallelität verändert Ergebnis nicht.
+Scheduler verändert Bedeutung nicht.
+Channel verändert Prompt-Sektion nicht.
+Persistenz lokaler Sektionen ist roundtrip-kohärent.
+Persistenz von Garben-Snapshots ist roundtrip-kohärent.
+Tabellenzustand und persistierter Snapshot kommutieren.
+Cache darf nur bei gleicher Semantik gelten.
+Audit und Validierung beschreiben denselben Lauf.
+```
+
+---
+
+## 21.2 Dritte Prozessrunde-Transformationen
+
+```text
+RowFilterProcessNaturalityTransformation
+ArithmeticBatchProcessNaturalityTransformation
+PackageIntegrityProcessNaturalityTransformation
+PersistenceBatchPreparationNaturalityTransformation
+ProcessExecutionAuditNaturalityTransformation
+```
+
+### Bedeutung
+
+```text
+Zeilenfilter seriell oder prozessparallel ergibt dieselbe RowSet-Sektion.
+Arithmetik seriell oder prozessparallel ergibt dieselbe Faktor-/Teilersektion.
+Manifest seriell oder prozessparallel ergibt denselben Digest.
+Batch-Persistenzvorbereitung seriell oder prozessparallel ergibt dieselben Datensätze.
+Persistierte Prozessläufe und persistierte Tabellenzustände beschreiben denselben Lauf.
+```
+
+---
+
+# 22. Welche alten Dinge sind dadurch ersetzt worden?
+
+Nicht ersetzt im Sinn von gelöscht.
+
+Aber praktisch entlastet wurden:
+
+## 22.1 Direkte Prozesspool-Nutzung
+
+Früher war Prozessparallelisierung stärker direkt in:
+
+```text
+parallel_execution.py
+```
+
+gebündelt.
+
+Jetzt geht ein Teil davon über:
+
+```text
+ExecutionNetworkCategory
+ExecutionTask
+execute_tasks_deterministically
+```
+
+Aber: `prepare_rows_in_processes` nutzt weiterhin direkt `multiprocessing.Pool`, weil dort der `Prepare`-Kontext speziell behandelt wird.
+
+Also korrekt formuliert:
+
+```text
+Direkte Pool-Nutzung wurde reduziert und architektonisch gerahmt,
+aber nicht vollständig eliminiert.
+```
+
+---
+
+## 22.2 Ad-hoc-Audit
+
+Vorher gab es keine eigene SQLite-Audit-Schicht.
+
+Jetzt gibt es:
+
+```text
+audit_events
+execution_runs
+cache_entries
+```
+
+Also:
+
+```text
+Ausführung und Validierung können persistiert und nachvollzogen werden.
+```
+
+---
+
+## 22.3 Implizite Cache-Idee
+
+Vorher gab es keine formale Cache-Persistenz.
+
+Jetzt gibt es:
+
+```text
+cache_put
+cache_get
+cache_put_many
+invalidate_cache
+CacheCoherenceTransformation
+```
+
+Aber der Cache ersetzt nicht die Semantik.
+
+---
+
+# 23. Was gibt es deswegen nicht mehr?
+
+Die beste Antwort ist:
+
+```text
+Nichts Wesentliches der Mathematik ist weggefallen.
+```
+
+Konkret:
+
+| Schicht | Weggefallen? | Erklärung |
+|---|---:|---|
+| Topologien | Nein | `RetaContextTopology` bleibt |
+| Morphismen | Nein | Kernmorphismen bleiben |
+| universelle Eigenschaften | Nein | wurden erweitert, nicht entfernt |
+| Prägarben | Nein | `FilesystemPresheaf`, `PromptStatePresheaf` bleiben |
+| Garben | Nein | `ParameterSemanticsSheaf`, `GeneratedColumnsSheaf`, `TableOutputSheaf`, `HtmlReferenceSheaf` bleiben |
+| math Kategorien | Nein | alte Kategorien bleiben, 4 kamen dazu |
+| Funktoren | Nein | alte Funktoren bleiben, neue kamen dazu |
+| natürliche Transformationen | Nein | alte Transformationen bleiben, neue kamen dazu |
+| Legacy-Fassaden | Nein | bleiben aus Kompatibilitätsgründen |
+| serielle Fallbacks | Nein | bleiben wichtig für kleine Datenmengen und CPython |
+| PyPy3-Prozesspfad | Ja, erweitert | mehr Stellen nutzen Prozesse |
+| Threads/ThreadPool | Nein, nicht eingeführt | es gibt keine Thread-Parallelisierung |
+
+Ein kleiner Sonderfall:
+
+```text
+ResourceSemaphore nutzt threading.BoundedSemaphore intern.
+```
+
+Das heißt aber nicht:
+
+```text
+Thread-Parallelisierung wurde eingeführt.
+```
+
+Es ist nur ein lokaler Semaphore-Wrapper. Die eigentliche Parallelisierung bleibt:
+
+```text
+multiprocessing
+Prozesse
+PyPy3-tauglich
+```
+
+---
+
+# 24. Wo liegen die Netzwerke genau?
+
+Die Netzwerke liegen **nicht** in den mathematischen Kernmodulen, sondern in:
+
+```text
+reta_architecture/execution_network.py
+```
+
+und werden verwendet über:
+
+```text
+reta_architecture/parallel_execution.py
+```
+
+Kategorie-theoretisch liegen sie in:
+
+```text
+ExecutionNetworkCategory
+SchedulerCategory
+ChannelCategory
+```
+
+Sie sind also eine eigene Runtime-Schicht.
+
+Die Einbettung sieht so aus:
+
+```text
+Topologien / Prägarben / Garben / Morphismen
+        ↓
+Tabellen- oder Zeilenmorphismus erzeugt reine Arbeit
+        ↓
+ExecutionTask
+        ↓
+FIFO/LIFO/Priority/Scheduler
+        ↓
+Prozessausführung
+        ↓
+ExecutionResult
+        ↓
+deterministic_reduce
+        ↓
+zurück in Tabellen-/Garben-/Ausgabepfad
+```
+
+---
+
+# 25. Wo liegt die Datenbank genau?
+
+Die Datenbankmechanik liegt in:
+
+```text
+reta_architecture/persistence.py
+```
+
+Kategorie-theoretisch:
+
+```text
+PersistenceCategory
+```
+
+Die Datenbank ist nicht die Quelle der mathematischen Wahrheit.
+
+Sie ist:
+
+```text
+Persistenz
+Audit
+Cache
+Snapshot-Speicher
+```
+
+Die Einbettung sieht so aus:
+
+```text
+LocalSection
+        ↓ persist_section
+PersistentLocalSection
+
+SheafBundle / ParameterSemanticsSheaf / TableOutputSheaf
+        ↓ persist_sheaf_snapshot
+PersistentSheafSnapshot
+
+ExecutionRunResult
+        ↓ persist_execution_run
+PersistentExecutionRun
+
+Validation / Execution / Cache event
+        ↓ record_audit_event
+AuditEvent
+
+Materialisiertes Ergebnis
+        ↓ cache_put
+CacheEntry
+```
+
+---
+
+# 26. Was ist der wichtigste Architekturgewinn?
+
+Der wichtigste Gewinn ist nicht einfach:
+
+```text
+mehr Parallelisierung
+```
+
+sondern:
+
+```text
+Parallelisierung, Persistenz und Audit sind jetzt architektonisch eingeordnet.
+```
+
+Vorher konnte Parallelisierung leicht zu versteckter Runtime-Mechanik werden.
+
+Jetzt gilt:
+
+```text
+Task-Ausführung ist eigene Kategorie.
+Scheduler ist eigene Kategorie.
+Kanäle sind eigene Kategorie.
+Persistenz ist eigene Kategorie.
+Cache und Audit haben Natürlichkeitsbedingungen.
+```
+
+Dadurch bleibt kontrollierbar:
+
+```text
+Was ist Semantik?
+Was ist Ausführung?
+Was ist Persistenz?
+Was ist Audit?
+Was ist Cache?
+```
+
+---
+
+# 27. Die neue Gesamtformel
+
+Der aktuelle Stand lässt sich so lesen:
+
+```text
+Mathematische Kernschicht:
+Topologien
+Morphismen
+universelle Eigenschaften
+Prägarben
+Garben
+math Kategorien
+Funktoren
+natürliche Transformationen
+
+bleibt rein.
+
+Neue Runtime-Schicht:
+ExecutionTask
+FIFO / LIFO / PriorityQueue
+HalfDuplex / FullDuplex
+ResourceSemaphore
+ProcessPool
+deterministic_reduce
+
+Neue Persistenzschicht:
+SQLite
+open_contexts
+local_sections
+sheaf_snapshots
+execution_runs
+audit_events
+cache_entries
+
+Neue Natürlichkeit:
+parallel == seriell
+persist/load == roundtrip
+cache == erneutes Gluing bei gleichen Hashes
+legacy == architecture
+audit == validierter Lauf
+```
+
+---
+
+# 28. Meine klare Bewertung
+
+Das ist eine sinnvolle Erweiterung.
+
+Nicht sinnvoll wäre gewesen:
+
+```text
+Topologien mit Queues vollstopfen
+Garben zu Datenbanktabellen machen
+Morphismen zu Worker-Prozessen machen
+natürliche Transformationen als Runtime-Callbacks missbrauchen
+```
+
+Das ist nicht passiert.
+
+Stattdessen ist es jetzt sauberer:
+
+```text
+Mathematik bleibt Bedeutung.
+ExecutionNetwork macht Ausführung.
+Persistence macht Speicher, Audit und Cache.
+Deterministic Gluing schützt Gleichheit.
+Natürliche Transformationen beschreiben, warum alles kommutiert.
+```
+
+In einem Satz:
+
+```text
+Es kam eine Ausführungs- und Persistenzarchitektur dazu;
+die ursprüngliche mathematische Architektur wurde nicht ersetzt,
+sondern um kontrollierte, auditierbare Runtime- und Datenbankschichten erweitert.
+```

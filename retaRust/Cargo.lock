@@ -1155,8 +1155,16 @@ dependencies = [
  "hypher",
  "indexmap",
  "libloading",
+ "reta_architecture",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "reta_architecture"
+version = "0.6.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -1165,6 +1173,7 @@ version = "0.6.0"
 dependencies = [
  "indexmap",
  "libloading",
+ "reta_architecture",
  "serde",
  "serde_json",
 ]
@@ -1185,6 +1194,7 @@ dependencies = [
  "indexmap",
  "ratatui",
  "reedline",
+ "reta_architecture",
  "retaprompt_commands",
 ]
 

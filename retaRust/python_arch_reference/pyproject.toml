@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "reta"
+version ="3.20250507.4591"
+description = ""
+authors = ["Alexander Kern <alexgit@alexkern.de>"]
+readme = "readme-retaPrompt.md"
+
+[tool.poetry.dependencies]
+python = ">=3.7.0,<4.0.0"
+bbcode = "==1.1.0"
+html2text = "==2020.1.16"
+prompt-toolkit = "==3.0.19"
+pyhyphen = "==3.0.1"
+rich = "==10.12.0"
+pyphen = "==0.9.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

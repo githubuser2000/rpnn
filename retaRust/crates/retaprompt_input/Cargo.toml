@@ -11,6 +11,7 @@ path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+reta_architecture = { path = "../reta_architecture" }
 indexmap = { version = "2", features = ["serde"] }
 retaprompt_commands = { path = "../retaprompt_commands" }
 reedline = "0.47.0"

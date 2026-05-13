@@ -1,0 +1,22 @@
+#!/bin/fish
+for arg in $argv
+for var in (seq 2 25)
+  echo -n $arg' % '$var' = '
+  set mod (math $arg % $var)
+  echo -n $mod' '
+  [ $mod -eq 0 ] && echo -n ja
+  [ $mod -eq 1 ] && echo -n Gegenteil
+  [ $mod -eq 2 ] && echo -n ähnlich
+  [ $mod -eq 3 ] && echo -n entferntes Gegenteil
+  [ $mod -eq 4 ] && echo -n entfernt ähnlich
+  set mod (math $var - $mod)
+  echo -n ', '
+  [ $mod -eq 0 ] && echo -n ja
+  [ $mod -eq 1 ] && echo -n Gegenteil
+  [ $mod -eq 2 ] && echo -n ähnlich
+  [ $mod -eq 3 ] && echo -n entferntes Gegenteil
+  [ $mod -eq 4 ] && echo -n entfernt ähnlich
+  echo
+end
+echo
+end

@@ -4619,7 +4619,7 @@ paraNdataMatrix: list = [
     (
         ParametersMain.kontinuum,
         ("M", "m", _("Dreizehn"),),
-        {493},
+        {493, 744},
     ),
     (
         ParametersMain.kontinuum,

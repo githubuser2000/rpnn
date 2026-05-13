@@ -14,6 +14,8 @@ mod reta_runtime_bridge;
 
 pub mod ffi;
 
+pub use reta_architecture as architecture;
+
 #[path = "prompt/semantic_choices.rs"]
 pub mod semantic_choices;
 
@@ -71,6 +73,11 @@ impl From<RetaResponse> for RetaRunResult {
 static SHARED_WORDS: OnceLock<crate::shared::words_py::Words> = OnceLock::new();
 static SHARED_PROGRAM_TEMPLATE: OnceLock<Program> = OnceLock::new();
 static SHARED_PRELOAD_RESULT: OnceLock<Result<(), String>> = OnceLock::new();
+static SHARED_ARCHITECTURE: OnceLock<reta_architecture::ArchitectureRuntime> = OnceLock::new();
+
+pub fn shared_architecture() -> &'static reta_architecture::ArchitectureRuntime {
+    SHARED_ARCHITECTURE.get_or_init(reta_architecture::bootstrap_architecture_runtime)
+}
 
 pub fn shared_words() -> &'static crate::shared::words_py::Words {
     SHARED_WORDS.get_or_init(crate::shared::words_py::Words::new)
@@ -95,6 +102,7 @@ pub fn preload_reta_runtime() -> Result<(), String> {
     SHARED_PRELOAD_RESULT
         .get_or_init(|| {
             let _ = shared_words();
+            let _ = shared_architecture();
             Ok(())
         })
         .clone()

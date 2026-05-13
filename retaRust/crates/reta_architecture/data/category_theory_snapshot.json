@@ -1,0 +1,3256 @@
+{
+  "categories": [
+    {
+      "description": "Kategorie der offenen Reta-Kontexte; Morphismen sind Verfeinerungen, Einschränkungen und Basisüberdeckungen.",
+      "implemented_by": [
+        "reta_architecture/topology.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "ContextSelection.refine",
+          "name": "refine",
+          "role": "Kontextverfeinerung",
+          "source": "ContextSelection",
+          "target": "ContextSelection"
+        },
+        {
+          "code_owner": "RetaContextTopology.open_for",
+          "name": "open_for",
+          "role": "Basisöffnung erzeugen",
+          "source": "RetaContextTopology",
+          "target": "ContextSelection"
+        },
+        {
+          "code_owner": "RetaContextTopology.cover_for_main",
+          "name": "cover_for_main",
+          "role": "lokale Überdeckung erzeugen",
+          "source": "RetaContextTopology",
+          "target": "ContextCover"
+        }
+      ],
+      "name": "OpenRetaContextCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.topology.ContextSelection",
+          "name": "ContextSelection",
+          "role": "symbolische offene Kontextmenge"
+        },
+        {
+          "code_owner": "reta_architecture.topology.RetaContextTopology",
+          "name": "RetaContextTopology",
+          "role": "Topologie über Sprache, Parametern, Zeilen, Ausgabearten und Scopes"
+        },
+        {
+          "code_owner": "reta_architecture.topology.RetaContextTopology.cover_for_main",
+          "name": "ContextCover",
+          "role": "Basisüberdeckung eines Hauptparameter-Kontexts"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie lokaler Rohsektionen; Morphismen sind Restriktionen entlang kleinerer Kontexte.",
+      "implemented_by": [
+        "reta_architecture/presheaves.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "Presheaf.add_section",
+          "name": "add_section",
+          "role": "lokale Sektion registrieren",
+          "source": "LocalSection",
+          "target": "FilesystemPresheaf"
+        },
+        {
+          "code_owner": "Presheaf.restrict",
+          "name": "restrict",
+          "role": "Sektion auf Kontext einschränken",
+          "source": "FilesystemPresheaf",
+          "target": "LocalSection"
+        },
+        {
+          "code_owner": "PromptStatePresheaf.update",
+          "name": "update_prompt_state",
+          "role": "Prompt-Rohsektion aktualisieren",
+          "source": "PromptStatePresheaf",
+          "target": "LocalSection"
+        }
+      ],
+      "name": "LocalSectionCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.presheaves.LocalSection",
+          "name": "LocalSection",
+          "role": "lokale CSV-/Übersetzungs-/Asset-/Prompt-Sektion"
+        },
+        {
+          "code_owner": "reta_architecture.presheaves.FilesystemPresheaf",
+          "name": "FilesystemPresheaf",
+          "role": "Prägarbe lokaler Dateien"
+        },
+        {
+          "code_owner": "reta_architecture.presheaves.PromptStatePresheaf",
+          "name": "PromptStatePresheaf",
+          "role": "Prägarbe lokaler Prompt-Zustände"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie geklebter kanonischer Semantik; Morphismen lösen Aliasnamen, Parameterpaare und Spaltenmengen auf.",
+      "implemented_by": [
+        "reta_architecture/sheaves.py",
+        "reta_architecture/semantics_builder.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "ParameterSemanticsSheaf.canonicalize_pair",
+          "name": "canonicalize_pair",
+          "role": "Aliasauflösung zu kanonischem Paar",
+          "source": "ParameterSemanticsSheaf",
+          "target": "CanonicalParameterPair"
+        },
+        {
+          "code_owner": "ParameterSemanticsSheaf.column_numbers_for_pair",
+          "name": "column_numbers_for_pair",
+          "role": "kanonisches Paar zu Spaltenmenge",
+          "source": "CanonicalParameterPair",
+          "target": "ColumnNumberSet"
+        },
+        {
+          "code_owner": "GeneratedColumnsSheaf.sync_from_tables",
+          "name": "sync_from_tables",
+          "role": "globale Tabellen-Metadaten in Garbe spiegeln",
+          "source": "Tables",
+          "target": "GeneratedColumnsSheaf"
+        }
+      ],
+      "name": "CanonicalSemanticSheafCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.sheaves.ParameterSemanticsSheaf",
+          "name": "ParameterSemanticsSheaf",
+          "role": "kanonische Parametersemantik"
+        },
+        {
+          "code_owner": "reta_architecture.sheaves.GeneratedColumnsSheaf",
+          "name": "GeneratedColumnsSheaf",
+          "role": "Garbe generierter Spaltenmetadaten"
+        },
+        {
+          "code_owner": "reta_architecture.sheaves.TableOutputSheaf",
+          "name": "TableOutputSheaf",
+          "role": "Garbe synchronisierter Ausgabe-Sektionen"
+        },
+        {
+          "code_owner": "reta_architecture.sheaves.HtmlReferenceSheaf",
+          "name": "HtmlReferenceSheaf",
+          "role": "Garbe der HTML-Referenzen"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Gluing-/Normalisierungs-Knoten, die lokale Sektionen zu globaler Semantik zusammenführen.",
+      "implemented_by": [
+        "reta_architecture/universal.py",
+        "reta_architecture/table_generation.py",
+        "reta_architecture/program_workflow.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.universal.merge_parameter_dicts",
+          "name": "merge_parameter_dicts",
+          "role": "pushout-artiges Zusammenkleben lokaler Parameterdaten",
+          "source": "ParameterDictionaryDiagram",
+          "target": "ParameterSemanticsSheaf"
+        },
+        {
+          "code_owner": "reta_architecture.universal.normalize_column_buckets",
+          "name": "normalize_column_buckets",
+          "role": "kanonische Differenz-/Normalisierungskonstruktion",
+          "source": "ColumnBucketDiagram",
+          "target": "NormalizedColumnBuckets"
+        },
+        {
+          "code_owner": "UniversalBundle.sync_tables",
+          "name": "sync_tables",
+          "role": "globale Tabellen-Sektion in Garben synchronisieren",
+          "source": "Tables",
+          "target": "SheafBundle"
+        }
+      ],
+      "name": "UniversalConstructionCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.universal.merge_parameter_dicts",
+          "name": "ParameterDictionaryDiagram",
+          "role": "Diagramm lokaler Parameter-Dictionaries"
+        },
+        {
+          "code_owner": "reta_architecture.universal.normalize_column_buckets",
+          "name": "ColumnBucketDiagram",
+          "role": "Diagramm positiver/negativer Spaltenauswahl"
+        },
+        {
+          "code_owner": "reta_architecture.universal.UniversalBundle.sync_tables",
+          "name": "TableSyncDiagram",
+          "role": "Diagramm globaler Tabellen-Synchronisierung"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie globaler Tabellen- und Tabellenzustandssektionen; Morphismen sind Prepare-, Concat-, Join-, Zeilenfilter- und Output-Übergänge.",
+      "implemented_by": [
+        "reta_architecture/table_runtime.py",
+        "reta_architecture/table_state.py",
+        "reta_architecture/table_preparation.py",
+        "reta_architecture/row_filtering.py",
+        "reta_architecture/concat_csv.py",
+        "reta_architecture/table_output.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.table_preparation.prepare_output_table",
+          "name": "prepare_output_table",
+          "role": "Tabellen-Prepare-Morphismus",
+          "source": "Tables",
+          "target": "Tables"
+        },
+        {
+          "code_owner": "reta_architecture.row_filtering.filter_original_lines",
+          "name": "filter_original_lines",
+          "role": "Zeilenfilter-Morphismus",
+          "source": "ParameterSection",
+          "target": "RowSet"
+        },
+        {
+          "code_owner": "reta_architecture.concat_csv.readConcatCsv",
+          "name": "readConcatCsv",
+          "role": "CSV-Prägarbensektion in globale Tabelle kleben",
+          "source": "LocalCsvSection",
+          "target": "Tables"
+        },
+        {
+          "code_owner": "reta_architecture.table_output.TableOutput",
+          "name": "render_table_output",
+          "role": "Tabellensektion rendern",
+          "source": "Tables",
+          "target": "RenderedOutput"
+        }
+      ],
+      "name": "TableSectionCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.table_runtime.Tables",
+          "name": "Tables",
+          "role": "mutable globale Tabellensektion"
+        },
+        {
+          "code_owner": "reta_architecture.table_state.TableStateSections",
+          "name": "TableStateSections",
+          "role": "explizite Zustandssektionen der globalen Tabelle"
+        },
+        {
+          "code_owner": "reta_architecture.table_preparation.TablePreparationBundle",
+          "name": "TablePreparationBundle",
+          "role": "Prepare-Morphismen"
+        },
+        {
+          "code_owner": "reta_architecture.table_output.TableOutput",
+          "name": "TableOutput",
+          "role": "Renderer-naher Output-Morphismus"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der generierten Spalten; Morphismen sind Endomorphismen der globalen Tabellensektion.",
+      "implemented_by": [
+        "reta_architecture/generated_columns.py",
+        "reta_architecture/table_state.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.generated_columns.concat_love_polygon",
+          "name": "concat_love_polygon",
+          "role": "generiert Love-/Polygon-Spalten",
+          "source": "Tables",
+          "target": "Tables"
+        },
+        {
+          "code_owner": "reta_architecture.generated_columns.concat_modallogik",
+          "name": "concat_modallogik",
+          "role": "generiert Modallogik-Spalten",
+          "source": "Tables",
+          "target": "Tables"
+        },
+        {
+          "code_owner": "reta_architecture.generated_columns.create_spalte_gestirn",
+          "name": "create_spalte_gestirn",
+          "role": "generiert Gestirn-Spalte",
+          "source": "Tables",
+          "target": "Tables"
+        }
+      ],
+      "name": "GeneratedColumnEndomorphismCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.generated_columns.GeneratedColumnSpec",
+          "name": "GeneratedColumnSpec",
+          "role": "Beschreibung eines generierten Spaltenmorphismus"
+        },
+        {
+          "code_owner": "reta_architecture.generated_columns.GeneratedColumnRegistry",
+          "name": "GeneratedColumnRegistry",
+          "role": "Registry der Tabellen-Endomorphismen"
+        },
+        {
+          "code_owner": "reta_architecture.table_state.GeneratedColumnSection",
+          "name": "GeneratedColumnSection",
+          "role": "Zustandssektion generierter Spalten"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie konkreter Ausgabeformate und normalisierbarer Output-Sektionen.",
+      "implemented_by": [
+        "reta_architecture/output_syntax.py",
+        "reta_architecture/output_semantics.py",
+        "reta_architecture/table_output.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.output_semantics.RetaOutputSemantics.apply_mode_to_tables",
+          "name": "apply_output_mode",
+          "role": "Ausgabemodus auf Tabelle anwenden",
+          "source": "Tables",
+          "target": "OutputModeApplication"
+        },
+        {
+          "code_owner": "reta_architecture.table_output.TableOutput",
+          "name": "render",
+          "role": "globale Tabelle rendern",
+          "source": "Tables",
+          "target": "RenderedOutput"
+        },
+        {
+          "code_owner": "tests.test_command_parity",
+          "name": "normalize_for_parity",
+          "role": "Output für Paritätstests normalisieren",
+          "source": "RenderedOutput",
+          "target": "NormalizedOutput"
+        }
+      ],
+      "name": "OutputFormatCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.output_syntax.OutputSyntax",
+          "name": "OutputSyntax",
+          "role": "abstrakte Ausgabesyntax"
+        },
+        {
+          "code_owner": "reta_architecture.output_semantics.OutputModeSpec",
+          "name": "OutputModeSpec",
+          "role": "semantische Ausgabeart"
+        },
+        {
+          "code_owner": "reta_architecture.table_output.TableOutput",
+          "name": "RenderedOutput",
+          "role": "gerenderte Ausgabe"
+        },
+        {
+          "code_owner": "tests.test_command_parity",
+          "name": "NormalizedOutput",
+          "role": "vergleichbare normalisierte Ausgabe"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie alter Import-/Aufrufpfade; Morphismen sind Kompatibilitätsdelegationen in die Architekturschicht.",
+      "implemented_by": [
+        "reta.py",
+        "libs/tableHandling.py",
+        "libs/lib4tables_prepare.py",
+        "libs/lib4tables_concat.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta.Program.__init__",
+          "name": "bootstrap_program",
+          "role": "Programmlauf über Architektur-Fassade erzeugen",
+          "source": "reta.py Program",
+          "target": "RetaArchitecture"
+        },
+        {
+          "code_owner": "libs/tableHandling.py",
+          "name": "tableHandling_reexport",
+          "role": "alte Tabellenimporte delegieren",
+          "source": "libs.tableHandling",
+          "target": "TableSectionCategory"
+        },
+        {
+          "code_owner": "libs/lib4tables_prepare.py",
+          "name": "prepare_delegation",
+          "role": "alte Prepare-Methoden delegieren",
+          "source": "libs.lib4tables_prepare",
+          "target": "TableSectionCategory"
+        },
+        {
+          "code_owner": "libs/lib4tables_concat.py",
+          "name": "concat_delegation",
+          "role": "alte Concat-Methoden delegieren",
+          "source": "libs.lib4tables_concat",
+          "target": "GeneratedColumnEndomorphismCategory"
+        }
+      ],
+      "name": "LegacyFacadeCategory",
+      "objects": [
+        {
+          "code_owner": "reta.py",
+          "name": "reta.py Program",
+          "role": "historischer CLI-Einstieg"
+        },
+        {
+          "code_owner": "libs/tableHandling.py",
+          "name": "libs.tableHandling",
+          "role": "alte Tabellen-Fassade"
+        },
+        {
+          "code_owner": "libs/lib4tables_prepare.py",
+          "name": "libs.lib4tables_prepare",
+          "role": "alte Prepare-Fassade"
+        },
+        {
+          "code_owner": "libs/lib4tables_concat.py",
+          "name": "libs.lib4tables_concat",
+          "role": "alte Concat-Fassade"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-29-Architekturverträge; Objekte sind kommutierende Diagramme, Kapselgrenzen und Refactor-Gesetze.",
+      "implemented_by": [
+        "reta_architecture/architecture_contracts.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.architecture_contracts.bootstrap_architecture_contracts",
+          "name": "bootstrap_architecture_contracts",
+          "role": "Vertragsbundle aus Kategorien und Kapselkarte erzeugen",
+          "source": "CategoryTheoryBundle",
+          "target": "ArchitectureContractsBundle"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_contracts._validation",
+          "name": "validate_contract_references",
+          "role": "Referenzen gegen bekannte Kategorien/Funktoren/Transformationen prüfen",
+          "source": "ArchitectureContractsBundle",
+          "target": "ContractValidationSpec"
+        },
+        {
+          "code_owner": "reta_architecture_probe_py.py architecture-contracts-md",
+          "name": "render_contract_diagram",
+          "role": "Vertragsdiagramm als Markdown/Mermaid ausgeben",
+          "source": "ArchitectureContractsBundle",
+          "target": "RenderedContractDiagram"
+        }
+      ],
+      "name": "CommutativeArchitectureContractCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_contracts.CommutativeDiagramSpec",
+          "name": "CommutativeDiagramSpec",
+          "role": "prüfbarer kommutierender Architekturpfad"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_contracts.CapsuleContractSpec",
+          "name": "CapsuleContractSpec",
+          "role": "Grenzvertrag einer Architektur-Kapsel"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_contracts.RefactorLawSpec",
+          "name": "RefactorLawSpec",
+          "role": "menschenlesbare Refactor-Invariante"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_contracts.ArchitectureContractsBundle",
+          "name": "ArchitectureContractsBundle",
+          "role": "gebündelte Stage-29-Vertragsmetadaten"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-31-Validierung; Objekte sind Checks, Layer, Summary und das ausführbare Architekturvalidierungsbundle.",
+      "implemented_by": [
+        "reta_architecture/architecture_validation.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.architecture_validation.bootstrap_architecture_validation",
+          "name": "bootstrap_architecture_validation",
+          "role": "Kategorien, Karte, Verträge, Witnesses und Paketbaum zu einem Audit komponieren",
+          "source": "ArchitectureWitnessBundle",
+          "target": "ArchitectureValidationBundle"
+        },
+        {
+          "code_owner": "ArchitectureValidationBundle.snapshot",
+          "name": "validate_stage31_references",
+          "role": "Stage-31-Prüfergebnis erzeugen",
+          "source": "ArchitectureValidationBundle",
+          "target": "ArchitectureValidationSummarySpec"
+        },
+        {
+          "code_owner": "reta_architecture_probe_py.py architecture-validation-md",
+          "name": "render_validation_diagram",
+          "role": "Validierungsdiagramm als Markdown/Mermaid ausgeben",
+          "source": "ArchitectureValidationBundle",
+          "target": "RenderedValidationDiagram"
+        }
+      ],
+      "name": "ArchitectureValidationCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.category_theory.CategoryTheoryBundle",
+          "name": "CategoryTheoryBundle",
+          "role": "Quelle der Kategorien/Funktoren/natürlichen Transformationen"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_map.ArchitectureMapBundle",
+          "name": "ArchitectureMapBundle",
+          "role": "Quelle der Kapseln, Flüsse und Stage-Schritte"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_contracts.ArchitectureContractsBundle",
+          "name": "ArchitectureContractsBundle",
+          "role": "Quelle der kommutierenden Diagramme und Gesetze"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_witnesses.ArchitectureWitnessBundle",
+          "name": "ArchitectureWitnessBundle",
+          "role": "Quelle der Repository-Witnesses"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_validation.ArchitectureValidationBundle",
+          "name": "ArchitectureValidationBundle",
+          "role": "ausführbarer Stage-31-Audit"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_validation.ArchitectureValidationCheckSpec",
+          "name": "ArchitectureValidationCheckSpec",
+          "role": "einzelner Architekturcheck"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_validation.ArchitectureValidationSummarySpec",
+          "name": "ArchitectureValidationSummarySpec",
+          "role": "zusammengefasster Validierungsstatus"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der kohärenten Metaarchitektur: Kapsel, Kategorie, Funktor, Transformation, Diagramm, Gesetz und Witness werden zusammengeführt.",
+      "implemented_by": [
+        "reta_architecture/architecture_coherence.py",
+        "reta_architecture/architecture_validation.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_validation",
+          "name": "validate",
+          "role": "Kohärenz wird validiert",
+          "source": "ArchitectureCoherenceBundle",
+          "target": "ArchitectureValidationBundle"
+        }
+      ],
+      "name": "ArchitectureCoherenceCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_coherence",
+          "name": "ArchitectureCoherenceBundle",
+          "role": "Kohärenzmatrix über Kapseln und funktorielle Routen"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_validation",
+          "name": "ArchitectureValidationBundle",
+          "role": "ausführbarer Audit der Metaschichten"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie navigierbarer Architekturspuren von alten reta-Besitzern bis zu Kapseln, Funktoren, Transformationen, Diagrammen und Witnesses.",
+      "implemented_by": [
+        "reta_architecture/architecture_traces.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_traces",
+          "name": "trace",
+          "role": "alte reta-Komponente wird navigierbar",
+          "source": "RetaComponentTraceSpec",
+          "target": "ArchitectureTraceBundle"
+        }
+      ],
+      "name": "ArchitectureTraceCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_traces",
+          "name": "ArchitectureTraceBundle",
+          "role": "Trace-Index"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_traces",
+          "name": "RetaComponentTraceSpec",
+          "role": "alte Komponente als Spur"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie realer Modulbesitz- und Importgrenzen; Python-Importe werden als Kapsel-Morphismen klassifiziert.",
+      "implemented_by": [
+        "reta_architecture/architecture_boundaries.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_boundaries",
+          "name": "classify_import",
+          "role": "Import wird Boundary-Morphismus",
+          "source": "ModuleOwnershipSpec",
+          "target": "ImportEdgeSpec"
+        }
+      ],
+      "name": "ArchitectureBoundaryCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_boundaries",
+          "name": "ArchitectureBoundariesBundle",
+          "role": "Boundary-Importgraph"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_boundaries",
+          "name": "ModuleOwnershipSpec",
+          "role": "Modulbesitz"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_boundaries",
+          "name": "ImportEdgeSpec",
+          "role": "Importkante"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-33 Impact-Routen: Trace- und Boundary-Informationen werden zu Regression-Gates und Migrationskandidaten verdichtet.",
+      "implemented_by": [
+        "reta_architecture/architecture_impact.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_impact",
+          "name": "compute_impact",
+          "role": "Trace/Boundary wird Impact-Route",
+          "source": "ImpactSourceSpec",
+          "target": "ArchitectureImpactBundle"
+        },
+        {
+          "code_owner": "bootstrap_architecture_impact",
+          "name": "gate",
+          "role": "Migrationskandidat wird durch Gates geschützt",
+          "source": "MigrationCandidateSpec",
+          "target": "RegressionGateSpec"
+        }
+      ],
+      "name": "ArchitectureImpactCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_impact",
+          "name": "ArchitectureImpactBundle",
+          "role": "Impact- und Migration-Gate-Bündel"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_impact",
+          "name": "ImpactSourceSpec",
+          "role": "alte/neue reta-Komponente als Impact-Quelle"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_impact",
+          "name": "RegressionGateSpec",
+          "role": "Probe-/Test-Gate"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_impact",
+          "name": "MigrationCandidateSpec",
+          "role": "guarded future extraction candidate"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-34 Migrationsplanung: Impact-Kandidaten werden zu geordneten Wellen, Schritten, Gate-Bindings und Migrationsinvarianten.",
+      "implemented_by": [
+        "reta_architecture/architecture_migration.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_migration",
+          "name": "plan",
+          "role": "Impact-Kandidat wird geplanter Migrationsschritt",
+          "source": "MigrationCandidateSpec",
+          "target": "MigrationStepSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_migration",
+          "name": "order",
+          "role": "Schritt wird in eine Kapselwelle eingeordnet",
+          "source": "MigrationStepSpec",
+          "target": "MigrationWaveSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_migration",
+          "name": "bind_gate",
+          "role": "Schritt erhält konkrete Gates",
+          "source": "MigrationStepSpec",
+          "target": "MigrationGateBindingSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_migration",
+          "name": "preserve_invariant",
+          "role": "Welle erhält Natürlichkeits-/Gesetzespflicht",
+          "source": "MigrationWaveSpec",
+          "target": "MigrationInvariantSpec"
+        }
+      ],
+      "name": "ArchitectureMigrationCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_migration",
+          "name": "ArchitectureMigrationBundle",
+          "role": "geordnetes Migrationsplan-Bündel"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_migration",
+          "name": "MigrationWaveSpec",
+          "role": "kapselweise Migrationswelle"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_migration",
+          "name": "MigrationStepSpec",
+          "role": "konkreter, noch nicht ausgeführter guarded migration step"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_migration",
+          "name": "MigrationGateBindingSpec",
+          "role": "Bindung von Migrationsschritt an Regression-Gates"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_migration",
+          "name": "MigrationInvariantSpec",
+          "role": "Naturality-/Law-Invariante pro Migrationswelle"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-35 Trockenlauf-/Readiness-Schicht: Migrationswellen werden Rehearsal-Open-Sets, Schritte werden Refactor-Moves und Gate-Bindings werden prüfbare Gate-Suites.",
+      "implemented_by": [
+        "reta_architecture/architecture_rehearsal.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_rehearsal",
+          "name": "rehearse_step",
+          "role": "geplanter Schritt wird Trockenlauf-Morphismus",
+          "source": "MigrationStepSpec",
+          "target": "RehearsalMoveSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_rehearsal",
+          "name": "rehearse_gate",
+          "role": "Gate-Binding wird Preflight/Postflight-Suite",
+          "source": "MigrationGateBindingSpec",
+          "target": "GateRehearsalSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_rehearsal",
+          "name": "cover_wave",
+          "role": "lokale Moves kleben zur globalen Readiness",
+          "source": "RehearsalOpenSetSpec",
+          "target": "RehearsalCoverSpec"
+        }
+      ],
+      "name": "ArchitectureRehearsalCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_rehearsal",
+          "name": "ArchitectureRehearsalBundle",
+          "role": "Trockenlauf-/Readiness-Bündel"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_rehearsal",
+          "name": "RehearsalOpenSetSpec",
+          "role": "topologische Basisöffnung einer Migrationswelle"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_rehearsal",
+          "name": "RehearsalMoveSpec",
+          "role": "dry-run Refactor-Morphismus"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_rehearsal",
+          "name": "GateRehearsalSpec",
+          "role": "lokale Gate-Prüfsektion"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_rehearsal",
+          "name": "RehearsalCoverSpec",
+          "role": "universelles Readiness-Cover"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-36 Aktivierungs-/Commit-Schicht: Rehearsal-Moves werden zu Aktivierungsfenstern, Commit-Gates, Rollback-Sektionen und Transaktionen, ohne Runtime-Verhalten zu bewegen.",
+      "implemented_by": [
+        "reta_architecture/architecture_activation.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "bootstrap_architecture_activation",
+          "name": "activate_move",
+          "role": "Trockenlauf-Move wird Aktivierungsumschlag",
+          "source": "RehearsalMoveSpec",
+          "target": "ActivationUnitSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_activation",
+          "name": "activate_gate",
+          "role": "Gate-Rehearsal wird Commit-/Rollback-Gate",
+          "source": "GateRehearsalSpec",
+          "target": "ActivationGateSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_activation",
+          "name": "rollback",
+          "role": "Commit-Gate erhält Rollback-Sektion",
+          "source": "ActivationGateSpec",
+          "target": "ActivationRollbackSpec"
+        },
+        {
+          "code_owner": "bootstrap_architecture_activation",
+          "name": "commit_transaction",
+          "role": "lokale Aktivierungen kleben zu einer Transaktion",
+          "source": "ActivationWindowSpec",
+          "target": "ActivationTransactionSpec"
+        }
+      ],
+      "name": "ArchitectureActivationCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ArchitectureActivationBundle",
+          "role": "Aktivierungs-/Commit-/Rollback-Bündel"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ActivationWindowSpec",
+          "role": "topologische Aktivierungsumgebung einer Rehearsal-Welle"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ActivationUnitSpec",
+          "role": "nicht ausgeführter Commit-Morphismus über einem Rehearsal-Move"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ActivationGateSpec",
+          "role": "lokale Preflight/Commit/Postflight/Rollback-Gate-Sektion"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ActivationRollbackSpec",
+          "role": "Rollback-Sektion zum Schutz kommutierender Diagramme"
+        },
+        {
+          "code_owner": "reta_architecture.architecture_activation",
+          "name": "ActivationTransactionSpec",
+          "role": "universelles Gluing lokaler Aktivierungseinheiten"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-37 aktivierten Zeilenbereichs-Morphismen: raw row-range text, Generator-Literale und v-Multiplikator-Sektionen werden zu endlichen Zeilenmengen expandiert; center.py bleibt nur noch Kompatibilitätsfassade.",
+      "implemented_by": [
+        "reta_architecture/row_ranges.py",
+        "libs/center.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.row_ranges.str_as_generator_to_set",
+          "name": "parse_generator_literal",
+          "role": "Generator-/Set-Literal wird lokale Zeilen-Sektion",
+          "source": "RowRangeExpression",
+          "target": "RowIndexSet"
+        },
+        {
+          "code_owner": "reta_architecture.row_ranges.is_row_range",
+          "name": "validate_row_range",
+          "role": "raw token wird gegen die Zeilenbereichs-Topologie geprüft",
+          "source": "RowRangeExpression",
+          "target": "RowRangeSyntax"
+        },
+        {
+          "code_owner": "reta_architecture.row_ranges.range_to_numbers",
+          "name": "expand_row_range",
+          "role": "Zeilenbereich wird zu Zeilenmenge expandiert",
+          "source": "RowRangeExpression",
+          "target": "RowIndexSet"
+        },
+        {
+          "code_owner": "libs.center.ROW_RANGE_MORPHISMS",
+          "name": "delegate_center_wrappers",
+          "role": "alte center-Funktionen delegieren an die aktivierte Architektur",
+          "source": "libs.center",
+          "target": "RowRangeMorphismBundle"
+        }
+      ],
+      "name": "ActivatedRowRangeCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.row_ranges",
+          "name": "RowRangeMorphismBundle",
+          "role": "aktivierter Architektur-Besitzer der Zeilenbereichsparser"
+        },
+        {
+          "code_owner": "reta_architecture.input_semantics.RowRangeSyntax",
+          "name": "RowRangeSyntax",
+          "role": "Syntaxobjekt für Komma-Splitting, v-Präfix und Integer-/Bruch-Token"
+        },
+        {
+          "code_owner": "libs.center.BereichToNumbers2",
+          "name": "RowRangeExpression",
+          "role": "legacy-kompatibler lokaler Rohtext"
+        },
+        {
+          "code_owner": "reta_architecture.row_ranges.range_to_numbers",
+          "name": "RowIndexSet",
+          "role": "expandierte endliche Zeilensektion"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-38 aktivierten center-Arithmetik: Zahlen, Zeilenbereichsausdrücke und Primfaktor-/Teilersektionen werden durch Architektur-Morphismen statt durch center.py besessen.",
+      "implemented_by": [
+        "reta_architecture/arithmetic.py",
+        "libs/center.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.arithmetic.factor_pairs",
+          "name": "factor_pairs",
+          "role": "Zahl wird zu Multiplikations-/Faktor-Paaren expandiert",
+          "source": "ArithmeticExpression",
+          "target": "FactorPairSet"
+        },
+        {
+          "code_owner": "reta_architecture.arithmetic.prime_factors",
+          "name": "prime_factorize",
+          "role": "Zahl wird in Primfaktoren zerlegt",
+          "source": "ArithmeticExpression",
+          "target": "PrimeFactorSection"
+        },
+        {
+          "code_owner": "reta_architecture.arithmetic.divisor_range",
+          "name": "glue_divisor_range",
+          "role": "Zeilenbereich wird über Faktorpaare zu Teilersektion geklebt",
+          "source": "RowIndexSet",
+          "target": "DivisorSection"
+        },
+        {
+          "code_owner": "libs.center.ARITHMETIC_MORPHISMS",
+          "name": "delegate_center_arithmetic",
+          "role": "alte center-Arithmetikfunktionen delegieren an die aktivierte Architektur",
+          "source": "libs.center",
+          "target": "ArithmeticMorphismBundle"
+        }
+      ],
+      "name": "ActivatedArithmeticCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.arithmetic",
+          "name": "ArithmeticMorphismBundle",
+          "role": "aktivierter Architektur-Besitzer der center-Arithmetik"
+        },
+        {
+          "code_owner": "libs.center",
+          "name": "ArithmeticExpression",
+          "role": "legacy-kompatible lokale Zahl- oder Bereichssektion"
+        },
+        {
+          "code_owner": "reta_architecture.arithmetic.factor_pairs",
+          "name": "FactorPairSet",
+          "role": "endliche Sektion von Faktor-/Multiplikationspaaren"
+        },
+        {
+          "code_owner": "reta_architecture.arithmetic.prime_factors",
+          "name": "PrimeFactorSection",
+          "role": "Primfaktorzerlegung als lokale Zahlensektion"
+        },
+        {
+          "code_owner": "reta_architecture.arithmetic.divisor_range",
+          "name": "DivisorSection",
+          "role": "über Row-Range-Topologie geklebte Teilersektion"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-39 aktivierten center-Console-/Help-/Utility-Morphismen: Hilfetexte, Terminal-Wrapping, Debug-Ausgabe, CLI-Output und finite Utility-Sektionen werden durch Architektur-Morphismen statt durch center.py besessen.",
+      "implemented_by": [
+        "reta_architecture/console_io.py",
+        "libs/center.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.console_io.reta_help_text",
+          "name": "load_help_section",
+          "role": "Dokumentationsdatei wird lokale Help-Sektion",
+          "source": "HelpMarkdownSection",
+          "target": "ConsoleOutputSection"
+        },
+        {
+          "code_owner": "reta_architecture.console_io.cli_output",
+          "name": "render_cli_output",
+          "role": "Textsektion wird Console-Ausgabe",
+          "source": "ConsoleOutputSection",
+          "target": "ConsoleOutputSection"
+        },
+        {
+          "code_owner": "reta_architecture.console_io.get_text_wrap_things",
+          "name": "discover_text_wrap_runtime",
+          "role": "Terminalkontext wird Wrapping-Sektion",
+          "source": "ConsoleOutputSection",
+          "target": "FiniteUtilitySection"
+        },
+        {
+          "code_owner": "libs.center.CONSOLE_IO_MORPHISMS",
+          "name": "delegate_center_console_io",
+          "role": "alte center-Hilfe-/Output-/Utilityfunktionen delegieren an die aktivierte Architektur",
+          "source": "libs.center",
+          "target": "ConsoleIOMorphismBundle"
+        }
+      ],
+      "name": "ActivatedConsoleIOCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.console_io",
+          "name": "ConsoleIOMorphismBundle",
+          "role": "aktivierter Architektur-Besitzer der center-Console-/Utility-Helfer"
+        },
+        {
+          "code_owner": "reta_architecture.console_io.reta_help_text",
+          "name": "HelpMarkdownSection",
+          "role": "lokale Dokumentationssektion aus doc/readme-Dateien"
+        },
+        {
+          "code_owner": "reta_architecture.console_io.cli_output",
+          "name": "ConsoleOutputSection",
+          "role": "sichtbarer Console-Ausgabeeffekt"
+        },
+        {
+          "code_owner": "reta_architecture.console_io.chunks / unique_everseen / DefaultOrderedDict",
+          "name": "FiniteUtilitySection",
+          "role": "endliche Hilfssektion für Tabellen- und Generated-Relation-Code"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-40 aktivierten Word-Completion-Morphismen: Wortlisten, Cursor-Präfixe und Completion-Kandidaten werden durch Architektur-Morphismen statt durch libs/word_completerAlx.py besessen.",
+      "implemented_by": [
+        "reta_architecture/completion_word.py",
+        "libs/word_completerAlx.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.completion_word.resolve_words",
+          "name": "resolve_completion_words",
+          "role": "statische/callable Wortquelle wird lokale Completion-Sektion",
+          "source": "CompletionWordSection",
+          "target": "CompletionWordSection"
+        },
+        {
+          "code_owner": "reta_architecture.completion_word.word_before_cursor",
+          "name": "restrict_to_cursor_prefix",
+          "role": "Dokument wird auf Cursor-Präfix-Open-Set eingeschränkt",
+          "source": "Document",
+          "target": "CursorPrefixOpenSet"
+        },
+        {
+          "code_owner": "reta_architecture.completion_word.word_completion_matches",
+          "name": "match_completion_word",
+          "role": "Wortsektion wird gegen Prefix/Middle-Match geprüft",
+          "source": "CompletionWordSection",
+          "target": "CompletionCandidateSection"
+        },
+        {
+          "code_owner": "libs/word_completerAlx.py",
+          "name": "delegate_word_completer",
+          "role": "alte WordCompleter-Importfläche delegiert an die aktivierte Architekturklasse",
+          "source": "libs.word_completerAlx",
+          "target": "WordCompletionMorphismBundle"
+        }
+      ],
+      "name": "ActivatedWordCompletionCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.completion_word",
+          "name": "WordCompletionMorphismBundle",
+          "role": "aktivierter Architektur-Besitzer der prompt_toolkit-WordCompleter-Logik"
+        },
+        {
+          "code_owner": "reta_architecture.completion_word.resolve_words",
+          "name": "CompletionWordSection",
+          "role": "lokale Liste oder Callable-Sektion möglicher Wörter"
+        },
+        {
+          "code_owner": "reta_architecture.completion_word.word_before_cursor",
+          "name": "CursorPrefixOpenSet",
+          "role": "topologische Einschränkung des Dokuments auf Text vor dem Cursor"
+        },
+        {
+          "code_owner": "reta_architecture.completion_word.iter_word_completions",
+          "name": "CompletionCandidateSection",
+          "role": "lokale Completion-Ausgabesektion"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der Stage-41 aktivierten nestedAlx-Hierarchiecompletion: Reta-Anfang, Hauptparameter, Subparameter, Gleichheits-/Kommawerte und Prompt-Kandidatensektionen werden durch Architektur-Morphismen statt durch libs/nestedAlx.py besessen.",
+      "implemented_by": [
+        "reta_architecture/completion_nested.py",
+        "libs/nestedAlx.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.completion_nested.ArchitectureNestedCompleter.matchTextAlx",
+          "name": "select_nested_open_set",
+          "role": "wählt die passende Completion-Situation aus",
+          "source": "PromptDocument",
+          "target": "NestedCompletionOpenSet"
+        },
+        {
+          "code_owner": "gleichKommaSpalten/Zeilen/Kombi/Ausg",
+          "name": "glue_equality_value_options",
+          "role": "klebt runtime vocabulary, i18n und Werteoptionen zur lokalen Wertsektion",
+          "source": "NestedOptionSection",
+          "target": "NestedOptionSection"
+        },
+        {
+          "code_owner": "ArchitectureNestedCompleter.get_completions",
+          "name": "yield_nested_candidates",
+          "role": "erzeugt Completion-Kandidaten für den eingeschränkten Prompt-Kontext",
+          "source": "NestedOptionSection",
+          "target": "NestedCompletionCandidateSection"
+        },
+        {
+          "code_owner": "libs/nestedAlx.py",
+          "name": "delegate_nested_completer",
+          "role": "alte nestedAlx-Importfläche delegiert an die aktivierte Architekturklasse",
+          "source": "libs.nestedAlx",
+          "target": "NestedCompletionMorphismBundle"
+        }
+      ],
+      "name": "ActivatedNestedCompletionCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.completion_nested",
+          "name": "NestedCompletionMorphismBundle",
+          "role": "aktivierter Architektur-Besitzer der nestedAlx-Hierarchiecompletion"
+        },
+        {
+          "code_owner": "ArchitectureNestedCompleter.matchTextAlx",
+          "name": "NestedCompletionOpenSet",
+          "role": "topologische Einschränkung des Prompt-Dokuments auf eine Completion-Situation"
+        },
+        {
+          "code_owner": "ArchitectureNestedCompleter.options",
+          "name": "NestedOptionSection",
+          "role": "lokale Completion-Sektion aus Befehlen, Parametern oder Werten"
+        },
+        {
+          "code_owner": "ArchitectureNestedCompleter.get_completions",
+          "name": "NestedCompletionCandidateSection",
+          "role": "aus prompt_toolkit Completion-Objekten bestehende Ausgabesektion"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der reinen Ausführungsnetzwerke über den mathematischen Schichten; Tasks, Queues, Worker und deterministisches Resultat-Gluing.",
+      "implemented_by": [
+        "reta_architecture/execution_network.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "FifoTaskQueue.push",
+          "name": "enqueue_task",
+          "role": "Task in Warteschlange einreihen",
+          "source": "ExecutionTask",
+          "target": "ExecutionQueue"
+        },
+        {
+          "code_owner": "FifoTaskQueue.pop",
+          "name": "dequeue_task",
+          "role": "Task aus Warteschlange entnehmen",
+          "source": "ExecutionQueue",
+          "target": "ExecutionTask"
+        },
+        {
+          "code_owner": "execute_tasks_deterministically",
+          "name": "dispatch_task",
+          "role": "Task seriell oder prozessbasiert ausführen",
+          "source": "ExecutionTask",
+          "target": "ExecutionRunResult"
+        },
+        {
+          "code_owner": "deterministic_reduce",
+          "name": "deterministic_reduce",
+          "role": "Taskresultate in stabiler Originalreihenfolge kleben",
+          "source": "ExecutionRunResult",
+          "target": "OrderedResultSection"
+        }
+      ],
+      "name": "ExecutionNetworkCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.execution_network.ExecutionTask",
+          "name": "ExecutionTask",
+          "role": "lokaler ausführbarer Task über einem bereits definierten Morphismus"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.FifoTaskQueue",
+          "name": "ExecutionQueue",
+          "role": "FIFO/LIFO/Priority Scheduling-Oberfläche"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.ExecutionRunResult",
+          "name": "ExecutionRunResult",
+          "role": "deterministisch reduzierte Task-Ergebnisse"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.ExecutionNetworkBundle",
+          "name": "ExecutionNetworkBundle",
+          "role": "Ausführungsnetzwerk mit Ressourcenlimits"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie begrenzter Scheduler-Ressourcen: FIFO, LIFO, PriorityQueue und Semaphoren als reine Runtime-Mechanik.",
+      "implemented_by": [
+        "reta_architecture/execution_network.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "FifoTaskQueue.push / LifoTaskStack.push / PriorityTaskQueue.push",
+          "name": "push",
+          "role": "Task in Scheduler einfügen",
+          "source": "ExecutionTask",
+          "target": "SchedulerQueue"
+        },
+        {
+          "code_owner": "FifoTaskQueue.pop / LifoTaskStack.pop / PriorityTaskQueue.pop",
+          "name": "pop",
+          "role": "nächsten Task nach Disziplin entnehmen",
+          "source": "SchedulerQueue",
+          "target": "ExecutionTask"
+        },
+        {
+          "code_owner": "ResourceSemaphore.acquire",
+          "name": "acquire_resource",
+          "role": "knappe Ressource reservieren",
+          "source": "ResourceSemaphore",
+          "target": "ResourceLease"
+        },
+        {
+          "code_owner": "ResourceSemaphore.release",
+          "name": "release_resource",
+          "role": "knappe Ressource freigeben",
+          "source": "ResourceLease",
+          "target": "ResourceSemaphore"
+        }
+      ],
+      "name": "SchedulerCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.execution_network.FifoTaskQueue",
+          "name": "FifoQueue",
+          "role": "faire Arbeitswarteschlange"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.LifoTaskStack",
+          "name": "LifoStack",
+          "role": "Stack für Tiefensuche/Nested-Kontexte"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.PriorityTaskQueue",
+          "name": "PriorityQueue",
+          "role": "priorisierte Arbeitswarteschlange"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.ResourceSemaphore",
+          "name": "ResourceSemaphore",
+          "role": "prozessfähige Ressourcenbegrenzung"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie von Halfduplex- und Fullduplex-Kanälen für Supervisor/Worker- und Prompt-Kommunikation.",
+      "implemented_by": [
+        "reta_architecture/execution_network.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "send_request / send_response",
+          "name": "send_message",
+          "role": "Nachricht senden",
+          "source": "ChannelMessage",
+          "target": "HalfDuplexChannel"
+        },
+        {
+          "code_owner": "receive_request / receive_response",
+          "name": "receive_message",
+          "role": "Nachricht empfangen",
+          "source": "HalfDuplexChannel",
+          "target": "ChannelMessage"
+        },
+        {
+          "code_owner": "send_b_to_a",
+          "name": "stream_progress",
+          "role": "Fortschritt in Gegenrichtung senden",
+          "source": "FullDuplexChannel",
+          "target": "ChannelMessage"
+        },
+        {
+          "code_owner": "send_a_to_b",
+          "name": "cancel_message",
+          "role": "Cancel/Abort-Nachricht senden",
+          "source": "ChannelMessage",
+          "target": "FullDuplexChannel"
+        }
+      ],
+      "name": "ChannelCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.execution_network.HalfDuplexChannel",
+          "name": "HalfDuplexChannel",
+          "role": "Request/Response-Kanal"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network.FullDuplexChannel",
+          "name": "FullDuplexChannel",
+          "role": "bidirektionaler Fortschritt-/Cancel-Kanal"
+        },
+        {
+          "code_owner": "reta_architecture.execution_network",
+          "name": "ChannelMessage",
+          "role": "serialisierbare Worker-/Prompt-Nachricht"
+        }
+      ]
+    },
+    {
+      "description": "Kategorie der SQLite-Materialisierung, Auditierung und Cache-Snapshots; speichert Instanzen ohne die mathematische Semantik zu definieren.",
+      "implemented_by": [
+        "reta_architecture/persistence.py"
+      ],
+      "morphisms": [
+        {
+          "code_owner": "reta_architecture.persistence.persist_section",
+          "name": "persist_section",
+          "role": "lokale Sektion materialisieren",
+          "source": "LocalSection",
+          "target": "PersistentLocalSection"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.load_section",
+          "name": "load_section",
+          "role": "lokale Sektion laden",
+          "source": "PersistentLocalSection",
+          "target": "LocalSection"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.persist_sheaf_snapshot",
+          "name": "persist_sheaf_snapshot",
+          "role": "Garbensnapshot materialisieren",
+          "source": "SheafBundle",
+          "target": "PersistentSheafSnapshot"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.persist_execution_run",
+          "name": "persist_execution_run",
+          "role": "Ausführungslauf auditierbar speichern",
+          "source": "ExecutionRunResult",
+          "target": "PersistentExecutionRun"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.record_audit_event",
+          "name": "record_audit_event",
+          "role": "Validierungs-/Paritätsereignis auditieren",
+          "source": "ArchitectureValidationBundle",
+          "target": "AuditEvent"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.cache_put",
+          "name": "cache_put",
+          "role": "gültiges Resultat cachen",
+          "source": "GlobalResult",
+          "target": "CacheEntry"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.cache_get",
+          "name": "cache_get",
+          "role": "gültiges Cache-Resultat laden",
+          "source": "CacheEntry",
+          "target": "GlobalResult"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.invalidate_cache",
+          "name": "invalidate_cache",
+          "role": "Cacheeintrag ungültig markieren",
+          "source": "CacheEntry",
+          "target": "CacheEntry"
+        }
+      ],
+      "name": "PersistenceCategory",
+      "objects": [
+        {
+          "code_owner": "reta_architecture.persistence.persist_section",
+          "name": "PersistentLocalSection",
+          "role": "persistierte lokale Prägarbensektion"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.persist_sheaf_snapshot",
+          "name": "PersistentSheafSnapshot",
+          "role": "persistierter Garben-Snapshot"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.persist_execution_run",
+          "name": "PersistentExecutionRun",
+          "role": "persistierter Ausführungslauf"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.record_audit_event",
+          "name": "AuditEvent",
+          "role": "Auditereignis mit stabiler Payload-Prüfsumme"
+        },
+        {
+          "code_owner": "reta_architecture.persistence.cache_put",
+          "name": "CacheEntry",
+          "role": "validierbarer materialisierter Cacheeintrag"
+        }
+      ]
+    }
+  ],
+  "class": "CategoryTheoryBundle",
+  "counts": {
+    "categories": 26,
+    "functors": 77,
+    "natural_transformations": 42,
+    "paradigm_terms": 8
+  },
+  "functors": [
+    {
+      "code_owner": "RetaContextTopology.from_schema",
+      "description": "Erzeugt aus der kanonischen Schema-/Words-Struktur die Topologie der offenen Reta-Kontexte.",
+      "morphism_map": {
+        "main_parameter_cover": "cover_for_main",
+        "schema_family_membership": "open_for"
+      },
+      "name": "SchemaToTopologyFunctor",
+      "object_map": {
+        "ParameterFamilies": "ContextSelection",
+        "RetaContextSchema": "RetaContextTopology"
+      },
+      "source_category": "CanonicalSemanticSheafCategory",
+      "target_category": "OpenRetaContextCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.presheaves.PromptStatePresheaf",
+      "description": "Ordnet jedem offenen Kontext lokale, noch nicht kanonisierte Prompt-/Datei-Sektionen zu.",
+      "morphism_map": {
+        "open_for": "add_section",
+        "refine": "restrict"
+      },
+      "name": "RawCommandPresheafFunctor",
+      "object_map": {
+        "ContextSelection": "LocalSection",
+        "PromptText": "PromptStatePresheaf"
+      },
+      "source_category": "OpenRetaContextCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "contravariant"
+    },
+    {
+      "code_owner": "reta_architecture.sheaves.ParameterSemanticsSheaf",
+      "description": "Ordnet offenen Kontexten die geklebte kanonische Parametersemantik zu.",
+      "morphism_map": {
+        "cover_for_main": "column_numbers_for_pair",
+        "refine": "canonicalize_pair"
+      },
+      "name": "CanonicalParameterSheafFunctor",
+      "object_map": {
+        "ContextCover": "ParameterSemanticsSheaf",
+        "ContextSelection": "ParameterSemanticsSheaf"
+      },
+      "source_category": "OpenRetaContextCategory",
+      "target_category": "CanonicalSemanticSheafCategory",
+      "variance": "contravariant"
+    },
+    {
+      "code_owner": "reta_architecture.presheaves.FilesystemPresheaf",
+      "description": "Modelliert CSVs, Übersetzungen und Assets als lokale Prägarben-Sektionen.",
+      "morphism_map": {
+        "cover_for_main": "add_section",
+        "refine": "restrict"
+      },
+      "name": "LocalDataPresheafFunctor",
+      "object_map": {
+        "ContextSelection": "FilesystemPresheaf",
+        "CsvContext": "LocalSection"
+      },
+      "source_category": "OpenRetaContextCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "contravariant"
+    },
+    {
+      "code_owner": "reta_architecture.sheaves.SheafBundle.from_repo",
+      "description": "Klebt lokale Daten zu global verwendbarer Semantik.",
+      "morphism_map": {
+        "cover_for_main": "merge_parameter_dicts",
+        "refine": "sync_program_semantics"
+      },
+      "name": "GluedSemanticSheafFunctor",
+      "object_map": {
+        "ContextSelection": "SheafBundle",
+        "CsvContext": "ParameterSemanticsSheaf"
+      },
+      "source_category": "OpenRetaContextCategory",
+      "target_category": "CanonicalSemanticSheafCategory",
+      "variance": "contravariant"
+    },
+    {
+      "code_owner": "reta_architecture.table_generation.bootstrap_table_generation",
+      "description": "Führt Parameter- und Spaltenauswahl über universelles Gluing zur globalen Tabellen-Sektion.",
+      "morphism_map": {
+        "merge_parameter_dicts": "create_tables",
+        "normalize_column_buckets": "prepare_output_table"
+      },
+      "name": "TableGenerationGluingFunctor",
+      "object_map": {
+        "ColumnBucketDiagram": "TableStateSections",
+        "ParameterDictionaryDiagram": "Tables"
+      },
+      "source_category": "UniversalConstructionCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.generated_columns.GeneratedColumnRegistry",
+      "description": "Familie von Tabellen-Endofunktoren, die abgeleitete Spalten erzeugen.",
+      "morphism_map": {
+        "concat_love_polygon": "concat_love_polygon",
+        "concat_modallogik": "concat_modallogik",
+        "create_spalte_gestirn": "create_spalte_gestirn"
+      },
+      "name": "GeneratedColumnEndofunctorFamily",
+      "object_map": {
+        "GeneratedColumnSection": "GeneratedColumnSection",
+        "Tables": "Tables"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.table_output.TableOutput",
+      "description": "Renderer-Funktoren von globalen Tabellensektionen in konkrete Ausgabeformate.",
+      "morphism_map": {
+        "apply_output_mode": "apply_output_mode",
+        "prepare_output_table": "render"
+      },
+      "name": "OutputRenderingFunctorFamily",
+      "object_map": {
+        "TableStateSections": "OutputModeSpec",
+        "Tables": "RenderedOutput"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "OutputFormatCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "tests.test_command_parity",
+      "description": "Vergleichsfunktor, der verschiedene Renderer-Ausgaben in paritätsfähige Normalformen überführt.",
+      "morphism_map": {
+        "apply_output_mode": "apply_output_mode",
+        "render": "normalize_for_parity"
+      },
+      "name": "NormalizedOutputFunctor",
+      "object_map": {
+        "OutputSyntax": "OutputSyntax",
+        "RenderedOutput": "NormalizedOutput"
+      },
+      "source_category": "OutputFormatCategory",
+      "target_category": "OutputFormatCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs compatibility facades",
+      "description": "Beschreibt, wie alte Importpfade auf die neue Tabellenarchitektur abgebildet werden.",
+      "morphism_map": {
+        "concat_delegation": "GeneratedColumnEndofunctorFamily",
+        "prepare_delegation": "prepare_output_table",
+        "tableHandling_reexport": "create_tables"
+      },
+      "name": "LegacyRuntimeFunctor",
+      "object_map": {
+        "libs.lib4tables_concat": "GeneratedColumnRegistry",
+        "libs.lib4tables_prepare": "TablePreparationBundle",
+        "libs.tableHandling": "Tables"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.facade.RetaArchitecture",
+      "description": "Der neue strukturierte Runtime-Pfad über die Architektur-Fassade.",
+      "morphism_map": {
+        "bootstrap_program": "bootstrap_table_runtime",
+        "concat_delegation": "bootstrap_generated_columns",
+        "prepare_delegation": "bootstrap_table_preparation",
+        "tableHandling_reexport": "create_tables"
+      },
+      "name": "ArchitectureRuntimeFunctor",
+      "object_map": {
+        "libs.lib4tables_concat": "GeneratedColumnRegistry",
+        "libs.lib4tables_prepare": "TablePreparationBundle",
+        "libs.tableHandling": "Tables",
+        "reta.py Program": "RetaArchitecture"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.table_runtime.Tables",
+      "description": "Historisch-mutable Sicht der globalen Tabellensektion.",
+      "morphism_map": {
+        "prepare_output_table": "prepare_output_table",
+        "render_table_output": "render_table_output"
+      },
+      "name": "MutableTableRuntimeFunctor",
+      "object_map": {
+        "TableOutput": "TableOutput",
+        "Tables": "Tables"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.table_state.TableStateBundle",
+      "description": "Projiziert die globale Runtime in explizite, inspizierbare Tabellenzustandssektionen.",
+      "morphism_map": {
+        "prepare_output_table": "TableStateSections.snapshot",
+        "render_table_output": "TableStateSections.snapshot"
+      },
+      "name": "ExplicitTableStateFunctor",
+      "object_map": {
+        "GeneratedColumnSection": "GeneratedColumnSection",
+        "Tables": "TableStateSections"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_contracts.bootstrap_architecture_contracts",
+      "description": "Hebt die Stage-27-Kategorien/Funktoren/natürlichen Transformationen in Stage-29-Vertragsdiagramme.",
+      "morphism_map": {
+        "bootstrap_category_theory": "bootstrap_architecture_contracts",
+        "natural_transformation_named": "diagram_named"
+      },
+      "name": "CategoryTheoryToContractFunctor",
+      "object_map": {
+        "CategoryTheoryBundle": "ArchitectureContractsBundle",
+        "NaturalTransformationSpec": "CommutativeDiagramSpec"
+      },
+      "source_category": "CommutativeArchitectureContractCategory",
+      "target_category": "CommutativeArchitectureContractCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_contracts.bootstrap_architecture_contracts",
+      "description": "Macht aus der Stage-28-Kapselkarte explizite Kapselverträge und kommutierende Diagramme.",
+      "morphism_map": {
+        "bootstrap_architecture_map": "bootstrap_architecture_contracts",
+        "capsule_named": "capsule_contract_named"
+      },
+      "name": "ArchitectureMapToContractFunctor",
+      "object_map": {
+        "ArchitectureCapsuleSpec": "CapsuleContractSpec",
+        "ArchitectureFlowSpec": "CommutativeDiagramSpec",
+        "ArchitectureMapBundle": "ArchitectureContractsBundle"
+      },
+      "source_category": "CommutativeArchitectureContractCategory",
+      "target_category": "CommutativeArchitectureContractCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_validation.bootstrap_architecture_validation",
+      "description": "Hebt Stage-29-Verträge in ausführbare Stage-31-Validierungschecks.",
+      "morphism_map": {
+        "bootstrap_architecture_contracts": "bootstrap_architecture_validation",
+        "validate_contract_references": "ContractReferenceValidationCheck"
+      },
+      "name": "ContractToValidationFunctor",
+      "object_map": {
+        "ArchitectureContractsBundle": "ArchitectureValidationBundle",
+        "CapsuleContractSpec": "ArchitectureValidationCheckSpec",
+        "CommutativeDiagramSpec": "ArchitectureValidationCheckSpec",
+        "RefactorLawSpec": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "CommutativeArchitectureContractCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_validation + reta_architecture.architecture_witnesses",
+      "description": "Hebt Stage-30-Witnesses in ausführbare Stage-31-Validierungschecks.",
+      "morphism_map": {
+        "diagram_named": "diagram_witness_named",
+        "validate_contract_references": "WitnessValidationCheck"
+      },
+      "name": "WitnessToValidationFunctor",
+      "object_map": {
+        "ArchitectureContractsBundle": "ArchitectureWitnessBundle",
+        "CommutativeDiagramSpec": "DiagramWitnessCoverageCheck",
+        "RefactorLawSpec": "RefactorLawObligationCoverageCheck"
+      },
+      "source_category": "CommutativeArchitectureContractCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_coherence.py",
+      "description": "Führt Verträge, Witnesses und Kapseln als Kohärenzmatrix zusammen.",
+      "morphism_map": {
+        "protects": "coheres"
+      },
+      "name": "CoherenceMatrixFunctor",
+      "object_map": {
+        "ContractDiagram": "CoherenceRow"
+      },
+      "source_category": "CommutativeArchitectureContractCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_traces.py",
+      "description": "Macht Kohärenzzeilen als navigierbare Trace-Routen sichtbar.",
+      "morphism_map": {
+        "coheres": "trace"
+      },
+      "name": "CoherenceToTraceFunctor",
+      "object_map": {
+        "CoherenceRow": "TraceRow"
+      },
+      "source_category": "ArchitectureCoherenceCategory",
+      "target_category": "ArchitectureTraceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_traces.py",
+      "description": "Ordnet alte reta-Besitzer ihren neuen Kapselspuren zu.",
+      "morphism_map": {
+        "delegates": "trace"
+      },
+      "name": "LegacyOwnershipTraceFunctor",
+      "object_map": {
+        "LegacyOwner": "RetaComponentTraceSpec"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ArchitectureTraceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_boundaries.py",
+      "description": "Projiziert Kohärenz auf konkrete Modul- und Importgrenzen.",
+      "morphism_map": {
+        "coheres": "classify_import"
+      },
+      "name": "CoherenceToBoundaryFunctor",
+      "object_map": {
+        "CapsuleCoherenceSpec": "CapsuleBoundarySpec"
+      },
+      "source_category": "ArchitectureCoherenceCategory",
+      "target_category": "ArchitectureBoundaryCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_boundaries.py",
+      "description": "Klassifiziert Legacy-Importe als sichtbare Kapselgrenzen.",
+      "morphism_map": {
+        "imports": "ImportEdgeSpec"
+      },
+      "name": "LegacyImportBoundaryFunctor",
+      "object_map": {
+        "LegacyModule": "ModuleOwnershipSpec"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ArchitectureBoundaryCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "description": "Projiziert Trace-Routen auf Impact-Quellen und betroffene Verträge.",
+      "morphism_map": {
+        "trace": "compute_impact"
+      },
+      "name": "TraceBoundaryImpactFunctor",
+      "object_map": {
+        "RetaComponentTraceSpec": "ImpactSourceSpec"
+      },
+      "source_category": "ArchitectureTraceCategory",
+      "target_category": "ArchitectureImpactCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "description": "Projiziert reale Importgrenzen auf Impact-Quellen.",
+      "morphism_map": {
+        "classify_import": "compute_impact"
+      },
+      "name": "BoundaryImpactFunctor",
+      "object_map": {
+        "ImportEdgeSpec": "ImpactSourceSpec"
+      },
+      "source_category": "ArchitectureBoundaryCategory",
+      "target_category": "ArchitectureImpactCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "description": "Führt Impact-Gates in die validierbare Kohärenzschicht zurück.",
+      "morphism_map": {
+        "gate": "validate"
+      },
+      "name": "ImpactGateValidationFunctor",
+      "object_map": {
+        "RegressionGateSpec": "CoherenceRow"
+      },
+      "source_category": "ArchitectureImpactCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "description": "Liest Legacy-Owner als guarded Migrationskandidaten statt als neue Semantik-Owner.",
+      "morphism_map": {
+        "delegates": "gate"
+      },
+      "name": "MigrationCandidateFunctor",
+      "object_map": {
+        "LegacyOwner": "MigrationCandidateSpec"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ArchitectureImpactCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "description": "Projiziert Stage-33-Migrationskandidaten auf geordnete Stage-34-Schritte.",
+      "morphism_map": {
+        "gate": "plan"
+      },
+      "name": "ImpactToMigrationPlanFunctor",
+      "object_map": {
+        "MigrationCandidateSpec": "MigrationStepSpec"
+      },
+      "source_category": "ArchitectureImpactCategory",
+      "target_category": "ArchitectureMigrationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "description": "Projiziert Impact-Gates auf konkrete Gate-Bindings der Migrationsschritte.",
+      "morphism_map": {
+        "gate": "bind_gate"
+      },
+      "name": "ImpactGateBindingFunctor",
+      "object_map": {
+        "RegressionGateSpec": "MigrationGateBindingSpec"
+      },
+      "source_category": "ArchitectureImpactCategory",
+      "target_category": "ArchitectureMigrationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "description": "Endofunktor, der geplante Schritte stufenweise/kapselweise ordnet.",
+      "morphism_map": {
+        "plan": "order"
+      },
+      "name": "MigrationWaveOrderingFunctor",
+      "object_map": {
+        "MigrationStepSpec": "MigrationWaveSpec"
+      },
+      "source_category": "ArchitectureMigrationCategory",
+      "target_category": "ArchitectureMigrationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "description": "Reflektiert Migrationswellen in die Kohärenzmatrix.",
+      "morphism_map": {
+        "order": "coheres"
+      },
+      "name": "MigrationOrderingCoherenceFunctor",
+      "object_map": {
+        "MigrationWaveSpec": "CoherenceRow"
+      },
+      "source_category": "ArchitectureMigrationCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "description": "Reflektiert Gate-Bindings in die validierbare Kohärenzschicht.",
+      "morphism_map": {
+        "bind_gate": "validate"
+      },
+      "name": "MigrationGateCoherenceFunctor",
+      "object_map": {
+        "MigrationGateBindingSpec": "CoherenceRow"
+      },
+      "source_category": "ArchitectureMigrationCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_rehearsal.py",
+      "description": "Projiziert Stage-34-Migrationsschritte auf Stage-35-Trockenlauf-Moves.",
+      "morphism_map": {
+        "plan": "rehearse_step"
+      },
+      "name": "MigrationStepRehearsalFunctor",
+      "object_map": {
+        "MigrationStepSpec": "RehearsalMoveSpec"
+      },
+      "source_category": "ArchitectureMigrationCategory",
+      "target_category": "ArchitectureRehearsalCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_rehearsal.py",
+      "description": "Projiziert Stage-34-Gate-Bindings auf Preflight/Postflight-Rehearsal-Suites.",
+      "morphism_map": {
+        "bind_gate": "rehearse_gate"
+      },
+      "name": "MigrationGateRehearsalFunctor",
+      "object_map": {
+        "MigrationGateBindingSpec": "GateRehearsalSpec"
+      },
+      "source_category": "ArchitectureMigrationCategory",
+      "target_category": "ArchitectureRehearsalCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_rehearsal.py",
+      "description": "Klebt lokale Rehearsal-Sektionen zu einem Readiness-Cover.",
+      "morphism_map": {
+        "rehearse_step": "cover_wave"
+      },
+      "name": "RehearsalCoverFunctor",
+      "object_map": {
+        "RehearsalOpenSetSpec": "RehearsalCoverSpec"
+      },
+      "source_category": "ArchitectureRehearsalCategory",
+      "target_category": "ArchitectureRehearsalCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Reflektiert Gate-Rehearsals in die Validierungsschicht.",
+      "morphism_map": {
+        "rehearse_gate": "validate"
+      },
+      "name": "RehearsalGateValidationFunctor",
+      "object_map": {
+        "GateRehearsalSpec": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ArchitectureRehearsalCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_coherence.py",
+      "description": "Reflektiert Stage-35-Readiness in die Kohärenzmatrix.",
+      "morphism_map": {
+        "cover_wave": "coheres"
+      },
+      "name": "RehearsalReadinessCoherenceFunctor",
+      "object_map": {
+        "RehearsalCoverSpec": "CoherenceRow"
+      },
+      "source_category": "ArchitectureRehearsalCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "description": "Projiziert Stage-35-Rehearsal-Moves auf Stage-36-Aktivierungseinheiten.",
+      "morphism_map": {
+        "rehearse_step": "activate_move"
+      },
+      "name": "RehearsalActivationFunctor",
+      "object_map": {
+        "RehearsalMoveSpec": "ActivationUnitSpec"
+      },
+      "source_category": "ArchitectureRehearsalCategory",
+      "target_category": "ArchitectureActivationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "description": "Projiziert Gate-Rehearsals auf Commit-/Rollback-Gates.",
+      "morphism_map": {
+        "rehearse_gate": "activate_gate"
+      },
+      "name": "GateActivationFunctor",
+      "object_map": {
+        "GateRehearsalSpec": "ActivationGateSpec"
+      },
+      "source_category": "ArchitectureRehearsalCategory",
+      "target_category": "ArchitectureActivationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "description": "Klebt lokale Aktivierungseinheiten zu einer Transaktion pro Fenster.",
+      "morphism_map": {
+        "activate_move": "commit_transaction"
+      },
+      "name": "ActivationTransactionFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "ActivationTransactionSpec",
+        "ActivationWindowSpec": "ActivationTransactionSpec"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ArchitectureActivationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "description": "Ordnet jedem Commit-Gate eine Rollback-Sektion zu.",
+      "morphism_map": {
+        "activate_gate": "rollback"
+      },
+      "name": "ActivationRollbackFunctor",
+      "object_map": {
+        "ActivationGateSpec": "ActivationRollbackSpec"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ArchitectureActivationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Reflektiert Aktivierungsfenster, Gates und Rollback-Sektionen in die Validierung.",
+      "morphism_map": {
+        "commit_transaction": "validate"
+      },
+      "name": "ActivationValidationFunctor",
+      "object_map": {
+        "ActivationTransactionSpec": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_coherence.py",
+      "description": "Reflektiert Stage-36-Aktivierungstransaktionen in die Kohärenzmatrix.",
+      "morphism_map": {
+        "commit_transaction": "coheres"
+      },
+      "name": "ActivationCoherenceFunctor",
+      "object_map": {
+        "ActivationTransactionSpec": "CoherenceRow"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ArchitectureCoherenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/row_ranges.py",
+      "description": "Aktiviert den Stage-36-Commit-Umschlag für den M2-Input-Move: Row-Range-Logik wird realer Architekturbesitz.",
+      "morphism_map": {
+        "activate_move": "delegate_center_wrappers"
+      },
+      "name": "RowRangeActivationFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "RowRangeMorphismBundle"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ActivatedRowRangeCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs/center.py",
+      "description": "Liest die alten center-Zeilenbereichsfunktionen als Fassaden über den neuen RowRangeMorphismBundle.",
+      "morphism_map": {
+        "legacy_call": "expand_row_range"
+      },
+      "name": "CenterRowRangeCompatibilityFunctor",
+      "object_map": {
+        "libs.center.BereichToNumbers2": "RowRangeMorphismBundle"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ActivatedRowRangeCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/row_ranges.py",
+      "description": "Transportiert aktivierte Zeilenbereichssektionen zurück in die lokale Input-/Prompt-Sektion.",
+      "morphism_map": {
+        "expand_row_range": "restrict"
+      },
+      "name": "RowRangeInputFunctor",
+      "object_map": {
+        "RowIndexSet": "LocalSection",
+        "RowRangeExpression": "LocalSection"
+      },
+      "source_category": "ActivatedRowRangeCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Macht die aktivierte Row-Range-Migration prüfbar.",
+      "morphism_map": {
+        "expand_row_range": "validate"
+      },
+      "name": "RowRangeValidationFunctor",
+      "object_map": {
+        "RowRangeMorphismBundle": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ActivatedRowRangeCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py",
+      "description": "Aktiviert einen weiteren Stage-36-Commit-Umschlag: center-Arithmetik wird realer Architekturbesitz.",
+      "morphism_map": {
+        "activate_move": "delegate_center_arithmetic"
+      },
+      "name": "ArithmeticActivationFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "ArithmeticMorphismBundle"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ActivatedArithmeticCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs/center.py",
+      "description": "Liest alte center-Arithmetiknamen als Fassaden über ArithmeticMorphismBundle.",
+      "morphism_map": {
+        "legacy_call": "factor_pairs"
+      },
+      "name": "CenterArithmeticCompatibilityFunctor",
+      "object_map": {
+        "libs.center.multiples": "ArithmeticMorphismBundle",
+        "libs.center.teiler": "ArithmeticMorphismBundle"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ActivatedArithmeticCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py",
+      "description": "Verwendet den Stage-37 RowRangeMorphismBundle als Topologie für Stage-38 Teiler-/Faktor-Gluing.",
+      "morphism_map": {
+        "expand_row_range": "glue_divisor_range"
+      },
+      "name": "ArithmeticRowRangeGluingFunctor",
+      "object_map": {
+        "RowIndexSet": "DivisorSection"
+      },
+      "source_category": "ActivatedRowRangeCategory",
+      "target_category": "ActivatedArithmeticCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Macht die aktivierte Arithmetik-Migration prüfbar.",
+      "morphism_map": {
+        "factor_pairs": "validate"
+      },
+      "name": "ArithmeticValidationFunctor",
+      "object_map": {
+        "ArithmeticMorphismBundle": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ActivatedArithmeticCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/console_io.py",
+      "description": "Aktiviert den nächsten Stage-36-Commit-Umschlag: center-Console-/Help-/Utility-Logik wird realer Architekturbesitz.",
+      "morphism_map": {
+        "activate_move": "delegate_center_console_io"
+      },
+      "name": "ConsoleIOActivationFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "ConsoleIOMorphismBundle"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ActivatedConsoleIOCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs/center.py",
+      "description": "Liest alte center-Console-/Help-/Utilitynamen als Fassaden über ConsoleIOMorphismBundle.",
+      "morphism_map": {
+        "legacy_call": "render_cli_output"
+      },
+      "name": "CenterConsoleIOCompatibilityFunctor",
+      "object_map": {
+        "libs.center.cliout": "ConsoleIOMorphismBundle",
+        "libs.center.getTextWrapThings": "ConsoleIOMorphismBundle",
+        "libs.center.retaHilfe": "ConsoleIOMorphismBundle"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ActivatedConsoleIOCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/console_io.py",
+      "description": "Transportiert aktivierte Console-Ausgabesektionen in die bestehende Output-Rendering-Kategorie.",
+      "morphism_map": {
+        "render_cli_output": "render"
+      },
+      "name": "ConsoleIOOutputRenderingFunctor",
+      "object_map": {
+        "ConsoleOutputSection": "RenderedOutput"
+      },
+      "source_category": "ActivatedConsoleIOCategory",
+      "target_category": "OutputFormatCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Macht die aktivierte Console-/Utility-Migration prüfbar.",
+      "morphism_map": {
+        "render_cli_output": "validate"
+      },
+      "name": "ConsoleIOValidationFunctor",
+      "object_map": {
+        "ConsoleIOMorphismBundle": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ActivatedConsoleIOCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/completion_word.py",
+      "description": "Aktiviert den nächsten Stage-36-Commit-Umschlag: word_completerAlx wird reale Architektur-Completion-Logik.",
+      "morphism_map": {
+        "activate_move": "delegate_word_completer"
+      },
+      "name": "WordCompletionActivationFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "WordCompletionMorphismBundle"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ActivatedWordCompletionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs/word_completerAlx.py",
+      "description": "Liest den alten WordCompleter-Import als Fassade über die Architektur-Completion-Klasse.",
+      "morphism_map": {
+        "legacy_call": "iter_word_completions"
+      },
+      "name": "LegacyWordCompleterCompatibilityFunctor",
+      "object_map": {
+        "libs.word_completerAlx.WordCompleter": "ArchitectureWordCompleter"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ActivatedWordCompletionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/completion_word.py",
+      "description": "Transportiert Completion-Kandidaten zurück in die Prompt-/Input-Kapsel.",
+      "morphism_map": {
+        "iter_word_completions": "prompt_completion"
+      },
+      "name": "WordCompletionPromptFunctor",
+      "object_map": {
+        "CompletionCandidateSection": "PromptCompletionSection"
+      },
+      "source_category": "ActivatedWordCompletionCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Macht die aktivierte Word-Completion-Migration prüfbar.",
+      "morphism_map": {
+        "iter_word_completions": "validate"
+      },
+      "name": "WordCompletionValidationFunctor",
+      "object_map": {
+        "WordCompletionMorphismBundle": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ActivatedWordCompletionCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/completion_nested.py",
+      "description": "Aktiviert den nächsten Stage-36-Commit-Umschlag: nestedAlx wird reale Architektur-Completion-Logik.",
+      "morphism_map": {
+        "activate_move": "delegate_nested_completer"
+      },
+      "name": "NestedCompletionActivationFunctor",
+      "object_map": {
+        "ActivationUnitSpec": "NestedCompletionMorphismBundle"
+      },
+      "source_category": "ArchitectureActivationCategory",
+      "target_category": "ActivatedNestedCompletionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "libs/nestedAlx.py",
+      "description": "Liest den alten nestedAlx-Import als Fassade über die Architektur-Nested-Completion-Klasse.",
+      "morphism_map": {
+        "legacy_call": "get_completions"
+      },
+      "name": "LegacyNestedCompleterCompatibilityFunctor",
+      "object_map": {
+        "libs.nestedAlx.ComplSitua": "ComplSitua",
+        "libs.nestedAlx.NestedCompleter": "ArchitectureNestedCompleter"
+      },
+      "source_category": "LegacyFacadeCategory",
+      "target_category": "ActivatedNestedCompletionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/completion_nested.py",
+      "description": "Transportiert hierarchische Completion-Kandidaten zurück in die Prompt-/Input-Kapsel.",
+      "morphism_map": {
+        "yield_nested_candidates": "prompt_completion"
+      },
+      "name": "NestedCompletionPromptFunctor",
+      "object_map": {
+        "NestedCompletionCandidateSection": "PromptCompletionSection"
+      },
+      "source_category": "ActivatedNestedCompletionCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_validation.py",
+      "description": "Macht die aktivierte nestedAlx-Migration prüfbar.",
+      "morphism_map": {
+        "yield_nested_candidates": "validate"
+      },
+      "name": "NestedCompletionValidationFunctor",
+      "object_map": {
+        "NestedCompletionMorphismBundle": "ArchitectureValidationCheckSpec"
+      },
+      "source_category": "ActivatedNestedCompletionCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "description": "Hebt chunkbare Tabellenarbeit in ein reines Ausführungsnetzwerk.",
+      "morphism_map": {
+        "filter_original_lines": "enqueue_task",
+        "prepare_output_table": "dispatch_task"
+      },
+      "name": "TableChunkExecutionFunctor",
+      "object_map": {
+        "TableStateSections": "ExecutionRunResult",
+        "Tables": "ExecutionTask"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "description": "Klebt parallel/seriell ausgeführte Taskresultate deterministisch zurück in Tabellen-Sektionen.",
+      "morphism_map": {
+        "deterministic_reduce": "prepare_output_table"
+      },
+      "name": "ExecutionResultGluingFunctor",
+      "object_map": {
+        "ExecutionRunResult": "TableStateSections",
+        "OrderedResultSection": "Tables"
+      },
+      "source_category": "ExecutionNetworkCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "description": "Übersetzt Queue-/Stack-/Semaphore-Mechanik in ausführbare Task-Netzwerke.",
+      "morphism_map": {
+        "acquire_resource": "dispatch_task",
+        "pop": "dequeue_task",
+        "push": "enqueue_task",
+        "release_resource": "collect_result"
+      },
+      "name": "SchedulerResourceFunctor",
+      "object_map": {
+        "FifoQueue": "ExecutionQueue",
+        "LifoStack": "ExecutionQueue",
+        "PriorityQueue": "ExecutionQueue",
+        "ResourceSemaphore": "ExecutionNetworkBundle"
+      },
+      "source_category": "SchedulerCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "description": "Transportiert Kanalnachrichten als lokale Prompt-/Input-Sektionen.",
+      "morphism_map": {
+        "receive_message": "restrict",
+        "send_message": "update_prompt_state"
+      },
+      "name": "ChannelPromptFunctor",
+      "object_map": {
+        "ChannelMessage": "LocalSection",
+        "FullDuplexChannel": "PromptStatePresheaf",
+        "HalfDuplexChannel": "PromptStatePresheaf"
+      },
+      "source_category": "ChannelCategory",
+      "target_category": "LocalSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Materialisiert lokale Prägarbensektionen in SQLite.",
+      "morphism_map": {
+        "add_section": "persist_section",
+        "restrict": "load_section",
+        "update_prompt_state": "persist_section"
+      },
+      "name": "PresheafPersistenceFunctor",
+      "object_map": {
+        "FilesystemPresheaf": "PersistentLocalSection",
+        "LocalSection": "PersistentLocalSection",
+        "PromptStatePresheaf": "PersistentLocalSection"
+      },
+      "source_category": "LocalSectionCategory",
+      "target_category": "PersistenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Materialisiert geklebte Garben-Snapshots in SQLite.",
+      "morphism_map": {
+        "canonicalize_pair": "persist_sheaf_snapshot",
+        "sync_from_tables": "persist_sheaf_snapshot"
+      },
+      "name": "SheafPersistenceFunctor",
+      "object_map": {
+        "GeneratedColumnsSheaf": "PersistentSheafSnapshot",
+        "HtmlReferenceSheaf": "PersistentSheafSnapshot",
+        "ParameterSemanticsSheaf": "PersistentSheafSnapshot",
+        "TableOutputSheaf": "PersistentSheafSnapshot"
+      },
+      "source_category": "CanonicalSemanticSheafCategory",
+      "target_category": "PersistenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Speichert Tabellenzustände und Ausführungsläufe auditierbar.",
+      "morphism_map": {
+        "prepare_output_table": "persist_execution_run",
+        "render_table_output": "persist_sheaf_snapshot"
+      },
+      "name": "TableStatePersistenceFunctor",
+      "object_map": {
+        "TableStateSections": "PersistentSheafSnapshot",
+        "Tables": "PersistentExecutionRun"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "PersistenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Persistiert Validierungs- und Paritätsereignisse als Auditlog.",
+      "morphism_map": {
+        "bootstrap_architecture_validation": "record_audit_event",
+        "render_validation_diagram": "record_audit_event"
+      },
+      "name": "AuditValidationPersistenceFunctor",
+      "object_map": {
+        "ArchitectureValidationBundle": "AuditEvent",
+        "ArchitectureValidationCheckSpec": "AuditEvent"
+      },
+      "source_category": "ArchitectureValidationCategory",
+      "target_category": "PersistenceCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Lädt gültige materialisierte Resultate zurück in Tabellenpfade.",
+      "morphism_map": {
+        "cache_get": "prepare_output_table",
+        "invalidate_cache": "filter_original_lines"
+      },
+      "name": "CacheMaterializationFunctor",
+      "object_map": {
+        "CacheEntry": "Tables",
+        "PersistentExecutionRun": "TableStateSections"
+      },
+      "source_category": "PersistenceCategory",
+      "target_category": "TableSectionCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Reflektiert Persistenzereignisse in die Validierungs-/Audit-Schicht.",
+      "morphism_map": {
+        "query_audit_events": "render_validation_diagram",
+        "record_audit_event": "validate"
+      },
+      "name": "PersistenceAuditFunctor",
+      "object_map": {
+        "AuditEvent": "ArchitectureValidationCheckSpec",
+        "PersistentSheafSnapshot": "ArchitectureValidationBundle"
+      },
+      "source_category": "PersistenceCategory",
+      "target_category": "ArchitectureValidationCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/row_filtering.py + reta_architecture/parallel_execution.py",
+      "description": "Hebt reine Zeilenfilter-Scans wie Primfaktoren, Sonnenanteile und Vielfache in PyPy3-Prozesschunks.",
+      "morphism_map": {
+        "filter_original_lines": "dispatch_task",
+        "prepare_output_table": "deterministic_reduce"
+      },
+      "name": "RowFilterProcessFunctor",
+      "object_map": {
+        "RowSet": "ExecutionTask",
+        "TableStateSections": "ExecutionRunResult"
+      },
+      "source_category": "TableSectionCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py + reta_architecture/parallel_execution.py",
+      "description": "Hebt pure Arithmetikbatches in prozessbasierte Chunk-Ausführung.",
+      "morphism_map": {
+        "factor_pairs": "dispatch_task",
+        "glue_divisor_range": "deterministic_reduce",
+        "prime_factorize": "dispatch_task"
+      },
+      "name": "ArithmeticBatchExecutionFunctor",
+      "object_map": {
+        "ArithmeticExpression": "ExecutionTask",
+        "FactorPairSet": "ExecutionRunResult",
+        "PrimeFactorSection": "ExecutionRunResult"
+      },
+      "source_category": "ActivatedArithmeticCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/package_integrity.py",
+      "description": "Berechnet Manifest-Hashes und CSV-Zählungen in prozessbasierten Datei-Chunks.",
+      "morphism_map": {
+        "bootstrap_architecture_validation": "dispatch_task",
+        "validate_stage31_references": "deterministic_reduce"
+      },
+      "name": "PackageIntegrityExecutionFunctor",
+      "object_map": {
+        "ArchitectureValidationCheckSpec": "ExecutionTask",
+        "RepositoryManifest": "ExecutionRunResult"
+      },
+      "source_category": "ArchitectureValidationCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "description": "Bereitet JSON/Digests großer Persistenzbatches in Prozessen vor; SQLite-Schreibpfad bleibt seriell.",
+      "morphism_map": {
+        "cache_put": "dispatch_task",
+        "persist_section": "dispatch_task",
+        "persist_sheaf_snapshot": "dispatch_task"
+      },
+      "name": "PersistenceBatchPreparationFunctor",
+      "object_map": {
+        "CacheEntry": "ExecutionTask",
+        "PersistentLocalSection": "ExecutionTask",
+        "PersistentSheafSnapshot": "ExecutionTask"
+      },
+      "source_category": "PersistenceCategory",
+      "target_category": "ExecutionNetworkCategory",
+      "variance": "covariant"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py + reta_architecture/persistence.py",
+      "description": "Spiegelt prozessbasierte Ausführungsläufe in Persistenz und Audit.",
+      "morphism_map": {
+        "deterministic_reduce": "persist_execution_run",
+        "dispatch_task": "record_audit_event"
+      },
+      "name": "ProcessExecutionAuditFunctor",
+      "object_map": {
+        "ExecutionRunResult": "PersistentExecutionRun",
+        "OrderedResultSection": "AuditEvent"
+      },
+      "source_category": "ExecutionNetworkCategory",
+      "target_category": "PersistenceCategory",
+      "variance": "covariant"
+    }
+  ],
+  "natural_transformations": [
+    {
+      "code_owner": "reta_architecture.morphisms + reta_architecture.sheaves",
+      "components": {
+        "ParameterPair": "ParameterSemanticsSheaf.canonicalize_pair",
+        "PromptText": "PromptMorphisms.split_command_words",
+        "RawAlias": "AliasMorphisms.canonical_main / canonical_sub"
+      },
+      "description": "Macht CLI-/Prompt-Rohtext zu kanonischer Parametersemantik.",
+      "name": "RawToCanonicalParameterTransformation",
+      "naturality_condition": "Kontext zuerst einschränken und dann kanonisieren liefert dieselbe kanonische Semantik wie zuerst kanonisieren und anschließend auf den kleineren Kontext einschränken.",
+      "source_functor": "RawCommandPresheafFunctor",
+      "target_functor": "CanonicalParameterSheafFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.presheaves + reta_architecture.sheaves + reta_architecture.universal",
+      "components": {
+        "CsvSections": "Presheaf.restrict -> merge_parameter_dicts",
+        "PromptSections": "PromptStatePresheaf.update -> sync_program_semantics",
+        "TranslationSections": "SheafBundle.from_repo"
+      },
+      "description": "Symbolische Sheafification der bereits vorhandenen Prägarben in die geklebten Garben.",
+      "name": "PresheafToSheafGluingTransformation",
+      "naturality_condition": "Lokale Sektionen über einer Überdeckung kleben zu derselben globalen Semantik, unabhängig davon, in welcher kompatiblen Reihenfolge die lokalen Restriktionen gelesen werden.",
+      "source_functor": "LocalDataPresheafFunctor",
+      "target_functor": "GluedSemanticSheafFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.column_selection + reta_architecture.table_generation + reta_architecture.program_workflow",
+      "components": {
+        "ColumnBuckets": "normalize_column_buckets",
+        "ParameterSemanticsSheaf": "ColumnSelectionBundle",
+        "ProgramWorkflow": "ProgramWorkflowBundle.run"
+      },
+      "description": "Verbindet die geklebte Parametersemantik mit der globalen Tabellen-Sektion.",
+      "name": "TableGenerationGluingTransformation",
+      "naturality_condition": "Kanonische Parametersemantik, Spaltenauswahl und Tabellenbau bilden ein kommutatives Workflow-Diagramm: äquivalente Alias-/Kontextpfade erzeugen dieselbe globale Tabellensektion.",
+      "source_functor": "CanonicalParameterSheafFunctor",
+      "target_functor": "TableGenerationGluingFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.generated_columns + reta_architecture.table_state + reta_architecture.universal",
+      "components": {
+        "GeneratedColumnRegistry": "GeneratedColumnSection.parameters",
+        "GeneratedColumnTags": "GeneratedColumnSection.tags",
+        "GeneratedColumnsSheaf": "sync_generated_columns_from_tables"
+      },
+      "description": "Hält generierte Spalten als Runtime-Zustand und als Garbenmetadaten zusammen.",
+      "name": "GeneratedColumnsSheafSyncTransformation",
+      "naturality_condition": "Ein generierter Spalten-Endofunktor und die anschließende State-/Sheaf-Synchronisierung kommutieren mit dem direkten Zugriff auf die explizite GeneratedColumnSection.",
+      "source_functor": "GeneratedColumnEndofunctorFamily",
+      "target_functor": "ExplicitTableStateFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.table_runtime + reta_architecture.table_state",
+      "components": {
+        "Tables.generatedSpaltenParameter": "TableStateSections.generated_columns.parameters",
+        "Tables.generatedSpaltenParameter_Tags": "TableStateSections.generated_columns.tags",
+        "Tables.religionNumbers": "TableDisplayState.religion_numbers",
+        "Tables.rowNumDisplay2rowNumOrig": "TableStateSections.row_display_to_original"
+      },
+      "description": "Formalisiert den Stage-26-Übergang von `Tables` zu expliziten Tabellenzustandssektionen.",
+      "name": "TableRuntimeToStateSectionsTransformation",
+      "naturality_condition": "Alte mutable Tabellenattribute und neue explizite Zustandssektionen referenzieren dieselben Objekte; Mutation über einen Pfad ist über den anderen Pfad sichtbar.",
+      "source_functor": "MutableTableRuntimeFunctor",
+      "target_functor": "ExplicitTableStateFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.output_syntax + reta_architecture.output_semantics + tests.test_command_parity",
+      "components": {
+        "csv": "CSV-Text vergleichen",
+        "html": "HTML normalisieren",
+        "markdown": "Markdown-Text vergleichen",
+        "shell": "Shell-Text vergleichen"
+      },
+      "description": "Macht die existierende Renderer-Parität als natürliche Transformation sichtbar.",
+      "name": "RenderedOutputNormalizationTransformation",
+      "naturality_condition": "Renderer-Ausgaben dürfen syntaktische Formatdetails haben, müssen nach zulässiger Normalisierung aber dieselbe semantische Paritätsaussage ergeben.",
+      "source_functor": "OutputRenderingFunctorFamily",
+      "target_functor": "NormalizedOutputFunctor"
+    },
+    {
+      "code_owner": "compatibility facades + tests.test_command_parity",
+      "components": {
+        "libs.lib4tables_concat": "reta_architecture.generated_columns / concat_csv / combi_join",
+        "libs.lib4tables_prepare": "reta_architecture.table_preparation / row_filtering / table_wrapping",
+        "libs.tableHandling": "reta_architecture.table_runtime",
+        "reta.py": "RetaArchitecture.bootstrap"
+      },
+      "description": "Die zentrale Refactor-Invariante: Legacy-Fassaden und Architektur-Fassade kommutieren beobachtbar.",
+      "name": "LegacyToArchitectureTransformation",
+      "naturality_condition": "Jeder repräsentative alte Aufrufpfad und der entsprechende neue Architekturpfad müssen beobachtbar gleiche Ausgabe liefern.",
+      "source_functor": "LegacyRuntimeFunctor",
+      "target_functor": "ArchitectureRuntimeFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_contracts",
+      "components": {
+        "ArchitectureCapsuleSpec": "CapsuleContractSpec",
+        "NaturalTransformationSpec": "CommutativeDiagramSpec",
+        "RefactorInvariant": "RefactorLawSpec",
+        "ReferenceValidation": "ContractValidationSpec"
+      },
+      "description": "Stage 29 macht natürliche Transformationen zu expliziten, validierten Architekturverträgen.",
+      "name": "ContractedNaturalityTransformation",
+      "naturality_condition": "Die aus Kategorie-Theorie und Kapselkarte abgeleiteten Vertragsdiagramme referenzieren dieselben bekannten Kapseln, Kategorien, Funktoren und natürlichen Transformationen.",
+      "source_functor": "CategoryTheoryToContractFunctor",
+      "target_functor": "ArchitectureMapToContractFunctor"
+    },
+    {
+      "code_owner": "reta_architecture.architecture_validation",
+      "components": {
+        "CapsuleContractSpec": "CapsuleContractCoverageCheck",
+        "CommutativeDiagramSpec": "DiagramWitnessCoverageCheck",
+        "NaturalTransformationSpec": "NaturalTransformationWitnessCoverageCheck",
+        "RefactorLawSpec": "RefactorLawObligationCoverageCheck",
+        "RepositoryManifest": "PackageIntegrityValidationCheck"
+      },
+      "description": "Stage 31 macht die Verträge und Witnesses zu einem ausführbaren Validierungsdiagramm.",
+      "name": "ContractWitnessValidationTransformation",
+      "naturality_condition": "Direkte Vertragsvalidierung und Validierung über konkrete Witnesses müssen denselben Stage-31-Gesamtstatus liefern: alle referenzierten Kategorien, Kapseln, Diagramme, Gesetze und natürlichen Transformationen sind gedeckt.",
+      "source_functor": "ContractToValidationFunctor",
+      "target_functor": "WitnessToValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_traces.py",
+      "components": {
+        "Capsule": "CapsuleTraceSpec",
+        "LegacyOwner": "RetaComponentTraceSpec"
+      },
+      "description": "Verbindet Stage-31-Kohärenz mit Stage-32-Trace-Navigation.",
+      "name": "CoherenceToTraceTransformation",
+      "naturality_condition": "Kohärenz und Trace-Navigation führen für jede Kapsel zum selben Diagramm-/Witness-Vertrag.",
+      "source_functor": "CoherenceMatrixFunctor",
+      "target_functor": "CoherenceToTraceFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_boundaries.py",
+      "components": {
+        "Import": "ImportEdgeSpec",
+        "Module": "ModuleOwnershipSpec"
+      },
+      "description": "Verbindet Kohärenzmatrix und reale Importkanten.",
+      "name": "CoherenceBoundaryValidationTransformation",
+      "naturality_condition": "Kapselgrenzen aus Kohärenz und reale Python-Importe werden zu demselben Boundary-Graphen klassifiziert.",
+      "source_functor": "CoherenceToBoundaryFunctor",
+      "target_functor": "LegacyImportBoundaryFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "components": {
+        "Import": "ImpactSourceSpec",
+        "Owner": "ImpactSourceSpec"
+      },
+      "description": "Verbindet Stage-32-Trace und Stage-32-Boundary als Stage-33-Impact.",
+      "name": "TraceBoundaryImpactTransformation",
+      "naturality_condition": "Impact aus Trace-Route und Impact aus Boundary-Importgraph führen zu derselben betroffenen Kapsel-/Diagramm-/Gate-Lesart.",
+      "source_functor": "TraceBoundaryImpactFunctor",
+      "target_functor": "BoundaryImpactFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_impact.py",
+      "components": {
+        "Candidate": "RegressionGateSpec",
+        "Gate": "ImpactValidationSpec"
+      },
+      "description": "Verbindet Migrationskandidaten mit prüfbarer Gate-Validierung.",
+      "name": "ImpactGateValidationTransformation",
+      "naturality_condition": "Migrationskandidaten und Gate-Validierung kommutieren: ein späterer Move ist nur zulässig, wenn seine Impact-Gates bestehen.",
+      "source_functor": "MigrationCandidateFunctor",
+      "target_functor": "ImpactGateValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "components": {
+        "Candidate": "MigrationStepSpec",
+        "Gate": "MigrationGateBindingSpec"
+      },
+      "description": "Verbindet Stage-33 Impact-Kandidaten mit Stage-34 Gate-Bindings.",
+      "name": "ImpactGateMigrationTransformation",
+      "naturality_condition": "Der direkte Pfad Impact-Kandidat→Migrationsschritt und der Pfad Impact-Gate→Gate-Binding beschreiben denselben erlaubten späteren Move.",
+      "source_functor": "ImpactToMigrationPlanFunctor",
+      "target_functor": "ImpactGateBindingFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_migration.py",
+      "components": {
+        "GateBinding": "MigrationGateBindingSpec",
+        "Wave": "MigrationInvariantSpec"
+      },
+      "description": "Verbindet Stage-34 Migrationswellen mit Validierung/Kohärenz.",
+      "name": "MigrationPlanCoherenceTransformation",
+      "naturality_condition": "Wellenordnung und Gate-Kohärenz kommutieren: eine geplante Extraktion ist nur kohärent, wenn ihre Gates und Invarianten dieselbe Welle schützen.",
+      "source_functor": "MigrationOrderingCoherenceFunctor",
+      "target_functor": "MigrationGateCoherenceFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_rehearsal.py",
+      "components": {
+        "Gate": "GateRehearsalSpec",
+        "Step": "RehearsalMoveSpec"
+      },
+      "description": "Verbindet Stage-34-Migration mit Stage-35-Rehearsal.",
+      "name": "MigrationRehearsalNaturalityTransformation",
+      "naturality_condition": "Migrationsschritt und Gate-Binding führen zum selben trockenlaufgeschützten Move.",
+      "source_functor": "MigrationStepRehearsalFunctor",
+      "target_functor": "MigrationGateRehearsalFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_rehearsal.py",
+      "components": {
+        "Cover": "RehearsalCoverSpec",
+        "GateSuite": "ArchitectureValidationCheckSpec"
+      },
+      "description": "Verbindet Rehearsal-Covers mit Validierung/Kohärenz.",
+      "name": "RehearsalReadinessValidationTransformation",
+      "naturality_condition": "Readiness-Cover und Gate-Validierung kommutieren: lokale Gate-Suiten kleben zur gleichen globalen Readiness-Aussage.",
+      "source_functor": "RehearsalCoverFunctor",
+      "target_functor": "RehearsalGateValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "components": {
+        "Gate": "ActivationGateSpec",
+        "Move": "ActivationUnitSpec"
+      },
+      "description": "Verbindet Stage-35-Rehearsal mit Stage-36-Aktivierung.",
+      "name": "RehearsalActivationNaturalityTransformation",
+      "naturality_condition": "Aktivierung über den Rehearsal-Move und Aktivierung über die Gate-Suite beschreiben denselben commit-geschützten Umschlag.",
+      "source_functor": "RehearsalActivationFunctor",
+      "target_functor": "GateActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/architecture_activation.py",
+      "components": {
+        "Rollback": "ActivationRollbackSpec",
+        "Transaction": "ActivationTransactionSpec"
+      },
+      "description": "Verbindet Commit-Transaktionen, Rollback-Sektionen und Validierung.",
+      "name": "ActivationRollbackValidationTransformation",
+      "naturality_condition": "Transaktionsgluing und Validierung kommutieren nur, wenn Rollback-Sektionen für alle lokalen Aktivierungen existieren.",
+      "source_functor": "ActivationTransactionFunctor",
+      "target_functor": "ActivationValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/row_ranges.py + libs/center.py",
+      "components": {
+        "BereichToNumbers2": "range_to_numbers",
+        "isZeilenAngabe": "is_row_range",
+        "strAsGeneratorToListOfNumStrs": "str_as_generator_to_set"
+      },
+      "description": "Stage 37 verbindet Legacy-center-API und aktivierte Architektur-API.",
+      "name": "CenterRowRangeToArchitectureTransformation",
+      "naturality_condition": "Erst über center.py aufrufen und dann expandieren ergibt dieselbe Zeilenmenge wie direkt über RowRangeMorphismBundle expandieren.",
+      "source_functor": "CenterRowRangeCompatibilityFunctor",
+      "target_functor": "RowRangeActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/row_ranges.py",
+      "components": {
+        "RowIndexSet": "architecture-validation-json",
+        "RowRangeMorphismBundle": "row-ranges-json"
+      },
+      "description": "Schützt die aktivierte Input-Morphismus-Kapsel gegen spätere center-Entkernungen.",
+      "name": "RowRangeValidationTransformation",
+      "naturality_condition": "Row-Range-Ausdruck einschränken, expandieren und validieren kommutiert mit direkter Architekturvalidierung.",
+      "source_functor": "RowRangeInputFunctor",
+      "target_functor": "RowRangeValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py + libs/center.py",
+      "components": {
+        "multiples": "factor_pairs",
+        "primRepeat": "prime_repeat_legacy",
+        "primfaktoren": "prime_factors",
+        "teiler": "divisor_range",
+        "textHatZiffer": "has_digit"
+      },
+      "description": "Stage 38 verbindet Legacy-center-Arithmetik und aktivierte Architektur-API.",
+      "name": "CenterArithmeticToArchitectureTransformation",
+      "naturality_condition": "Erst über center.py aufrufen und dann arithmetisch expandieren ergibt dasselbe Ergebnis wie der direkte ArithmeticMorphismBundle-Pfad.",
+      "source_functor": "CenterArithmeticCompatibilityFunctor",
+      "target_functor": "ArithmeticActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py",
+      "components": {
+        "ArithmeticMorphismBundle": "arithmetic-json",
+        "RowIndexSet": "DivisorSection"
+      },
+      "description": "Schützt die Abhängigkeit der Stage-38-Arithmetik von der Stage-37-Row-Range-Topologie.",
+      "name": "ArithmeticRowRangeGluingTransformation",
+      "naturality_condition": "Row-Range-Expansion und arithmetisches Teiler-Gluing kommutieren mit der Architekturvalidierung.",
+      "source_functor": "ArithmeticRowRangeGluingFunctor",
+      "target_functor": "ArithmeticValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/console_io.py + libs/center.py",
+      "components": {
+        "cliout": "cli_output",
+        "getTextWrapThings": "get_text_wrap_things",
+        "retaHilfe": "reta_help_text",
+        "unique_everseen": "unique_everseen"
+      },
+      "description": "Stage 39 verbindet Legacy-center-Console-API und aktivierte Architektur-API.",
+      "name": "CenterConsoleIOToArchitectureTransformation",
+      "naturality_condition": "Erst über center.py aufrufen und dann rendern/zerlegen ergibt dieselbe sichtbare Ausgabe bzw. endliche Hilfssektion wie der direkte ConsoleIOMorphismBundle-Pfad.",
+      "source_functor": "CenterConsoleIOCompatibilityFunctor",
+      "target_functor": "ConsoleIOActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/console_io.py",
+      "components": {
+        "ConsoleIOMorphismBundle": "console-io-json",
+        "ConsoleOutputSection": "architecture-validation-json"
+      },
+      "description": "Schützt die aktivierte Output-/Utility-Kapsel gegen spätere center-Entkernungen.",
+      "name": "ConsoleIOOutputValidationTransformation",
+      "naturality_condition": "Console-Output rendern und Console-Output validieren kommutieren mit der bestehenden Output-Rendering-Kategorie.",
+      "source_functor": "ConsoleIOOutputRenderingFunctor",
+      "target_functor": "ConsoleIOValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/completion_word.py + libs/word_completerAlx.py",
+      "components": {
+        "WordCompleter": "ArchitectureWordCompleter",
+        "get_completions": "iter_word_completions"
+      },
+      "description": "Stage 40 verbindet die alte WordCompleter-Fassade mit der aktivierten Architektur-Completion-API.",
+      "name": "WordCompleterToArchitectureTransformation",
+      "naturality_condition": "Erst über libs.word_completerAlx.WordCompleter instanziieren und dann Completion-Kandidaten erzeugen ergibt dieselbe Kandidatensektion wie der direkte WordCompletionMorphismBundle-Pfad.",
+      "source_functor": "LegacyWordCompleterCompatibilityFunctor",
+      "target_functor": "WordCompletionActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/completion_word.py",
+      "components": {
+        "CompletionCandidateSection": "word-completion-json",
+        "WordCompletionMorphismBundle": "architecture-validation-json"
+      },
+      "description": "Schützt die aktivierte Completion-Schicht gegen spätere nestedAlx-/retaPrompt-Entkernungen.",
+      "name": "WordCompletionValidationTransformation",
+      "naturality_condition": "Prompt-Completion und Word-Completion-Validierung kommutieren über derselben Completion-Kandidatensektion.",
+      "source_functor": "WordCompletionPromptFunctor",
+      "target_functor": "WordCompletionValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/completion_nested.py + libs/nestedAlx.py",
+      "components": {
+        "ComplSitua": "ComplSitua",
+        "NestedCompleter": "ArchitectureNestedCompleter",
+        "get_completions": "yield_nested_candidates"
+      },
+      "description": "Stage 41 verbindet die alte nestedAlx-Fassade mit der aktivierten Architektur-Nested-Completion-API.",
+      "name": "NestedCompleterToArchitectureTransformation",
+      "naturality_condition": "Erst über libs.nestedAlx.NestedCompleter instanziieren und dann hierarchisch completieren ergibt dieselbe Kandidatensektion wie der direkte NestedCompletionMorphismBundle-Pfad.",
+      "source_functor": "LegacyNestedCompleterCompatibilityFunctor",
+      "target_functor": "NestedCompletionActivationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/completion_nested.py",
+      "components": {
+        "NestedCompletionCandidateSection": "nested-completion-json",
+        "NestedCompletionMorphismBundle": "architecture-validation-json"
+      },
+      "description": "Schützt die aktivierte hierarchische Completion-Schicht gegen spätere retaPrompt-/LibRetaPrompt-Entkernungen.",
+      "name": "NestedCompletionValidationTransformation",
+      "naturality_condition": "Nested Prompt Completion und Nested-Completion-Validierung kommutieren über derselben Completion-Kandidatensektion.",
+      "source_functor": "NestedCompletionPromptFunctor",
+      "target_functor": "NestedCompletionValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "components": {
+        "ChunkResult": "OrderedResultSection",
+        "ChunkTask": "ExecutionTask",
+        "TableStateSections": "Tables"
+      },
+      "description": "Schützt die Netzwerkmechanik: Ausführungsreihenfolge darf die Ausgabe nicht verändern.",
+      "name": "ParallelExecutionNaturalityTransformation",
+      "naturality_condition": "Parallel oder seriell ausgeführte Chunks kleben nach deterministischer Reduktion zur selben Tabellensektion.",
+      "source_functor": "TableChunkExecutionFunctor",
+      "target_functor": "ExecutionResultGluingFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "components": {
+        "FifoQueue": "ExecutionQueue",
+        "ResourceSemaphore": "ExecutionNetworkBundle"
+      },
+      "description": "Hält Queues, Stacks und Semaphoren aus der Semantik heraus.",
+      "name": "SchedulerExecutionNaturalityTransformation",
+      "naturality_condition": "Scheduler-Disziplin und Ressourcenbegrenzung verändern nur die Ausführungsreihenfolge, nicht das deterministisch geklebte Resultat.",
+      "source_functor": "SchedulerResourceFunctor",
+      "target_functor": "TableChunkExecutionFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/execution_network.py",
+      "components": {
+        "ChannelMessage": "PromptText",
+        "PromptStatePresheaf": "LocalSection"
+      },
+      "description": "Schützt Halfduplex/Fullduplex-Mechanik gegen Semantik-Verschiebung.",
+      "name": "ChannelPromptNaturalityTransformation",
+      "naturality_condition": "Kanaltransport eines Prompt-Befehls und direkte Rohkommando-Prägarbe führen zu derselben lokalen Prompt-Sektion.",
+      "source_functor": "ChannelPromptFunctor",
+      "target_functor": "RawCommandPresheafFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "FilesystemPresheaf": "PersistentLocalSection",
+        "LocalSection": "PersistentLocalSection"
+      },
+      "description": "Datenbankmaterialisierung ersetzt nicht die Prägarbe, sondern rundet sie auditierbar ab.",
+      "name": "PresheafPersistenceRoundTripTransformation",
+      "naturality_condition": "Persistieren und Laden einer lokalen Sektion liefert bei gleicher Prüfsumme dieselbe lokale Prägarbensektion.",
+      "source_functor": "PresheafPersistenceFunctor",
+      "target_functor": "LocalDataPresheafFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "ParameterSemanticsSheaf": "PersistentSheafSnapshot",
+        "SheafBundle": "PersistentSheafSnapshot"
+      },
+      "description": "Datenbankmaterialisierung ersetzt nicht die Garbe, sondern speichert Snapshots.",
+      "name": "SheafPersistenceRoundTripTransformation",
+      "naturality_condition": "Persistieren und Laden eines Garben-Snapshots liefert bei gleicher Prüfsumme dieselbe geklebte Semantik.",
+      "source_functor": "SheafPersistenceFunctor",
+      "target_functor": "GluedSemanticSheafFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "TableStateSections": "PersistentSheafSnapshot",
+        "Tables": "PersistentExecutionRun"
+      },
+      "description": "Macht Tabellenläufe auditierbar, ohne Mutable-State-Semantik zu ändern.",
+      "name": "TableStatePersistenceTransformation",
+      "naturality_condition": "Expliziter Tabellenzustand und persistierter Tabellen-Snapshot kommutieren, solange Kontext- und Payload-Hashes gleich bleiben.",
+      "source_functor": "TableStatePersistenceFunctor",
+      "target_functor": "ExplicitTableStateFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "CacheEntry": "Tables",
+        "ParameterDictionaryDiagram": "PersistentSheafSnapshot"
+      },
+      "description": "Schützt Execution-Cache gegen falsche Wiederverwendung.",
+      "name": "CacheCoherenceTransformation",
+      "naturality_condition": "Ein Cache-Hit darf nur denselben Tabellen-Zielpunkt liefern wie erneutes universelles Gluing mit identischen Kontext-/Sektionshashes.",
+      "source_functor": "CacheMaterializationFunctor",
+      "target_functor": "TableGenerationGluingFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "ArchitectureValidationBundle": "AuditEvent",
+        "ArchitectureValidationCheckSpec": "AuditEvent"
+      },
+      "description": "Verbindet Datenbank-Audit und Architekturvalidierung.",
+      "name": "AuditPersistenceValidationTransformation",
+      "naturality_condition": "Audit-Ereignisse aus Validierung und Persistenzabfragen beschreiben denselben prüfbaren Lauf.",
+      "source_functor": "AuditValidationPersistenceFunctor",
+      "target_functor": "PersistenceAuditFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/row_filtering.py + reta_architecture/parallel_execution.py",
+      "components": {
+        "ChunkResult": "OrderedResultSection",
+        "RowSet": "ExecutionTask"
+      },
+      "description": "Schützt die zusätzliche Prozessparallelisierung der Zeilenfilter gegen Semantikverschiebung.",
+      "name": "RowFilterProcessNaturalityTransformation",
+      "naturality_condition": "Zeilenfilter seriell oder in PyPy3-Prozesschunks liefern dieselbe RowSet-Sektion, bevor die Tabelle vorbereitet wird.",
+      "source_functor": "RowFilterProcessFunctor",
+      "target_functor": "TableChunkExecutionFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/arithmetic.py + reta_architecture/parallel_execution.py",
+      "components": {
+        "ArithmeticExpression": "ExecutionTask",
+        "DivisorSection": "OrderedResultSection"
+      },
+      "description": "Schützt prozessbasierte Faktor- und Primfaktorberechnung.",
+      "name": "ArithmeticBatchProcessNaturalityTransformation",
+      "naturality_condition": "Arithmetikbatches über Prozesse und direkte RowRange-Arithmetik-Gluing-Pfade führen zu derselben Faktor-/Teilersektion.",
+      "source_functor": "ArithmeticBatchExecutionFunctor",
+      "target_functor": "ArithmeticRowRangeGluingFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/package_integrity.py",
+      "components": {
+        "FileDigest": "AuditEvent",
+        "RepositoryManifest": "ArchitectureValidationCheckSpec"
+      },
+      "description": "Macht Manifest-Parallelisierung auditierbar, ohne Paketvalidierung zu verändern.",
+      "name": "PackageIntegrityProcessNaturalityTransformation",
+      "naturality_condition": "Serielle Manifestberechnung und prozessbasierte Datei-Chunk-Berechnung ergeben denselben RepositoryManifest-Digest.",
+      "source_functor": "PackageIntegrityExecutionFunctor",
+      "target_functor": "WitnessToValidationFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "CacheEntry": "PersistentLocalSection",
+        "PersistentLocalSection": "LocalSection"
+      },
+      "description": "Schützt Batch-Persistenz gegen abweichende Datenbankmaterialisierung.",
+      "name": "PersistenceBatchPreparationNaturalityTransformation",
+      "naturality_condition": "Batchweise Digest-/JSON-Vorbereitung in Prozessen und direkte Persistenz einzelner Sektionen liefern bei gleicher Prüfsumme dieselben persistierten Datensätze.",
+      "source_functor": "PersistenceBatchPreparationFunctor",
+      "target_functor": "PresheafPersistenceFunctor"
+    },
+    {
+      "code_owner": "reta_architecture/persistence.py",
+      "components": {
+        "ExecutionRunResult": "PersistentExecutionRun",
+        "OrderedResultSection": "PersistentSheafSnapshot"
+      },
+      "description": "Verbindet neue Prozessparallelisierung mit Audit/Persistenz.",
+      "name": "ProcessExecutionAuditNaturalityTransformation",
+      "naturality_condition": "Persistierte Prozessläufe und persistierte Tabellenzustände beschreiben denselben deterministisch reduzierten Lauf, solange Kontext- und Payload-Hashes gleich sind.",
+      "source_functor": "ProcessExecutionAuditFunctor",
+      "target_functor": "TableStatePersistenceFunctor"
+    }
+  ],
+  "paradigm": [
+    "topology",
+    "morphism",
+    "universal_property",
+    "presheaf",
+    "sheaf",
+    "category",
+    "functor",
+    "natural_transformation"
+  ],
+  "paradigm_terms": [
+    {
+      "implemented_by": [
+        "reta_architecture/topology.py"
+      ],
+      "meaning": "Reta-Kontexte als offene Mengen über Sprache, Parametern, Zeilen, Ausgabearten, Tags und Scopes.",
+      "stage_status": "bereits seit früher Refactor-Stufe umgesetzt; Stage 27 macht die Kategorie der offenen Kontexte explizit",
+      "term": "Topologie"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/morphisms.py",
+        "reta_architecture/row_filtering.py",
+        "reta_architecture/generated_columns.py",
+        "reta_architecture/concat_csv.py",
+        "reta_architecture/table_output.py"
+      ],
+      "meaning": "Explizit benannte Übergänge zwischen Architektursektionen statt versteckter Methoden in Legacy-Klassen.",
+      "stage_status": "bereits breit umgesetzt; Stage 27 ordnet Morphismen Kategorien und Funktoren zu",
+      "term": "Morphismus"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/universal.py",
+        "reta_architecture/table_generation.py",
+        "reta_architecture/program_workflow.py"
+      ],
+      "meaning": "Kanonische Gluing-/Normalisierungs-Knoten, die lokale Daten kompatibel zusammenführen.",
+      "stage_status": "bereits umgesetzt; Stage 27 benennt die UniversalConstructionCategory",
+      "term": "universelle Eigenschaft"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/presheaves.py"
+      ],
+      "meaning": "Lokale Rohsektionen, die über Kontext-Restriktionen gelesen werden.",
+      "stage_status": "bereits umgesetzt; Stage 27 ergänzt Presheaf-Funktoren",
+      "term": "Prägarbe"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/sheaves.py"
+      ],
+      "meaning": "Geklebte, global verwendbare Semantik aus lokalen Sektionen.",
+      "stage_status": "bereits umgesetzt; Stage 27 ergänzt Sheafification als natürliche Transformation",
+      "term": "Garbe"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/category_theory.py"
+      ],
+      "meaning": "Objekte und Morphismen der Architektur werden als inspizierbare Kategorien benannt.",
+      "stage_status": "neu in Stage 27",
+      "term": "math Kategorie"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/category_theory.py"
+      ],
+      "meaning": "Strukturerhaltende Abbildungen zwischen Kontext-, Sektionen-, Tabellen-, Output- und Legacy-Kategorien.",
+      "stage_status": "neu in Stage 27",
+      "term": "Funktor"
+    },
+    {
+      "implemented_by": [
+        "reta_architecture/category_theory.py"
+      ],
+      "meaning": "Kommutierende Verträglichkeitsfamilien zwischen Funktoren, z.B. Raw→Canonical, Presheaf→Sheaf, Legacy→Architecture.",
+      "stage_status": "neu in Stage 27",
+      "term": "natürliche Transformation"
+    }
+  ],
+  "plan": {
+    "already_implemented_before_stage_27": [
+      "Topologie: reta_architecture/topology.py.",
+      "Prägarben: reta_architecture/presheaves.py.",
+      "Garben: reta_architecture/sheaves.py.",
+      "Morphismen: morphisms.py, row_filtering.py, generated_columns.py, concat_csv.py, combi_join.py, table_output.py und weitere.",
+      "Universelle Eigenschaften/Gluing: reta_architecture/universal.py, table_generation.py und program_workflow.py.",
+      "Globale Tabellensektion und State-Sektionen: table_runtime.py und table_state.py."
+    ],
+    "behaviour_change": "keine beabsichtigte Laufzeit-/CLI-Verhaltensänderung; Stage 27 ist eine explizite, inspizierbare Architektur- und Paradigmen-Schicht",
+    "implemented_in_stage_27": [
+      "Neue Datei reta_architecture/category_theory.py mit CategorySpec, FunctorSpec, NaturalTransformationSpec, ParadigmTermSpec und CategoryTheoryBundle.",
+      "RetaArchitecture bootstrapt und snapshottet jetzt die Kategorie-Theorie-Schicht.",
+      "reta_architecture_probe_py.py besitzt category-theory-json.",
+      "Paketmanifest und Regressionstests prüfen die neue Schicht.",
+      "Dokumentation beschreibt geplant/jetzt/bereits umgesetzt."
+    ],
+    "planned_before_stage_27": [
+      "Nicht noch eine große Verhaltensänderung, sondern die bereits extrahierten Topologie-/Prägarben-/Garben-/Morphismen-/Gluing-Schichten kategorial sichtbar machen.",
+      "Kategorien für offene Kontexte, lokale Sektionen, geklebte Semantik, Tabellen-Sektionen, generierte Spalten, Ausgabeformate und Legacy-Fassaden benennen.",
+      "Funktoren zwischen diesen Kategorien einführen, insbesondere Presheaf-/Sheaf-, Table-Generation-, Renderer- und Legacy-Kompatibilitätsfunktoren.",
+      "Natürliche Transformationen ergänzen, weil die Refactor-Invariante nicht nur Funktorabbildung ist, sondern kommutierende Verträglichkeit zwischen alten/neuen und lokalen/globalen Pfaden."
+    ]
+  }
+}

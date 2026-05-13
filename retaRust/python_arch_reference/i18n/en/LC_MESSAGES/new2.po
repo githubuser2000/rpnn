@@ -1,0 +1,4011 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-04-04 00:07+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#~ msgid "Multiplikationen"
+#~ msgstr "multiplications"
+
+#~ msgid "Primzahlkreuz_pro_contra"
+#~ msgstr "prime_cross_pro_contra"
+
+#~ msgid ""
+#~ "nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-"
+#~ "Algorithmus_(15)"
+#~ msgstr "comprehend_emotionally_or_mentally_by_prime_cross_algorithm_(15)"
+
+#~ msgid "nocolor"
+#~ msgstr "nocolor"
+
+#~ msgid "justtext"
+#~ msgstr "justtext"
+
+#~ msgid "art"
+#~ msgstr "type"
+
+#~ msgid "onetable"
+#~ msgstr "onetable"
+
+#~ msgid "spaltenreihenfolgeundnurdiese"
+#~ msgstr "columnorderandonlythese"
+
+#~ msgid "endlessscreen"
+#~ msgstr "endlessscreen"
+
+#~ msgid "endless"
+#~ msgstr "endless"
+
+#~ msgid "dontwrap"
+#~ msgstr "dontwrap"
+
+#~ msgid "breite"
+#~ msgstr "width"
+
+#~ msgid "breiten"
+#~ msgstr "widths"
+
+#~ msgid "keineleereninhalte"
+#~ msgstr "noblankcontents"
+
+#~ msgid "keinenummerierung"
+#~ msgstr "nonumbering"
+
+#~ msgid "keineueberschriften"
+#~ msgstr "noheadings"
+
+#~ msgid "galaxie"
+#~ msgstr "galaxy"
+
+#~ msgid "universum"
+#~ msgstr "universe"
+
+#~ msgid "alles"
+#~ msgstr "all"
+
+#~ msgid "gestern"
+#~ msgstr "yesterday"
+
+#~ msgid "heute"
+#~ msgstr "today"
+
+#~ msgid "hoehemaximal"
+#~ msgstr "heightmaximum"
+
+#~ msgid "mond"
+#~ msgstr "moon"
+
+#~ msgid "morgen"
+#~ msgstr "tomorrow"
+
+#~ msgid "nachtraeglichneuabzaehlung"
+#~ msgstr "retrospectiverecount"
+
+#~ msgid "nachtraeglichneuabzaehlungvielfache"
+#~ msgstr "retrospectiverecountmultiples"
+
+#~ msgid "oberesmaximum"
+#~ msgstr "uppermaximum"
+
+#~ msgid "planet"
+#~ msgstr "planet"
+
+#~ msgid "potenzenvonzahlen"
+#~ msgstr "potenciesofnumbers"
+
+#~ msgid "primzahlvielfache"
+#~ msgstr "primemultiples"
+
+#~ msgid "schwarzesonne"
+#~ msgstr "blacksun"
+
+#~ msgid "sonne"
+#~ msgstr "sun"
+
+#~ msgid "typ"
+#~ msgstr "type"
+
+#~ msgid "vielfachevonzahlen"
+#~ msgstr "multiplesofnumbers"
+
+#~ msgid "vorhervonausschnitt"
+#~ msgstr "thisrangebefore"
+
+#~ msgid "vorhervonausschnittteiler"
+#~ msgstr "thisrangebeforedividers"
+
+#~ msgid "Zählung"
+#~ msgstr "ranges"
+
+#~ msgid "zeit"
+#~ msgstr "time"
+
+#~ msgid "zeilen"
+#~ msgstr "lines"
+
+#~ msgid "spalten"
+#~ msgstr "columns"
+
+#~ msgid "kombination"
+#~ msgstr "combination"
+
+#~ msgid "ausgabe"
+#~ msgstr "output"
+
+#~ msgid "h"
+#~ msgstr "h"
+
+#~ msgid "help"
+#~ msgstr "help"
+
+#~ msgid "debug"
+#~ msgstr "debug"
+
+#~ msgid "bbcode"
+#~ msgstr "bbcode"
+
+#~ msgid "html"
+#~ msgstr "html"
+
+#~ msgid "csv"
+#~ msgstr "csv"
+
+#~ msgid "shell"
+#~ msgstr "shell"
+
+#~ msgid "markdown"
+#~ msgstr "markdown"
+
+#~ msgid "emacs"
+#~ msgstr "emacs"
+
+#~ msgid "Strukturalien_bzw_Meta-Paradigmen_bzw_Transzendentalien_(15)"
+#~ msgstr "structural_paradigms_or_meta-paradigms_or_transcendental_(15)"
+
+#~ msgid "Geist_(15)"
+#~ msgstr "mind_(15)"
+
+#~ msgid "Model_of_Hierarchical_Complexity),"
+#~ msgstr "model_of_Hierarchical_Complexity),"
+
+#~ msgid "Konkreta_und_Focus_(2)"
+#~ msgstr "concretes_and_Focus_(2)"
+
+#~ msgid "Impulse_(5)"
+#~ msgstr "impulses_(5)"
+
+#~ msgid "Gefühle_(7)"
+#~ msgstr "feelings_(7)"
+
+#~ msgid "Modus_und_Sein_(8)"
+#~ msgstr "mode_and_being_(8)"
+
+#~ msgid "Wirklichkeiten_Wahrheit_Wahrnehmung_(10)"
+#~ msgstr "realities_truth_perception_(10)"
+
+#~ msgid "Meta-Systeme_(12),Ordnung_und_Filterung_12_und_1pro12"
+#~ msgstr "meta-systems_(12),order_and_filtering_12_and_1pro12"
+
+#~ msgid "Paradigmen_sind_Absichten_(13)"
+#~ msgstr "paradigms_are_intentions_(13)"
+
+#~ msgid "Gedanken_sind_Positionen_(17)"
+#~ msgstr "thoughts_are_positions_(17)"
+
+#~ msgid "Verbundenheiten_(18)"
+#~ msgstr "connections_(18)"
+
+#~ msgid "Triebe_und_Bedürfnisse_(6)"
+#~ msgstr "drives_and_needs_(6)"
+
+#~ msgid "Lust_(9)"
+#~ msgstr "lust_(9)"
+
+#~ msgid "Reflexe_(3),Existenzialien_(3)"
+#~ msgstr "reflexes_(3),existentials_(3)"
+
+#~ msgid "Absicht_6_ist_Vorteilsmaximierung"
+#~ msgstr "intention_6_is_advantage_maximization."
+
+#~ msgid "Absicht_7_ist_Selbstlosigkeit"
+#~ msgstr "intention_7_is_selflessness"
+
+#~ msgid "Absicht_10_ist_Wirklichkeit_erkennen"
+#~ msgstr "intention_10_is_recognition_of_reality"
+
+#~ msgid "Absicht_17_ist_zu_meinen"
+#~ msgstr "intention_17_is_to_mean_opionions"
+
+#~ msgid "Zeit_(4)_als_Wirklichkeit"
+#~ msgstr "time_(4)_as_reality"
+
+#~ msgid "Funktionen_Vorstellungen_(16)"
+#~ msgstr "functions_Conceptions_(16)"
+
+#~ msgid "Achtung_(4)"
+#~ msgstr "attention_(4)"
+
+#~ msgid "Absicht_1/8"
+#~ msgstr "intention_1/8"
+
+#~ msgid "Absicht_1/6_ist_Reinigung_und_Klarheit"
+#~ msgstr "intention_1/6_is_cleaning_and_clarity"
+
+#~ msgid "Reflektion_und_Kategorien_(1/15)"
+#~ msgstr "reflection_and_Categories_(1/15)"
+
+#~ msgid "Regungen_(1)"
+#~ msgstr "not_Emotions_not_impulses_but_similar_and_being_less_(1)"
+
+#~ msgid "Energie_und_universelle_Eigenschaften_(30)"
+#~ msgstr "energy_and_universal_properties_(30)"
+
+#~ msgid "Stimmungen_Kombinationen_(14)"
+#~ msgstr "moods_combinations_(14)"
+
+#~ msgid "Klassen_(20)"
+#~ msgstr "classes_(20)"
+
+#~ msgid "Empathie_(37)"
+#~ msgstr "empathy_(37)"
+
+#~ msgid "Garben_und_Verhalten_nachfühlen(31)"
+#~ msgstr "sheaf_and_behavior_empathy_(31)"
+
+#~ msgid "Verhalten_(11)"
+#~ msgstr "behavior_(11)"
+
+#~ msgid "Bedeutung_(10)"
+#~ msgstr "meaning_(10)"
+
+#~ msgid "Themen_(6)"
+#~ msgstr "topics_(6)"
+
+#~ msgid "Optimierung_(10)"
+#~ msgstr "optimization_(10)"
+
+#~ msgid "Attraktionen_(36)"
+#~ msgstr "attractions_(36)"
+
+#~ msgid "Absicht_16_ist_zu_genügen"
+#~ msgstr "intention_16_is_to_be_enough"
+
+#~ msgid "Liebe_(7)"
+#~ msgstr "love_(7)"
+
+#~ msgid "Koalitionen_(10)"
+#~ msgstr "coalitions_(10)"
+
+#~ msgid "Ansichten_Standpunkte_(18_17)"
+#~ msgstr "views_Stances_(18_17)"
+
+#~ msgid "Prinzipien(1/8)"
+#~ msgstr "principles(1/8)"
+
+#~ msgid "Bestrebungen(1/5)"
+#~ msgstr "aspirations(1/5)"
+
+#~ msgid "Bedingung_und_Auslöser_(1/3)"
+#~ msgstr "condition_and_trigger_(1/3)"
+
+#~ msgid "relativer_Zeit-Betrag_(15_10_4_18_6)"
+#~ msgstr "relative_time_amount_(15_10_4_18_6)"
+
+#~ msgid "Zahlenvergleich_(15_18_6)"
+#~ msgstr "comparision_of_numbers_(15_18_6)"
+
+#~ msgid "Leidenschaften_(21)"
+#~ msgstr "passions_(21)"
+
+#~ msgid "Erwartungshaltungen_(26)"
+#~ msgstr "expectations_(26)"
+
+#~ msgid "Extremalien_(19),Ziele_(19)"
+#~ msgstr "extremalias_(19),goals_(19)"
+
+#~ msgid "universeller_Komperativ_(18→15)"
+#~ msgstr "universal_comperative_(18→15)"
+
+#~ msgid "Relation_zueinander_reziprok_Universellen_(18→n_vs._1/n)"
+#~ msgstr "relation_to_each_other_reciprocal_universal_(18→n_vs._1/n)"
+
+#~ msgid "Sollen_Frage_Vorgehensweise_(1/13)"
+#~ msgstr "shall_question_procedure_(1/13)"
+
+#~ msgid "Fundament_(1/19)"
+#~ msgstr "foundation_(1/19)"
+
+#~ msgid "abhängige_Verbundenheit_(90)"
+#~ msgstr "dependent_connectedness_(90)"
+
+#~ msgid "Absicht_13_ist_Helfen"
+#~ msgstr "intention_13_is_helping"
+
+#~ msgid "Karte_Filter_und_Unterscheidung_(1/12)"
+#~ msgstr "map_filter_and_distinction_(1/12)"
+
+#~ msgid "Model_of_Hierarchical_Complexity"
+#~ msgstr "model_of_Hierarchical_Complexity"
+
+#~ msgid "Meta-Systeme_(12)"
+#~ msgstr "meta-systems_(12)"
+
+#~ msgid "Ordnung_und_Filterung_12_und_1pro12"
+#~ msgstr "order_and_Filtering_12_and_1pro12"
+
+#~ msgid "reta"
+#~ msgstr "reta"
+
+#~ msgid "absicht"
+#~ msgstr "intent"
+
+#~ msgid "motiv"
+#~ msgstr "motive"
+
+#~ msgid "thomas"
+#~ msgstr "thomas"
+
+#~ msgid "motive"
+#~ msgstr "motifs"
+
+#~ msgid "absichten"
+#~ msgstr "intentions"
+
+#~ msgid "vielfache"
+#~ msgstr "multiple"
+
+#~ msgid "einzeln"
+#~ msgstr "single"
+
+#~ msgid "multis"
+#~ msgstr "multis"
+
+#~ msgid "modulo"
+#~ msgstr "modulo"
+
+#~ msgid "prim"
+#~ msgstr "prime"
+
+#~ msgid "primfaktorzerlegung"
+#~ msgstr "primefactorization"
+
+#~ msgid "prim24"
+#~ msgstr "prime24"
+
+#~ msgid "primfaktorzerlegungModulo24"
+#~ msgstr "primefactorizationModulo24"
+
+#~ msgid "hilfe"
+#~ msgstr "help"
+
+#~ msgid "abc"
+#~ msgstr "abc"
+
+#~ msgid "abcd"
+#~ msgstr "abcd"
+
+#~ msgid "a"
+#~ msgstr "i"
+
+#~ msgid "u"
+#~ msgstr "u"
+
+#~ msgid "befehle"
+#~ msgstr "commands"
+
+#~ msgid "t"
+#~ msgstr "t"
+
+#~ msgid "richtung"
+#~ msgstr "direction"
+
+#~ msgid "r"
+#~ msgstr "r"
+
+#~ msgid "v"
+#~ msgstr "m"
+
+#~ msgid "p"
+#~ msgstr "p"
+
+#~ msgid "mo"
+#~ msgstr "mo"
+
+#~ msgid "mu"
+#~ msgstr "mu"
+
+#~ msgid "primzahlkreuz"
+#~ msgstr "primecross"
+
+#~ msgid "ende"
+#~ msgstr "end"
+
+#~ msgid "exit"
+#~ msgstr "exit"
+
+#~ msgid "quit"
+#~ msgstr "quit"
+
+#~ msgid "q"
+#~ msgstr "q"
+
+#~ msgid ":q"
+#~ msgstr ":q"
+
+#~ msgid "s"
+#~ msgstr "s"
+
+#~ msgid "math"
+#~ msgstr "math"
+
+#~ msgid "loggen"
+#~ msgstr "logging_yes"
+
+#~ msgid "nichtloggen"
+#~ msgstr "logging_no"
+
+#~ msgid "mulpri"
+#~ msgstr "mulpri"
+
+#~ msgid "python"
+#~ msgstr "python"
+
+#~ msgid "w"
+#~ msgstr "d"
+
+#~ msgid "teiler"
+#~ msgstr "divider"
+
+#~ msgid "BefehlSpeichernDanach"
+#~ msgstr "CommandSaveAfter"
+
+#~ msgid "S"
+#~ msgstr "S"
+
+#~ msgid "BefehlSpeicherungLöschen"
+#~ msgstr "CommandClearSaves"
+
+#~ msgid "l"
+#~ msgstr "c"
+
+#~ msgid "BefehlSpeicherungAusgeben"
+#~ msgstr "CommandSaveOutput"
+
+#~ msgid "o"
+#~ msgstr "o"
+
+#~ msgid "e"
+#~ msgstr "e"
+
+#~ msgid "BefehlSpeichernDavor"
+#~ msgstr "CommandSaveBefore"
+
+#~ msgid "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+#~ msgstr "noOneCharacterLinePlusNoOutputWhichCommandItWas"
+
+#~ msgid "abstand"
+#~ msgstr "distance"
+
+#~ msgid "konzept"
+#~ msgstr "concept"
+
+#~ msgid "konzept2"
+#~ msgstr "concept2"
+
+#~ msgid "gebrochenuniversum"
+#~ msgstr "gebrochenuniversum_fractionaluniverse"
+
+#~ msgid "gebrochengalaxie"
+#~ msgstr "gebrochengalaxie_fractionalgalaxy"
+
+#~ msgid "Wichtigstes_zum_verstehen"
+#~ msgstr "most_important_to_understand"
+
+#~ msgid "wichtigsteverstehen"
+#~ msgstr "mostimportanttounderstand"
+
+#~ msgid "Wichtigstes_zum_gedanklich_einordnen"
+#~ msgstr "most_important_to_think_about"
+
+#~ msgid "wichtigsteeinordnen"
+#~ msgstr "mostImportantToClassify"
+
+#~ msgid "Religionen"
+#~ msgstr "religions"
+
+#~ msgid "religionen"
+#~ msgstr "religions"
+
+#~ msgid "religion"
+#~ msgstr "religion"
+
+#~ msgid "Galaxie"
+#~ msgstr "galaxy"
+
+#~ msgid "alteschriften"
+#~ msgstr "ancientscripts"
+
+#~ msgid "kreis"
+#~ msgstr "circle"
+
+#~ msgid "galaxien"
+#~ msgstr "galaxies"
+
+#~ msgid "kreise"
+#~ msgstr "circles"
+
+#~ msgid "Größenordnung"
+#~ msgstr "scale"
+
+#~ msgid "groessenordnung"
+#~ msgstr "scale"
+
+#~ msgid "strukturgroesse"
+#~ msgstr "structuresize"
+
+#~ msgid "strukturgroeße"
+#~ msgstr "structuresize"
+
+#~ msgid "strukturgrösse"
+#~ msgstr "structuresize"
+
+#~ msgid "strukturgröße"
+#~ msgstr "structuresize"
+
+#~ msgid "groesse"
+#~ msgstr "size"
+
+#~ msgid "stufe"
+#~ msgstr "level"
+
+#~ msgid "organisationen"
+#~ msgstr "organizations"
+
+#~ msgid "Universum"
+#~ msgstr "universe"
+
+#~ msgid "transzendentalien"
+#~ msgstr "transcendentals"
+
+#~ msgid "strukturalien"
+#~ msgstr "structurals"
+
+#~ msgid "kugel"
+#~ msgstr "sphere"
+
+#~ msgid "kugeln"
+#~ msgstr "spheres"
+
+#~ msgid "ball"
+#~ msgstr "ball"
+
+#~ msgid "baelle"
+#~ msgstr "balls"
+
+#~ msgid "bälle"
+#~ msgstr "balls"
+
+#~ msgid "Wirtschaft"
+#~ msgstr "economy"
+
+#~ msgid "wirtschaft"
+#~ msgstr "economy"
+
+#~ msgid "Menschliches"
+#~ msgstr "human"
+
+#~ msgid "menschliches"
+#~ msgstr "human"
+
+#~ msgid "Pro_Contra"
+#~ msgstr "pro_contra"
+
+#~ msgid "procontra"
+#~ msgstr "procontra"
+
+#~ msgid "dagegendafuer"
+#~ msgstr "procontra"
+
+#~ msgid "Licht"
+#~ msgstr "light"
+
+#~ msgid "licht"
+#~ msgstr "light"
+
+#~ msgid "Bedeutung"
+#~ msgstr "meaning"
+
+#~ msgid "bedeutung"
+#~ msgstr "meaning"
+
+#~ msgid "Symbole"
+#~ msgstr "symbols"
+
+#~ msgid "symbole"
+#~ msgstr "symbols"
+
+#~ msgid "Eigenschaften_n"
+#~ msgstr "properties_n"
+
+#~ msgid "eigenschaften"
+#~ msgstr "properties"
+
+#~ msgid "eigenschaft"
+#~ msgstr "property"
+
+#~ msgid "konzepte"
+#~ msgstr "concepts"
+
+#~ msgid "Eigenschaften_1/n"
+#~ msgstr "properties_1/n"
+
+#~ msgid "konzepte2"
+#~ msgstr "concepts2"
+
+#~ msgid "Inkrementieren"
+#~ msgstr "increment"
+
+#~ msgid "inkrementieren"
+#~ msgstr "increment"
+
+#~ msgid "Operationen"
+#~ msgstr "operations"
+
+#~ msgid "operationen"
+#~ msgstr "operations"
+
+#~ msgid "Meta_vs_Konkret_(Universum)"
+#~ msgstr "meta_vs_concrete_(universe)"
+
+#~ msgid "universummetakonkret"
+#~ msgstr "universeMetaConcrete"
+
+#~ msgid "Primzahlwirkung"
+#~ msgstr "prime_effect"
+
+#~ msgid "primzahlwirkung"
+#~ msgstr "primeeffect"
+
+#~ msgid "multiplikationen"
+#~ msgstr "multiplications"
+
+#~ msgid "Planet_(10_und_oder_12)"
+#~ msgstr "planet_(10_and_or_12)"
+
+#~ msgid "Strukturen_1_bis_9"
+#~ msgstr "structures_1_to_9"
+
+#~ msgid "strukturkleinerzehn"
+#~ msgstr "structureLessTen"
+
+#~ msgid "Grundstrukturen"
+#~ msgstr "basic_structures"
+
+#~ msgid "grundstrukturen"
+#~ msgstr "basic_structures"
+
+#~ msgid "motivation"
+#~ msgstr "motivation"
+
+#~ msgid "transzendentaliereziproke"
+#~ msgstr "transcendentalreciprocal"
+
+#~ msgid "verhaeltnisgleicherzahl"
+#~ msgstr "ratioSameNumber"
+
+#~ msgid "gestirn"
+#~ msgstr "spaceObject"
+
+#~ msgid "Galaxieabsicht"
+#~ msgstr "galaxyintention"
+
+#~ msgid "Wichtigste"
+#~ msgstr "mostimportant"
+
+#~ msgid "wichtigste"
+#~ msgstr "mostimportant"
+
+#~ msgid "Mensch-zu-Tier"
+#~ msgstr "human-to-animal"
+
+#~ msgid "menschtier"
+#~ msgstr "human-animal"
+
+#~ msgid "tiermensch"
+#~ msgstr "human-animal"
+
+#~ msgid "ansichten"
+#~ msgstr "views"
+
+#~ msgid "(politische)_Richtungen_(7)"
+#~ msgstr "(political)_directions_(7)"
+
+#~ msgid "richtungen"
+#~ msgstr "directions"
+
+#~ msgid "politische"
+#~ msgstr "political"
+
+#~ msgid "Wirklichkeiten_(10)"
+#~ msgstr "truthRealities_(10)"
+
+#~ msgid "wirklichkeit"
+#~ msgstr "truthRealities"
+
+#~ msgid "wirklichkeiten"
+#~ msgstr "truthRealities"
+
+#~ msgid "metasysteme"
+#~ msgstr "metasystems"
+
+#~ msgid "metasystem"
+#~ msgstr "metasystem"
+
+#~ msgid "meta-systeme"
+#~ msgstr "metasystems"
+
+#~ msgid "meta-system"
+#~ msgstr "metasystem"
+
+#~ msgid "Intelligenz"
+#~ msgstr "intelligence"
+
+#~ msgid "intelligenz"
+#~ msgstr "intelligence"
+
+#~ msgid "Gleichheit_Freiheit_Ordnung"
+#~ msgstr "equality_freedom_order"
+
+#~ msgid "gleichheit"
+#~ msgstr "equality"
+
+#~ msgid "freiheit"
+#~ msgstr "freedom"
+
+#~ msgid "ordnung"
+#~ msgstr "order"
+
+#~ msgid "Komplexität"
+#~ msgstr "complexity"
+
+#~ msgid "komplexität"
+#~ msgstr "complexity"
+
+#~ msgid "komplexitaet"
+#~ msgstr "complexity"
+
+#~ msgid "Mechanismen"
+#~ msgstr "mechanisms"
+
+#~ msgid "mechanismen"
+#~ msgstr "mechanisms"
+
+#~ msgid "mechanismus"
+#~ msgstr "mechanism"
+
+#~ msgid "Zweitwichtigste"
+#~ msgstr "secondmostimportant"
+
+#~ msgid "zweitwichtigste"
+#~ msgstr "secondmostimportant"
+
+#~ msgid "Drittwichtigste"
+#~ msgstr "thirdmostimportant"
+
+#~ msgid "drittwichtigste"
+#~ msgstr "thirdmostimportant"
+
+#~ msgid "Motive_Sternpolygone"
+#~ msgstr "Motifs_starpolygons"
+
+#~ msgid "viertwichtigste"
+#~ msgstr "fourthmostimportant"
+
+#~ msgid "wichtigstes"
+#~ msgstr "mostimportant"
+
+#~ msgid "Halbierung"
+#~ msgstr "halving"
+
+#~ msgid "halbierung"
+#~ msgstr "halving"
+
+#~ msgid "halbierungen"
+#~ msgstr "halving"
+
+#~ msgid "Religions-Gründer-Typ"
+#~ msgstr "religion-founder-type"
+
+#~ msgid "religionsgründertyp"
+#~ msgstr "religionfoundertype"
+
+#~ msgid "prophet"
+#~ msgstr "Prophet"
+
+#~ msgid "archon"
+#~ msgstr "Archon"
+
+#~ msgid "religionsgruendertyp"
+#~ msgstr "religionfoundertype"
+
+#~ msgid "Hinduismus"
+#~ msgstr "Hinduism"
+
+#~ msgid "hinduismus"
+#~ msgstr "hinduism"
+
+#~ msgid "Sternpolygon"
+#~ msgstr "Starpolygon"
+
+#~ msgid "sternpolygon"
+#~ msgstr "starpolygon"
+
+#~ msgid "der_Tierkreiszeichen"
+#~ msgstr "of_the_zodiac"
+
+#~ msgid "dertierkreiszeichen"
+#~ msgstr "ofthezodiac"
+
+#~ msgid "babylon"
+#~ msgstr "babylon"
+
+#~ msgid "Sternpolygon_vs_gleichförmiges"
+#~ msgstr "star_polygon_vs_uniform_polygon"
+
+#~ msgid "vergleich"
+#~ msgstr "compare"
+
+#~ msgid "sternpolygonvsgleichfoermiges"
+#~ msgstr "starpolygonvsuniformpolygon"
+
+#~ msgid "vergleichnvs1divn"
+#~ msgstr "comparevs1divn"
+
+#~ msgid "Messias"
+#~ msgstr "Messiah"
+
+#~ msgid "messias"
+#~ msgstr "messiah"
+
+#~ msgid "heptagramm"
+#~ msgstr "heptagram"
+
+#~ msgid "hund"
+#~ msgstr "dog"
+
+#~ msgid "messiase"
+#~ msgstr "messiases"
+
+#~ msgid "messiasse"
+#~ msgstr "messiases"
+
+#~ msgid "gleichförmiges_Polygon"
+#~ msgstr "uniform_polygon"
+
+#~ msgid "gleichförmigespolygon"
+#~ msgstr "uniformpolygon"
+
+#~ msgid "gleichfoermigespolygon"
+#~ msgstr "uniformpolygon"
+
+#~ msgid "nichtsternpolygon"
+#~ msgstr "nonstarpolygon"
+
+#~ msgid "polygon"
+#~ msgstr "polygon"
+
+#~ msgid "Vertreter_höherer_Konzepte"
+#~ msgstr "representative_higher_concepts"
+
+#~ msgid "vertreterhoehererkonzepte"
+#~ msgstr "representativehigherconcepts"
+
+#~ msgid "schwarzesonnen"
+#~ msgstr "blackSuns"
+
+#~ msgid "universen"
+#~ msgstr "universes"
+
+#~ msgid "Offenbarung_des_Johannes"
+#~ msgstr "Revelation_of_John"
+
+#~ msgid "offenbarung"
+#~ msgstr "revelation"
+
+#~ msgid "offenbarungdesjohannes"
+#~ msgstr "revelationofjohn"
+
+#~ msgid "johannes"
+#~ msgstr "john"
+
+#~ msgid "bibel"
+#~ msgstr "bible"
+
+#~ msgid "offenbarungjohannes"
+#~ msgstr "revelationofjohn"
+
+#~ msgid "Teilchen-Meta-Physik"
+#~ msgstr "particle-meta-physics"
+
+#~ msgid "addition"
+#~ msgstr "addition"
+
+#~ msgid "identitaet"
+#~ msgstr "identity"
+
+#~ msgid "Identität"
+#~ msgstr "identity"
+
+#~ msgid "Hochzüchten"
+#~ msgstr "breedingUp"
+
+#~ msgid "hochzüchten"
+#~ msgstr "breedingup"
+
+#~ msgid "hochzuechten"
+#~ msgstr "breedingup"
+
+#~ msgid "Universelles_Verhältnis_gleicher_Zahlen"
+#~ msgstr "Universal_ratio_of_equal_numbers"
+
+#~ msgid "universelles_Recht"
+#~ msgstr "universal_right"
+
+#~ msgid "recht"
+#~ msgstr "law"
+
+#~ msgid "jura"
+#~ msgstr "law"
+
+#~ msgid "sowas_wie_Kombinieren_Verknüpfen"
+#~ msgstr "such_as_combining_linking"
+
+#~ msgid "kombinierenetc"
+#~ msgstr "combineetc"
+
+#~ msgid "keine_Nur-Paradigma-Religionen"
+#~ msgstr "no_only_paradigm_religions"
+
+#~ msgid "metaparadigmareligion"
+#~ msgstr "metaparadigmreligion"
+
+#~ msgid "Kugeln_Kreise"
+#~ msgstr "spheres_circles"
+
+#~ msgid "kugelnkreise"
+#~ msgstr "spherescircles"
+
+#~ msgid "chinesisches_Horoskop"
+#~ msgstr "chinese_horoscope"
+
+#~ msgid "chinesischeshoroskop"
+#~ msgstr "chinesehoroscope"
+
+#~ msgid "china"
+#~ msgstr "china"
+
+#~ msgid "babylonische_Tierkreiszeichen"
+#~ msgstr "babylonian_zodiac"
+
+#~ msgid "tierkreiszeichen"
+#~ msgstr "zodiacsigns"
+
+#~ msgid "Thomasevangelium"
+#~ msgstr "GospelofThomas"
+
+#~ msgid "thomasevangelium"
+#~ msgstr "gospelofthomas"
+
+#~ msgid "analytische_Ontologie"
+#~ msgstr "analytic_ontology"
+
+#~ msgid "analytischeontologie"
+#~ msgstr "analyticontology"
+
+#~ msgid "ontologie"
+#~ msgstr "ontology"
+
+#~ msgid "Transzendentalien_innen_außen"
+#~ msgstr "transcendentals_inside_outside"
+
+#~ msgid "innenaussenstrukur"
+#~ msgstr "insideOutsideStructure"
+
+#~ msgid "strukturalieninnenaußen"
+#~ msgstr "structurealiasInsideOutside"
+
+#~ msgid "strukturalieninnenaussen"
+#~ msgstr "structurealieninsideoutside"
+
+#~ msgid "innenaußenstrukur"
+#~ msgstr "structureinsideoutside"
+
+#~ msgid "transzendentalieninnenaußen"
+#~ msgstr "interiorexteriorstructure"
+
+#~ msgid "transzendentalieninnenaussen"
+#~ msgstr "transcendentalieninsideoutside"
+
+#~ msgid "Modallogik"
+#~ msgstr "modallogic"
+
+#~ msgid "modallogik"
+#~ msgstr "modallogic"
+
+#~ msgid "5"
+#~ msgstr "5"
+
+#~ msgid "fünf"
+#~ msgstr "five"
+
+#~ msgid "fünfer"
+#~ msgstr "five"
+
+#~ msgid "fünferstruktur"
+#~ msgstr "structureOfFive"
+
+#~ msgid "fuenf"
+#~ msgstr "five"
+
+#~ msgid "fuenfer"
+#~ msgstr "five"
+
+#~ msgid "fuenferstruktur"
+#~ msgstr "structureoffive"
+
+#~ msgid "9"
+#~ msgstr "9"
+
+#~ msgid "neun"
+#~ msgstr "nine"
+
+#~ msgid "neuner"
+#~ msgstr "nine"
+
+#~ msgid "neunerstruktur"
+#~ msgstr "nineStructure"
+
+#~ msgid "3"
+#~ msgstr "3"
+
+#~ msgid "drei"
+#~ msgstr "three"
+
+#~ msgid "dreier"
+#~ msgstr "three"
+
+#~ msgid "dreierstruktur"
+#~ msgstr "threeStructure"
+
+#~ msgid "Strukturgrösse"
+#~ msgstr "structureSize"
+
+#~ msgid "größe"
+#~ msgstr "size"
+
+#~ msgid "gross"
+#~ msgstr "size"
+
+#~ msgid "Organisationen"
+#~ msgstr "organizations"
+
+#~ msgid "organisation"
+#~ msgstr "organization"
+
+#~ msgid "politische_Systeme"
+#~ msgstr "political_systems"
+
+#~ msgid "politischesysteme"
+#~ msgstr "politicalsystems"
+
+#~ msgid "politik"
+#~ msgstr "politics"
+
+#~ msgid "meta"
+#~ msgstr "meta"
+
+#~ msgid "konkret"
+#~ msgstr "concrete"
+
+#~ msgid "Theorie"
+#~ msgstr "theory"
+
+#~ msgid "theorie"
+#~ msgstr "theory"
+
+#~ msgid "Praxis"
+#~ msgstr "practice"
+
+#~ msgid "praxis"
+#~ msgstr "practice"
+
+#~ msgid "Management"
+#~ msgstr "management"
+
+#~ msgid "management"
+#~ msgstr "management"
+
+#~ msgid "stau"
+#~ msgstr "congestion"
+
+#~ msgid "verändernd"
+#~ msgstr "changing"
+
+#~ msgid "veraendernd"
+#~ msgstr "changing"
+
+#~ msgid "fluss"
+#~ msgstr "flow"
+
+#~ msgid "ganzheitlich"
+#~ msgstr "discrete"
+
+#~ msgid "mathematisch_diskret"
+#~ msgstr "mathematical_discrete"
+
+#~ msgid "diskret"
+#~ msgstr "discrete"
+
+#~ msgid "darüber_hinausgehend"
+#~ msgstr "beyond_that"
+
+#~ msgid "hinausgehend"
+#~ msgstr "beyond"
+
+#~ msgid "kontinuierlich"
+#~ msgstr "continuous"
+
+#~ msgid "Universum_Strukturalien_Transzendentalien"
+#~ msgstr "Universe_Structurals_Transcendentals"
+
+#~ msgid "strukturalie"
+#~ msgstr "structuralia"
+
+#~ msgid "transzendentalie"
+#~ msgstr "transcendentalia"
+
+#~ msgid "Richtung_als_Richtung"
+#~ msgstr "direction_as_direction"
+
+#~ msgid "richtungrichtung"
+#~ msgstr "directiondirection"
+
+#~ msgid "absichtgalaxie"
+#~ msgstr "intentionGalaxy"
+
+#~ msgid "Absicht_Reziproke_Galaxie"
+#~ msgstr "intention_reciprocal_galaxy"
+
+#~ msgid "absichtgalaxiereziproke"
+#~ msgstr "intentGalaxyReciprocal"
+
+#~ msgid "absichtreziproke"
+#~ msgstr "intentReciprocal"
+
+#~ msgid "motivereziproke"
+#~ msgstr "motivereciprocal"
+
+#~ msgid "motivreziproke"
+#~ msgstr "motivereciprocal"
+
+#~ msgid "absichtenreziproke"
+#~ msgstr "reciprocalofintention"
+
+#~ msgid "galaxiereziproke"
+#~ msgstr "galaxyreciprocal"
+
+#~ msgid "Universum_Reziproke"
+#~ msgstr "universe_reciprocal"
+
+#~ msgid "universumreziproke"
+#~ msgstr "universeReciprocal"
+
+#~ msgid "strukturaliereziproke"
+#~ msgstr "structuralReciprocal"
+
+#~ msgid "strukturalienreziproke"
+#~ msgstr "structuralreciprocal"
+
+#~ msgid "transzendentalienreziproke"
+#~ msgstr "transcendentalreciprocal"
+
+#~ msgid "Dagegen-Gegentranszendentalie"
+#~ msgstr "counter-transcendental"
+
+#~ msgid "dagegengegentranszendentalie"
+#~ msgstr "against-against-transcendentalism"
+
+#~ msgid "dagegengegentranszendentalien"
+#~ msgstr "against-against-transcendentalism"
+
+#~ msgid "dagegengegenstrukturalien"
+#~ msgstr "against-against-structurals"
+
+#~ msgid "dagegengegenstrukturalie"
+#~ msgstr "against-against-structural"
+
+#~ msgid "neutrale_Gegentranszendentalie"
+#~ msgstr "neutral_opposite_transcendentalia"
+
+#~ msgid "neutralegegentranszendentalie"
+#~ msgstr "neutral_against_transcendentalism"
+
+#~ msgid "neutralegegentranszendentalien"
+#~ msgstr "neutralCounterTranscendentalism"
+
+#~ msgid "neutralegegenstrukturalien"
+#~ msgstr "neutralcounterstructuralism"
+
+#~ msgid "neutralegegenstrukturalie"
+#~ msgstr "neutral-versus-structural"
+
+#~ msgid "Unternehmung_Geschäft"
+#~ msgstr "enterprise_business"
+
+#~ msgid "unternehmen"
+#~ msgstr "enterprise"
+
+#~ msgid "unternehmung"
+#~ msgstr "enterprise"
+
+#~ msgid "geschaeft"
+#~ msgstr "business"
+
+#~ msgid "geschäft"
+#~ msgstr "business"
+
+#~ msgid "wertvoll"
+#~ msgstr "valuable"
+
+#~ msgid "wert"
+#~ msgstr "value"
+
+#~ msgid "Beherrschen"
+#~ msgstr "mastery"
+
+#~ msgid "regieren"
+#~ msgstr "rule"
+
+#~ msgid "beherrschen"
+#~ msgstr "rule"
+
+#~ msgid "Richtung"
+#~ msgstr "direction"
+
+#~ msgid "gut"
+#~ msgstr "good"
+
+#~ msgid "Gegentranszendentalien"
+#~ msgstr "countertranscendentals"
+
+#~ msgid "gegentranszendentalien"
+#~ msgstr "countertranscendentals"
+
+#~ msgid "gegentranszendentalie"
+#~ msgstr "counter-transcendental"
+
+#~ msgid "gegenstrukturalien"
+#~ msgstr "counter-structuralias"
+
+#~ msgid "gegenalien"
+#~ msgstr "counter-philoalias"
+
+#~ msgid "gegenuniversalien"
+#~ msgstr "counteruniversals"
+
+#~ msgid "Systemsachen"
+#~ msgstr "systemthings"
+
+#~ msgid "systemsachen"
+#~ msgstr "systemthings"
+
+#~ msgid "Transzendentalien"
+#~ msgstr "transcendentals"
+
+#~ msgid "alien"
+#~ msgstr "philoalias"
+
+#~ msgid "universalien"
+#~ msgstr "universals"
+
+#~ msgid "Reziproke_von_Transzendentalien"
+#~ msgstr "reciprocal_of_transcendentalia"
+
+#~ msgid "alienreziproke"
+#~ msgstr "philoalienreciprocal"
+
+#~ msgid "universalienreziproke"
+#~ msgstr "universalsReciprocal"
+
+#~ msgid "Netzwerk"
+#~ msgstr "network"
+
+#~ msgid "netzwerk"
+#~ msgstr "network"
+
+#~ msgid "warum_Transzendentalie_=_Strukturgroesse_=_Charakter"
+#~ msgstr "why_transcendental_=_structure_size_=_character"
+
+#~ msgid "warumtranszendentaliezustrukturgroesseundcharakter"
+#~ msgstr "whytranscendentalstructuralsizeandcharacter"
+
+#~ msgid "Kategorie"
+#~ msgstr "category"
+
+#~ msgid "kategorie"
+#~ msgstr "category"
+
+#~ msgid "Raum-Missionen"
+#~ msgstr "space-missions"
+
+#~ msgid "weltall"
+#~ msgstr "space"
+
+#~ msgid "Programmier-Paradigmen"
+#~ msgstr "programming-paradigms"
+
+#~ msgid "programmierparadigmen"
+#~ msgstr "programmingparadigms"
+
+#~ msgid "Geist__(15)"
+#~ msgstr "mind__(15)"
+
+#~ msgid "geist"
+#~ msgstr "mind"
+
+#~ msgid "warum_Transzendentalie_=_Komplexität_von_Michael_Commons"
+#~ msgstr "why_transcendental_=_complexity_by_Michael_Commons"
+
+#~ msgid "warumtranszendentaliegleichkomplexitaet"
+#~ msgstr "whyTranscendentalEqualsComplexity"
+
+#~ msgid "modelofhierarchicalcomplexity"
+#~ msgstr "modelofhierarchicalcomplexity"
+
+#~ msgid "komplex"
+#~ msgstr "complex"
+
+#~ msgid "complexity"
+#~ msgstr "complexity"
+
+#~ msgid "model"
+#~ msgstr "model"
+
+#~ msgid "abstraktion"
+#~ msgstr "abstraction"
+
+#~ msgid "2"
+#~ msgstr "2"
+
+#~ msgid "zwei"
+#~ msgstr "two"
+
+#~ msgid "gerade"
+#~ msgstr "even"
+
+#~ msgid "ungerade"
+#~ msgstr "odd"
+
+#~ msgid "alternierung"
+#~ msgstr "alternation"
+
+#~ msgid "alternierend"
+#~ msgstr "alternating"
+
+#~ msgid "zweierstruktur"
+#~ msgstr "dualstructure"
+
+#~ msgid "Multiplikation"
+#~ msgstr "multiplication"
+
+#~ msgid "multiplikation"
+#~ msgstr "multiplication"
+
+#~ msgid "4"
+#~ msgstr "4"
+
+#~ msgid "vier"
+#~ msgstr "four"
+
+#~ msgid "viererstruktur"
+#~ msgstr "fourstructure"
+
+#~ msgid "viererabfolgen"
+#~ msgstr "sequencesoffour"
+
+#~ msgid "Gesellschaftsschicht"
+#~ msgstr "socialclass"
+
+#~ msgid "klasse"
+#~ msgstr "class"
+
+#~ msgid "klassen"
+#~ msgstr "classes"
+
+#~ msgid "Moral"
+#~ msgstr "Morale"
+
+#~ msgid "moral"
+#~ msgstr "morality"
+
+#~ msgid "warummoral"
+#~ msgstr "whymorals"
+
+#~ msgid "Fachgebiete"
+#~ msgstr "specialties"
+
+#~ msgid "fachgebiete"
+#~ msgstr "specialties"
+
+#~ msgid "fachbereiche"
+#~ msgstr "specialties"
+
+#~ msgid "themen"
+#~ msgstr "topics"
+
+#~ msgid "Pflanzen"
+#~ msgstr "plants"
+
+#~ msgid "pflanzen"
+#~ msgstr "plants"
+
+#~ msgid "Maschinen"
+#~ msgstr "machines"
+
+#~ msgid "maschinen"
+#~ msgstr "machines"
+
+#~ msgid "maschine"
+#~ msgstr "machine"
+
+#~ msgid "gerät"
+#~ msgstr "machine"
+
+#~ msgid "geräte"
+#~ msgstr "devices"
+
+#~ msgid "geraete"
+#~ msgstr "equipment"
+
+#~ msgid "geraet"
+#~ msgstr "device"
+
+#~ msgid "Organisationsform"
+#~ msgstr "typeOfOrganization"
+
+#~ msgid "organisationsform"
+#~ msgstr "typeoforganization"
+
+#~ msgid "organisationsart"
+#~ msgstr "typeoforganization"
+
+#~ msgid "firma"
+#~ msgstr "company"
+
+#~ msgid "verein"
+#~ msgstr "association"
+
+#~ msgid "System"
+#~ msgstr "system"
+
+#~ msgid "system"
+#~ msgstr "system"
+
+#~ msgid "realistisch"
+#~ msgstr "realistic"
+
+#~ msgid "funktioniert"
+#~ msgstr "works"
+
+#~ msgid "Erklärung"
+#~ msgstr "explanation"
+
+#~ msgid "erklärung"
+#~ msgstr "explanation"
+
+#~ msgid "erklaerung"
+#~ msgstr "explanation"
+
+#~ msgid "BWL"
+#~ msgstr "businessAdministration"
+
+#~ msgid "bwl"
+#~ msgstr "businessadministration"
+
+#~ msgid "Sinn_des_Lebens"
+#~ msgstr "sense_and_meaning_of_life"
+
+#~ msgid "sinndeslebens"
+#~ msgstr "senseandmeaningoflife"
+
+#~ msgid "lebenssinn"
+#~ msgstr "senseAndMeaningOfLife"
+
+#~ msgid "sinn"
+#~ msgstr "senseAndMeaning"
+
+#~ msgid "sinnsuche"
+#~ msgstr "searchformeaning"
+
+#~ msgid "Intelligenzprobleme"
+#~ msgstr "intelligenceproblems"
+
+#~ msgid "intelligenzprobleme"
+#~ msgstr "intelligenceproblems"
+
+#~ msgid "intelligenzmaengel"
+#~ msgstr "intelligencedeficiencies"
+
+#~ msgid "intelligenzmängel"
+#~ msgstr "intelligencedeficiencies"
+
+#~ msgid "Denkweise_von_Lebewesen"
+#~ msgstr "way_of_thinking"
+
+#~ msgid "lebewesendenkweise"
+#~ msgstr "way_of_thinking_of_living_beings"
+
+#~ msgid "denkweise"
+#~ msgstr "wayofthinking"
+
+#~ msgid "Gleichheit_Freiheit"
+#~ msgstr "equality_freedom"
+
+#~ msgid "gleichheitfreiheit"
+#~ msgstr "equalityfreedom"
+
+#~ msgid "ungleichheit"
+#~ msgstr "inequality"
+
+#~ msgid "dominieren"
+#~ msgstr "dominate"
+
+#~ msgid "Gefühle"
+#~ msgstr "feelings"
+
+#~ msgid "emotionen"
+#~ msgstr "emotions"
+
+#~ msgid "gefuehle"
+#~ msgstr "emotions"
+
+#~ msgid "emotion"
+#~ msgstr "emotions"
+
+#~ msgid "gefühl"
+#~ msgstr "emotion"
+
+#~ msgid "gefuehl"
+#~ msgstr "feel"
+
+#~ msgid "Egoismus"
+#~ msgstr "egoism"
+
+#~ msgid "egoismus"
+#~ msgstr "egoism"
+
+#~ msgid "altruismus"
+#~ msgstr "altruism"
+
+#~ msgid "selbstlosigkeit"
+#~ msgstr "selflessness"
+
+#~ msgid "Wirkung"
+#~ msgstr "effect"
+
+#~ msgid "wirkung"
+#~ msgstr "effect"
+
+#~ msgid "INCELs"
+#~ msgstr "INCELs"
+
+#~ msgid "incel"
+#~ msgstr "incel"
+
+#~ msgid "incels"
+#~ msgstr "incels"
+
+#~ msgid "irrationale_Zahlen_durch_Wurzelbildung"
+#~ msgstr "irrational_numbers_by_rooting"
+
+#~ msgid "irrationalezahlendurchwurzelbildung"
+#~ msgstr "irrationalNumbersbyrooting"
+
+#~ msgid "ausgangslage"
+#~ msgstr "initialposition"
+
+#~ msgid "dominierendes_Geschlecht"
+#~ msgstr "dominant_gender"
+
+#~ msgid "dominierendesgeschlecht"
+#~ msgstr "dominantgender"
+
+#~ msgid "maennlich"
+#~ msgstr "male"
+
+#~ msgid "männlich"
+#~ msgstr "male"
+
+#~ msgid "weiblich"
+#~ msgstr "female"
+
+#~ msgid "Liebe"
+#~ msgstr "love"
+
+#~ msgid "liebe"
+#~ msgstr "love"
+
+#~ msgid "ethik"
+#~ msgstr "ethics"
+
+#~ msgid "Glaube_Erkenntnis"
+#~ msgstr "faith_and_epistemology"
+
+#~ msgid "glauben"
+#~ msgstr "faith"
+
+#~ msgid "erkenntnis"
+#~ msgstr "epistemology"
+
+#~ msgid "glaube"
+#~ msgstr "faith"
+
+#~ msgid "Angreifbarkeit"
+#~ msgstr "vulnerability"
+
+#~ msgid "angreifbarkeit"
+#~ msgstr "vulnerability"
+
+#~ msgid "angreifbar"
+#~ msgstr "vulnerable"
+
+#~ msgid "meta-paradigmen"
+#~ msgstr "meta-paradigms"
+
+#~ msgid "bedingung"
+#~ msgstr "condition"
+
+#~ msgid "bedingungen"
+#~ msgstr "conditions"
+
+#~ msgid "auslöser"
+#~ msgstr "trigger"
+
+#~ msgid "ausloeser"
+#~ msgstr "trigger"
+
+#~ msgid "relativreziprokuniversell"
+#~ msgstr "relativereciprocal"
+
+#~ msgid "universellerkomperativ"
+#~ msgstr "universalcomparative"
+
+#~ msgid "Existenzialien_(3)"
+#~ msgstr "existentials_(3)"
+
+#~ msgid "existenzialien"
+#~ msgstr "existentials"
+
+#~ msgid "Extremalien_(19)"
+#~ msgstr "extremalias_(19)"
+
+#~ msgid "extremalien"
+#~ msgstr "extremalia"
+
+#~ msgid "erwartungen"
+#~ msgstr "expectations"
+
+#~ msgid "erwartungshaltungen"
+#~ msgstr "expectations"
+
+#~ msgid "leidenschaft"
+#~ msgstr "passion"
+
+#~ msgid "leidenschaften"
+#~ msgstr "passions"
+
+#~ msgid "relativerzeitbetrag"
+#~ msgstr "relativetimeamount"
+
+#~ msgid "zahlenvergleich"
+#~ msgstr "numericalcomparison"
+
+#~ msgid "bestrebung"
+#~ msgstr "aspiration"
+
+#~ msgid "bestrebungen"
+#~ msgstr "aspirations"
+
+#~ msgid "prinzipien"
+#~ msgstr "principles"
+
+#~ msgid "attraktionen"
+#~ msgstr "attractions"
+
+#~ msgid "optimierung"
+#~ msgstr "optimization"
+
+#~ msgid "thema"
+#~ msgstr "topic"
+
+#~ msgid "Reziprokes"
+#~ msgstr "reciprocal"
+
+#~ msgid "reziproke"
+#~ msgstr "reciprocal"
+
+#~ msgid "reziprokes"
+#~ msgstr "reciprocal"
+
+#~ msgid "achtung"
+#~ msgstr "attention"
+
+#~ msgid "achten"
+#~ msgstr "attentionOrRespect"
+
+#~ msgid "absicht16"
+#~ msgstr "intention16"
+
+#~ msgid "absicht17"
+#~ msgstr "intention17"
+
+#~ msgid "absicht6"
+#~ msgstr "intention6"
+
+#~ msgid "absicht7"
+#~ msgstr "intention7"
+
+#~ msgid "regung"
+#~ msgstr "notemotionnotimpulsesbutsimilar"
+
+#~ msgid "regungen"
+#~ msgstr "notemotionnotimpulsesbutsimilar"
+
+#~ msgid "verhalten"
+#~ msgstr "behavior"
+
+#~ msgid "energie"
+#~ msgstr "energy"
+
+#~ msgid "universelleeigenschaften"
+#~ msgstr "universalproperties"
+
+#~ msgid "lebensenergie"
+#~ msgstr "energyoflife"
+
+#~ msgid "garben"
+#~ msgstr "sheafs"
+
+#~ msgid "verhaltenfuehlen"
+#~ msgstr "behavioralandfeels"
+
+#~ msgid "verhaltenfühlen"
+#~ msgstr "behavefeel"
+
+#~ msgid "nachvollziehen"
+#~ msgstr "comprehend"
+
+#~ msgid "empathie"
+#~ msgstr "empathy"
+
+#~ msgid "mitgefuehl"
+#~ msgstr "empathy"
+
+#~ msgid "absicht1/6"
+#~ msgstr "intention1/6"
+
+#~ msgid "absicht1pro6"
+#~ msgstr "intention1pro6"
+
+#~ msgid "absicht10"
+#~ msgstr "intention10"
+
+#~ msgid "bewusstsein"
+#~ msgstr "consciousness"
+
+#~ msgid "Reflexe_(3)"
+#~ msgstr "reflexes_(3)"
+
+#~ msgid "reflex"
+#~ msgstr "reflex"
+
+#~ msgid "reflexe"
+#~ msgstr "reflexes"
+
+#~ msgid "lust"
+#~ msgstr "lust"
+
+#~ msgid "paradigmen"
+#~ msgstr "paradigms"
+
+#~ msgid "wahrheit"
+#~ msgstr "truth"
+
+#~ msgid "wahrnehmung"
+#~ msgstr "perception"
+
+#~ msgid "stimmung"
+#~ msgstr "mood"
+
+#~ msgid "stimmungen"
+#~ msgstr "moods"
+
+#~ msgid "kombinationen"
+#~ msgstr "combinations"
+
+#~ msgid "ordnen"
+#~ msgstr "order"
+
+#~ msgid "ordnenundfiltern"
+#~ msgstr "orderandfilter"
+
+#~ msgid "filtern"
+#~ msgstr "filter"
+
+#~ msgid "menge"
+#~ msgstr "set"
+
+#~ msgid "mengen"
+#~ msgstr "sets"
+
+#~ msgid "absicht1pro8"
+#~ msgstr "intention1pro8"
+
+#~ msgid "absicht1/8"
+#~ msgstr "intention1/8"
+
+#~ msgid "Ziele_(19)"
+#~ msgstr "goals_(19)"
+
+#~ msgid "ziele"
+#~ msgstr "goals"
+
+#~ msgid "maxima"
+#~ msgstr "maxima"
+
+#~ msgid "höhenvorstellungen"
+#~ msgstr "altitudes"
+
+#~ msgid "konkreta"
+#~ msgstr "concreta"
+
+#~ msgid "focus"
+#~ msgstr "fcous"
+
+#~ msgid "fokus"
+#~ msgstr "focus"
+
+#~ msgid "gefühle"
+#~ msgstr "feelings"
+
+#~ msgid "abhaengigkeit"
+#~ msgstr "dependence"
+
+#~ msgid "abhängigkeit"
+#~ msgstr "dependence"
+
+#~ msgid "karte"
+#~ msgstr "map"
+
+#~ msgid "filter"
+#~ msgstr "filter"
+
+#~ msgid "unterscheidung"
+#~ msgstr "distinction"
+
+#~ msgid "fundament"
+#~ msgstr "foundation"
+
+#~ msgid "positionen"
+#~ msgstr "positions"
+
+#~ msgid "gedanken"
+#~ msgstr "thoughts"
+
+#~ msgid "vorstellungen"
+#~ msgstr "imaginations"
+
+#~ msgid "vorstellung"
+#~ msgstr "imagination"
+
+#~ msgid "funktionen"
+#~ msgstr "functions"
+
+#~ msgid "sollen"
+#~ msgstr "shall"
+
+#~ msgid "frage"
+#~ msgstr "question"
+
+#~ msgid "vorgehensweise"
+#~ msgstr "procedure"
+
+#~ msgid "verbundenheiten"
+#~ msgstr "affiliations"
+
+#~ msgid "absicht13"
+#~ msgstr "intention13"
+
+#~ msgid "helfen"
+#~ msgstr "help"
+
+#~ msgid "koalitionen"
+#~ msgstr "coalitions"
+
+#~ msgid "impulse"
+#~ msgstr "impulses"
+
+#~ msgid "trieb"
+#~ msgstr "drive"
+
+#~ msgid "triebe"
+#~ msgstr "drive"
+
+#~ msgid "bedürfnis"
+#~ msgstr "need"
+
+#~ msgid "bedürfnisse"
+#~ msgstr "needs"
+
+#~ msgid "reflektion"
+#~ msgstr "reflection"
+
+#~ msgid "kategorien"
+#~ msgstr "categories"
+
+#~ msgid "zustaende"
+#~ msgstr "states"
+
+#~ msgid "zustände"
+#~ msgstr "states"
+
+#~ msgid "modus"
+#~ msgstr "mode"
+
+#~ msgid "modi"
+#~ msgstr "modes"
+
+#~ msgid "sein"
+#~ msgstr "be"
+
+#~ msgid "Motive"
+#~ msgstr "motifs"
+
+#~ msgid "Bewusstsein_und_Wahrnehmung"
+#~ msgstr "consciousness_and_perception"
+
+#~ msgid "Errungenschaften"
+#~ msgstr "achievements"
+
+#~ msgid "errungenschaften"
+#~ msgstr "achievements"
+
+#~ msgid "erhalten"
+#~ msgstr "obtained"
+
+#~ msgid "evolutionär_erwerben_und_Intelligenz_Kreativität"
+#~ msgstr "evolutionary_acquisition_and_intelligence_creativity"
+
+#~ msgid "evolutionärerwerbenundintelligenz"
+#~ msgstr "evolutionary_acquire_and_intelligence"
+
+#~ msgid "erwerben"
+#~ msgstr "acquire"
+
+#~ msgid "erlernen"
+#~ msgstr "learn"
+
+#~ msgid "lernen"
+#~ msgstr "learn"
+
+#~ msgid "evolutionaer"
+#~ msgstr "evolutionary"
+
+#~ msgid "evolutionär"
+#~ msgstr "evolutionary"
+
+#~ msgid "kreativität"
+#~ msgstr "creativity"
+
+#~ msgid "kreativitaet"
+#~ msgstr "creativity"
+
+#~ msgid "kreativ"
+#~ msgstr "creative"
+
+#~ msgid "brauchen"
+#~ msgstr "need"
+
+#~ msgid "benoetigen"
+#~ msgstr "need"
+
+#~ msgid "benötigen"
+#~ msgstr "need"
+
+#~ msgid "notwendig"
+#~ msgstr "necessary"
+
+#~ msgid "Krankheit"
+#~ msgstr "illness"
+
+#~ msgid "krankheit"
+#~ msgstr "disease"
+
+#~ msgid "krankheiten"
+#~ msgstr "diseases"
+
+#~ msgid "pathologisch"
+#~ msgstr "pathological"
+
+#~ msgid "pathologie"
+#~ msgstr "psychiatric"
+
+#~ msgid "psychiatrisch"
+#~ msgstr "psychiatric"
+
+#~ msgid "alpha_beta"
+#~ msgstr "alpha_beta"
+
+#~ msgid "alphabeta"
+#~ msgstr "alphabeta"
+
+#~ msgid "alpha"
+#~ msgstr "alpha"
+
+#~ msgid "beta"
+#~ msgstr "beta"
+
+#~ msgid "omega"
+#~ msgstr "omega"
+
+#~ msgid "sigma"
+#~ msgstr "sigma"
+
+#~ msgid "Anführer"
+#~ msgstr "leader"
+
+#~ msgid "anfuehrer"
+#~ msgstr "lead"
+
+#~ msgid "chef"
+#~ msgstr "boss"
+
+#~ msgid "Manipulation"
+#~ msgstr "manipulation"
+
+#~ msgid "manipulation"
+#~ msgstr "manipulation"
+
+#~ msgid "Berufe"
+#~ msgstr "jobs"
+
+#~ msgid "berufe"
+#~ msgstr "jobs"
+
+#~ msgid "beruf"
+#~ msgstr "job"
+
+#~ msgid "Lösungen"
+#~ msgstr "solutions"
+
+#~ msgid "lösungen"
+#~ msgstr "solutions"
+
+#~ msgid "loesungen"
+#~ msgstr "solutions"
+
+#~ msgid "loesung"
+#~ msgstr "solution"
+
+#~ msgid "Musik"
+#~ msgstr "music"
+
+#~ msgid "musik"
+#~ msgstr "music"
+
+#~ msgid "ergibt_Sinn"
+#~ msgstr "makes_sense"
+
+#~ msgid "ergibtsinn"
+#~ msgstr "resultsSense"
+
+#~ msgid "machtsinn"
+#~ msgstr "yieldsSense"
+
+#~ msgid "Veränderung"
+#~ msgstr "change"
+
+#~ msgid "veraenderung"
+#~ msgstr "change"
+
+#~ msgid "veraendern"
+#~ msgstr "change"
+
+#~ msgid "veränderung"
+#~ msgstr "change"
+
+#~ msgid "verändern"
+#~ msgstr "change"
+
+#~ msgid "bändigen_kontrollieren"
+#~ msgstr "tame_control"
+
+#~ msgid "baendigenkontrollieren"
+#~ msgstr "tamecontrol"
+
+#~ msgid "kontrollieren"
+#~ msgstr "control"
+
+#~ msgid "baendigen"
+#~ msgstr "tame"
+
+#~ msgid "bändigen"
+#~ msgstr "tame"
+
+#~ msgid "vereinen"
+#~ msgstr "unite"
+
+#~ msgid "einheit"
+#~ msgstr "unity"
+
+#~ msgid "Vorteile"
+#~ msgstr "advantages"
+
+#~ msgid "vorteile"
+#~ msgstr "advantages"
+
+#~ msgid "veraenderungnutzen"
+#~ msgstr "usechange"
+
+#~ msgid "Gegenspieler"
+#~ msgstr "opponent"
+
+#~ msgid "gegenspieler"
+#~ msgstr "opponent"
+
+#~ msgid "antagonist"
+#~ msgstr "antagonist"
+
+#~ msgid "nervig"
+#~ msgstr "annoying"
+
+#~ msgid "pro_nutzen"
+#~ msgstr "pro_benefit"
+
+#~ msgid "pronutzen"
+#~ msgstr "probenefit"
+
+#~ msgid "Gegenposition"
+#~ msgstr "counterposition"
+
+#~ msgid "gegenposition"
+#~ msgstr "counterposition"
+
+#~ msgid "Hilfe_erhalten"
+#~ msgstr "help_receive"
+
+#~ msgid "hilfeerhalten"
+#~ msgstr "helpreceive"
+
+#~ msgid "Helfen"
+#~ msgstr "help"
+
+#~ msgid "Pro"
+#~ msgstr "pro"
+
+#~ msgid "pro"
+#~ msgstr "pro"
+
+#~ msgid "dafür"
+#~ msgstr "forit"
+
+#~ msgid "dafuer"
+#~ msgstr "forit"
+
+#~ msgid "nicht_miteinander_auskommen"
+#~ msgstr "not_getting_along_with_another"
+
+#~ msgid "nichtauskommen"
+#~ msgstr "notGettingAlong"
+
+#~ msgid "nicht_dagegen"
+#~ msgstr "not_against"
+
+#~ msgid "nichtdagegen"
+#~ msgstr "notAgainst"
+
+#~ msgid "kein_Gegenteil"
+#~ msgstr "no_opposite"
+
+#~ msgid "keingegenteil"
+#~ msgstr "noopposite"
+
+#~ msgid "nicht_dafür"
+#~ msgstr "not_for"
+
+#~ msgid "nichtdafuer"
+#~ msgstr "notfor"
+
+#~ msgid "Hilfe_nicht_gebrauchen"
+#~ msgstr "help_not_need"
+
+#~ msgid "hilfenichtgebrauchen"
+#~ msgstr "helpnotneed"
+
+#~ msgid "nicht_helfen_können"
+#~ msgstr "cannot_help"
+
+#~ msgid "nichthelfenkoennen"
+#~ msgstr "cannothelp"
+
+#~ msgid "nicht_abgeneigt"
+#~ msgstr "not_disposed"
+
+#~ msgid "nichtabgeneigt"
+#~ msgstr "notdisposed"
+
+#~ msgid "unmotivierbar"
+#~ msgstr "unmotivated"
+
+#~ msgid "contra"
+#~ msgstr "contra"
+
+#~ msgid "dagegen"
+#~ msgstr "against"
+
+#~ msgid "Gegenteil"
+#~ msgstr "opposite"
+
+#~ msgid "gegenteil"
+#~ msgstr "opposite"
+
+#~ msgid "Harmonie"
+#~ msgstr "harmony"
+
+#~ msgid "harmonie"
+#~ msgstr "harmony"
+
+#~ msgid "in_ReTa"
+#~ msgstr "in_ReTa"
+
+#~ msgid "inreta"
+#~ msgstr "inreta"
+
+#~ msgid "Vorzeichen"
+#~ msgstr "signbefore"
+
+#~ msgid "vorzeichen"
+#~ msgstr "signbefore"
+
+#~ msgid "Primzahlen"
+#~ msgstr "primenumbers"
+
+#~ msgid "primzahlen"
+#~ msgstr "primenumbers"
+
+#~ msgid "vielfacher"
+#~ msgstr "multiples"
+
+#~ msgid "Anwendung_der_Sonnen_und_Monde"
+#~ msgstr "application_of_suns_and_moons"
+
+#~ msgid "anwendungdersonnenundmonde"
+#~ msgstr "applicationofsunsandmoons"
+
+#~ msgid "anwendungdersonnen"
+#~ msgstr "applicationssuns"
+
+#~ msgid "anwendungenfuermonde"
+#~ msgstr "applicationsmoons"
+
+#~ msgid "Zählungen"
+#~ msgstr "ranges"
+
+#~ msgid "zählungen"
+#~ msgstr "ranges"
+
+#~ msgid "zaehlungen"
+#~ msgstr "ranges"
+
+#~ msgid "zählung"
+#~ msgstr "range"
+
+#~ msgid "Jura"
+#~ msgstr "law"
+
+#~ msgid "gesetzeslehre"
+#~ msgstr "law"
+
+#~ msgid "Vollkommenheit_des_Geistes"
+#~ msgstr "perfection_of_the_spirit"
+
+#~ msgid "vollkommenheit"
+#~ msgstr "perfection"
+
+#~ msgid "Gestirn"
+#~ msgstr "spaceObject"
+
+#~ msgid "Konjunktiv_Wurzelbildung"
+#~ msgstr "subjunctive_root"
+
+#~ msgid "konjunktiv"
+#~ msgstr "subjunctive"
+
+#~ msgid "wurzel"
+#~ msgstr "root"
+
+#~ msgid "Mechanismen_der_Züchtung"
+#~ msgstr "mechanisms_of_breeding"
+
+#~ msgid "wesen"
+#~ msgstr "essence"
+
+#~ msgid "zuechtung"
+#~ msgstr "breeding"
+
+#~ msgid "züchtung"
+#~ msgstr "breeding"
+
+#~ msgid "züchten"
+#~ msgstr "breed"
+
+#~ msgid "zuechten"
+#~ msgstr "breed"
+
+#~ msgid "Weisheit_etc"
+#~ msgstr "wisdom_etc"
+
+#~ msgid "weisheit"
+#~ msgstr "wisdom"
+
+#~ msgid "metaweisheit"
+#~ msgstr "metawisdom"
+
+#~ msgid "meta-weisheit"
+#~ msgstr "meta-wisdom"
+
+#~ msgid "idiot"
+#~ msgstr "idiot"
+
+#~ msgid "weise"
+#~ msgstr "wise"
+
+#~ msgid "optimal"
+#~ msgstr "optimal"
+
+#~ msgid "optimum"
+#~ msgstr "optimum"
+
+#~ msgid "Dein_Recht_bekommen"
+#~ msgstr "get_your_right"
+
+#~ msgid "rechte"
+#~ msgstr "rights"
+
+#~ msgid "selbstgerecht"
+#~ msgstr "selfrighteous"
+
+#~ msgid "unterlegen_überlegen"
+#~ msgstr "inferior_superior"
+
+#~ msgid "unterlegen"
+#~ msgstr "inferior"
+
+#~ msgid "ueberlegen"
+#~ msgstr "outnumber"
+
+#~ msgid "Ehrlichkeit_und_Streit"
+#~ msgstr "honesty_and_contention"
+
+#~ msgid "streit"
+#~ msgstr "dispute"
+
+#~ msgid "ehrlichkeit"
+#~ msgstr "honesty"
+
+#~ msgid "Würdig"
+#~ msgstr "dignified"
+
+#~ msgid "wuerdig"
+#~ msgstr "worthy"
+
+#~ msgid "würdig"
+#~ msgstr "worthy"
+
+#~ msgid "Regel_vs_Ausnahme"
+#~ msgstr "rule_vs_exception"
+
+#~ msgid "regel"
+#~ msgstr "rule"
+
+#~ msgid "ausnahme"
+#~ msgstr "exception"
+
+#~ msgid "Filterart_Widrigkeit"
+#~ msgstr "filter_type_and_violation"
+
+#~ msgid "filterart"
+#~ msgstr "filterType"
+
+#~ msgid "widrigkeit"
+#~ msgstr "adversity"
+
+#~ msgid "Werte"
+#~ msgstr "values"
+
+#~ msgid "werte"
+#~ msgstr "values"
+
+#~ msgid "Gutartigkeits-Egoismus"
+#~ msgstr "Goodnessegoism"
+
+#~ msgid "position"
+#~ msgstr "position"
+
+#~ msgid "gutesreziprok"
+#~ msgstr "goodreciprocal"
+
+#~ msgid "Reflektieren_Erkenntnis-Erkennen"
+#~ msgstr "reflect_recognize"
+
+#~ msgid "reflektieren"
+#~ msgstr "reflect"
+
+#~ msgid "Vertrauen_wollen"
+#~ msgstr "trust_want"
+
+#~ msgid "vertrauenwollen"
+#~ msgstr "wantToTrust"
+
+#~ msgid "einklinken_vertrauen_anprangern"
+#~ msgstr "engage_trust_denounce"
+
+#~ msgid "einklinken"
+#~ msgstr "latchOn"
+
+#~ msgid "vertrauenerhalten"
+#~ msgstr "trustMaintain"
+
+#~ msgid "anprangern"
+#~ msgstr "denounce"
+
+#~ msgid "Ausrichten_Einrichten"
+#~ msgstr "align_setup"
+
+#~ msgid "einrichten"
+#~ msgstr "align"
+
+#~ msgid "ausrichten"
+#~ msgstr "align"
+
+#~ msgid "Toleranz_Respekt_Akzeptanz_Willkommen"
+#~ msgstr "tolerance_respect_acceptance_welcome"
+
+#~ msgid "toleranz"
+#~ msgstr "tolerance"
+
+#~ msgid "respekt"
+#~ msgstr "respect"
+
+#~ msgid "akzeptanz"
+#~ msgstr "acceptance"
+
+#~ msgid "willkommen"
+#~ msgstr "welcome"
+
+#~ msgid "familiebrauchen"
+#~ msgstr "familyneeds"
+
+#~ msgid "ego"
+#~ msgstr "ego"
+
+#~ msgid "bescheiden"
+#~ msgstr "humble"
+
+#~ msgid "Selbstsucht_Ichsucht_etc"
+#~ msgstr "selfishness_wantingYourOwnI_etc"
+
+#~ msgid "selbstsucht"
+#~ msgstr "selfishness"
+
+#~ msgid "ichsucht"
+#~ msgstr "IAddiction"
+
+#~ msgid "Forschen_Erfinden_Einklinken"
+#~ msgstr "research_invention_engagement"
+
+#~ msgid "wissenschaft"
+#~ msgstr "science"
+
+#~ msgid "forschen"
+#~ msgstr "research"
+
+#~ msgid "erfinden"
+#~ msgstr "invent"
+
+#~ msgid "Kooperation_vs_Arsch"
+#~ msgstr "cooperation_vs_ass"
+
+#~ msgid "arschloch"
+#~ msgstr "asshole"
+
+#~ msgid "kooperation"
+#~ msgstr "cooperation"
+
+#~ msgid "arsch"
+#~ msgstr "ass"
+
+#~ msgid "Liebe_usw"
+#~ msgstr "love_etc"
+
+#~ msgid "zuneigung"
+#~ msgstr "affection"
+
+#~ msgid "Selbstlosigkeit_Ichlosigkeit_etc"
+#~ msgstr "selflessness_Ilessness_etc"
+
+#~ msgid "selbstlos"
+#~ msgstr "selfless"
+
+#~ msgid "ichlos"
+#~ msgstr "Iless"
+
+#~ msgid "variationsreich_eintönig"
+#~ msgstr "varied_monotonous"
+
+#~ msgid "eintönig"
+#~ msgstr "monotonous"
+
+#~ msgid "eintoenig"
+#~ msgstr "monotonous"
+
+#~ msgid "variationsreich"
+#~ msgstr "varied"
+
+#~ msgid "Zuneigung_Abneigung"
+#~ msgstr "affection_dislike"
+
+#~ msgid "abgeneigt"
+#~ msgstr "averse"
+
+#~ msgid "zugewandt"
+#~ msgstr "affectionate"
+
+#~ msgid "reserviert"
+#~ msgstr "reserved"
+
+#~ msgid "zugeneigt"
+#~ msgstr "inclined"
+
+#~ msgid "ehrlich"
+#~ msgstr "honest"
+
+#~ msgid "höflich"
+#~ msgstr "polite"
+
+#~ msgid "hoeflich"
+#~ msgstr "courteous"
+
+#~ msgid "Tragweite"
+#~ msgstr "scope"
+
+#~ msgid "tragweite"
+#~ msgstr "scope"
+
+#~ msgid "wertlos"
+#~ msgstr "worthless"
+
+#~ msgid "Götter_Propheten_Familien_Freunde"
+#~ msgstr "gods_prophets_families_friends"
+
+#~ msgid "familiaer"
+#~ msgstr "familial"
+
+#~ msgid "goettlich"
+#~ msgstr "godly"
+
+#~ msgid "freunde"
+#~ msgstr "friends"
+
+#~ msgid "propheten"
+#~ msgstr "prophets"
+
+#~ msgid "sanft_vs_hart"
+#~ msgstr "gentle_vs_hard"
+
+#~ msgid "sanft"
+#~ msgstr "soft"
+
+#~ msgid "hart"
+#~ msgstr "hard"
+
+#~ msgid "vereinen_vs_verbinden"
+#~ msgstr "unite_vs_connect"
+
+#~ msgid "vereinenverbinden"
+#~ msgstr "uniteConnect"
+
+#~ msgid "verbinden"
+#~ msgstr "connect"
+
+#~ msgid "verbindung"
+#~ msgstr "connect"
+
+#~ msgid "ähnlich"
+#~ msgstr "similar"
+
+#~ msgid "aehnlich"
+#~ msgstr "similar"
+
+#~ msgid "gut_böse_lieb_schlecht"
+#~ msgstr "good_evil_love_bad"
+
+#~ msgid "böse"
+#~ msgstr "evil"
+
+#~ msgid "boese"
+#~ msgstr "evil"
+
+#~ msgid "lieb"
+#~ msgstr "kind"
+
+#~ msgid "schlecht"
+#~ msgstr "bad"
+
+#~ msgid "Sinn_und_Zweck_des_Lebens"
+#~ msgstr "meaning_and_purpose_of_life"
+
+#~ msgid "zweck"
+#~ msgstr "purpose"
+
+#~ msgid "Zeit_vs_Raum"
+#~ msgstr "time_vs_space"
+
+#~ msgid "raum"
+#~ msgstr "space"
+
+#~ msgid "zeitlich"
+#~ msgstr "time"
+
+#~ msgid "räumlich"
+#~ msgstr "spatially"
+
+#~ msgid "egalitär_vs_autoritär"
+#~ msgstr "egalitarian_vs_authoritarian"
+
+#~ msgid "egalitaerautoritaer"
+#~ msgstr "egalitarianAuthoritarian"
+
+#~ msgid "egalitaer"
+#~ msgstr "egalitarian"
+
+#~ msgid "autoritaer"
+#~ msgstr "authoritarian"
+
+#~ msgid "egalitär"
+#~ msgstr "egalitarian"
+
+#~ msgid "autoritär"
+#~ msgstr "authoritarian"
+
+#~ msgid "Meinungen_und_Ruf"
+#~ msgstr "opinions_and_reputation"
+
+#~ msgid "meinungen"
+#~ msgstr "opinions"
+
+#~ msgid "anderemenschen"
+#~ msgstr "otherpeople"
+
+#~ msgid "ruf"
+#~ msgstr "reputation"
+
+#~ msgid "Meinungsintelligenz"
+#~ msgstr "opinionintelligence"
+
+#~ msgid "meinungsintelligenz"
+#~ msgstr "opinionintelligence"
+
+#~ msgid "ursprungsintelligenz"
+#~ msgstr "originintelligence"
+
+#~ msgid "Sittlichkeit"
+#~ msgstr "morality"
+
+#~ msgid "sittlichkeit"
+#~ msgstr "morality"
+
+#~ msgid "annaehrerung"
+#~ msgstr "gettingNear"
+
+#~ msgid "Führung"
+#~ msgstr "leadership"
+
+#~ msgid "führung"
+#~ msgstr "leadership"
+
+#~ msgid "fuehrung"
+#~ msgstr "leadership"
+
+#~ msgid "Durchleuchten"
+#~ msgstr "X-ray"
+
+#~ msgid "durchleuchten"
+#~ msgstr "X-ray"
+
+#~ msgid "erleuchten"
+#~ msgstr "illuminate"
+
+#~ msgid "Fördern_Sensiblisieren_und_Gedeihen"
+#~ msgstr "encourage_sensitize_and_grant"
+
+#~ msgid "foerdern"
+#~ msgstr "encourage"
+
+#~ msgid "fördern"
+#~ msgstr "promote"
+
+#~ msgid "begrenzen"
+#~ msgstr "limit"
+
+#~ msgid "sensibilisieren"
+#~ msgstr "raiseawareness"
+
+#~ msgid "gedeihen"
+#~ msgstr "thrive"
+
+#~ msgid "verderben"
+#~ msgstr "spoil"
+
+#~ msgid "Überheblichkeit"
+#~ msgstr "arrogance"
+
+#~ msgid "überheblich"
+#~ msgstr "arrogant"
+
+#~ msgid "ueberheblichkeit"
+#~ msgstr "arrogance"
+
+#~ msgid "ueberheblich"
+#~ msgstr "arrogance"
+
+#~ msgid "überheblichkeit"
+#~ msgstr "arrogant"
+
+#~ msgid "Polung_der_Liebe"
+#~ msgstr "polarity_of_love"
+
+#~ msgid "liebepolung"
+#~ msgstr "polarityOfLove"
+
+#~ msgid "Egoismus_vs_Altruismus"
+#~ msgstr "egoism_vs_altruism"
+
+#~ msgid "egoist"
+#~ msgstr "egoist"
+
+#~ msgid "altruist"
+#~ msgstr "altruist"
+
+#~ msgid "kausal"
+#~ msgstr "causal"
+
+#~ msgid "geltung"
+#~ msgstr "cachetPrestigeValidity"
+
+#~ msgid "genese"
+#~ msgstr "genesis"
+
+#~ msgid "Gleichheit"
+#~ msgstr "equality"
+
+#~ msgid "gleich"
+#~ msgstr "equal"
+
+#~ msgid "Überleben"
+#~ msgstr "survival"
+
+#~ msgid "ueberleben"
+#~ msgstr "survive"
+
+#~ msgid "um1"
+#~ msgstr "of1"
+
+#~ msgid "um2"
+#~ msgstr "of2"
+
+#~ msgid "um3"
+#~ msgstr "of3"
+
+#~ msgid "Rahmen-Bedingungen"
+#~ msgstr "Framework-conditions"
+
+#~ msgid "rahmen"
+#~ msgstr "frame"
+
+#~ msgid "Motive_gleichförmige_Polygone"
+#~ msgstr "motifs_uniform_polygons"
+
+#~ msgid "motivgleichfoermig"
+#~ msgstr "motifRegularPolygons"
+
+#~ msgid "Struktur_gleichförmige_Polygone"
+#~ msgstr "structure_regular_polygons"
+
+#~ msgid "strukturgleichfoermig"
+#~ msgstr "structureRegularPolygons"
+
+#~ msgid "motivstern"
+#~ msgstr "motifStar"
+
+#~ msgid "Struktur_Sternpolygone"
+#~ msgstr "structure_star_polygons"
+
+#~ msgid "strukturstern"
+#~ msgstr "structureStar"
+
+#~ msgid "Motiv_Sternpolygon_gebrochen-rational"
+#~ msgstr "motif_star_polygon_fractioned-rational"
+
+#~ msgid "motivgebrstern"
+#~ msgstr "motifStar"
+
+#~ msgid "Struktur_Sternpolyon_gebrochen-rational"
+#~ msgstr "structure_star_polygon_fractioned-rational"
+
+#~ msgid "strukgebrstern"
+#~ msgstr "strukgebrstern"
+
+#~ msgid "Motiv_gleichförmige_Polygone_gebrochen-rational"
+#~ msgstr "motif_regular_polygons_fractioned-rational"
+
+#~ msgid "motivgebrgleichf"
+#~ msgstr "motifRegularf"
+
+#~ msgid "Struktur_gleichförmige_Polygone_gebrochen-rational"
+#~ msgstr "structure_regular_polygons_fractioned-rationall"
+
+#~ msgid "strukgebrgleichf"
+#~ msgstr "structureRegularF"
+
+#~ msgid "beschrieben"
+#~ msgstr "described"
+
+#~ msgid "Lebewesen"
+#~ msgstr "livingbeing"
+
+#~ msgid "tiere"
+#~ msgstr "animals"
+
+#~ msgid "tier"
+#~ msgstr "animal"
+
+#~ msgid "lebewesen"
+#~ msgstr "creatures"
+
+#~ msgid "Kreativität_und_Intelligenz"
+#~ msgstr "creativity_and_intelligence"
+
+#~ msgid "Männer"
+#~ msgstr "men"
+
+#~ msgid "männer"
+#~ msgstr "men"
+
+#~ msgid "maenner"
+#~ msgstr "men"
+
+#~ msgid "frauen"
+#~ msgstr "women"
+
+#~ msgid "Persönlichkeit_evolutionär_erwerben"
+#~ msgstr "personality_evolutionary_acquisition"
+
+#~ msgid "evolution"
+#~ msgstr "evolution"
+
+#~ msgid "persoenlichkeit"
+#~ msgstr "personality"
+
+#~ msgid "persönlichkeit"
+#~ msgstr "personality"
+
+#~ msgid "Religion"
+#~ msgstr "religion"
+
+#~ msgid "Motive_Ziele"
+#~ msgstr "motives_goals"
+
+#~ msgid "ziel"
+#~ msgstr "goal"
+
+#~ msgid "Emotionen"
+#~ msgstr "Emotions"
+
+#~ msgid "Personen"
+#~ msgstr "people"
+
+#~ msgid "personen"
+#~ msgstr "persons"
+
+#~ msgid "berühmtheiten"
+#~ msgstr "celebrities"
+
+#~ msgid "beruehmtheiten"
+#~ msgstr "celebrities"
+
+#~ msgid "Wirtschaftssysteme"
+#~ msgstr "economicsystems"
+
+#~ msgid "wirtschaftssystem"
+#~ msgstr "economicsystem"
+
+#~ msgid "wirtschaftssysteme"
+#~ msgstr "economicsystems"
+
+#~ msgid "kombinierteswirtschaftssystem"
+#~ msgstr "combinedeconomicsystem"
+
+#~ msgid "kombiniertewirtschaftssysteme"
+#~ msgstr "combinedeconomicsystems"
+
+#~ msgid "Transzendentalien_Strukturalien"
+#~ msgstr "transcendentalia_structuralia"
+
+#~ msgid "transzendenz"
+#~ msgstr "transcendence"
+
+#~ msgid "Primzahlkreuz"
+#~ msgstr "primecross"
+
+#~ msgid "leibnitz"
+#~ msgstr "leibnitz"
+
+#~ msgid "Mechanismen_der_Zuechtung"
+#~ msgstr "mechanisms_of_breeding"
+
+#~ msgid "Geist"
+#~ msgstr "mind"
+
+#~ msgid "Bewusstsein"
+#~ msgstr "consciousness"
+
+#~ msgid "ja"
+#~ msgstr "yes"
+
+#~ msgid "entferntes Gegenteil"
+#~ msgstr "distant opposite"
+
+#~ msgid "entfernt ähnlich"
+#~ msgstr "remotely similar"
+
+#~ msgid "Kombination_(Galaxie_und_schwarzes_Loch)_(14_mit_13)"
+#~ msgstr "combination_(galaxy_and_black_hole)_(14_with_13)"
+
+#~ msgid "Kombination_(Universum_und_Galaxie)_(14_mit_15)"
+#~ msgstr "Combination_(universe_and_galaxy)_(14_with_15)"
+
+#~ msgid "Mond"
+#~ msgstr "moon"
+
+#~ msgid "Sonne"
+#~ msgstr "sun"
+
+#~ msgid "Planet"
+#~ msgstr "planet"
+
+#~ msgid "Thema: "
+#~ msgstr "topic: "
+
+#~ msgid " der eigenen Strukturgröße ("
+#~ msgstr " own structure size ("
+
+#~ msgid ") auf dich bei gleichförmigen Polygonen"
+#~ msgstr ") on you with regular polygons"
+
+#~ msgid "eine Denkart"
+#~ msgstr "a way of thinking"
+
+#~ msgid "eine Gefühlsart"
+#~ msgstr "a way of feeling"
+
+#~ msgid "total eine Art, etwas geistig zu erzeugen"
+#~ msgstr "totally a way of producing something mentally"
+
+#~ msgid "total eine Art zu erleben"
+#~ msgstr "totally a way of experiencing"
+
+#~ msgid "total eine Energie-Art"
+#~ msgstr "totally a way of energy"
+
+#~ msgid "etwas eine Art zu erleben"
+#~ msgstr "something a way of experiencing"
+
+#~ msgid "etwas eine Art, etwas geistig zu erzeugen"
+#~ msgstr "something a way of generating something mentally"
+
+#~ msgid "wenig eine Art, etwas geistig zu erzeugen"
+#~ msgstr "little a way to generate something mentally"
+
+#~ msgid "einigermaßen eine Energie-Art"
+#~ msgstr "somewhat a kind of energy"
+
+#~ msgid "kaum eine Energie-Art"
+#~ msgstr "hardly a kind of energy"
+
+#~ msgid "kaum eine Art, etwas geistig zu erzeugen"
+#~ msgstr "hardly a way to generate something mentally"
+
+#~ msgid ""
+#~ "Energie oder Denkart oder Gefühlsart oder Materie-Art oder Topologie-Art"
+#~ msgstr ""
+#~ "energy kind or thinking kind or feeling kind or matter kind or topology "
+#~ "kind."
+
+#~ msgid "Evolutions-Züchtungs-Kreativität"
+#~ msgstr "Evolution-breeding-creativity"
+
+#~ msgid "0. Primzahl 1"
+#~ msgstr "0. prime number 1"
+
+#~ msgid "1. Primzahl und Sonnenzahl"
+#~ msgstr "1. prime number and sun number"
+
+#~ msgid "2. Sonnenzahl, aber keine Primzahl"
+#~ msgstr "2. sun number, but no prime number"
+
+#~ msgid "3. Mondzahl"
+#~ msgstr "3. lunar number"
+
+#~ msgid "Mond-Typ eines Sternpolygons"
+#~ msgstr "moon type of a star polygon"
+
+#~ msgid "Mond-Typ eines gleichförmigen Polygons"
+#~ msgstr "moon type of a uniform polygon"
+
+#~ msgid "kein Mond"
+#~ msgstr "no moon"
+
+#~ msgid "mittelstark überdurchschnittlich: "
+#~ msgstr "medium above average: "
+
+#~ msgid "überdurchschnittlich: "
+#~ msgstr "above average: "
+
+#~ msgid "mittelleicht überdurchschnittlich: "
+#~ msgstr "moderately above average: "
+
+#~ msgid "sehr: "
+#~ msgstr "very: "
+
+#~ msgid "sehr leicht überdurchschnittlich: "
+#~ msgstr "very slightly above average: "
+
+#~ msgid "intrinsisch"
+#~ msgstr "intrinsic"
+
+#~ msgid "zuerst"
+#~ msgstr "first"
+
+#~ msgid "extrinsisch"
+#~ msgstr "extrinsic"
+
+#~ msgid "als zweites"
+#~ msgstr "second"
+
+#~ msgid ", nicht: "
+#~ msgstr ", not: "
+
+#~ msgid " (das alles nicht): "
+#~ msgstr " (not all that): "
+
+#~ msgid "Generiert: "
+#~ msgstr "Generated: "
+
+#~ msgid "Alles nur bezogen auf die selbe Strukturgröße einer "
+#~ msgstr "All only related to the same structure size of a "
+
+#~ msgid "gegen "
+#~ msgstr "against "
+
+#~ msgid "pro "
+#~ msgstr "per "
+
+#~ msgid " Darin kann sich die "
+#~ msgstr " In this "
+
+#~ msgid " am Besten hineinversetzten."
+#~ msgstr " can put himself in the best position."
+
+#~ msgid "pro dieser Zahl sind: "
+#~ msgstr "per this number are: "
+
+#~ msgid "pro dieser Zahl ist "
+#~ msgstr "per this number is "
+
+#~ msgid " contra dieser Zahl sind: "
+#~ msgstr " contra this number are: "
+
+#~ msgid " contra dieser Zahl ist "
+#~ msgstr " contra this number is "
+
+#~ msgid "Sternpolygone"
+#~ msgstr "star polygons"
+
+#~ msgid "gleichförmige Polygone"
+#~ msgstr "regular polygons"
+
+#~ msgid "Motiv -> Motiv"
+#~ msgstr "Motif -> Motif"
+
+#~ msgid "Motiv -> Strukur"
+#~ msgstr "Motif -> Structure"
+
+#~ msgid "Struktur -> Motiv"
+#~ msgstr "Structure -> Motif"
+
+#~ msgid "Struktur -> Strukur"
+#~ msgstr "Structure -> Structure"
+
+#~ msgid ", mit Faktoren aus gebrochen-rationalen Zahlen"
+#~ msgstr ", with factors from fractional-rational numbers"
+
+#~ msgid "generierte Multiplikationen "
+#~ msgstr "generated multiplications"
+
+#~ msgid ", außerdem: "
+#~ msgstr ", furthermore: "
+
+#~ msgid "| außerdem: "
+#~ msgstr "| moreover:"
+
+#~ msgid "Viertwichtigste"
+#~ msgstr "fourth most important"
+
+#~ msgid "Meta-Thema: "
+#~ msgstr "meta-topic:"
+
+#~ msgid "Konkretes: "
+#~ msgstr "sonrete things: "
+
+#~ msgid "Meta-"
+#~ msgstr "meta-"
+
+#~ msgid "Konkret-"
+#~ msgstr "concrete-"
+
+#~ msgid "Theorie-Thema: "
+#~ msgstr "theory-topic: "
+
+#~ msgid "Praxis: "
+#~ msgstr "practise: "
+
+#~ msgid "Theorie-"
+#~ msgstr "theory-"
+
+#~ msgid "Praxis-"
+#~ msgstr "practise-"
+
+#~ msgid "Planungs-Thema: "
+#~ msgstr "planning topic: "
+
+#~ msgid "Umsetzungs-Thema: "
+#~ msgstr "realization-topic: "
+
+#~ msgid "Planung-"
+#~ msgstr "planing-"
+
+#~ msgid "Umsetzung-"
+#~ msgstr "realization-"
+
+#~ msgid "Anlass-Thema: "
+#~ msgstr "occasion-topic: "
+
+#~ msgid "Wirkungs-Thema: "
+#~ msgstr "effect-topic: "
+
+#~ msgid "Anlass-"
+#~ msgstr "occasion-"
+
+#~ msgid "wirkung-"
+#~ msgstr "effect-"
+
+#~ msgid "Kraft-Gebung: "
+#~ msgstr "power-geving: "
+
+#~ msgid "Verstärkungs-Thema: "
+#~ msgstr "amplification-topic: "
+
+#~ msgid "Kraft-geben-"
+#~ msgstr "give-power-"
+
+#~ msgid "Verstärkung-"
+#~ msgstr "empower-"
+
+#~ msgid "Beherrschung: "
+#~ msgstr "rule: "
+
+#~ msgid "Richtung-Thema: "
+#~ msgstr "direction-topic: "
+
+#~ msgid "beherrschend-"
+#~ msgstr "rule-"
+
+#~ msgid "Richtung-"
+#~ msgstr "direction-"
+
+#~ msgid "Meta"
+#~ msgstr "meta"
+
+#~ msgid "Verwertung, Unternehmung, Geschäft"
+#~ msgstr "utilization, enterprise, business"
+
+#~ msgid "regieren, beherrschen"
+#~ msgstr "rule, dominate"
+
+#~ msgid "Konkretes"
+#~ msgstr "concreteThings"
+
+#~ msgid "darüber hinaus gehend"
+#~ msgstr "going beyond"
+
+#~ msgid " für 1/n statt n"
+#~ msgstr "for 1/n instead of n"
+
+#~ msgid " für n"
+#~ msgstr " for n"
+
+#~ msgid "für innen"
+#~ msgstr "for inside"
+
+#~ msgid "für außen"
+#~ msgstr "for outside"
+
+#~ msgid "\"für seitlich und gegen Schwächlinge innen\""
+#~ msgstr "\"for other sides and against weaklings inside\""
+
+#~ msgid "\"gegen seitlich und für Schwächlinge innen\""
+#~ msgstr "\"against other sides and  pro weaklings inside\""
+
+#~ msgid "Transzendentalien, Strukturalien, Universum n"
+#~ msgstr "Transcendentalia, structuralia, universe n"
+
+#~ msgid "Galaxie n"
+#~ msgstr "galaxy n"
+
+#~ msgid "Galaxie 1/n"
+#~ msgstr "galaxy 1/n"
+
+#~ msgid "Transzendentalien, Strukturalien, Universum 1/n"
+#~ msgstr "transcendentalia, structuralia, universe 1/n"
+
+#~ msgid "Dagegen-Gegen-Transzendentalien, Gegen-Strukturalien, Universum n"
+#~ msgstr "against-counter-transcendentalia, counter-structuralia, universe n"
+
+#~ msgid "neutrale Gegen-Transzendentalien, Gegen-Strukturalien, Universum n"
+#~ msgstr "neutral counter-transcendentalia, counter-structuralia, universe n"
+
+#~ msgid "Richtung-Richtung"
+#~ msgstr "direction-direction"
+
+#~ msgid "Primzahlwirkung (7, Richtung) "
+#~ msgstr "prime number effect (7, direction)"
+
+#~ msgid "] * letztendlich: "
+#~ msgstr "] * finally: "
+
+#~ msgid "Primzahlvielfache, nicht generiert"
+#~ msgstr "prime multiples, not generated"
+
+#~ msgid "Fehler"
+#~ msgstr "Error"
+
+#~ msgid "Nicht_generiert"
+#~ msgstr "Not_generated"
+
+#~ msgid "Nummerierung"
+#~ msgstr "numbering"
+
+#~ msgid "nichts"
+#~ msgstr "nothing"
+
+#~ msgid "Der Haupt-Parameter \""
+#~ msgstr "The Main-Paramter \""
+
+#~ msgid "\" existiert hier nicht als Befehl!"
+#~ msgstr "\" does not exist here als a command!"
+
+#~ msgid " Es ist nur möglich: -"
+#~ msgstr " It is only possible: -"
+
+#~ msgid "Der Unter-Paramaeter \"--"
+#~ msgstr "The sub-paramaeter \" --"
+
+#~ msgid "\" existiert, aber nicht mit dem Textwert \""
+#~ msgstr "\" exists,but not with the text value \""
+
+#~ msgid "\". Stattdessen gibt keine Nebenparameter-Textwerte."
+#~ msgstr "\". Instead there are not sub parameter text values."
+
+#~ msgid "\" mit dem Textwert \""
+#~ msgstr "\" with the text value \""
+
+#~ msgid "\" existiert hier nicht als Befehl für Haupt-Parameter"
+#~ msgstr "\" does not exist here als a command for the main parameterr"
+
+#~ msgid " !"
+#~ msgstr "!"
+
+#~ msgid ""
+#~ " Es ist nur möglich:\n"
+#~ "--"
+#~ msgstr ""
+#~ " It is only possible:\n"
+#~ "--"
+
+#~ msgid ""
+#~ "\n"
+#~ "mit dem Werten dahinter:\n"
+#~ msgstr ""
+#~ "\n"
+#~ "with the values behind:\n"
+
+#~ msgid "Der Unter-Parameter \"--"
+#~ msgstr "The sub parameter \"--"
+
+#~ msgid ""
+#~ ", oder dieser Parameter braucht Werte analog wie: \n"
+#~ "--unterParameter=Wert1\n"
+#~ msgstr ""
+#~ ", or this parameter needs values analogous to: \n"
+#~ "--subParameter=value1\n"
+
+#~ msgid "Es ist nur möglich: --"
+#~ msgstr "It is only possible: --"
+
+#~ msgid "Die Kombispalte \""
+#~ msgstr "The combination column \""
+
+#~ msgid "\" existiert so nicht als Befehl. Möglich sind die Parameter für "
+#~ msgstr ""
+#~ "\" does not exist as a command like this. Possible are the parameters for "
+
+#~ msgid "kein Unter-Parameter"
+#~ msgstr "no sub parameter"
+
+#~ msgid ", oder"
+#~ msgstr ", or"
+
+#~ msgid "angegeben für Hauptparameter"
+#~ msgstr "specified for main parameters"
+
+#~ msgid " oder einen nicht zugehörigen Parameter: "
+#~ msgstr " or an unrelated parameter: "
+
+#~ msgid ""
+#~ "Es muss ein Hauptparameter, bzw. der richtige, gesetzt sein, damit ein"
+#~ msgstr "A main parameter, or the correct one, must be set so that a"
+
+#~ msgid " Nebenparameter, wie möglicherweise: \""
+#~ msgstr " sub paramter, as maybe: \""
+
+#~ msgid "\" ausgeführt werden kann. Hauptparameter sind: -"
+#~ msgstr "\" can be executed. Main parameters are: -"
+
+#~ msgid "Versuche Parameter -h"
+#~ msgstr "try parameters -h"
+
+#~ msgid "Den Neben-Parameter \""
+#~ msgstr "The sub parameter \""
+
+#~ msgid "\" gibt es hier nicht für den Hauptparameter \"-"
+#~ msgstr "\" does not exist here for the main parameter \"-"
+
+#~ msgid "\". Oder ein = fehlt dahinter."
+#~ msgstr "\" Or a = is missing behind it."
+
+#~ msgid " Möglich sind: "
+#~ msgstr "Possible are: "
+
+#~ msgid "\". Oder es fehlt ein = dahinter."
+#~ msgstr "\" Or a = is missing behind it."
+
+#~ msgid "Debug Log aktiviert."
+#~ msgstr "Debug log is activated."
+
+#~ msgid "der Befehl '"
+#~ msgstr "the command "
+
+#~ msgid ""
+#~ "' ist nur erlaubt mit 2 weiteren Angaben mit Leerzeichen getrennt, einer "
+#~ "Zahl und einem Zahlenbereich, z.B. '"
+#~ msgstr ""
+#~ "' is only allowed with 2 further specifications separated by spaces, a "
+#~ "number and a number range, e.g. "
+
+#~ msgid "Befehle"
+#~ msgstr "commands"
+
+#~ msgid "promptmode vorher: {} , {}"
+#~ msgstr "promptmode before: {} , {}"
+
+#~ msgid "'{}' ergibt sich aus '{}' und ergibt danach reta-Befehl:"
+#~ msgstr "'{}' results from '{}' and results reta command after:"
+
+#~ msgid "Dies ('"
+#~ msgstr "This ('"
+
+#~ msgid ""
+#~ "') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts "
+#~ "auszugeben."
+#~ msgstr ""
+#~ "') is actually a command (or there are several), but there is nothing to "
+#~ "output."
+
+#~ msgid ""
+#~ "Wenn im Zähler oder Nenner eine 1 ist, so werden davon oft (nicht immer) "
+#~ "keine Vielfacher gebildet.\n"
+#~ "Für Brüche \"n/1=ganze Zahl\" gibt es die gewöhnlichen Befehle für ganze "
+#~ "Zahlen.\n"
+#~ "Das ist eine Design-Entscheidung, die getroffen worden ist."
+#~ msgstr ""
+#~ "If there is a 1 in the numerator or denominator, often (not always) no "
+#~ "multiples are formed.\n"
+#~ "For fractions \"n/1=integer\" there are the usual commands for integers "
+#~ "numbers.\n"
+#~ "This is a design decision that has been made."
+
+#~ msgid "vi"
+#~ msgstr "vi"
+
+#~ msgid "log"
+#~ msgstr "log"
+
+#~ msgid "befehl"
+#~ msgstr "command"
+
+#~ msgid " bewirkt, dass bei allen Befehlen das '"
+#~ msgstr " causes all commands to display the '"
+
+#~ msgid ""
+#~ "' jedes mal verwendet wird - außer wenn der erste Befehl reta war, weil "
+#~ "dieser anders funktioniert "
+#~ msgstr ""
+#~ "' is used every time - except if the first command was reta, because  "
+#~ "this one works differently "
+
+#~ msgid "was speichern>"
+#~ msgstr "save what>"
+
+#~ msgid "was löschen>"
+#~ msgstr "delete what>"
+
+#~ msgid "kombi.csv"
+#~ msgstr "kombi.csv"
+
+#~ msgid "kombi-meta.csv"
+#~ msgstr "kombi-meta.csv"
+
+#~ msgid "religion.csv"
+#~ msgstr "religion.csv"
+
+#~ msgid "primenumbers.csv"
+#~ msgstr "primenumbers.csv"
+
+#~ msgid "gebrochen-rational-universum.csv"
+#~ msgstr "gebrochen-rational-universum.csv"
+
+#~ msgid "gebrochen-rational-galaxie.csv"
+#~ msgstr "gebrochen-rational-galaxie.csv"
+
+#~ msgid "gebrochen-rational-emotionen.csv"
+#~ msgstr "gebrochen-rational-emotionen.csv"
+
+#~ msgid "gebrochen-rational-strukturgroesse.csv"
+#~ msgstr "gebrochen-rational-strukturgroesse.csv"
+
+#~ msgid "kombi-gedanken17-absichten13-bewusstsein15.csv"
+#~ msgstr "kombi-gedanken17-absichten13-bewusstsein15.csv"
+
+#~ msgid "kombi-meta-systeme.csv"
+#~ msgstr "kombi-meta-systeme.csv"
+
+#~ msgid "kombi-universelle-wirklichkeit.csv"
+#~ msgstr "kombi-universelle-wirklichkeit.csv"
+
+#~ msgid "kreisVomTyp18.csv"
+#~ msgstr "kreisVomTyp18.csv"
+
+#~ msgid "sunMoonEtc.csv"
+#~ msgstr "sunMoonEtc.csv"
+
+#~ msgid "meaningOfLife.csv"
+#~ msgstr "meaningOfLife.csv"
+
+#~ msgid "dualism-trinities-etc.csv"
+#~ msgstr "dualism-trinities-etc.csv"
+
+#~ msgid "EIGN"
+#~ msgstr "PROPN"
+
+#~ msgid "EIGR"
+#~ msgstr "PROPR"
+
+#~ msgid "ehrlich_vs_höflich"
+#~ msgstr "honest_vs_polite"
+
+#~ msgid ""
+#~ "\". Mögliche Nebenparameter-Textwerte, für diesen Unter-Parameter, sind: "
+#~ "\""
+#~ msgstr ""
+#~ "\". Possible secondary parameter text values, for this sub-parameter, "
+#~ "are: \""
+
+#~ msgid ""
+#~ "Erlaube Parameter sind\n"
+#~ "            -"
+#~ msgstr ""
+#~ "allowed parameters are\n"
+#~ "            -"
+
+#~ msgid ""
+#~ ", für vi mode statt emacs mode,\n"
+#~ "            -"
+#~ msgstr ""
+#~ ", for vi mode instead of emacs mode,\n"
+#~ "            -"
+
+#~ msgid ""
+#~ ",  um Logging zu aktivieren,\n"
+#~ "            -"
+#~ msgstr ""
+#~ ",  to activate logging,\n"
+#~ "            -"
+
+#~ msgid ""
+#~ ", um Debugging-Log-Ausgabe zu aktivieren. Das ist nur für Entwickler "
+#~ "gedacht.\n"
+#~ "            -"
+#~ msgstr ""
+#~ ", to enable debugging log output. This is only for developers intended.\n"
+#~ "            -"
+
+#~ msgid ""
+#~ " bewirkt, dass bis zum letzten Programmparameter retaPrompt Befehl nur "
+#~ "ein RetaPrompt-Befehl ausgeführt wird.\n"
+#~ "            -"
+#~ msgstr ""
+#~ " causes that up to the last program parameter retaPrompt command only one "
+#~ "RetaPrompt command is executed.\n"
+#~ "            -"
+
+#~ msgid "' Kommando bzw. '"
+#~ msgstr "' command \trespectively '"
+
+#~ msgid "readme-reta.md"
+#~ msgstr "readme-reta-en.md"
+
+#~ msgid "readme-retaPrompt.md"
+#~ msgstr "readme-retaPrompt-en.md"
+
+#~ msgid "readme-startFiles.md"
+#~ msgstr "readme-startFiles.md"
+
+#~ msgid "readme.org"
+#~ msgstr "readme.org"
+
+#~ msgid "für '-languages=' sind die Paramter-Werte erlaubt: "
+#~ msgstr "for '-languages=' parameter values are allowed: "
+
+#~ msgid ",  um eine andere Sprache zu wählen und möglich sind: "
+#~ msgstr ", to select another language and possible are: "
+
+#~ msgid "gebrochen-rational_Universum_n/m"
+#~ msgstr "fractional_universe_n/m"
+
+#~ msgid "gebrochen-rational_Galaxie_n/m"
+#~ msgstr "fractional_galaxy_n/m"
+
+#~ msgid "Maßnahmen_(39)"
+#~ msgstr "measures_(39)"
+
+#~ msgid "massnahmen"
+#~ msgstr "measures"
+
+#~ msgid "Strategie_Taktik_(15m8)"
+#~ msgstr "strategy_tactics_(15m8)"
+
+#~ msgid "strategie"
+#~ msgstr "strategy"
+
+#~ msgid "taktik"
+#~ msgstr "tactics"
+
+#~ msgid "Bereich"
+#~ msgstr "range"
+
+#~ msgid "bereich"
+#~ msgstr "range"
+
+#~ msgid "zaehlung"
+#~ msgstr "ranges"
+
+#~ msgid "G"
+#~ msgstr "M"
+
+#~ msgid "E"
+#~ msgstr "E"
+
+#~ msgid "Multiversalien_(16)"
+#~ msgstr "multiversalias_(16)"
+
+#~ msgid "Meta-Physik-Teilchen_(1)"
+#~ msgstr "multiverse_particles_(1)"
+
+#~ msgid "Multiversum"
+#~ msgstr "multiverse"
+
+#~ msgid "multiversum"
+#~ msgstr "multiverse"
+
+#~ msgid "multiversalien"
+#~ msgstr "multiversalias"
+
+#~ msgid "teilchen"
+#~ msgstr "particles"
+
+#~ msgid "HELP"
+#~ msgstr "HELP"
+
+#~ msgid "B"
+#~ msgstr "C"
+
+#~ msgid "Gleichheit, Freiheit, Dominieren (Ordnungen [12]) Generiert"
+#~ msgstr "Being equal, Freedom, Liberty, Domination (Order [12]) generated"
+
+#~ msgid "Dominieren, Unterordnen"
+#~ msgstr "domination over submission"
+
+#~ msgid "Freiheit"
+#~ msgstr "freedom and or liberty"
+
+#~ msgid "Einschränkung der Freiheit"
+#~ msgstr "reduction of liberty and or freedom"
+
+#~ msgid "den anderen überbieten wollen"
+#~ msgstr "wanting to be better or higher than the other"
+
+#~ msgid "den anderen unterbieten wollen"
+#~ msgstr "wanting to be among or under the other"
+
+#~ msgid ""
+#~ "wäre eine schwarze Sonne (-3*n), wenn ins Negative durch eine Typ 13 "
+#~ "verdreht"
+#~ msgstr "would be a black sun, if inverted into its negative by a type 13"
+
+#~ msgid ", und außerdem "
+#~ msgstr ", and as well "
+
+#~ msgid "Mond (Potenzen)"
+#~ msgstr "moon (math powers)"
+
+#~ msgid "Sonne (keine Potenzen)"
+#~ msgstr "suns (no math powers)"
+
+#~ msgid "Planet (2*n)"
+#~ msgstr "planets (2*n)"
+
+#~ msgid "leeren"
+#~ msgstr "clear"
+
+#~ msgid "I"
+#~ msgstr "I"
+
+#~ msgid "R"
+#~ msgstr "R"
+
+#~ msgid "range"
+#~ msgstr "range"
+
+#~ msgid "kurzbefehle"
+#~ msgstr "shortcuts"
+
+#~ msgid "Kurzbefehle"
+#~ msgstr "shortcuts"
+
+#~ msgid "{}{}{} ergibt sich aus '{}' und ergibt danach reta-Befehl:"
+#~ msgstr "{}{}{} results from '{}' and results reta command after:"
+
+# msgid "ein Mal kein Tabelleninhalt"
+# msgstr "one time no table content"
+#~ msgid "Das ist kein Befehl! -> '{}'"
+#~ msgstr "This is not a command! -> '{}'"
+
+#~ msgid "multis3"
+#~ msgstr "multis3"
+
+#~ msgid "T"
+#~ msgstr "D"
+
+#~ msgid "einheiten"
+#~ msgstr "units"
+
+#~ msgid "ein Mal kein Tabelleninhalt"
+#~ msgstr "one time no table content"
+
+#~ msgid "innere_Werte_1/6_der_Reinigung_und_Klarheit"
+#~ msgstr "inner-values_1/6_of_cleaning_and_clarity"
+
+#~ msgid "innerewerte"
+#~ msgstr "innervalues"
+
+#~ msgid "Rechnen"
+#~ msgstr "calculate"
+
+#~ msgid "rechnen"
+#~ msgstr "calculate"
+
+#~ msgid "W"
+#~ msgstr "T"
+
+#~ msgid "lebensbereiche"
+#~ msgstr "areas_of_life"
+
+#~ msgid "lebensfelder"
+#~ msgstr "domains_of_life"
+
+#~ msgid "künstliches_Leben_(15)"
+#~ msgstr "artificial_life_(15)"
+
+#~ msgid "künstlichesleben"
+#~ msgstr "artificiallife"
+
+#~ msgid "grosseki"
+#~ msgstr "bigAI"
+
+#~ msgid "das_Universelle_(15)"
+#~ msgstr "universal_(16)"
+
+#~ msgid "das_Galaktische_(14)"
+#~ msgstr "galactic_(14)"
+
+#~ msgid "das_Multiverselle_(16)"
+#~ msgstr "multiverse_(16)"
+
+#~ msgid "die_Tugendsortierung_(13_mit_14)"
+#~ msgstr "non_value_virtue_sorting_(13_with_14)"
+
+#~ msgid "die_Galaxie_Unterbereiche_(13)"
+#~ msgstr "galaxy_sub_areas_(13)"
+
+#~ msgid "das_Gute_die_Richtung_(7)"
+#~ msgstr "goodness_and_direction_(7)"
+
+#~ msgid "Raum_und_Dimensionen_(8)"
+#~ msgstr "space_and_dimension_(8)"
+
+#~ msgid "Eigentum_und_Besitz"
+#~ msgstr "ownership_and_possession"
+
+#~ msgid "Lebensbereiche_Problemklassen_(28)"
+#~ msgstr "areas_of_life_and_classes_of_problems(28)"
+
+#~ msgid "problemklassen"
+#~ msgstr "classes_of_problems"
+
+#~ msgid "ee"
+#~ msgstr "ee"
+
+#~ msgid "aussenerste"
+#~ msgstr "outsidefirst"
+
+#~ msgid "innenerste"
+#~ msgstr "insidefirst"
+
+#~ msgid "aussenalle"
+#~ msgstr "outsideall"
+
+#~ msgid "innenalle"
+#~ msgstr "insideall"
+
+#~ msgid "Bewusstheit_statt_Bewusstsein_(1)"
+#~ msgstr "awareness_instead_of_consciousness_(1)"
+
+#~ msgid "bewusstheit"
+#~ msgstr "awareness"
+
+#~ msgid "Gemeinsamkeiten"
+#~ msgstr "commonalities"
+
+#~ msgid "primfaktorenvergleich"
+#~ msgstr "primaryfactorcomparison"
+
+#~ msgid "gebrochen-rational_Gefuehle_n/m"
+#~ msgstr "fractional-rational_numbered_emotions_n/m"
+
+#~ msgid "gebrochenemotion"
+#~ msgstr "fractionedemotion"
+
+#~ msgid "gebrochen-rational_Strukturgroesse_n/m"
+#~ msgstr "fractional-rational_numbered_structure_sizes_n/m"
+
+#~ msgid "gebrochengroesse"
+#~ msgstr "fractionalnumberedstructuresize"
+
+#~ msgid "Emotion"
+#~ msgstr "emotion"
+
+#~ msgid "Strukturgroesse"
+#~ msgstr "structuresize"
+
+#~ msgid " am Besten hineinversetzen."
+#~ msgstr " is able to mentally understand the mind inside."
+
+#~ msgid "mathematisches_Design_(32)"
+#~ msgstr "mathematical_design_(32)"
+
+#~ msgid "mathematischesdesign"
+#~ msgstr "mathematicaldesign"
+
+#~ msgid "Primzahl"
+#~ msgstr "prime_number"
+
+#~ msgid "gegen_5"
+#~ msgstr "against_5"
+
+#~ msgid "invertieren"
+#~ msgstr "invert"
+
+#~ msgid "SonneMitMondanteil"
+#~ msgstr "sunWithMoonParts"
+
+#~ msgid "abstandPrim"
+#~ msgstr "distancePrime"
+
+#~ msgid "' verlangt mindestens 2 Zahlenangaben, wie '"
+#~ msgstr "' need at least 2 number or number ranges, as '"
+
+#~ msgid "Kontroverse_(51)"
+#~ msgstr "controversy_(51)"
+
+#~ msgid "Taetigkeiten"
+#~ msgstr "actions"
+
+#~ msgid "Wohlbefinden_(7mit6)"
+#~ msgstr "well-being_(7with6)"
+
+#~ msgid "Software-Lizenzen_akademische_Grade"
+#~ msgstr "software_licences_and_academic_degrees"
+
+#~ msgid "softwarelizenz"
+#~ msgstr "software_license"
+
+#~ msgid "akademischeGrade"
+#~ msgstr "academic_degrees"
+
+#~ msgid "kontroverse"
+#~ msgstr "controversy"
+
+#~ msgid "wohlbefinden"
+#~ msgstr "well-being"
+
+#~ msgid "tätigkeiten"
+#~ msgstr "actions"
+
+#~ msgid "taetigkeiten"
+#~ msgstr "actions"
+
+#~ msgid "mit"
+#~ msgstr "with"
+
+#~ msgid "gegen"
+#~ msgstr "against"
+
+#~ msgid "kontinuum"
+#~ msgstr "continuum"
+
+#~ msgid "Kontinuum"
+#~ msgstr "continuum"
+
+#~ msgid "Anführer_Arten_(7)"
+#~ msgstr "leadership_types_(7)"
+
+#~ msgid "Struktur-Wissenschaften_(10)"
+#~ msgstr "structure_sciences_(10)"
+
+#~ msgid "Muster-Wissenschaften_(20)"
+#~ msgstr "pattern_sciences_(20)"
+
+#~ msgid "Drei"
+#~ msgstr "Three"
+
+#~ msgid "Vier"
+#~ msgstr "Four"
+
+#~ msgid "Fünf"
+#~ msgstr "Fife"
+
+#~ msgid "Fuenf"
+#~ msgstr "Fife"
+
+#~ msgid "Sechs"
+#~ msgstr "Six"
+
+#~ msgid "Sieben"
+#~ msgstr "Seven"
+
+#~ msgid "Acht"
+#~ msgstr "Eight"
+
+#~ msgid "Neun"
+#~ msgstr "Nine"
+
+#~ msgid "Zehn"
+#~ msgstr "Ten"
+
+#~ msgid "Zwölf"
+#~ msgstr "Twelve"
+
+#~ msgid "Zwoelf"
+#~ msgstr "Twelve"
+
+#~ msgid "Q"
+#~ msgstr "Q"
+
+#~ msgid "Siebzehn"
+#~ msgstr "Seventeen"
+
+#~ msgid "P"
+#~ msgstr "P"
+
+#~ msgid "Sechszehn"
+#~ msgstr "Sixteen"
+
+#~ msgid "X"
+#~ msgstr "X"
+
+#~ msgid "x"
+#~ msgstr "x"
+
+#~ msgid "Vierundzwanzig"
+#~ msgstr "Twentyfour"
+
+#~ msgid "Achzehn"
+#~ msgstr "Eighteen"
+
+#~ msgid "A"
+#~ msgstr "A"
+
+#~ msgid "b"
+#~ msgstr "b"
+
+#~ msgid "C"
+#~ msgstr "C"
+
+#~ msgid "c"
+#~ msgstr "c"
+
+#~ msgid "D"
+#~ msgstr "D"
+
+#~ msgid "d"
+#~ msgstr "d"
+
+#~ msgid "Farben"
+#~ msgstr "colors"
+
+#~ msgid "Formationen"
+#~ msgstr "formations"

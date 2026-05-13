@@ -1,0 +1,16 @@
+#!/bin/sh
+SCRIPT_PATH="${BASH_SOURCE:-$0}"
+ABS_SCRIPT_PATH="$(realpath "${SCRIPT_PATH}")"
+ABS_DIRECTORY="$(dirname "${ABS_SCRIPT_PATH}")"
+GIT_DIRECTORY="${ABS_DIRECTORY}/.git"
+#cd ~/myRepos/reta
+echo aktueller Branch: `git --git-dir ${GIT_DIRECTORY} branch | grep '*' | awk '{print $2}'`
+echo In den Feature Branch wechseln oder Master ? m für master und f für feature, alles andere ändert nichts
+echo Es wird empfohlen Programmierungen im Feature-Branch durchzuführen und csvs input im master branch
+read branchwechslung
+[ "$branchwechslung" = "m" ] && git --git-dir ${GIT_DIRECTORY} --work-tree=${ABS_DIRECTORY} switch master && sleep 2
+[ "$branchwechslung" = "f" ] && git --git-dir ${GIT_DIRECTORY} --work-tree=${ABS_DIRECTORY} switch feature && sleep 2
+file=`ls ${ABS_DIRECTORY} -r | grep -e '\.nvim$' | fzf`
+if [ "$file" != "" ];then
+  nvim -S ${ABS_DIRECTORY}/${file}
+fi

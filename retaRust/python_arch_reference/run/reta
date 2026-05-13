@@ -1,0 +1,12 @@
+#!/usr/bin/env pypy3
+# -*- coding: utf-8 -*-
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "libs"))
+import reta
+
+# reta.infoLog = True
+retaProgram = reta.Program(sys.argv)
+# retaProgram.showCommandResults()
+# reta.alxp("verdreht: ")
+# retaProgram.showCommandResults("-")

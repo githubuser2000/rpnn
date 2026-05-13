@@ -11,6 +11,8 @@ use libloading::{library_filename, Library};
 #[path = "../../../src/shared/parallel_runtime.rs"]
 pub mod parallel_runtime;
 
+pub use reta_architecture;
+
 pub mod shared {
     pub mod parallel_runtime {
         pub use crate::parallel_runtime::*;
@@ -285,6 +287,11 @@ static RETA_ALL_MAIN_ALIAS_GROUPS_JSON_FN: OnceLock<Result<RetaAllMainAliasGroup
 static RETA_PARAMETER_ALIAS_GROUPS_FOR_MAIN_JSON_FN: OnceLock<
     Result<RetaParameterAliasGroupsForMainJsonFn, String>,
 > = OnceLock::new();
+static RETAPROMPT_ARCHITECTURE: OnceLock<reta_architecture::ArchitectureRuntime> = OnceLock::new();
+
+pub fn shared_retaprompt_architecture() -> &'static reta_architecture::ArchitectureRuntime {
+    RETAPROMPT_ARCHITECTURE.get_or_init(reta_architecture::bootstrap_architecture_runtime)
+}
 
 pub fn run_reta_from_args<A>(argv: A) -> RetaRunResult
 where
@@ -870,6 +877,9 @@ fn run_command_one_shot(
     start_with_vi_mode: bool,
     implicit_logging: bool,
 ) -> i32 {
+    let _ = shared_retaprompt_architecture();
+    let _prompt_architecture =
+        reta_architecture::PromptArchitectureContext::from_prompt_input(&program_name, &input);
     let mut state = SessionState::new(program_name.clone(), start_with_vi_mode, implicit_logging);
 
     if input.trim().is_empty() {

@@ -1,0 +1,42 @@
+#!/bin/zsh
+place="/home/alex/Eigene-Dateien/myRepos/"
+re="religionen"
+cd ${place}reta
+cp ${place}reta/i18n/en/LC_MESSAGES/messages.po ${place}reta/i18n/vn/LC_MESSAGES/vn.po;cp ${place}reta/i18n/en/LC_MESSAGES/messages.po ${place}reta/i18n/kr/LC_MESSAGES/kr.po;cp ${place}reta/i18n/en/LC_MESSAGES/messages.po ${place}reta/i18n/cn/LC_MESSAGES/cn.po;msgfmt -o ${place}reta/i18n/vn/LC_MESSAGES/vn.mo ${place}reta/i18n/vn/LC_MESSAGES/vn.po;msgfmt -o ${place}reta/i18n/cn/LC_MESSAGES/cn.mo ${place}reta/i18n/cn/LC_MESSAGES/cn.po;msgfmt -o ${place}reta/i18n/kr/LC_MESSAGES/kr.mo ${place}reta/i18n/kr/LC_MESSAGES/kr.po
+${place}reta/libs/changeVersion.sh
+cd -
+cd ${place}reta
+git add -A
+git commit -m ${3}
+git pushall
+cd -
+cd ${place}
+rm -f ${place}*xz.*0*
+rm -f ${place}*bz2.*0*
+rm -f ${place}*br.*0*
+rm -f ${place}*zip.*0*
+tar --exclude=lib64 --exclude=lib --exclude=__pycache__ --exclude=include --exclude=node_modules --exclude=muell --exclude=inspiration --exclude=unit-testing --exclude=probiere --exclude=bin --exclude=i18n/__pycache__ --exclude=libs/__pycache__ -c reta > 2025-${1}-reta-repo${2}.tar;brotli -k --large_window=29 -Z 2025-${1}-reta-repo${2}.tar -o 2025-${1}-reta-repo${2}.tar.br;xz -k --threads=16 -e -9 --lzma2=dict=128MiB 2025-${1}-reta-repo${2}.tar;tar --exclude=lib64 --exclude=.git --exclude=lib --exclude=__pycache__ --exclude=include --exclude=node_modules --exclude=muell --exclude=inspiration --exclude=unit-testing --exclude=probiere --exclude=bin --exclude=i18n/__pycache__ --exclude=libs/__pycache__ -c reta > 2025-${1}-reta${2}.tar;cd ~/Eigene-Dateien/myRepos/reta;rm ${place}${re}*.html.{xz,br,bz2,zip};./pypy-reta-all2.sh reta > ../${re}.html;./pypy-reta-all2-VnCnKrEn.sh reta korean > ../${re}-korean.html;./pypy-reta-all2-VnCnKrEn.sh reta vietnamese > ../${re}-vietnamese.html;./pypy-reta-all2-VnCnKrEn.sh reta english > ../${re}-english.html;./pypy-reta-all2-VnCnKrEn.sh reta chinese > ../${re}-chinese.html;cd ~/Eigene-Dateien/myRepos;brotli -k --large_window=29 -Z 2025-${1}-reta${2}.tar;brotli -k --large_window=29 -Z ${re}-english.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB ${re}-english.html;brotli -k --large_window=29 -Z ${re}.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB ${re}.html;brotli -k --large_window=29 -Z ${re}-chinese.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB ${re}-chinese.html;brotli -k --large_window=29 -Z ${re}-korean.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB ${re}-korean.html;brotli -k --large_window=29 -Z ${re}-vietnamese.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB ${re}-vietnamese.html;xz -k --threads=16 -e -9 --lzma2=dict=128MiB 2025-${1}-reta${2}.tar;split -d -b 9000000 2025-${1}-reta-repo${2}.tar.xz 2025-${1}-reta-repo${2}.tar.xz.;split -d -b 9000000 2025-${1}-reta-repo${2}.tar.br 2025-${1}-reta-repo${2}.tar.br.
+zip -9 -u ${place}2025-${1}-reta${2}.tar.zip ${place}2025-${1}-reta${2}.tar
+zip -9 -u ${place}2025-${1}-reta-repo${2}.tar.zip ${place}2025-${1}-reta-repo${2}.tar
+zip -9 -u ${place}${re}.html.zip ${place}${re}.html
+zip -9 -u ${place}${re}-vietnamese.html.zip ${place}${re}-vietnamese.html
+zip -9 -u ${place}${re}-chinese.html.zip ${place}${re}-chinese.html
+zip -9 -u ${place}${re}-korean.html.zip ${place}${re}-korean.html
+zip -9 -u ${place}${re}-english.html.zip ${place}${re}-english.html
+bzip2 -z -k -9 ${place}2025-${1}-reta-repo${2}.tar
+bzip2 -z -k -9 ${place}2025-${1}-reta${2}.tar
+bzip2 -z -k -9 ${place}${re}.html
+bzip2 -z -k -9 ${place}${re}-korean.html
+bzip2 -z -k -9 ${place}${re}-english.html
+bzip2 -z -k -9 ${place}${re}-chinese.html
+bzip2 -z -k -9 ${place}${re}-vietnamese.html
+split -d -b 9000000 2025-${1}-reta-repo${2}.tar.bz2 2025-${1}-reta-repo${2}.tar.bz2.
+split -d -b 9000000 2025-${1}-reta${2}.tar.bz2 2025-${1}-reta${2}.tar.bz2.
+split -d -b 9000000 2025-${1}-reta-repo${2}.tar.zip 2025-${1}-reta-repo${2}.tar.zip.
+split -d -b 9000000 2025-${1}-reta${2}.tar.zip 2025-${1}-reta${2}.tar.zip.
+cd -
+rm -f ${place}up/*
+cp -ax ${place}{*html.{xz,br,bz2,zip},2025-${1}-*${2}*.{xz,br,zip,bz2}*,reta/rpmake} ${place}up
+touch ${place}up/*{xz,bz2,br,zip}.*0*
+rm ${place}/2025-${1}-reta-repo${2}.tar
+rm ${place}/2025-${1}-reta${2}.tar

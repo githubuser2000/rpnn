@@ -246,6 +246,10 @@ mod tests {
             tableTags2_for_column(370),
             Some(set(&[ST::keinParaOdMetaP, ST::sternPolygon, ST::galaxie]))
         );
+        assert_eq!(
+            tableTags2_for_column(744),
+            Some(set(&[ST::keinParaOdMetaP, ST::sternPolygon]))
+        );
 
         let star_galaxy_columns = tableTags_columns_for_tags([ST::sternPolygon, ST::galaxie]);
         assert!(star_galaxy_columns.contains(&14));

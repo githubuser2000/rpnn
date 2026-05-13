@@ -424,6 +424,10 @@ pub fn run_prompt_command_frontend_with_profile(
 fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPreset) -> i32 {
     let program_name = program_name_from_argv(&argv);
     let startup = parse_startup_args(&argv, &preset);
+    let _frontend_architecture = reta_architecture::PromptArchitectureContext::from_prompt_input(
+        &program_name,
+        startup.command_text.as_deref().unwrap_or(""),
+    );
 
     let mut state = SessionState::new(
         program_name.clone(),
@@ -498,6 +502,8 @@ fn run_one_shot(
     emacs_output_mode: bool,
     state: &mut SessionState,
 ) -> i32 {
+    let _prompt_architecture =
+        reta_architecture::PromptArchitectureContext::from_prompt_input(&state.program_name, &input);
     if input.trim().is_empty() {
         let output = PromptOutput {
             title: "usage".to_string(),

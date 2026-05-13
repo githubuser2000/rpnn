@@ -7431,7 +7431,7 @@ impl Words {
             parameterMainNames: vec!["Kontinuum".to_string(), "kontinuum".to_string()],
             parameterNames: vec!["M".to_string(), "m".to_string(), "Dreizehn".to_string()],
             datas: vec![
-                vec![PyValue::Int(493)],
+                vec![PyValue::Int(493), PyValue::Int(744)],
                 vec![],
                 vec![],
                 vec![],

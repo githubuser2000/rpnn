@@ -480,6 +480,7 @@ pub(crate) fn ordinary_table_tags_exact_py(column_number: u32) -> Option<&'stati
         517 => Some(&[ST::keinParaOdMetaP, ST::sternPolygon]),
         518 => Some(&[ST::keinParaOdMetaP, ST::sternPolygon]),
         519 => Some(&[ST::keinParaOdMetaP, ST::sternPolygon]),
+        744 => Some(&[ST::keinParaOdMetaP, ST::sternPolygon]),
         _ => None,
     }
 }

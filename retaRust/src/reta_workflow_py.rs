@@ -6,6 +6,7 @@ use crate::{fresh_program_from_template, preload_reta_runtime, shared_words};
 
 pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
     let argv = normalize_program_argv(&request.raw_args);
+    let _architecture_run = reta_architecture::RetaRunArchitecture::from_cli_args(&argv);
 
     preload_reta_runtime().map_err(RetaError::Execution)?;
 

@@ -6,6 +6,7 @@ autobins = false
 default-run = "rreta"
 
 [dependencies]
+reta_architecture = { path = "crates/reta_architecture" }
 indexmap = { version = "2", features = ["serde"] }
 hypher = { version = "0.1.7", default-features = false, features = ["german"] }
 libloading = "0.8"
@@ -41,12 +42,14 @@ path = "src/bin/generate4readme.rs"
 [workspace]
 members = [
   ".",
+  "crates/reta_architecture",
   "crates/retaprompt_input",
   "crates/retaprompt_commands",
   "crates/retaprompt_frontends"
 ]
 default-members = [
   ".",
+  "crates/reta_architecture",
   "crates/retaprompt_input",
   "crates/retaprompt_commands",
   "crates/retaprompt_frontends"

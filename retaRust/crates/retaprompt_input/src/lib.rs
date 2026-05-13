@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+pub use reta_architecture;
+
 pub mod shared {
     pub mod words_py {
         pub use retaprompt_commands::shared::words_py::*;

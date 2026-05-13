@@ -1,0 +1,4 @@
+#!/usr/bin/env pypy3
+# -*- coding: utf-8 -*-
+print("um reta oder retaPrompt in englisch zu starten: Paramater angeben: -language=english")
+print("Die Inhalte sind nicht englisch, aber die Befehle funktionieren in Englisch. Es gibt keine Hilfe-Datei, die diese Englischen Befehle nennt, aber in retaPrompt gibt es dafür ja nundenn die Autovervollständigung.")

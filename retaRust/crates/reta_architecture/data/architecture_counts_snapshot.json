@@ -1,0 +1,158 @@
+{
+  "category_theory_counts": {
+    "categories": 26,
+    "functors": 77,
+    "natural_transformations": 42,
+    "paradigm_terms": 8
+  },
+  "class": "RetaArchitecture",
+  "execution_network": {
+    "category": "ExecutionNetworkCategory",
+    "channel_category": "ChannelCategory",
+    "channels": [
+      "HalfDuplexChannel",
+      "FullDuplexChannel"
+    ],
+    "class": "ExecutionNetworkBundle",
+    "config": {
+      "bounded_queue_size": null,
+      "class": "ExecutionNetworkConfig",
+      "max_workers": 56,
+      "preserve_input_order": true,
+      "queue_discipline": "fifo",
+      "resolved_available_workers": 56,
+      "start_method": null,
+      "use_processes": false
+    },
+    "morphisms": [
+      "enqueue_task",
+      "dequeue_task",
+      "dispatch_task",
+      "collect_result",
+      "deterministic_reduce",
+      "acquire_resource",
+      "release_resource",
+      "send_message",
+      "receive_message"
+    ],
+    "processor_cores": 56,
+    "queues": [
+      "FifoTaskQueue",
+      "LifoTaskStack",
+      "PriorityTaskQueue"
+    ],
+    "scheduler_category": "SchedulerCategory",
+    "semaphores": {
+      "cpu": {
+        "class": "ResourceSemaphore",
+        "value": 56
+      },
+      "file_io": {
+        "class": "ResourceSemaphore",
+        "value": 4
+      },
+      "output": {
+        "class": "ResourceSemaphore",
+        "value": 1
+      }
+    },
+    "universal_property": "parallel_chunks_glue_deterministically_to_serial_result"
+  },
+  "parallel_execution": {
+    "class": "ParallelExecutionBundle",
+    "config": {
+      "chunk_size": 64,
+      "class": "ParallelExecutionConfig",
+      "enabled_by_mode": false,
+      "mode": "auto",
+      "processor_cores": {
+        "available": 56,
+        "default_workers": 56,
+        "physical": 56,
+        "virtual": 56
+      },
+      "resolved_workers": 56,
+      "runtime": "CPython",
+      "source": "defaults",
+      "start_method": null,
+      "threshold": 128,
+      "workers": null
+    },
+    "default_policy": "auto_on_pypy_off_on_cpython",
+    "default_workers": 56,
+    "execution_network": "reta_architecture.execution_network.ExecutionNetworkBundle",
+    "morphisms": [
+      "extract_parallel_config_from_argv",
+      "prepare_rows_in_processes",
+      "decode_religion_rows_in_processes",
+      "decode_kombi_rows_in_processes",
+      "select_columns_in_processes",
+      "max_cell_text_len_in_processes",
+      "prepare_kombi_join_tables_in_processes",
+      "moon_numbers_in_processes",
+      "prime_factors_in_processes",
+      "filter_numbers_in_processes",
+      "factor_pairs_in_processes",
+      "normalize_column_buckets_in_processes",
+      "glue_parallel_row_chunks"
+    ],
+    "processor_cores": {
+      "available": 56,
+      "default_workers": 56,
+      "physical": 56,
+      "virtual": 56
+    },
+    "strategy": "process_chunked_table_work"
+  },
+  "repo_kind": "py_reta_arch",
+  "snapshot_keys": [
+    "architecture_activation",
+    "architecture_boundaries",
+    "architecture_coherence",
+    "architecture_contracts",
+    "architecture_impact",
+    "architecture_map",
+    "architecture_migration",
+    "architecture_progress",
+    "architecture_rehearsal",
+    "architecture_traces",
+    "architecture_validation",
+    "architecture_witnesses",
+    "arithmetic",
+    "category_theory",
+    "column_selection",
+    "combi_join",
+    "concat_csv",
+    "console_io",
+    "generated_columns",
+    "inputs",
+    "meta_columns",
+    "morphisms",
+    "nested_completion",
+    "number_theory",
+    "output_semantics",
+    "output_syntax",
+    "parallel_execution",
+    "parameter_runtime",
+    "presheaves",
+    "program_workflow",
+    "prompt_execution",
+    "prompt_interaction",
+    "prompt_language",
+    "prompt_preparation",
+    "prompt_session",
+    "row_filtering",
+    "row_ranges",
+    "schema",
+    "sheaves",
+    "table_generation",
+    "table_output",
+    "table_preparation",
+    "table_runtime",
+    "table_state",
+    "table_wrapping",
+    "topology",
+    "universal",
+    "word_completion"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "stage": "py_reta_arch_to_rust_architecture_spine",
+  "status": "started",
+  "visible_output_change_intended": false,
+  "build_checked_with_cargo": false,
+  "reason_cargo_not_checked": "cargo/rustc are not installed in the sandbox environment",
+  "shared_crate": "crates/reta_architecture",
+  "used_by": ["reta", "retaprompt_commands", "retaprompt_input"],
+  "ported_concepts": [
+    "network",
+    "queue",
+    "stack",
+    "fifo",
+    "lifo",
+    "dataflow",
+    "bidirectionality",
+    "semaphore",
+    "topology",
+    "morphism",
+    "universal_property",
+    "presheaf",
+    "sheaf",
+    "category",
+    "functor",
+    "natural_transformation"
+  ],
+  "python_references": {
+    "legacy_exact": "python_reference",
+    "architecture": "python_arch_reference"
+  },
+  "enum_i18n_currentness": {
+    "kontinuum_m_columns": [493, 744],
+    "column_744_tags": ["keinParaOdMetaP", "sternPolygon"]
+  }
+}

@@ -11,6 +11,7 @@ path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+reta_architecture = { path = "../reta_architecture" }
 indexmap = { version = "2", features = ["serde"] }
 libloading = "0.8"
 serde = { version = "1", features = ["derive"] }
