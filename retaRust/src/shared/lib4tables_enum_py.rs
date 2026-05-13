@@ -4,10 +4,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use crate::shared::reta_exact_tags_py::{
-    kombi13_table_tags_exact_py, kombi15_table_tags_exact_py, ordinary_table_tags_exact_py,
-};
-
 pub const PYTHON_SOURCE__LIB4TABLES_ENUM: &str = include_str!("../../python_reference/lib4tables_Enum.py");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -87,8 +83,20 @@ impl fmt::Display for ST {
 pub type TableTags = BTreeMap<BTreeSet<ST>, BTreeSet<i64>>;
 pub type TableTags2 = BTreeMap<i64, BTreeSet<ST>>;
 
-fn tag_set_from_slice(tags: &[ST]) -> BTreeSet<ST> {
-    tags.iter().copied().collect()
+fn st_from_arch_tag(tag: reta_architecture::TableTag) -> ST {
+    match tag {
+        reta_architecture::TableTag::sternPolygon => ST::sternPolygon,
+        reta_architecture::TableTag::gleichfoermigesPolygon => ST::gleichfoermigesPolygon,
+        reta_architecture::TableTag::keinPolygon => ST::keinPolygon,
+        reta_architecture::TableTag::galaxie => ST::galaxie,
+        reta_architecture::TableTag::universum => ST::universum,
+        reta_architecture::TableTag::keinParaOdMetaP => ST::keinParaOdMetaP,
+        reta_architecture::TableTag::gebrRat => ST::gebrRat,
+    }
+}
+
+fn tag_set_from_arch(tags: BTreeSet<reta_architecture::TableTag>) -> BTreeSet<ST> {
+    tags.into_iter().map(st_from_arch_tag).collect()
 }
 
 fn group_reverse_tags(table_tags2: &TableTags2) -> TableTags {
@@ -117,7 +125,7 @@ pub fn tableTags2_for_column(column_number: i64) -> Option<BTreeSet<ST>> {
     if column_number < 0 {
         return None;
     }
-    ordinary_table_tags_exact_py(column_number as u32).map(tag_set_from_slice)
+    reta_architecture::ordinary_tags_for_column(column_number).map(tag_set_from_arch)
 }
 
 pub fn tableTags2() -> TableTags2 {
@@ -154,7 +162,7 @@ pub fn tableTags2_kombiTable_for_column(column_number: i64) -> Option<BTreeSet<S
     if column_number < 0 {
         return None;
     }
-    kombi13_table_tags_exact_py(column_number as usize).map(tag_set_from_slice)
+    reta_architecture::kombi_table_tags_for_column(column_number).map(tag_set_from_arch)
 }
 
 pub fn tableTags2_kombiTable() -> TableTags2 {
@@ -186,7 +194,7 @@ pub fn tableTags2_kombiTable2_for_column(column_number: i64) -> Option<BTreeSet<
     if column_number < 0 {
         return None;
     }
-    kombi15_table_tags_exact_py(column_number as usize).map(tag_set_from_slice)
+    reta_architecture::kombi_table2_tags_for_column(column_number).map(tag_set_from_arch)
 }
 
 pub fn tableTags2_kombiTable2() -> TableTags2 {

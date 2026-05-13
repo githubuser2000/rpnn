@@ -4,7 +4,9 @@ use crate::category::{bootstrap_category_theory, CategoryTheoryBundle};
 use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, ExecutionTask};
 use crate::morphism::{MorphismEdge, MorphismGraph, MorphismKind};
 use crate::presheaf::PresheafBundle;
+use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::sheaf::SheafBundle;
+use crate::tag_schema::{bootstrap_tag_schema, TagSchemaBundle};
 use crate::topology::{ContextSelection, RetaContextTopology};
 use crate::universal::UniversalBundle;
 
@@ -16,7 +18,9 @@ pub struct ArchitectureRuntime {
     pub category_theory: CategoryTheoryBundle,
     pub execution_network: ExecutionNetworkBundle,
     pub presheaves: PresheafBundle,
+    pub row_ranges: RowRangeMorphismBundle,
     pub sheaves: SheafBundle,
+    pub tag_schema: TagSchemaBundle,
     pub morphisms: MorphismGraph,
     pub universal: UniversalBundle,
 }
@@ -58,7 +62,9 @@ impl ArchitectureRuntime {
             category_theory: bootstrap_category_theory(),
             execution_network: bootstrap_execution_network(None),
             presheaves: PresheafBundle::default(),
+            row_ranges: bootstrap_row_range_morphisms(None),
             sheaves: SheafBundle::default(),
+            tag_schema: bootstrap_tag_schema(),
             morphisms,
             universal: UniversalBundle::new(),
         }
@@ -75,6 +81,8 @@ impl ArchitectureRuntime {
             "bidirectionality",
             "semaphore",
             "topology",
+            "tag_schema",
+            "row_ranges",
             "morphism",
             "universal_property",
             "presheaf",

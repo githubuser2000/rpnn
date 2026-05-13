@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 
 use crate::shared::lib4tables_enum_py::ST;
 

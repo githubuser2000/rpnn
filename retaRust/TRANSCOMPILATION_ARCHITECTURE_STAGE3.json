@@ -1,0 +1,56 @@
+{
+  "stage": 3,
+  "status": "completed",
+  "goal": "continue py reta arch to Rust transcompilation by porting tag schema and row ranges into reta_architecture",
+  "implemented_modules": [
+    "crates/reta_architecture/src/tag_schema.rs",
+    "crates/reta_architecture/src/row_ranges.rs"
+  ],
+  "integration": [
+    "crates/reta_architecture/src/lib.rs exports tag_schema and row_ranges",
+    "crates/reta_architecture/src/facade.rs stores TagSchemaBundle and RowRangeMorphismBundle",
+    "src/shared/lib4tables_enum_py.rs delegates tag reverse lookups to reta_architecture::tag_schema"
+  ],
+  "important_parity_points": [
+    "ST enum values match Python tag_schema.py",
+    "column 744 maps to {keinParaOdMetaP, sternPolygon}",
+    "column 14 keeps Python dictViceversa last-writer semantics",
+    "TagSchemaBundle count snapshot matches Python counts",
+    "RowRangeSyntax supports comma splitting outside bracket/brace/paren literals",
+    "range_to_numbers supports include/exclude ranges, set literals, v-multiples and plus offsets"
+  ],
+  "changed_files": [
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/row_ranges.rs",
+    "crates/reta_architecture/src/tag_schema.rs",
+    "src/shared/lib4tables_enum_py.rs",
+    "src/shared/reta_exact_tags_py.rs"
+  ],
+  "toolchain_in_environment": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "real_build_status": "blocked by DNS / crates.io dependency fetching: index.crates.io not resolvable"
+  },
+  "checks": [
+    {
+      "name": "isolated reta_architecture cargo test with local dependency stubs",
+      "result": "passed",
+      "tests": 13
+    },
+    {
+      "name": "reta lib cargo check with local dependency stubs",
+      "result": "passed"
+    },
+    {
+      "name": "retaprompt_commands cargo check with local dependency stubs",
+      "result": "passed"
+    }
+  ],
+  "next_stage": [
+    "parameter_runtime.py -> typed CLI parameter resolution",
+    "column_selection.py and table_state.py -> typed table-state capsule",
+    "table_generation.py / table_preparation.py -> Rust generation pipeline",
+    "prompt_language.py / completion_runtime.py -> deeper rretaPrompt parity"
+  ]
+}
