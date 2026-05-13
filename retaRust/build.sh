@@ -52,3 +52,4 @@ copy_runtime_data() {
 }
 
 copy_runtime_data
+echo "Build complete: $TARGET_DIR"
