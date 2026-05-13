@@ -101,7 +101,6 @@ impl SessionState {
     }
 }
 
-
 /// Python `PromptAllesVorGroesserSchleife`: initialize the prompt state before
 /// the main `>` loop starts.
 #[allow(non_snake_case)]
@@ -191,9 +190,7 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         "s" | "BefehlSpeichernDavor" => return Ok(PromptCommand::SaveBefore),
         "S" | "BefehlSpeichernDanach" => return Ok(PromptCommand::SaveAfter),
         "l" | "BefehlSpeicherungLöschen" => return Ok(PromptCommand::DeleteStoredStart),
-        "o" | "BefehlSpeicherungAusgeben" => {
-            return Ok(PromptCommand::EnterStoredOutputMode(None))
-        }
+        "o" | "BefehlSpeicherungAusgeben" => return Ok(PromptCommand::EnterStoredOutputMode(None)),
         "leeren" | "clear" => return Ok(PromptCommand::Clear),
         ":ui" | ":preview" => return Ok(PromptCommand::LaunchUi),
         ":history" => return Ok(PromptCommand::PrintHistory),
@@ -256,7 +253,10 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
             prompt_command_from_reta_calls(calls),
             direct_number_output,
         );
-        return Ok(append_sonder_logging_toggle_like_python(command, &effective_tokens));
+        return Ok(append_sonder_logging_toggle_like_python(
+            command,
+            &effective_tokens,
+        ));
     }
     if let Some(output) = direct_number_output {
         return Ok(append_sonder_logging_toggle_like_python(
@@ -280,9 +280,11 @@ fn compile_command_inner(input: &str, prompt_mode: PromptModus) -> Result<Prompt
         return Ok(PromptCommand::Immediate(output));
     }
 
-    Err(format!(
-        "Unbekannter rp-Befehl: {trimmed}\nVersuche 'help', 'befehle', ':ui' oder beginne mit 'reta ...' bzw. '-zeilen ...'."
-    ))
+    Ok(PromptCommand::Immediate(PromptOutput {
+        title: "prompt".to_string(),
+        text: python_no_output_or_unknown_prompt_message(&effective_tokens, trimmed),
+        exit_code: 0,
+    }))
 }
 
 pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {
@@ -388,30 +390,28 @@ pub fn compile_command_with_state(
     match PromptScope_route_for_input(trimmed, &tokens, state) {
         PromptScopeRoute::EmptyRunsStored => Ok(PromptCommand::ShowStored(None)),
         PromptScopeRoute::EmptyNoop => Ok(PromptCommand::Noop),
-        PromptScopeRoute::SpeichernInput => Ok(PromptCommand::StoreCurrentInput(trimmed.to_string())),
-        PromptScopeRoute::LoeschenInput => Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string())),
-        PromptScopeRoute::ProcessCommand => Ok(
-            compile_python_process_command_from_raw_text(trimmed)
-                .expect("PromptScope route checked process command"),
-        ),
-        PromptScopeRoute::InlineStorageCommand => Ok(
-            compile_inline_storage_command(&tokens)
-                .expect("PromptScope route checked inline storage command"),
-        ),
+        PromptScopeRoute::SpeichernInput => {
+            Ok(PromptCommand::StoreCurrentInput(trimmed.to_string()))
+        }
+        PromptScopeRoute::LoeschenInput => {
+            Ok(PromptCommand::DeleteStoredSelection(trimmed.to_string()))
+        }
+        PromptScopeRoute::ProcessCommand => {
+            Ok(compile_python_process_command_from_raw_text(trimmed)
+                .expect("PromptScope route checked process command"))
+        }
+        PromptScopeRoute::InlineStorageCommand => Ok(compile_inline_storage_command(&tokens)
+            .expect("PromptScope route checked inline storage command")),
         PromptScopeRoute::StoredRetaRowRewrite => {
-            let prepared = prepare_prompt_big_output_for_stored_reta(
-                &state.stored_expanded_tokens,
-                &tokens,
-            )
-            .expect("PromptScope route checked stored reta row rewrite");
+            let prepared =
+                prepare_prompt_big_output_for_stored_reta(&state.stored_expanded_tokens, &tokens)
+                    .expect("PromptScope route checked stored reta row rewrite");
             Ok(PromptCommand::Reta(prepared.tokens))
         }
         PromptScopeRoute::StoredRowsIntoRawReta => {
-            let prepared = prepare_prompt_big_output_for_stored_rows(
-                &state.stored_expanded_tokens,
-                &tokens,
-            )
-            .expect("PromptScope route checked stored rows into raw reta");
+            let prepared =
+                prepare_prompt_big_output_for_stored_rows(&state.stored_expanded_tokens, &tokens)
+                    .expect("PromptScope route checked stored rows into raw reta");
             Ok(PromptCommand::Reta(prepared.tokens))
         }
         PromptScopeRoute::StoredRetaPromptOverlay => {
@@ -609,9 +609,7 @@ fn apply_nested_frontend_overrides(
         PromptCommand::RetaBatch(argvs) => PromptCommand::RetaBatch(
             argvs
                 .into_iter()
-                .map(|argv| {
-                    apply_rpe_emacs_output_to_nested_argv(argv, append_after_user_args)
-                })
+                .map(|argv| apply_rpe_emacs_output_to_nested_argv(argv, append_after_user_args))
                 .collect(),
         ),
         PromptCommand::Sequence(commands) => PromptCommand::Sequence(
@@ -926,7 +924,6 @@ fn delete_from_stored_placeholder(state: &mut SessionState, selection_text: &str
     refresh_stored_placeholder_cache(state);
 }
 
-
 #[allow(non_snake_case)]
 fn speichern(state: &mut SessionState, text: &str) -> PromptOutput {
     store_text_in_placeholder(state, text);
@@ -1008,6 +1005,68 @@ fn run_nested_prompt_input(
     }
 }
 
+fn is_internal_no_output_marker(token: &str) -> bool {
+    token == "keineAusgabeWelcherBefehlEsWar"
+        || token == "keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+}
+
+fn visible_prompt_tokens_py(tokens: &[String]) -> Vec<String> {
+    tokens
+        .iter()
+        .filter(|token| !is_internal_no_output_marker(token))
+        .cloned()
+        .collect()
+}
+
+fn contains_real_prompt_command_py(tokens: &[String]) -> bool {
+    tokens
+        .iter()
+        .filter(|token| !is_internal_no_output_marker(token))
+        .any(|token| prompt_words().befehle_set.contains(token))
+}
+
+fn python_no_output_or_unknown_prompt_message(
+    effective_tokens: &[String],
+    fallback_text: &str,
+) -> String {
+    let visible = visible_prompt_tokens_py(effective_tokens);
+    let shown = if visible.is_empty() {
+        fallback_text.trim().to_string()
+    } else {
+        visible.join(" ")
+    };
+
+    if contains_real_prompt_command_py(effective_tokens) {
+        format!(
+            "Dies ('{shown}') ist tatsächlich ein Befehl (oder es sind mehrere), aber es gibt nichts auszugeben."
+        )
+    } else {
+        format!("Das ist kein Befehl! -> '{shown}'")
+    }
+}
+
+fn should_echo_reta_command_like_python(argv: &[String]) -> bool {
+    !argv.iter().any(|token| is_internal_no_output_marker(token))
+}
+
+fn reta_command_echo_line_like_python(argv: &[String]) -> Option<String> {
+    should_echo_reta_command_like_python(argv).then(|| argv.join(" "))
+}
+
+fn prompt_output_from_reta_run_like_python(argv: &[String], result: RetaRunResult) -> PromptOutput {
+    let mut text = String::new();
+    if let Some(echo) = reta_command_echo_line_like_python(argv) {
+        text.push_str(&echo);
+        text.push('\n');
+    }
+    text.push_str(&result.render_text());
+
+    PromptOutput {
+        title: "reta".to_string(),
+        text,
+        exit_code: result.exit_code(),
+    }
+}
 
 fn run_reta_batch_ordered_parallel_py(
     argvs: Vec<Vec<String>>,
@@ -1036,8 +1095,7 @@ fn run_reta_batch_ordered_parallel_py(
         let mut results = Vec::with_capacity(total);
         for handle in handles {
             let mut chunk_results = handle.join().map_err(|_| {
-                "Paralleler retaPrompt-Batch-Aufruf ist in einem Worker fehlgeschlagen."
-                    .to_string()
+                "Paralleler retaPrompt-Batch-Aufruf ist in einem Worker fehlgeschlagen.".to_string()
             })?;
             results.append(&mut chunk_results);
         }
@@ -1046,22 +1104,43 @@ fn run_reta_batch_ordered_parallel_py(
 }
 
 fn append_reta_batch_result_text_py(combined: &mut String, text: &str) {
-    if !combined.is_empty() && !combined.ends_with('\n') {
-        combined.push('\n');
+    if text.is_empty() {
+        return;
     }
-    combined.push_str(text);
-    if !combined.ends_with('\n') {
-        combined.push('\n');
+    if !combined.is_empty() {
+        if !combined.ends_with('\n') {
+            combined.push('\n');
+        }
+        if !combined.ends_with("\n\n") {
+            combined.push('\n');
+        }
     }
+    combined.push_str(text.trim_end_matches('\n'));
+    combined.push('\n');
 }
 
-fn combine_reta_batch_results_py(results: Vec<RetaRunResult>) -> PromptOutput {
+fn combine_reta_batch_results_py(
+    argvs: Vec<Vec<String>>,
+    results: Vec<RetaRunResult>,
+) -> PromptOutput {
     let mut combined = String::new();
     let mut exit_code = 0;
 
-    for result in results {
-        append_reta_batch_result_text_py(&mut combined, &result.render_text());
-        exit_code = exit_code.max(result.exit_code());
+    for (argv, result) in argvs.into_iter().zip(results) {
+        if !combined.is_empty() {
+            // Python prints each generated reta command and table through
+            // separate `print`/`cliout` calls. Between consecutive tables this
+            // leaves a visible blank line at the hand-over point.
+            if !combined.ends_with("\n\n") {
+                if !combined.ends_with('\n') {
+                    combined.push('\n');
+                }
+                combined.push('\n');
+            }
+        }
+        let output = prompt_output_from_reta_run_like_python(&argv, result);
+        append_reta_batch_result_text_py(&mut combined, &output.text);
+        exit_code = exit_code.max(output.exit_code);
     }
 
     PromptOutput {
@@ -1238,16 +1317,12 @@ pub fn execute_command(
         PromptCommand::Immediate(output) => Ok(Some(output)),
         PromptCommand::Sequence(commands) => execute_command_sequence(commands, state),
         PromptCommand::Reta(argv) => {
-            let result: RetaRunResult = run_reta_from_args(argv);
-            Ok(Some(PromptOutput {
-                title: "reta".to_string(),
-                text: result.render_text(),
-                exit_code: result.exit_code(),
-            }))
+            let result: RetaRunResult = run_reta_from_args(argv.clone());
+            Ok(Some(prompt_output_from_reta_run_like_python(&argv, result)))
         }
         PromptCommand::RetaBatch(argvs) => {
-            let results = run_reta_batch_ordered_parallel_py(argvs)?;
-            Ok(Some(combine_reta_batch_results_py(results)))
+            let results = run_reta_batch_ordered_parallel_py(argvs.clone())?;
+            Ok(Some(combine_reta_batch_results_py(argvs, results)))
         }
     }
 }
@@ -1256,13 +1331,16 @@ fn append_output_text(combined: &mut String, text: &str) {
     if text.is_empty() {
         return;
     }
-    if !combined.is_empty() && !combined.ends_with('\n') {
-        combined.push('\n');
+    if !combined.is_empty() {
+        if !combined.ends_with('\n') {
+            combined.push('\n');
+        }
+        if !combined.ends_with("\n\n") {
+            combined.push('\n');
+        }
     }
-    combined.push_str(text);
-    if !combined.ends_with('\n') {
-        combined.push('\n');
-    }
+    combined.push_str(text.trim_end_matches('\n'));
+    combined.push('\n');
 }
 
 fn execute_command_sequence(
@@ -1444,7 +1522,6 @@ fn render_primfaktorenvergleich_like_python(numbers: &[i64]) -> Vec<String> {
     lines
 }
 
-
 const PY_SET_LINEAR_PROBES: usize = 9;
 const PY_SET_PERTURB_SHIFT: u32 = 5;
 const PY_HASH_XXPRIME_1: u64 = 11_400_714_785_074_694_791;
@@ -1574,12 +1651,7 @@ impl<const N: usize> PythonIntTupleSet<N> {
         }
 
         let mask = self.table.len() - 1;
-        if self
-            .fill
-            .saturating_add(source.len())
-            .saturating_mul(5)
-            >= mask.saturating_mul(3)
-        {
+        if self.fill.saturating_add(source.len()).saturating_mul(5) >= mask.saturating_mul(3) {
             self.resize(self.used.saturating_add(source.len()).saturating_mul(2));
         }
 
@@ -1681,10 +1753,7 @@ fn factor_triples(a: i64) -> Vec<(i64, i64, i64)> {
         m3.update_like_set_merge(set_o6.items());
     }
 
-    m3.items()
-        .into_iter()
-        .map(|[a, b, c]| (a, b, c))
-        .collect()
+    m3.items().into_iter().map(|[a, b, c]| (a, b, c)).collect()
 }
 
 fn modulo_classification_text(value: i64) -> &'static str {
@@ -1718,8 +1787,7 @@ fn modulo_remainders_display(n: i64) -> String {
 }
 
 fn abstand_usage_text() -> String {
-    "der Befehl 'abstand' verlangt mindestens 2 Zahlenangaben, wie 'abstand 7 17-25'"
-        .to_string()
+    "der Befehl 'abstand' verlangt mindestens 2 Zahlenangaben, wie 'abstand 7 17-25'".to_string()
 }
 
 fn parse_integer_row_numbers_from_spec(spec: &str) -> Option<Vec<i64>> {
@@ -1742,7 +1810,9 @@ fn format_python_dict_items(entries: Vec<(i64, String)>) -> String {
 }
 
 #[allow(non_snake_case)]
-fn maxMenge<T: Ord + Clone>(mengen: &[std::collections::BTreeSet<T>]) -> std::collections::BTreeSet<T> {
+fn maxMenge<T: Ord + Clone>(
+    mengen: &[std::collections::BTreeSet<T>],
+) -> std::collections::BTreeSet<T> {
     let Some(first) = mengen.first() else {
         return std::collections::BTreeSet::new();
     };
@@ -1768,7 +1838,11 @@ fn render_abstand_like_python(
         let Some(group) = parse_integer_row_set_from_spec(token) else {
             continue;
         };
-        let key = group.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(",");
+        let key = group
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
         if seen.insert(key) {
             groups.push((token.clone(), group));
         }
@@ -1790,8 +1864,7 @@ fn render_abstand_like_python(
 
     let mut distance_rows: std::collections::BTreeMap<i64, String> =
         std::collections::BTreeMap::new();
-    let mut prime_rows: std::collections::BTreeMap<i64, String> =
-        std::collections::BTreeMap::new();
+    let mut prime_rows: std::collections::BTreeMap<i64, String> = std::collections::BTreeMap::new();
 
     for (_, target_group) in &groups {
         for (_, source_group) in groups.iter() {
@@ -1911,7 +1984,9 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
             || !(token_set.contains("mulpri") || token_set.contains("p"));
         if render_comparison {
             matched = true;
-            lines.extend(render_primfaktorenvergleich_like_python(&comparison_numbers));
+            lines.extend(render_primfaktorenvergleich_like_python(
+                &comparison_numbers,
+            ));
         }
     }
     if token_set.contains("modulo") {
@@ -2158,8 +2233,8 @@ mod tests {
     use super::{
         compile_command, compile_command_with_state, execute_command, factor_pairs_without_ones,
         factor_triples, merge_stored_placeholder, promptSpeicherungB,
-        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand,
-        PromptModus, PromptScope, PromptScopeRoute, PromptScope_route_for_input, SessionState,
+        refresh_stored_placeholder_cache, take_auto_prompt_command, PromptCommand, PromptModus,
+        PromptScope, PromptScopeRoute, PromptScope_route_for_input, SessionState,
     };
 
     fn compile_rp(input: &str) -> PromptCommand {
@@ -2197,9 +2272,9 @@ mod tests {
     fn has_logging_toggle(command: &PromptCommand, enabled: bool) -> bool {
         match command {
             PromptCommand::ToggleLogging(value) => *value == enabled,
-            PromptCommand::Sequence(commands) => {
-                commands.iter().any(|command| has_logging_toggle(command, enabled))
-            }
+            PromptCommand::Sequence(commands) => commands
+                .iter()
+                .any(|command| has_logging_toggle(command, enabled)),
             _ => false,
         }
     }
@@ -2212,7 +2287,10 @@ mod tests {
     fn golden_rp_befehl_bare_number_uses_python_default_prompt_pipeline() {
         let command = compile_rp("12");
         let argvs = reta_argvs(&command);
-        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(
+            !argvs.is_empty(),
+            "expected generated reta calls, got {command:?}"
+        );
         assert!(has_immediate_output(&command));
         assert!(argvs
             .iter()
@@ -2230,7 +2308,10 @@ mod tests {
     fn golden_rpb_exact_bare_number_adds_no_headers() {
         let command = compile_rp("12 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar");
         let argvs = reta_argvs(&command);
-        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(
+            !argvs.is_empty(),
+            "expected generated reta calls, got {command:?}"
+        );
         assert!(argvs
             .iter()
             .all(|argv| argv_has(argv, "--keineueberschriften")));
@@ -2243,7 +2324,10 @@ mod tests {
     fn golden_rp_befehl_fraction_defaults_cover_reciprocal_semantics() {
         let command = compile_rp("2/3");
         let argvs = reta_argvs(&command);
-        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(
+            !argvs.is_empty(),
+            "expected generated reta calls, got {command:?}"
+        );
         assert!(argvs
             .iter()
             .any(|argv| argv_has(argv, "--gebrochenuniversum=2")));
@@ -2265,9 +2349,9 @@ mod tests {
 
         let vielfache = compile_rp("12 v");
         let vielfache_argvs = reta_argvs(&vielfache);
-        assert!(vielfache_argvs.iter().any(|argv| argv
+        assert!(vielfache_argvs
             .iter()
-            .any(|token| token == "--vielfachevonzahlen=12")));
+            .any(|argv| argv.iter().any(|token| token == "--vielfachevonzahlen=12")));
         assert!(vielfache_argvs
             .iter()
             .any(|argv| argv_has(argv, "--vorhervonausschnitt=12,v12")));
@@ -2277,7 +2361,10 @@ mod tests {
     fn golden_rp_befehl_repeated_denominator_fraction_uses_reverse_bucket() {
         let command = compile_rp("2/5-3/5");
         let argvs = reta_argvs(&command);
-        assert!(!argvs.is_empty(), "expected generated reta calls, got {command:?}");
+        assert!(
+            !argvs.is_empty(),
+            "expected generated reta calls, got {command:?}"
+        );
         assert!(argvs.iter().any(|argv| {
             argv_has(argv, "--gebrochenuniversum=5")
                 && argv_has(argv, "--vorhervonausschnitt=2,3")
@@ -2316,7 +2403,9 @@ mod tests {
         let command = PromptScope("12 s", &state).unwrap();
         match command {
             PromptCommand::StoreInline(text) => assert_eq!(text, "12"),
-            other => panic!("expected PromptScope facade to use inline storage route, got {other:?}"),
+            other => {
+                panic!("expected PromptScope facade to use inline storage route, got {other:?}")
+            }
         }
     }
 
@@ -2378,8 +2467,14 @@ mod tests {
         let effective = promptSpeicherungB(&state, Some("12 t".to_string()));
         assert!(effective.starts_with("reta "), "{effective}");
         assert!(effective.contains("--nocolor"), "{effective}");
-        assert!(effective.split_whitespace().any(|part| part == "12"), "{effective}");
-        assert!(effective.split_whitespace().any(|part| part == "t"), "{effective}");
+        assert!(
+            effective.split_whitespace().any(|part| part == "12"),
+            "{effective}"
+        );
+        assert!(
+            effective.split_whitespace().any(|part| part == "t"),
+            "{effective}"
+        );
     }
 
     #[test]
@@ -2507,8 +2602,8 @@ mod tests {
 
     #[test]
     fn multis3_prompt_keeps_python_first_number_only_bug() {
-        let output = compile_command("multis3 12,18", PromptModus::Normal)
-            .expect("multis3 should compile");
+        let output =
+            compile_command("multis3 12,18", PromptModus::Normal).expect("multis3 should compile");
         let PromptCommand::Immediate(output) = output else {
             panic!("expected immediate multis3 output");
         };
@@ -2569,7 +2664,9 @@ mod tests {
         let command = compile_command_with_state("emotion 12", &state).unwrap();
         match command {
             PromptCommand::Reta(argv) => {
-                assert!(argv.iter().any(|token| token == "--grundstrukturen=emotion"));
+                assert!(argv
+                    .iter()
+                    .any(|token| token == "--grundstrukturen=emotion"));
                 assert!(argv.iter().any(|token| token == "--nocolor"));
                 assert!(argv.iter().any(|token| token == "--vorhervonausschnitt=12"));
             }
@@ -2760,7 +2857,9 @@ mod tests {
         match command {
             PromptCommand::Immediate(output) => {
                 assert!(output.text.starts_with("7 % 2 = 1 Gegenteil, 1 Gegenteil"));
-                assert!(output.text.contains("7 % 5 = 2 ähnlich, 3 entferntes Gegenteil"));
+                assert!(output
+                    .text
+                    .contains("7 % 5 = 2 ähnlich, 3 entferntes Gegenteil"));
                 assert!(output.text.contains("7 % 25 = 7 None, 18 None"));
             }
             other => panic!("expected immediate modulo output, got {other:?}"),
@@ -2773,8 +2872,12 @@ mod tests {
         let command = compile_command_with_state("mulpri emotion 12", &state).unwrap();
         match command {
             PromptCommand::Sequence(commands) => {
-                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Reta(_))));
-                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, PromptCommand::Reta(_))));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, PromptCommand::Immediate(_))));
             }
             other => panic!("expected PromptCommand::Sequence, got {other:?}"),
         }
@@ -2787,9 +2890,14 @@ mod tests {
         match command {
             PromptCommand::Sequence(commands) => {
                 assert!(commands.iter().any(|command| {
-                    matches!(command, PromptCommand::Reta(_) | PromptCommand::RetaBatch(_))
+                    matches!(
+                        command,
+                        PromptCommand::Reta(_) | PromptCommand::RetaBatch(_)
+                    )
                 }));
-                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, PromptCommand::Immediate(_))));
             }
             other => panic!("expected default bare-number sequence, got {other:?}"),
         }
@@ -2801,8 +2909,12 @@ mod tests {
         let command = compile_command_with_state("2/3", &state).unwrap();
         match command {
             PromptCommand::Sequence(commands) => {
-                assert!(commands.iter().any(|command| matches!(command, PromptCommand::RetaBatch(_))));
-                assert!(commands.iter().any(|command| matches!(command, PromptCommand::Immediate(_))));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, PromptCommand::RetaBatch(_))));
+                assert!(commands
+                    .iter()
+                    .any(|command| matches!(command, PromptCommand::Immediate(_))));
             }
             PromptCommand::RetaBatch(_) => {}
             other => panic!("expected default bare-fraction batch or sequence, got {other:?}"),
@@ -2833,7 +2945,6 @@ mod tests {
             other => panic!("expected immediate abc output, got {other:?}"),
         }
     }
-
 
     #[test]
     fn prompt_tokenizer_keeps_quotes_like_python_custom_split() {
@@ -2893,5 +3004,4 @@ mod tests {
         assert!(has_logging_toggle(&command, false), "{command:?}");
         assert!(!reta_argvs(&command).is_empty(), "{command:?}");
     }
-
 }

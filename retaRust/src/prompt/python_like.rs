@@ -4,9 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use indexmap::IndexMap;
 use std::sync::OnceLock;
 
-use crate::domain::python_source_of_truth::{
-    all_main_alias_groups, parameter_alias_groups_for_main,
-};
+use crate::domain::python_source_of_truth::parameter_alias_groups_for_main;
 use crate::shared::words_py::PyValue;
 use crate::shared_words;
 
@@ -378,49 +376,83 @@ fn push_unique_exact_str(target: &mut Vec<String>, value: &str) {
     push_unique_exact_string(target, value.to_string());
 }
 
-fn spalten_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
+fn python_data_dict0_parameter_pairs_by_column() -> IndexMap<i64, Vec<Vec<(String, String)>>> {
     let words = shared_words();
+    let mut data_dict: IndexMap<i64, Vec<Vec<(String, String)>>> = IndexMap::new();
 
-    // Python baut das Inventar fuer `retaPrompt.regExReplace()` nicht direkt
-    // aus `paraNdataMatrix`, sondern aus `retaProgram.dataDict[0]`. Die
-    // Reihenfolge der Spalten-Keys in diesem Dict ist wichtig fuer `*`:
-    // `--Bedeutung=*` beginnt in Python mit den Werten der zuerst gesehenen
-    // Bedeutung-Spalte 107, also `Mechanismen_der_Zuechtung,...`, und nicht
-    // mit der Reihenfolge der spaeteren `paraNdataMatrix`-Eintraege.
-    let mut by_column: IndexMap<i64, Vec<(String, String)>> = IndexMap::new();
+    // Python `reta.Program.storeParamtersForColumns()` builds `dataDict[0]`
+    // through repeated dictionary merges. `retaPrompt.regExReplace()` then
+    // scans that dictionary in insertion order. This is why
+    // `reta -spalten --Bedeutung=*` starts with the values attached to column
+    // 107, although the `Bedeutung` rows in `paraNdataMatrix` appear later.
     for entry in &words.paraNdataMatrix {
         let Some(column_values) = entry.datas.first() else {
             continue;
         };
+
         let parameter_names = if entry.parameterNames.is_empty() {
             vec![String::new()]
         } else {
             entry.parameterNames.clone()
         };
+        let mut into = Vec::new();
+        for main_name in &entry.parameterMainNames {
+            for parameter_name in &parameter_names {
+                into.push((main_name.clone(), parameter_name.clone()));
+            }
+        }
+        if into.is_empty() {
+            continue;
+        }
 
+        let mut entry_dict: IndexMap<i64, Vec<Vec<(String, String)>>> = IndexMap::new();
         for value in column_values {
-            let PyValue::Int(column_number) = value else {
-                continue;
-            };
-            let pairs = by_column.entry(*column_number).or_default();
-            for main_name in &entry.parameterMainNames {
-                for parameter_name in &parameter_names {
-                    if !pairs
-                        .iter()
-                        .any(|(main, parameter)| main == main_name && parameter == parameter_name)
-                    {
-                        pairs.push((main_name.clone(), parameter_name.clone()));
+            if let PyValue::Int(column_number) = value {
+                entry_dict
+                    .entry(*column_number)
+                    .or_default()
+                    .push(into.clone());
+            }
+        }
+        if entry_dict.is_empty() {
+            continue;
+        }
+
+        if data_dict.is_empty() {
+            data_dict = entry_dict;
+            continue;
+        }
+
+        let old_keys = data_dict.keys().copied().collect::<Vec<_>>();
+        for old_key in old_keys {
+            for (new_key, new_values) in &entry_dict {
+                if old_key == *new_key {
+                    let values = data_dict.entry(*new_key).or_default();
+                    for value in new_values {
+                        if !values.iter().any(|existing| existing == value) {
+                            values.push(value.clone());
+                        }
                     }
+                } else if !data_dict.contains_key(new_key) {
+                    data_dict.insert(*new_key, new_values.clone());
                 }
             }
         }
     }
 
+    data_dict
+}
+
+fn spalten_parameter_inventory_for_regex() -> IndexMap<String, Vec<String>> {
     let mut inventory: IndexMap<String, Vec<String>> = IndexMap::new();
-    for (_column_number, pairs) in by_column {
-        for (main_name, parameter_name) in pairs {
-            let values = inventory.entry(main_name).or_default();
-            if !parameter_name.is_empty() {
+
+    for (_column_number, pair_groups) in python_data_dict0_parameter_pairs_by_column() {
+        for pair_group in pair_groups {
+            for (main_name, parameter_name) in pair_group {
+                if parameter_name.is_empty() {
+                    continue;
+                }
+                let values = inventory.entry(main_name).or_default();
                 push_unique_exact_str(values, &parameter_name);
             }
         }
@@ -9183,7 +9215,6 @@ mod tests {
         assert!(!txt.hasWithoutABC(&string_set(&["x"])));
     }
 
-
     #[test]
     fn prompt_help_alias_matches_python_uppercase_help() {
         assert_eq!(super::replace_prompt_alias("h"), "HELP");
@@ -11044,6 +11075,27 @@ mod tests {
         assert_eq!(
             python_row_spec_to_numbers("[a + b for a,b in map(lambda n: (n,n+1), range(1,4))]"),
             Some(vec![3, 5, 7])
+        );
+    }
+
+    #[test]
+    fn reta_prompt_star_lhs_filters_parameters_by_rhs_value_like_python() {
+        assert_eq!(
+            expand_python_regex_like_tokens(&strings(&["reta", "-spalten", "--*=mond"])),
+            strings(&["reta", "-spalten", "--Bedeutung=mond", "--bedeutung=mond"])
+        );
+    }
+
+    #[test]
+    fn reta_prompt_star_rhs_expands_spalten_values_in_python_datadict_order() {
+        assert_eq!(
+            expand_python_regex_like_tokens(&strings(&["reta", "-spalten", "--Bedeutung=*"])),
+            strings(&[
+                "reta",
+                "-zeilen",
+                "-spalten",
+                "--Bedeutung=Mechanismen_der_Züchtung,mechanismen,wesen,zuechtung,züchtung,züchten,zuechten,Primzahlen,primzahlen,vielfache,vielfacher,Gestirn,gestirn,mond,sonne,planet,Jura,jura,gesetzeslehre,recht,Zählungen,zählungen,zaehlung,zaehlungen,zählung,in_ReTa,inreta,Vorzeichen,vorzeichen,Anwendung_der_Sonnen_und_Monde,anwendungdersonnenundmonde,anwendungdersonnen,anwendungenfuermonde,Vollkommenheit_des_Geistes,vollkommenheit,geist,Konjunktiv_Wurzelbildung,konjunktiv,wurzel",
+            ])
         );
     }
 }

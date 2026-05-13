@@ -1,5 +1,5 @@
---- src/prompt/python_like.rs
-+++ src/prompt/python_like.rs
+--- src/prompt/python_like.rs	2026-05-13 08:46:24.386874769 +0000
++++ src/prompt/python_like.rs	2026-05-13 08:46:26.477644793 +0000
 @@ -4,9 +4,7 @@
  use std::sync::OnceLock;
  
@@ -11,30 +11,3 @@
  use crate::shared_words;
  
  use super::semantic_choices::{
-@@ -10765,4 +10857,26 @@
- 
- 
- 
-+
-+    #[test]
-+    fn reta_prompt_star_lhs_filters_parameters_by_rhs_value_like_python() {
-+        assert_eq!(
-+            expand_python_regex_like_tokens(&strings(&["reta", "-spalten", "--*=mond"])),
-+            strings(&["reta", "-spalten", "--Bedeutung=mond", "--bedeutung=mond"])
-+        );
-+    }
-+
-+    #[test]
-+    fn reta_prompt_star_rhs_expands_spalten_values_in_python_datadict_order() {
-+        assert_eq!(
-+            expand_python_regex_like_tokens(&strings(&["reta", "-spalten", "--Bedeutung=*"])),
-+            strings(&[
-+                "reta",
-+                "-zeilen",
-+                "-spalten",
-+                "--Bedeutung=Mechanismen_der_Züchtung,mechanismen,wesen,zuechtung,züchtung,züchten,zuechten,Primzahlen,primzahlen,vielfache,vielfacher,Gestirn,gestirn,mond,sonne,planet,Jura,jura,gesetzeslehre,recht,Zählungen,zählungen,zaehlung,zaehlungen,zählung,in_ReTa,inreta,Vorzeichen,vorzeichen,Anwendung_der_Sonnen_und_Monde,anwendungdersonnenundmonde,anwendungdersonnen,anwendungenfuermonde,Vollkommenheit_des_Geistes,vollkommenheit,geist,Konjunktiv_Wurzelbildung,konjunktiv,wurzel",
-+            ])
-+        );
-+    }
-+
- }

@@ -1,0 +1,45 @@
+--- src/prompt/commands.rs
++++ src/prompt/commands.rs
+@@ -1,14 +1,13 @@
+ use crate::{run_reta_from_args, RetaRunResult};
+ 
+-use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
+ use super::python_like::{
+-    libreta_prompt_custom_split,
+-    prepare_prompt_big_output_for_stored_reta,
+-    python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
+-    prepare_prompt_big_output_for_stored_rows, prompt_words, PromptGrosseAusgabe,
+-    PromptLoescheVorSpeicherungBefehle, PromptModus,
+-    PromptSonderBefehlAktion, PromptVonGrosserAusgabeSonderBefehlAusgaben,
++    libreta_prompt_custom_split, prepare_prompt_big_output_for_stored_reta,
++    prepare_prompt_big_output_for_stored_reta_prompt_overlay,
++    prepare_prompt_big_output_for_stored_rows, prompt_words, python_row_spec_to_numbers,
++    PromptGrosseAusgabe, PromptLoescheVorSpeicherungBefehle, PromptModus, PromptSonderBefehlAktion,
++    PromptVonGrosserAusgabeSonderBefehlAusgaben,
+ };
++use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
+ 
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub enum EditModeKind {
+@@ -269,13 +268,16 @@
+             &effective_tokens,
+         ));
+     }
+-    if let Some(enabled) = PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &effective_tokens, false).loggingCommand {
++    if let Some(enabled) =
++        PromptVonGrosserAusgabeSonderBefehlAusgaben(false, &effective_tokens, false).loggingCommand
++    {
+         return Ok(PromptCommand::ToggleLogging(enabled));
+     }
+-
+-    Err(format!(
+-        "Unbekannter rp-Befehl: {trimmed}\nVersuche 'help', 'befehle', ':ui' oder beginne mit 'reta ...' bzw. '-zeilen ...'."
+-    ))
++    Ok(PromptCommand::Immediate(PromptOutput {
++        title: "prompt".to_string(),
++        text: python_no_output_or_unknown_prompt_message(&effective_tokens, trimmed),
++        exit_code: 0,
++    }))
+ }
+ 
+ pub fn compile_command(input: &str, prompt_mode: PromptModus) -> Result<PromptCommand, String> {

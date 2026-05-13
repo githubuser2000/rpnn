@@ -2921,7 +2921,7 @@ impl Program {
 
         let mut chunked_lines: Vec<Vec<String>> = vec![];
 
-        for (chunk_start, chunk_end) in chunks.iter().cloned() {
+        for (chunk_index, (chunk_start, chunk_end)) in chunks.iter().cloned().enumerate() {
             let one_chunk_lines = self.render_shell_chunk_ordered_py(
                 &finallyDisplayLines,
                 &newTable,
@@ -2930,6 +2930,9 @@ impl Program {
                 chunk_end,
                 num_prefix_width,
             );
+            if chunk_index > 0 && !one_chunk_lines.is_empty() {
+                out_lines.push(String::new());
+            }
             chunked_lines.push(one_chunk_lines.clone());
             out_lines.extend(one_chunk_lines);
         }
