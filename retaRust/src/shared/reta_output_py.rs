@@ -432,6 +432,36 @@ impl Program {
         r#" class="tdSymbole" style="background-image: url();background-size: cover;background-repeat: no-repeat;background-position: right; ""#
     }
 
+    fn html_compact_body_cell_attrs_py(
+        &self,
+        spalte_for_metadata: Option<i64>,
+        html_col_idx: usize,
+        content: Option<&str>,
+    ) -> String {
+        let mut attrs = String::new();
+
+        if html_col_idx == 0 || html_col_idx == 1 {
+            if Self::html_cell_content_is_even_exact_py(content) {
+                attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
+            } else if html_col_idx == 0 {
+                attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
+            }
+            return attrs;
+        }
+
+        if let Some(spalte_for_metadata) = spalte_for_metadata {
+            if self
+                .html_python_cell_parts_exact_py(spalte_for_metadata)
+                .map(|(_, _, has_symbole)| has_symbole)
+                .unwrap_or(false)
+            {
+                attrs.push_str(Self::html_symbol_attrs_exact_py());
+            }
+        }
+
+        attrs
+    }
+
     fn html_python_cell_attrs_exact_py(
         &self,
         spalte_for_metadata: Option<i64>,
@@ -440,8 +470,6 @@ impl Program {
         _row_number: Option<i64>,
         is_header: bool,
     ) -> String {
-        let mut attrs = String::new();
-
         // Critical size guard: the normal CLI HTML output must not attach
         // header/column metadata to body cells.  Some data rows can fail
         // row-number parsing and therefore have `row_number == None`; that
@@ -449,23 +477,10 @@ impl Program {
         // `is_header` flag may enable the large `p1_... p2_... p4_...`
         // header class string.
         if !is_header {
-            if html_col_idx == 0 || html_col_idx == 1 {
-                if Self::html_cell_content_is_even_exact_py(content) {
-                    attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
-                } else if html_col_idx == 0 {
-                    attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
-                }
-            } else if let Some(spalte_for_metadata) = spalte_for_metadata {
-                if self
-                    .html_python_cell_parts_exact_py(spalte_for_metadata)
-                    .map(|(_, _, has_symbole)| has_symbole)
-                    .unwrap_or(false)
-                {
-                    attrs.push_str(Self::html_symbol_attrs_exact_py());
-                }
-            }
-            return attrs;
+            return self.html_compact_body_cell_attrs_py(spalte_for_metadata, html_col_idx, content);
         }
+
+        let mut attrs = String::new();
 
         let Some(spalte_for_metadata) = spalte_for_metadata else {
             return String::new();
@@ -3028,6 +3043,16 @@ mod tests {
         let body_attrs_without_parseable_row_number =
             program.html_python_cell_attrs_exact_py(Some(0), 2, None, None, false);
         assert_eq!(body_attrs_without_parseable_row_number, "");
+
+        program.generatedSpaltenParameter_Exact.insert(
+            1,
+            vec![vec![PairStr("Symbole".to_string(), String::new())]],
+        );
+        let symbol_body_attrs =
+            program.html_python_cell_attrs_exact_py(Some(1), 3, Some("☉"), Some(1), false);
+        assert!(symbol_body_attrs.contains("tdSymbole"));
+        assert!(!symbol_body_attrs.contains("data-column-number"));
+        assert!(!symbol_body_attrs.contains("p1_col_"));
     }
 
     #[test]
