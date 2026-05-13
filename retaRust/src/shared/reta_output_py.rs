@@ -2,10 +2,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::domain::python_html_meta::{html_meta_for_column, HtmlDeclMeta};
-use crate::domain::python_source_of_truth::{
-    all_main_alias_groups, canonicalize_pair, parameter_alias_groups_for_main,
-};
 use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
 use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::shared::words_py::Words;
@@ -203,55 +199,11 @@ impl<'a> PyLikeIntExprParser<'a> {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-struct HtmlRuntimeMetaPy {
-    classes: BTreeSet<String>,
-    data_attributes: BTreeMap<String, String>,
-}
-
 #[derive(Clone, Debug)]
 struct StructuredRowRenderPy {
     line: String,
     is_header: bool,
     cells_len: usize,
-}
-
-fn html_slug_exact_py(txt: &str) -> String {
-    txt.trim()
-        .replace(' ', "_")
-        .replace('(', "")
-        .replace(')', "")
-        .replace('/', "_")
-        .replace(',', "_")
-        .replace('ß', "ss")
-        .to_lowercase()
-}
-
-fn merge_pipe_separated_unique_py(left: &str, right: &str) -> String {
-    let mut parts = BTreeSet::new();
-    for part in left.split('|').chain(right.split('|')) {
-        let trimmed = part.trim();
-        if !trimmed.is_empty() {
-            parts.insert(trimmed.to_string());
-        }
-    }
-    parts.into_iter().collect::<Vec<_>>().join("|")
-}
-
-impl HtmlRuntimeMetaPy {
-    fn merge(&mut self, other: Self) {
-        self.classes.extend(other.classes);
-        for (key, value) in other.data_attributes {
-            if value.trim().is_empty() {
-                continue;
-            }
-            if let Some(existing) = self.data_attributes.get_mut(&key) {
-                *existing = merge_pipe_separated_unique_py(existing, &value);
-            } else {
-                self.data_attributes.insert(key, value);
-            }
-        }
-    }
 }
 
 impl Program {
@@ -364,171 +316,6 @@ impl Program {
             .replace('"', "&quot;")
             .replace('\n', " ")
             .replace('\r', " ")
-    }
-
-    fn html_runtime_meta_from_decl_exact_py(meta: HtmlDeclMeta) -> HtmlRuntimeMetaPy {
-        let mut out = HtmlRuntimeMetaPy::default();
-        for class_name in meta.classes {
-            if !class_name.trim().is_empty() {
-                out.classes.insert(class_name);
-            }
-        }
-        for (key, value) in meta.data_attributes {
-            if !value.trim().is_empty() {
-                out.data_attributes.insert(key, value);
-            }
-        }
-        out
-    }
-
-    fn html_runtime_meta_from_generated_exact_py(
-        &self,
-        words: &Words,
-        original_col: i64,
-    ) -> HtmlRuntimeMetaPy {
-        let Some(parameter_groups) = self.generatedSpaltenParameter_Exact.get(&original_col) else {
-            return HtmlRuntimeMetaPy::default();
-        };
-
-        let mut out = HtmlRuntimeMetaPy::default();
-        let mut canonical_pairs: BTreeSet<(String, String)> = BTreeSet::new();
-        let mut main_aliases: BTreeSet<String> = BTreeSet::new();
-        let mut parameter_aliases: BTreeSet<String> = BTreeSet::new();
-        let main_groups = all_main_alias_groups(words);
-
-        for group in parameter_groups {
-            for pair in group {
-                let raw_main = pair.0.trim();
-                let raw_param = pair.1.trim();
-                if raw_main.is_empty() || raw_param.is_empty() {
-                    continue;
-                }
-
-                let (canonical_main, canonical_param) =
-                    canonicalize_pair(words, raw_main, raw_param)
-                        .unwrap_or((raw_main.to_string(), raw_param.to_string()));
-
-                canonical_pairs.insert((canonical_main.clone(), canonical_param.clone()));
-
-                let mut saw_main_aliases = false;
-                for main_group in &main_groups {
-                    if main_group.canonical == canonical_main {
-                        saw_main_aliases = true;
-                        for alias in &main_group.aliases {
-                            main_aliases.insert(alias.clone());
-                        }
-                        break;
-                    }
-                }
-                if !saw_main_aliases {
-                    main_aliases.insert(raw_main.to_string());
-                }
-
-                let mut saw_parameter_aliases = false;
-                for parameter_group in parameter_alias_groups_for_main(words, &canonical_main) {
-                    if parameter_group.canonical == canonical_param {
-                        saw_parameter_aliases = true;
-                        for alias in parameter_group.aliases {
-                            parameter_aliases.insert(alias);
-                        }
-                        break;
-                    }
-                }
-                if !saw_parameter_aliases {
-                    parameter_aliases.insert(raw_param.to_string());
-                }
-            }
-        }
-
-        if canonical_pairs.is_empty() {
-            return out;
-        }
-
-        out.classes.insert(format!("p1_col_{}", original_col));
-        for (canonical_main, canonical_param) in &canonical_pairs {
-            out.classes
-                .insert(format!("p2_{}", html_slug_exact_py(canonical_main)));
-            out.classes
-                .insert(format!("p3_{}", html_slug_exact_py(canonical_param)));
-        }
-        for alias in &main_aliases {
-            out.classes
-                .insert(format!("p2alias_{}", html_slug_exact_py(alias)));
-        }
-        for alias in &parameter_aliases {
-            out.classes
-                .insert(format!("p3alias_{}", html_slug_exact_py(alias)));
-        }
-
-        out.data_attributes
-            .insert("data-column-number".to_string(), original_col.to_string());
-        out.data_attributes.insert(
-            "data-column-group".to_string(),
-            canonical_pairs
-                .iter()
-                .map(|(main_name, parameter_name)| format!("{}::{}", main_name, parameter_name))
-                .collect::<Vec<_>>()
-                .join("|"),
-        );
-        if !main_aliases.is_empty() {
-            out.data_attributes.insert(
-                "data-main-aliases".to_string(),
-                main_aliases.into_iter().collect::<Vec<_>>().join("|"),
-            );
-        }
-        if !parameter_aliases.is_empty() {
-            out.data_attributes.insert(
-                "data-parameter-aliases".to_string(),
-                parameter_aliases.into_iter().collect::<Vec<_>>().join("|"),
-            );
-        }
-
-        out
-    }
-
-    fn html_runtime_meta_for_column_exact_py(
-        &self,
-        words: &Words,
-        original_col: i64,
-    ) -> HtmlRuntimeMetaPy {
-        let mut out = HtmlRuntimeMetaPy::default();
-        let is_direct_source_column = self
-            .dataDict
-            .get(0)
-            .and_then(|dict| dict.get(&original_col.to_string()))
-            .is_some();
-
-        if is_direct_source_column {
-            if let Some(meta) = html_meta_for_column(words, original_col) {
-                out.merge(Self::html_runtime_meta_from_decl_exact_py(meta));
-            }
-        }
-
-        out.merge(self.html_runtime_meta_from_generated_exact_py(words, original_col));
-
-        if let Some(tags) = self.generatedSpaltenParameter_Tags.get(&original_col) {
-            let tag_names = tags
-                .iter()
-                .map(|tag| tag.py_name().to_string())
-                .collect::<Vec<_>>();
-            for tag in tags {
-                out.classes.insert(tag.html_class());
-            }
-            if !tag_names.is_empty() {
-                out.data_attributes
-                    .insert("data-structural-tags".to_string(), tag_names.join("|"));
-            }
-        }
-
-        if !out
-            .classes
-            .iter()
-            .any(|class_name| class_name.starts_with("p1_"))
-        {
-            out.classes.insert(format!("p1_col_{}", original_col));
-        }
-
-        out
     }
 
     fn html_syntax_tuple_for_special_column_exact_py(spalte: i64) -> Option<Vec<Vec<PairStr>>> {
@@ -691,30 +478,6 @@ impl Program {
         }
 
         attrs
-    }
-
-    fn html_runtime_attrs_exact_py(
-        &self,
-        words: &Words,
-        original_col: Option<u32>,
-        html_col_idx: usize,
-        row_number: Option<i64>,
-        is_header: bool,
-    ) -> String {
-        let _ = words;
-        let metadata_column = original_col.map(|col| col as i64);
-        // Python's normal CLI HTML path (`htmlSyntax.generateCell`) does not emit
-        // Rust debug/web metadata (`p1_col_*`, `p2alias_*`, `data-column-*`, ...)
-        // on every body cell.  Keeping those attributes inflated the middle table
-        // from ~25 MB to >100 MB.  Emit only Python-style header classes and the
-        // special `tdSymbole` marker for symbol columns.
-        self.html_python_cell_attrs_exact_py(
-            metadata_column,
-            html_col_idx,
-            None,
-            row_number,
-            is_header,
-        )
     }
 
     fn ordinary_column_tags_exact_py(&self, original_col: i64) -> Option<BTreeSet<ST>> {
