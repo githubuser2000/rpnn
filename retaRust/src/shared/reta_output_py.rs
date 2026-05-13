@@ -11,7 +11,7 @@ use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
 
-use crate::shared::reta_program_types::{dedup_preserve_order_i64, Program};
+use crate::shared::reta_program_types::{dedup_preserve_order_i64, PairStr, Program};
 
 struct PyLikeIntExprParser<'a> {
     chars: Vec<char>,
@@ -531,6 +531,168 @@ impl Program {
         out
     }
 
+    fn html_syntax_tuple_for_special_column_exact_py(spalte: i64) -> Option<Vec<Vec<PairStr>>> {
+        match spalte {
+            -2 => Some(vec![vec![PairStr("Zählung".to_string(), String::new())]]),
+            -1 => Some(vec![vec![PairStr("Nummerierung".to_string(), String::new())]]),
+            _ => None,
+        }
+    }
+
+    fn html_python_class_name_from_pair_exact_py(
+        pair: &PairStr,
+        para_num: usize,
+        column_group: usize,
+    ) -> String {
+        if para_num == 0 {
+            pair.0.clone()
+        } else {
+            format!("p3_{}_{}", column_group, pair.1)
+        }
+    }
+
+    fn html_python_cell_parts_exact_py(
+        &self,
+        spalte_for_metadata: i64,
+    ) -> Option<(String, String, bool)> {
+        let tuple_of_lists_of_couples = if let Some(special) =
+            Self::html_syntax_tuple_for_special_column_exact_py(spalte_for_metadata)
+        {
+            special
+        } else if let Some(found) = self.generatedSpaltenParameter_Exact.get(&spalte_for_metadata) {
+            found.clone()
+        } else if let Some(found) = self
+            .dataDict
+            .get(0)
+            .and_then(|dict| dict.get(&spalte_for_metadata.to_string()))
+        {
+            found.clone()
+        } else {
+            return None;
+        };
+
+        let mut things1: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+        for (column_group, couples) in tuple_of_lists_of_couples.iter().enumerate() {
+            let Some(first_pair) = couples.first() else {
+                continue;
+            };
+            for para_num in 0..=1usize {
+                things1
+                    .entry(para_num)
+                    .or_default()
+                    .push(Self::html_python_class_name_from_pair_exact_py(
+                        first_pair,
+                        para_num,
+                        column_group,
+                    ));
+            }
+        }
+
+        let has_symbole = things1
+            .get(&0)
+            .map(|values| values.iter().any(|value| value == "Symbole"))
+            .unwrap_or(false);
+
+        let mut rendered_parts: BTreeMap<usize, String> = BTreeMap::new();
+        for (key, values) in things1 {
+            let mut rendered = String::new();
+            for value in values {
+                if value == "alles" {
+                    continue;
+                }
+                if key == 0 {
+                    rendered.push('✗');
+                }
+                rendered.push_str(&value);
+                rendered.push(',');
+            }
+            rendered_parts.insert(key, rendered);
+        }
+
+        if rendered_parts.len() < 2 {
+            return None;
+        }
+
+        Some((
+            rendered_parts.remove(&0).unwrap_or_default(),
+            rendered_parts.remove(&1).unwrap_or_default(),
+            has_symbole,
+        ))
+    }
+
+    fn html_p4_values_exact_py(&self, spalte_for_metadata: i64) -> String {
+        self.generatedSpaltenParameter_Tags
+            .get(&spalte_for_metadata)
+            .map(|tags| {
+                tags.iter()
+                    .map(|tag| tag.py_value().to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default()
+    }
+
+    fn html_cell_content_is_even_exact_py(content: Option<&str>) -> bool {
+        content
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .and_then(|text| text.parse::<i64>().ok())
+            .map(|value| value % 2 == 0)
+            .unwrap_or(false)
+    }
+
+    fn html_symbol_attrs_exact_py() -> &'static str {
+        r#" class="tdSymbole" style="background-image: url();background-size: cover;background-repeat: no-repeat;background-position: right; ""#
+    }
+
+    fn html_python_cell_attrs_exact_py(
+        &self,
+        spalte_for_metadata: Option<i64>,
+        html_col_idx: usize,
+        content: Option<&str>,
+        row_number: Option<i64>,
+        is_header: bool,
+    ) -> String {
+        let Some(spalte_for_metadata) = spalte_for_metadata else {
+            return String::new();
+        };
+
+        let Some((p1_part, p2_part, has_symbole)) =
+            self.html_python_cell_parts_exact_py(spalte_for_metadata)
+        else {
+            return if is_header {
+                Self::html_exact_header_attrs_py(&Words::new(), Some(html_col_idx as u32), html_col_idx)
+            } else {
+                String::new()
+            };
+        };
+
+        let mut attrs = String::new();
+        let zeile_value = if is_header { 0 } else { row_number.unwrap_or(0) };
+        if zeile_value == 0 {
+            attrs.push_str(&format!(
+                r#" class="z_{} r_{} p1_{}, p2_{} p4_{}""#,
+                zeile_value,
+                html_col_idx,
+                Self::html_escape_attr_value_py(&p1_part),
+                Self::html_escape_attr_value_py(&p2_part),
+                Self::html_escape_attr_value_py(&self.html_p4_values_exact_py(spalte_for_metadata))
+            ));
+        }
+
+        if html_col_idx == 0 || html_col_idx == 1 {
+            if Self::html_cell_content_is_even_exact_py(content) {
+                attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
+            } else if html_col_idx == 0 {
+                attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
+            }
+        } else if has_symbole {
+            attrs.push_str(Self::html_symbol_attrs_exact_py());
+        }
+
+        attrs
+    }
+
     fn html_runtime_attrs_exact_py(
         &self,
         words: &Words,
@@ -539,43 +701,20 @@ impl Program {
         row_number: Option<i64>,
         is_header: bool,
     ) -> String {
-        let z_value = if is_header {
-            0
-        } else {
-            row_number.unwrap_or(0)
-        };
-        let mut meta = if let Some(original_col) = original_col {
-            self.html_runtime_meta_for_column_exact_py(words, original_col as i64)
-        } else {
-            HtmlRuntimeMetaPy::default()
-        };
-
-        meta.classes.insert(format!("z_{}", z_value));
-        meta.classes.insert(format!("r_{}", html_col_idx));
-        if let Some(original_col) = original_col {
-            meta.classes.insert(format!("c_{}", original_col));
-        }
-
-        let class_string = meta.classes.iter().cloned().collect::<Vec<_>>().join(" ");
-        let mut attrs = String::new();
-        if !class_string.is_empty() {
-            attrs.push_str(&format!(
-                r#" class="{}""#,
-                Self::html_escape_attr_value_py(&class_string)
-            ));
-        }
-        for (key, value) in meta.data_attributes {
-            if value.trim().is_empty() {
-                continue;
-            }
-            attrs.push(' ');
-            attrs.push_str(&format!(
-                r#"{}="{}""#,
-                key,
-                Self::html_escape_attr_value_py(&value)
-            ));
-        }
-        attrs
+        let _ = words;
+        let metadata_column = original_col.map(|col| col as i64);
+        // Python's normal CLI HTML path (`htmlSyntax.generateCell`) does not emit
+        // Rust debug/web metadata (`p1_col_*`, `p2alias_*`, `data-column-*`, ...)
+        // on every body cell.  Keeping those attributes inflated the middle table
+        // from ~25 MB to >100 MB.  Emit only Python-style header classes and the
+        // special `tdSymbole` marker for symbol columns.
+        self.html_python_cell_attrs_exact_py(
+            metadata_column,
+            html_col_idx,
+            None,
+            row_number,
+            is_header,
+        )
     }
 
     fn ordinary_column_tags_exact_py(&self, original_col: i64) -> Option<BTreeSet<ST>> {
@@ -2208,11 +2347,13 @@ impl Program {
     }
 
     fn html_escape_cell_py(text: &str) -> String {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;")
-            .replace('\n', "<br>")
+        // Cells are already decoded/escaped according to the selected output type
+        // in csv_loader_py.  In HTML mode, raw CSV text is already HTML-escaped,
+        // while generated fragments such as <ul>, <li>, <br> and nested tables are
+        // intentionally trusted HTML.  Escaping here again turns `&gt;` into
+        // `&amp;gt;` and `<ul>` into visible `&lt;ul&gt;`.  The renderer only has to
+        // preserve line breaks in the compact one-line row format.
+        text.replace('\n', "<br>")
     }
 
     fn row_prefix_text_py(&self, row_number: Option<i64>, is_header: bool) -> String {
@@ -2222,12 +2363,10 @@ impl Program {
         if is_header {
             return " ".to_string();
         }
-        if let Some(n) = row_number {
-            if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
-                return "█".to_string();
-            }
-        }
-        " ".to_string()
+        row_number
+            .map(Self::zeile_which_zaehlung_py)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| " ".to_string())
     }
 
     fn limit_cell_height_py(&self, cell: &str) -> String {
@@ -2672,7 +2811,6 @@ impl Program {
                 }
             }
             "html" => {
-                let words = Words::new();
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
                 let rendered_rows =
                     Self::render_structured_rows_ordered_py(newTable, 16, |row_idx, row| {
@@ -2685,35 +2823,29 @@ impl Program {
                         let is_header = row_number.is_none();
                         let mut cells: Vec<String> = vec![];
                         if this.nummeriere {
-                            let prefix_text = Self::html_escape_cell_py(
-                                &this.row_prefix_text_py(row_number, is_header),
+                            let prefix_raw = this.row_prefix_text_py(row_number, is_header);
+                            let label_raw = finallyDisplayLines
+                                .get(row_idx)
+                                .cloned()
+                                .unwrap_or_default();
+                            let prefix_text = Self::html_escape_cell_py(&prefix_raw);
+                            let label_text = Self::html_escape_cell_py(&label_raw);
+                            let prefix_attrs = this.html_python_cell_attrs_exact_py(
+                                Some(-2),
+                                0,
+                                Some(&prefix_raw),
+                                row_number,
+                                is_header,
                             );
-                            let label_text = Self::html_escape_cell_py(
-                                &finallyDisplayLines
-                                    .get(row_idx)
-                                    .cloned()
-                                    .unwrap_or_default(),
+                            let label_attrs = this.html_python_cell_attrs_exact_py(
+                                Some(-1),
+                                1,
+                                Some(&label_raw),
+                                row_number,
+                                is_header,
                             );
-                            if is_header {
-                                cells.push(format!(
-                                    r#"<td{}> {} </td>"#,
-                                    Self::html_exact_header_attrs_py(&words, None, 0),
-                                    prefix_text
-                                ));
-                                cells.push(format!(
-                                    r#"<td{}> {} </td>"#,
-                                    Self::html_exact_header_attrs_py(&words, None, 1),
-                                    label_text
-                                ));
-                            } else {
-                                let prefix_style = if row_number.unwrap_or(0) % 2 == 0 {
-                                    r#" style="background-color:#000000;color:#ffffff;""#
-                                } else {
-                                    r#" style="background-color:#ffffff;color:#000000;""#
-                                };
-                                cells.push(format!(r#"<td{}>{}</td>"#, prefix_style, prefix_text));
-                                cells.push(format!(r#"<td>{}</td>"#, label_text));
-                            }
+                            cells.push(format!(r#"<td{}>{}</td>"#, prefix_attrs, prefix_text));
+                            cells.push(format!(r#"<td{}>{}</td>"#, label_attrs, label_text));
                         }
                         for (visible_idx, cell) in row.iter().enumerate() {
                             let html_col_idx = if this.nummeriere {
@@ -2725,10 +2857,10 @@ impl Program {
                                 displayed_columns.get(visible_idx).cloned().flatten();
                             let limited = this.limit_cell_height_py(cell);
                             let escaped = Self::html_escape_cell_py(&limited);
-                            let attrs = this.html_runtime_attrs_exact_py(
-                                &words,
-                                original_col,
+                            let attrs = this.html_python_cell_attrs_exact_py(
+                                original_col.map(|col| col as i64),
                                 html_col_idx,
+                                Some(&limited),
                                 row_number,
                                 is_header,
                             );
@@ -3009,7 +3141,7 @@ impl Program {
 
 #[cfg(test)]
 mod tests {
-    use crate::shared::reta_program_types::Program;
+    use crate::shared::reta_program_types::{PairStr, Program};
 
     #[test]
     fn bereich_to_numbers2_v_prefix_open_max_matches_python_cap() {
@@ -3077,6 +3209,43 @@ mod tests {
 
         assert_eq!(old2new.last().copied(), Some(1040));
         assert!(!old2new.contains(&1041));
+    }
+
+
+    #[test]
+    fn html_cell_renderer_keeps_trusted_fragments_and_existing_entities() {
+        assert_eq!(
+            Program::html_escape_cell_py("<ul><li>10*n+m mit m&gt;0</li></ul>\nweiter"),
+            "<ul><li>10*n+m mit m&gt;0</li></ul><br>weiter"
+        );
+    }
+
+    #[test]
+    fn html_cell_attrs_do_not_emit_runtime_debug_metadata_in_body_cells() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.generatedSpaltenParameter_Exact.insert(
+            0,
+            vec![vec![PairStr(
+                "Religionen".to_string(),
+                "Sternpolygon".to_string(),
+            )]],
+        );
+
+        let header_attrs = program.html_python_cell_attrs_exact_py(Some(0), 2, None, None, true);
+        assert!(header_attrs.contains("p1_✗Religionen,"));
+        assert!(header_attrs.contains("p2_p3_0_Sternpolygon,"));
+        assert!(!header_attrs.contains("data-column-number"));
+        assert!(!header_attrs.contains("p1_col_"));
+
+        let body_attrs = program.html_python_cell_attrs_exact_py(Some(0), 2, None, Some(1), false);
+        assert_eq!(body_attrs, "");
+    }
+
+    #[test]
+    fn structured_row_prefix_uses_python_zaehlung_number() {
+        let program = Program::new(vec!["reta".to_string()]);
+        assert_eq!(program.row_prefix_text_py(Some(1), false), "1");
+        assert_eq!(program.row_prefix_text_py(Some(5), false), "2");
     }
 
     #[test]

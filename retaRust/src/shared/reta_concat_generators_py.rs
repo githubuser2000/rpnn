@@ -443,11 +443,11 @@ impl Program {
                 .any(|selection| selection.code == code)
     }
 
-    fn remove_concat1_trigger_columns_py(&self, rowsAsNumbers: &mut Vec<i64>) {
-        if self.puniverseprims.is_empty() {
-            return;
-        }
-        rowsAsNumbers.retain(|n| !self.puniverseprims.contains(n));
+    fn remove_concat1_trigger_columns_py(&self, _rowsAsNumbers: &mut Vec<i64>) {
+        // Python keeps the concat-table-1 trigger columns (the early prime source
+        // columns 2,3,5,7,11,13,17,19,23,29,31) visible for `-spalten --alles`.
+        // Removing them here made the HTML header/data rows 10 cells narrower than
+        // Python after a later duplicate generated PrimCSV column was also present.
     }
 
     fn boolAndTupleSet1Options_exact_py(&self) -> Vec<Option<usize>> {
@@ -3685,7 +3685,13 @@ impl Program {
             }
         }
 
-        if wants_primcsv {
+        let primcsv_already_selected_from_concat_csv = self
+            .CsvTheirsSpalten
+            .get(&1)
+            .map(|columns| !columns.is_empty())
+            .unwrap_or(false);
+
+        if wants_primcsv && !primcsv_already_selected_from_concat_csv {
             if let Some(csv_name) = self.concat_csv_name_py(1) {
                 if let Ok(mut tableToAdd) = self.load_csv_rows_semicolon_exact_path(csv_name) {
                     tableToAdd = self.readConcatCsv_ChangeTableToAddToTable(1, tableToAdd);
