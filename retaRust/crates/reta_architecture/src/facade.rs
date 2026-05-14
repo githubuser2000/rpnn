@@ -62,6 +62,10 @@ use crate::completion_runtime::{
 use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletionMorphismBundle};
 use crate::concat_csv::{bootstrap_concat_csv as bootstrap_concat_csv_impl, ConcatCsvBundle};
 use crate::console_io::{bootstrap_console_io_morphisms, ConsoleIOMorphismBundle};
+use crate::csv_catalog::{
+    bootstrap_csv_catalog, csv_asset_count, csv_language_variant_count, csv_total_row_count,
+    CsvCatalogBundle,
+};
 use crate::dataflow::{
     bootstrap_execution_network as bootstrap_execution_network_impl, ExecutionNetworkBundle,
     ExecutionTask,
@@ -175,6 +179,7 @@ pub struct ArchitectureRuntime {
     pub arithmetic: ArithmeticMorphismBundle,
     pub category_theory: CategoryTheoryBundle,
     pub console_io: ConsoleIOMorphismBundle,
+    pub csv_catalog: CsvCatalogBundle,
     pub execution_network: ExecutionNetworkBundle,
     pub execution_network_bridge: ExecutionNetworkBridgeBundle,
     pub column_selection: ColumnSelectionBundle,
@@ -325,6 +330,7 @@ impl ArchitectureRuntime {
             arithmetic: bootstrap_arithmetic_morphisms(None, None),
             category_theory: bootstrap_category_theory_impl(),
             console_io: bootstrap_console_io_morphisms(None),
+            csv_catalog: bootstrap_csv_catalog(),
             execution_network: bootstrap_execution_network_impl(None),
             execution_network_bridge: bootstrap_execution_network_bridge(None),
             column_selection: bootstrap_column_selection_impl(),
@@ -352,7 +358,7 @@ impl ArchitectureRuntime {
             prompt_execution: bootstrap_prompt_execution_impl(),
             prompt_interaction: bootstrap_prompt_interaction_impl(),
             prompt_language: bootstrap_prompt_language_impl(),
-            presheaves: bootstrap_presheaves(Some(&ContextSelection::cli())),
+            presheaves: bootstrap_presheaves(None),
             row_filtering: bootstrap_row_filtering_impl(),
             row_ranges: bootstrap_row_range_morphisms(None),
             runtime_compat: bootstrap_runtime_compat(None, &[]),
@@ -411,6 +417,7 @@ impl ArchitectureRuntime {
             "semantics_builder",
             "runtime_compat",
             "runtime_switch",
+            "csv_catalog",
             "shadow_pipeline",
             "migration_control",
             "parity_harness",
@@ -538,6 +545,10 @@ impl ArchitectureRuntime {
             rust_combi_join_morphism_count: self.combi_join.snapshot().count,
             rust_arithmetic_morphism_count: self.arithmetic.snapshot().morphisms.len(),
             rust_console_io_morphism_count: self.console_io.snapshot().morphisms.len(),
+            rust_csv_catalog_asset_count: csv_asset_count(),
+            rust_csv_catalog_language_variant_count: csv_language_variant_count(),
+            rust_csv_catalog_total_row_count: csv_total_row_count(),
+            rust_csv_catalog_nonempty_cell_count: self.csv_catalog.snapshot().total_nonempty_cell_count,
             rust_parallel_execution_morphism_count: self
                 .parallel_execution
                 .snapshot()
@@ -630,6 +641,10 @@ pub struct ArchitectureSnapshotRef {
     pub rust_combi_join_morphism_count: usize,
     pub rust_arithmetic_morphism_count: usize,
     pub rust_console_io_morphism_count: usize,
+    pub rust_csv_catalog_asset_count: usize,
+    pub rust_csv_catalog_language_variant_count: usize,
+    pub rust_csv_catalog_total_row_count: usize,
+    pub rust_csv_catalog_nonempty_cell_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
     pub rust_persistence_table_count: usize,
     pub rust_schema_main_alias_count: usize,
@@ -664,6 +679,7 @@ pub struct RetaRunArchitecture {
     pub resolved_column_pair_count: usize,
     pub column_bucket_count: usize,
     pub symbolic_column_bucket_count: usize,
+    pub required_csv_asset_count: usize,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -688,6 +704,7 @@ impl RetaRunArchitecture {
         let execution_network_plan = execution_network_bridge.plan_for_tasks(&[task.clone()]);
         let parameter_runtime = bootstrap_parameter_runtime_impl();
         let parsed = parameter_runtime.parse_cli_args(&clean_args);
+        let table_generation_plan = crate::table_generation::TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
         let activation_units =
@@ -716,6 +733,7 @@ impl RetaRunArchitecture {
             resolved_column_pair_count: parsed.command_sets.resolved_alias_pairs.len(),
             column_bucket_count: parsed.command_sets.column_buckets.len(),
             symbolic_column_bucket_count: parsed.command_sets.symbolic_column_buckets.len(),
+            required_csv_asset_count: table_generation_plan.csv_asset_names.len(),
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -732,7 +750,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -745,6 +763,7 @@ impl RetaRunArchitecture {
             self.resolved_column_pair_count,
             self.column_bucket_count,
             self.symbolic_column_bucket_count,
+            self.required_csv_asset_count,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,

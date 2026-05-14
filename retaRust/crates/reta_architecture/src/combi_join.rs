@@ -175,6 +175,14 @@ mod tests {
     fn remove_one_number_preserves_other_numbers() {
         assert_eq!(remove_number_from_cell("(1/2|3)", "2"), "1|3");
     }
+
+    #[test]
+    fn kombi_csv_sources_are_backed_by_catalog() {
+        let sources = _kombi_csv_sources();
+        assert!(sources.iter().any(|name| name == "kombi.csv"));
+        assert!(sources.iter().any(|name| name == "kombi-meta.csv"));
+        assert_eq!(read_kombi_csv_by_name("kombi-meta.csv").unwrap().len(), 262);
+    }
 }
 
 // Stage 16 continued: concrete KombiJoin class compatibility surface.
@@ -182,12 +190,21 @@ pub type KombiJoin = KombiJoinBundle;
 pub fn __init__() -> KombiJoinBundle { bootstrap_combi_join() }
 pub fn create() -> KombiJoinBundle { bootstrap_combi_join() }
 pub fn _ensure_runtime_dependencies() -> bool { true }
-pub fn _kombi_csv_sources() -> Vec<String> { vec!["kombi.csv".to_string(), "kombi-meta.csv".to_string()] }
+pub fn _kombi_csv_sources() -> Vec<String> {
+    let mut names = Vec::new();
+    for kind in [crate::csv_catalog::CsvAssetKind::Kombi, crate::csv_catalog::CsvAssetKind::KombiMeta] {
+        names.extend(crate::csv_catalog::csv_assets_by_kind(kind).into_iter().map(|asset| asset.name.to_string()));
+    }
+    names.sort();
+    names.dedup();
+    names
+}
 #[allow(non_snake_case)]
 pub fn kombiNumbersCorrectTestAndSet(values: &[i64]) -> BTreeSet<i64> { values.iter().copied().filter(|value| *value > 0).collect() }
 pub fn prepare_kombi(chosen: &BTreeMap<i64, BTreeSet<i64>>, table: &[Vec<String>]) -> Vec<KombiSubTable> { prepare_table_join(chosen, table) }
 #[allow(non_snake_case)]
-pub fn readKombiCsv(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
+pub fn readKombiCsv(text: &str) -> Vec<Vec<String>> { crate::csv_catalog::parse_csv_text_with_delimiter(text, ';') }
+pub fn read_kombi_csv_by_name(name: &str) -> Option<Vec<Vec<String>>> { crate::csv_catalog::csv_rows_by_name(name) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

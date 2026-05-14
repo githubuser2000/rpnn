@@ -34,6 +34,7 @@ impl TableGenerationResult {
             kombi_rows_len: self.rows_of_combi.len(),
             animals_professions_table_len: self.animals_professions_table_len,
             animals_professions_table2_len: self.animals_professions_table2_len,
+            csv_asset_count: crate::csv_catalog::csv_asset_count(),
         }
     }
 }
@@ -46,6 +47,7 @@ pub struct TableGenerationResultSnapshot {
     pub kombi_rows_len: usize,
     pub animals_professions_table_len: usize,
     pub animals_professions_table2_len: usize,
+    pub csv_asset_count: usize,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -57,6 +59,7 @@ pub struct TableGenerationPlan {
     pub rows_of_combi2: BTreeSet<i64>,
     pub concat_columns: BTreeSet<i64>,
     pub symbolic_column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<String>>,
+    pub csv_asset_names: Vec<String>,
 }
 
 impl TableGenerationPlan {
@@ -78,6 +81,7 @@ impl TableGenerationPlan {
             rows_of_combi: get(3),
             rows_of_combi2: get(8),
             symbolic_column_buckets: BTreeMap::new(),
+            csv_asset_names: csv_asset_names_for_bucket_state(&get(0), &get(2), &get(3), &get(8), &BTreeMap::new()),
         }
     }
 
@@ -100,8 +104,71 @@ impl TableGenerationPlan {
             .normalize_bucket_map(&sets.column_buckets);
         let mut plan = Self::from_column_buckets(&normalized, sets.rows_as_numbers.iter().copied());
         plan.symbolic_column_buckets = sets.symbolic_column_buckets.clone();
+        plan.csv_asset_names = csv_asset_names_for_bucket_state(
+            &plan.selected_columns,
+            &plan.concat_columns,
+            &plan.rows_of_combi,
+            &plan.rows_of_combi2,
+            &plan.symbolic_column_buckets,
+        );
         plan
     }
+}
+
+
+pub fn csv_asset_names_for_bucket_state(
+    selected_columns: &BTreeSet<i64>,
+    concat_columns: &BTreeSet<i64>,
+    rows_of_combi: &BTreeSet<i64>,
+    rows_of_combi2: &BTreeSet<i64>,
+    symbolic_column_buckets: &BTreeMap<ColumnBucketKey, BTreeSet<String>>,
+) -> Vec<String> {
+    let mut names = BTreeSet::new();
+    if !selected_columns.is_empty() {
+        names.insert("religion.csv".to_string());
+    }
+    if !concat_columns.is_empty() {
+        names.insert("primenumbers.csv".to_string());
+    }
+    if !rows_of_combi.is_empty() {
+        names.insert("kombi.csv".to_string());
+    }
+    if !rows_of_combi2.is_empty() {
+        names.insert("kombi-meta.csv".to_string());
+    }
+    for (bucket, symbols) in symbolic_column_buckets {
+        if symbols.is_empty() {
+            continue;
+        }
+        match bucket.bucket {
+            2 | 7 => {
+                names.insert("primenumbers.csv".to_string());
+            }
+            5 => {
+                names.insert("gebrochen-rational-universum.csv".to_string());
+            }
+            6 => {
+                names.insert("gebrochen-rational-galaxie.csv".to_string());
+            }
+            9 => {
+                names.insert("gebrochen-rational-emotionen.csv".to_string());
+            }
+            10 => {
+                names.insert("gebrochen-rational-strukturgroesse.csv".to_string());
+            }
+            3 => {
+                names.insert("kombi.csv".to_string());
+            }
+            8 => {
+                names.insert("kombi-meta.csv".to_string());
+            }
+            _ => {}
+        }
+    }
+    names
+        .into_iter()
+        .filter(|name| crate::csv_catalog::csv_asset_by_name(name).is_some())
+        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -198,6 +265,19 @@ mod tests {
             plan.symbolic_column_buckets[&ColumnBucketKey::positive(7)].contains("primMotivStern")
         );
         assert!(plan.symbolic_column_buckets[&ColumnBucketKey::positive(5)].contains("2"));
+        assert!(plan.csv_asset_names.iter().any(|name| name == "primenumbers.csv"));
+        assert!(plan.csv_asset_names.iter().any(|name| name == "gebrochen-rational-universum.csv"));
+    }
+
+    #[test]
+    fn generation_plan_exposes_csv_presheaf_assets() {
+        let selection = crate::column_selection::bootstrap_column_selection();
+        let mut buckets = selection.new_bucket_map();
+        buckets.insert(ColumnBucketKey::positive(0), BTreeSet::from([493, 744]));
+        buckets.insert(ColumnBucketKey::positive(3), BTreeSet::from([13]));
+        let plan = TableGenerationPlan::from_column_buckets(&buckets, [1]);
+        assert!(plan.csv_asset_names.iter().any(|name| name == "religion.csv"));
+        assert!(plan.csv_asset_names.iter().any(|name| name == "kombi.csv"));
     }
 }
 

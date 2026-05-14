@@ -49,6 +49,9 @@ pub struct ConcatCsvBundle {
     pub specs: Vec<ConcatCsvSpec>,
     pub csv_sources: Vec<String>,
     pub fraction_helpers: Vec<String>,
+    pub csv_catalog_asset_count: usize,
+    pub csv_catalog_total_row_count: usize,
+    pub active_csv_names: Vec<String>,
 }
 
 impl ConcatCsvBundle {
@@ -59,11 +62,34 @@ impl ConcatCsvBundle {
             morphisms: self.specs.iter().map(ConcatCsvSpec::snapshot).collect(),
             csv_sources: self.csv_sources.clone(),
             fraction_helpers: self.fraction_helpers.clone(),
+            csv_catalog_asset_count: crate::csv_catalog::csv_asset_count(),
+            csv_catalog_total_row_count: crate::csv_catalog::csv_total_row_count(),
+            active_csv_names: self.active_csv_names(),
         }
     }
 
     pub fn combine_dicts(&self, a: &FractionPairMap, b: &FractionPairMap) -> FractionPairMap {
         combine_dicts(a, b)
+    }
+
+    pub fn active_csv_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for kind in [
+            crate::csv_catalog::CsvAssetKind::PrimeNumbers,
+            crate::csv_catalog::CsvAssetKind::GebrochenRationalGalaxie,
+            crate::csv_catalog::CsvAssetKind::GebrochenRationalUniversum,
+            crate::csv_catalog::CsvAssetKind::GebrochenRationalEmotionen,
+            crate::csv_catalog::CsvAssetKind::GebrochenRationalStrukturgroesse,
+        ] {
+            names.extend(crate::csv_catalog::csv_assets_by_kind(kind).into_iter().map(|asset| asset.name.to_string()));
+        }
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    pub fn read_concat_csv_by_name(&self, name: &str) -> Option<Vec<Vec<String>>> {
+        crate::csv_catalog::csv_rows_by_name(name)
     }
 }
 
@@ -74,6 +100,9 @@ pub struct ConcatCsvSnapshot {
     pub morphisms: Vec<ConcatCsvSpecSnapshot>,
     pub csv_sources: Vec<String>,
     pub fraction_helpers: Vec<String>,
+    pub csv_catalog_asset_count: usize,
+    pub csv_catalog_total_row_count: usize,
+    pub active_csv_names: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -121,6 +150,19 @@ pub fn bootstrap_concat_csv() -> ConcatCsvBundle {
             "convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction",
             "combineDicts",
         ].into_iter().map(str::to_string).collect(),
+        csv_catalog_asset_count: crate::csv_catalog::csv_asset_count(),
+        csv_catalog_total_row_count: crate::csv_catalog::csv_total_row_count(),
+        active_csv_names: crate::csv_catalog::CSV_ASSETS
+            .iter()
+            .filter(|asset| matches!(asset.kind,
+                crate::csv_catalog::CsvAssetKind::PrimeNumbers
+                | crate::csv_catalog::CsvAssetKind::GebrochenRationalGalaxie
+                | crate::csv_catalog::CsvAssetKind::GebrochenRationalUniversum
+                | crate::csv_catalog::CsvAssetKind::GebrochenRationalEmotionen
+                | crate::csv_catalog::CsvAssetKind::GebrochenRationalStrukturgroesse
+            ))
+            .map(|asset| asset.name.to_string())
+            .collect(),
     }
 }
 
@@ -284,7 +326,20 @@ mod tests {
 
 // Stage 16 continued: Python-name concat_csv wrappers.
 pub fn _ensure_runtime_dependencies() -> bool { true }
-pub fn choose_csv_file(name: &str) -> String { format!("csv/{name}.csv") }
+pub fn choose_csv_file(name: &str) -> String {
+    if crate::csv_catalog::csv_asset_by_name(name).is_some() {
+        return name.to_string();
+    }
+    let with_ext = if name.ends_with(".csv") { name.to_string() } else { format!("{name}.csv") };
+    if crate::csv_catalog::csv_asset_by_name(&with_ext).is_some() {
+        return with_ext;
+    }
+    crate::csv_catalog::CSV_ASSETS
+        .iter()
+        .find(|asset| asset.base_name == with_ext)
+        .map(|asset| asset.name.to_string())
+        .unwrap_or(with_ext)
+}
 #[allow(non_snake_case)]
 pub fn readConcatCSV_choseCsvFile(name: &str) -> String { choose_csv_file(name) }
 #[allow(non_snake_case)]
@@ -293,7 +348,8 @@ pub fn readConcatCsv_ChangeTableToAddToTable(table: &[Vec<String>]) -> Vec<Vec<S
 pub fn readConcatCsv_LoopBody(row: &[String]) -> Vec<String> { row.to_vec() }
 #[allow(non_snake_case)]
 pub fn readConcatCsv_SetHtmlParamaters(enabled: bool) -> Vec<(String, String)> { if enabled { vec![("html".to_string(), "concat-csv".to_string())] } else { Vec::new() } }
-pub fn read_concat_csv(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
+pub fn read_concat_csv(text: &str) -> Vec<Vec<String>> { crate::csv_catalog::parse_csv_text_with_delimiter(text, ';') }
+pub fn read_concat_csv_by_name(name: &str) -> Option<Vec<Vec<String>>> { crate::csv_catalog::csv_rows_by_name(name) }
 #[allow(non_snake_case)]
 pub fn readConcatCsv(text: &str) -> Vec<Vec<String>> { read_concat_csv(text) }
 pub fn transpose(table: &[Vec<String>]) -> Vec<Vec<String>> {

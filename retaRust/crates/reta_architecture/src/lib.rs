@@ -29,6 +29,7 @@ pub mod completion_runtime;
 pub mod completion_word;
 pub mod concat_csv;
 pub mod console_io;
+pub mod csv_catalog;
 pub mod dataflow;
 pub mod execution_network;
 pub mod facade;
@@ -126,7 +127,7 @@ pub use column_selection::{
 };
 pub use combi_join::{
     bootstrap_combi_join, prepare_table_join, remove_number_from_cell, remove_one_number,
-    rows_of_combi_from_relation, table_join, KombiJoinBundle, KombiJoinSnapshot, KombiJoinSpec,
+    read_kombi_csv_by_name, rows_of_combi_from_relation, table_join, KombiJoinBundle, KombiJoinSnapshot, KombiJoinSpec,
     KombiSubTable,
 };
 pub use completion_nested::{
@@ -151,8 +152,15 @@ pub use concat_csv::{
     convert_fractions_to_dict_of_num_to_pairs_of_mul_of_int_and_fraction,
     convert_set_of_pairs_to_dict_of_num_to_pairs_div,
     convert_set_of_pairs_to_dict_of_num_to_pairs_mul, normalize_fraction, rational_div,
-    rational_mul, read_concat_csv_tabelle_dazu_colchange, ConcatCsvBundle, ConcatCsvSnapshot,
+    rational_mul, read_concat_csv_by_name, read_concat_csv_tabelle_dazu_colchange, ConcatCsvBundle, ConcatCsvSnapshot,
     ConcatCsvSpec, ConcatCsvSpecSnapshot, FractionPair, FractionPairMap,
+};
+pub use csv_catalog::{
+    bootstrap_csv_catalog, csv_asset_by_name, csv_asset_count, csv_assets_by_kind,
+    csv_assets_by_language, csv_cell_by_name, csv_language_variant_count, csv_rows_by_name,
+    csv_text_by_name, csv_total_row_count, parse_csv_text, parse_csv_text_with_delimiter,
+    select_csv_rows_one_based, CsvAsset, CsvAssetKind, CsvCatalogBundle, CsvCatalogSnapshot,
+    CsvDelimiter, CsvLanguage, CSV_ASSETS,
 };
 pub use console_io::{
     bootstrap_console_io_morphisms, chunks as console_chunks, cli_output_text, debug_pair_text,
@@ -340,7 +348,7 @@ pub use table_adapters::{
     TableAdaptersSnapshot,
 };
 pub use table_generation::{
-    bootstrap_table_generation, TableGenerationBundle, TableGenerationBundleSnapshot,
+    bootstrap_table_generation, csv_asset_names_for_bucket_state, TableGenerationBundle, TableGenerationBundleSnapshot,
     TableGenerationPlan, TableGenerationResult, TableGenerationResultSnapshot,
 };
 pub use table_output::{

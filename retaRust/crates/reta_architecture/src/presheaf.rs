@@ -261,6 +261,36 @@ impl PresheafBundle {
         selection
     }
 
+
+    pub fn csv_context_from_asset(asset: crate::csv_catalog::CsvAsset) -> ContextSelection {
+        ContextSelection::empty()
+            .restrict_dimension("scopes", ["csv".to_string()])
+            .restrict_dimension("language", [asset.language.canonical().to_string()])
+            .restrict_dimension("csv_kind", [asset.kind.canonical().to_string()])
+    }
+
+    pub fn from_csv_catalog_assets() -> Self {
+        let mut bundle = Self::default();
+        for asset in crate::csv_catalog::CSV_ASSETS {
+            let mut payload = BTreeMap::new();
+            payload.insert("name".to_string(), asset.name.to_string());
+            payload.insert("base_name".to_string(), asset.base_name.to_string());
+            payload.insert("language".to_string(), asset.language.canonical().to_string());
+            payload.insert("kind".to_string(), asset.kind.canonical().to_string());
+            payload.insert("delimiter".to_string(), asset.delimiter.as_char().to_string());
+            payload.insert("rows".to_string(), asset.row_count.to_string());
+            payload.insert("max_columns".to_string(), asset.max_columns.to_string());
+            payload.insert("nonempty_cells".to_string(), asset.nonempty_cell_count.to_string());
+            payload.insert("byte_len".to_string(), asset.byte_len.to_string());
+            bundle.csv.add_section(
+                Self::csv_context_from_asset(*asset),
+                payload,
+                format!("python_arch_reference/csv/{}", asset.name),
+            );
+        }
+        bundle
+    }
+
     pub fn asset_context(path: &Path) -> ContextSelection {
         let scope = file_extension(path);
         ContextSelection::empty().restrict_dimension(
@@ -326,7 +356,7 @@ pub struct PresheafBundleSnapshot {
 pub fn bootstrap_presheaves(context: Option<&ContextSelection>) -> PresheafBundle {
     match context {
         Some(context) => PresheafBundle::from_context(context),
-        None => PresheafBundle::default(),
+        None => PresheafBundle::from_csv_catalog_assets(),
     }
 }
 
@@ -350,6 +380,13 @@ mod tests {
         let snapshot = prompt.snapshot();
         assert_eq!(snapshot.section_count, 1);
         assert_eq!(snapshot.sources, vec!["prompt".to_string()]);
+    }
+
+    #[test]
+    fn default_presheaf_bootstrap_exposes_csv_catalog() {
+        let bundle = bootstrap_presheaves(None);
+        assert_eq!(bundle.csv.sections.len(), crate::csv_catalog::csv_asset_count());
+        assert!(bundle.csv.sections.iter().any(|section| section.source.ends_with("religion.csv")));
     }
 }
 
