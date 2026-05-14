@@ -15,12 +15,14 @@ use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, Execu
 use crate::generated_columns::{bootstrap_generated_columns, GeneratedColumnsBundle};
 use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
 use crate::meta_columns::{bootstrap_meta_columns, MetaColumnsBundle};
+use crate::migration_control::{bootstrap_migration_control, MigrationControlBundle};
 use crate::morphism::{MorphismEdge, MorphismGraph, MorphismKind};
 use crate::number_theory::{bootstrap_number_theory, NumberTheoryBundle};
 use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
 use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
 use crate::package_integrity::{bootstrap_package_integrity, PackageIntegrityBundle};
 use crate::parallel_execution::{bootstrap_parallel_execution, ParallelExecutionBundle};
+use crate::parity_harness::{bootstrap_parity_harness, ParityHarnessBundle};
 use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
 use crate::persistence::{bootstrap_persistence, PersistenceBundle};
 use crate::presheaf::PresheafBundle;
@@ -34,6 +36,9 @@ use crate::prompt_session::{bootstrap_prompt_session, PromptSessionBundle};
 use crate::row_filtering::{bootstrap_row_filtering, RowFilteringBundle};
 use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::runtime_compat::{bootstrap_runtime_compat, RuntimeCompatBundle};
+use crate::runtime_switch::{
+    bootstrap_runtime_switch, extract_architecture_switch_from_argv, RuntimeSwitchBundle,
+};
 use crate::schema::{bootstrap_schema, RetaContextSchema};
 use crate::semantics_builder::{bootstrap_semantics_builder, SemanticsBuilderBundle};
 use crate::sheaf::SheafBundle;
@@ -68,11 +73,13 @@ pub struct ArchitectureRuntime {
     pub generated_columns: GeneratedColumnsBundle,
     pub input_semantics: InputBundle,
     pub meta_columns: MetaColumnsBundle,
+    pub migration_control: MigrationControlBundle,
     pub number_theory: NumberTheoryBundle,
     pub output_semantics: RetaOutputSemantics,
     pub output_syntax: OutputSyntaxBundle,
     pub package_integrity: PackageIntegrityBundle,
     pub parallel_execution: ParallelExecutionBundle,
+    pub parity_harness: ParityHarnessBundle,
     pub persistence: PersistenceBundle,
     pub parameter_runtime: ParameterRuntimeBundle,
     pub program_workflow: ProgramWorkflowBundle,
@@ -86,6 +93,7 @@ pub struct ArchitectureRuntime {
     pub row_filtering: RowFilteringBundle,
     pub row_ranges: RowRangeMorphismBundle,
     pub runtime_compat: RuntimeCompatBundle,
+    pub runtime_switch: RuntimeSwitchBundle,
     pub schema: RetaContextSchema,
     pub semantics_builder: SemanticsBuilderBundle,
     pub sheaves: SheafBundle,
@@ -150,11 +158,13 @@ impl ArchitectureRuntime {
             generated_columns: bootstrap_generated_columns(),
             input_semantics: bootstrap_input_semantics(Some(schema.clone())),
             meta_columns: bootstrap_meta_columns(),
+            migration_control: bootstrap_migration_control(),
             number_theory: bootstrap_number_theory(),
             output_semantics: bootstrap_output_semantics(),
             output_syntax: bootstrap_output_syntax(),
             package_integrity: bootstrap_package_integrity(),
             parallel_execution: bootstrap_parallel_execution(None),
+            parity_harness: bootstrap_parity_harness(),
             persistence: bootstrap_persistence(None, None),
             parameter_runtime: bootstrap_parameter_runtime(),
             program_workflow: bootstrap_program_workflow(),
@@ -168,6 +178,7 @@ impl ArchitectureRuntime {
             row_filtering: bootstrap_row_filtering(),
             row_ranges: bootstrap_row_range_morphisms(None),
             runtime_compat: bootstrap_runtime_compat(None, &[]),
+            runtime_switch: bootstrap_runtime_switch(None),
             schema: schema.clone(),
             semantics_builder: bootstrap_semantics_builder(Some(schema)),
             sheaves: SheafBundle::default(),
@@ -206,6 +217,9 @@ impl ArchitectureRuntime {
             "input_semantics",
             "semantics_builder",
             "runtime_compat",
+            "runtime_switch",
+            "migration_control",
+            "parity_harness",
             "split_i18n",
             "package_integrity",
             "row_filtering",
@@ -308,6 +322,9 @@ impl ArchitectureRuntime {
             rust_runtime_compat_morphism_count: self.runtime_compat.snapshot().morphisms.len(),
             rust_split_i18n_module_count: self.split_i18n.source_modules.len(),
             rust_table_adapter_morphism_count: self.table_adapters.snapshot().morphisms.len(),
+            rust_runtime_switch_morphism_count: self.runtime_switch.known_morphisms.len(),
+            rust_migration_control_step_count: self.migration_control.steps.len(),
+            rust_parity_harness_case_count: self.parity_harness.cases.len(),
         }
     }
 }
@@ -359,6 +376,9 @@ pub struct ArchitectureSnapshotRef {
     pub rust_runtime_compat_morphism_count: usize,
     pub rust_split_i18n_module_count: usize,
     pub rust_table_adapter_morphism_count: usize,
+    pub rust_runtime_switch_morphism_count: usize,
+    pub rust_migration_control_step_count: usize,
+    pub rust_parity_harness_case_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -372,6 +392,12 @@ pub struct RetaRunArchitecture {
     pub upper_limit: Option<i64>,
     pub parallel_mode: String,
     pub parallel_workers: usize,
+    pub architecture_mode: String,
+    pub architecture_switch_source: String,
+    pub architecture_allowed_gate_count: usize,
+    pub architecture_shadow_gate_count: usize,
+    pub architecture_rollback_anchor: Option<String>,
+    pub architecture_visible_behaviour_may_change: bool,
     pub topology_owner: String,
     pub universal_property: String,
 }
@@ -379,11 +405,21 @@ pub struct RetaRunArchitecture {
 impl RetaRunArchitecture {
     pub fn from_cli_args(args: &[String]) -> Self {
         let context = ContextSelection::from_cli_args(args);
+        let (arch_clean_args, arch_switch_config) = extract_architecture_switch_from_argv(args, None);
         let (clean_args, parallel_config) =
-            crate::parallel_execution::extract_parallel_config_from_argv(args, None);
+            crate::parallel_execution::extract_parallel_config_from_argv(&arch_clean_args, None);
         let task = ExecutionTask::new(0usize, clean_args.clone()).with_operation("rreta_cli_run");
         let parameter_runtime = bootstrap_parameter_runtime();
         let parsed = parameter_runtime.parse_cli_args(&clean_args);
+        let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
+        let migration_control = bootstrap_migration_control();
+        let activation_units = migration_control
+            .activation_units_for_switch(&switch_bundle, &arch_switch_config);
+        let architecture_allowed_gate_count = activation_units.iter().filter(|unit| unit.can_commit).count();
+        let architecture_shadow_gate_count = activation_units
+            .iter()
+            .filter(|unit| unit.shadow_execution && !unit.can_commit)
+            .count();
         Self {
             context,
             args_len: args.len(),
@@ -396,6 +432,12 @@ impl RetaRunArchitecture {
             upper_limit: parsed.upper_limit,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
+            architecture_mode: arch_switch_config.mode.canonical().to_string(),
+            architecture_switch_source: arch_switch_config.source.clone(),
+            architecture_allowed_gate_count,
+            architecture_shadow_gate_count,
+            architecture_rollback_anchor: arch_switch_config.rollback_anchor.clone(),
+            architecture_visible_behaviour_may_change: arch_switch_config.visible_behaviour_may_change(),
             topology_owner: "OpenRetaContextCategory".to_string(),
             universal_property: "same_cli_context_maps_to_same_ordered_rreta_result".to_string(),
         }
@@ -403,7 +445,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} mains={} output={:?} upper={:?} parallel={} workers={} owner={} universal={}",
+            "args={} clean_args={} tasks={} mains={} output={:?} upper={:?} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -412,6 +454,10 @@ impl RetaRunArchitecture {
             self.upper_limit,
             self.parallel_mode,
             self.parallel_workers,
+            self.architecture_mode,
+            self.architecture_switch_source,
+            self.architecture_allowed_gate_count,
+            self.architecture_shadow_gate_count,
             self.topology_owner,
             self.universal_property
         )
@@ -428,6 +474,8 @@ pub struct PromptArchitectureContext {
     pub nested_completion_preview_count: usize,
     pub prepared_token_count: usize,
     pub execution_plan_argv_count: usize,
+    pub architecture_mode: String,
+    pub activation_preview_count: usize,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -441,6 +489,12 @@ impl PromptArchitectureContext {
         let nested_completion = bootstrap_nested_completion_morphisms();
         let prompt_preparation = bootstrap_prompt_preparation();
         let prompt_execution = bootstrap_prompt_execution();
+        let switch_bundle = bootstrap_runtime_switch(None);
+        let migration_control = bootstrap_migration_control();
+        let activation_units = migration_control.activation_units_for_switch(
+            &switch_bundle,
+            &switch_bundle.default_config,
+        );
         let text_state = crate::prompt_session::PromptTextState::new(input);
         let prepared = prompt_preparation.prepare_large_output(
             "",
@@ -460,6 +514,8 @@ impl PromptArchitectureContext {
             nested_completion_preview_count: nested_completion.complete(input).len(),
             prepared_token_count: prepared.tokens.len(),
             execution_plan_argv_count: execution_plan.reta_argv.len(),
+            architecture_mode: switch_bundle.default_config.mode.canonical().to_string(),
+            activation_preview_count: activation_units.len(),
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
             universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"

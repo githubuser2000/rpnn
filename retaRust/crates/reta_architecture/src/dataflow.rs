@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -342,6 +342,95 @@ where
     }
 }
 
+
+/// Execute tasks in a small Rust worker pool while preserving the same gluing
+/// law as the serial architecture path.  Scheduling may be FIFO/LIFO/priority,
+/// but `deterministic_reduce` can still restore input order, which is the
+/// important Reta output invariant.
+pub fn execute_tasks_threaded_ordered<T, U, F>(
+    tasks: &[ExecutionTask<T>],
+    handler: F,
+    config: Option<ExecutionNetworkConfig>,
+) -> ExecutionRunResult<U>
+where
+    T: Clone + Send + 'static,
+    U: Clone + Send + 'static,
+    F: Fn(&T) -> U + Send + Sync + 'static,
+{
+    let config = config.unwrap_or_default();
+    if tasks.is_empty() {
+        return ExecutionRunResult {
+            values: Vec::new(),
+            results: Vec::new(),
+            workers: 0,
+            task_count: 0,
+            queue_discipline: config.queue_discipline,
+            mode: "empty".to_string(),
+            config,
+        };
+    }
+
+    let scheduled = order_tasks(tasks, &config);
+    let worker_count = config.workers_for(scheduled.len());
+    if worker_count <= 1 || scheduled.len() <= 1 {
+        return execute_tasks_deterministically(tasks, handler, Some(config));
+    }
+
+    let queue = Arc::new(Mutex::new(VecDeque::from(scheduled.clone())));
+    let handler = Arc::new(handler);
+    let (tx, rx) = mpsc::channel::<ExecutionResult<U>>();
+    let mut handles = Vec::with_capacity(worker_count);
+
+    for _ in 0..worker_count {
+        let queue = Arc::clone(&queue);
+        let handler = Arc::clone(&handler);
+        let tx = tx.clone();
+        handles.push(std::thread::spawn(move || loop {
+            let next_task = {
+                let mut guard = queue
+                    .lock()
+                    .expect("execution network task queue mutex poisoned");
+                guard.pop_front()
+            };
+            let Some(task) = next_task else {
+                break;
+            };
+            let value = handler(&task.payload);
+            if tx
+                .send(ExecutionResult {
+                    task_index: task.index,
+                    value,
+                    operation: task.operation,
+                    metadata: task.metadata,
+                })
+                .is_err()
+            {
+                break;
+            }
+        }));
+    }
+    drop(tx);
+
+    let mut results = rx.into_iter().collect::<Vec<_>>();
+    for handle in handles {
+        let _ = handle.join();
+    }
+    if config.preserve_input_order {
+        results.sort_by_key(|item| item.task_index);
+    }
+    let values = deterministic_reduce(&results, config.preserve_input_order);
+
+    ExecutionRunResult {
+        values,
+        results,
+        workers: worker_count,
+        task_count: scheduled.len(),
+        queue_discipline: config.queue_discipline,
+        mode: "threaded".to_string(),
+        config,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ResourceSemaphore {
     capacity: usize,
@@ -588,5 +677,20 @@ mod tests {
         let run = execute_tasks_deterministically(&tasks, |value| value.to_string(), Some(priority));
         assert_eq!(run.values, vec!["a", "b", "c"]);
         assert_eq!(run.results[0].task_index, 1);
+    }
+
+    #[test]
+    fn threaded_execution_glues_back_to_input_order() {
+        let tasks = vec![
+            ExecutionTask::new(0, 10),
+            ExecutionTask::new(1, 20),
+            ExecutionTask::new(2, 30),
+            ExecutionTask::new(3, 40),
+        ];
+        let cfg = ExecutionNetworkConfig::new(4, DataflowDiscipline::Lifo);
+        let run = execute_tasks_threaded_ordered(&tasks, |value| *value + 1, Some(cfg));
+        assert_eq!(run.values, vec![11, 21, 31, 41]);
+        assert_eq!(run.mode, "threaded");
+        assert!(run.workers > 1);
     }
 }

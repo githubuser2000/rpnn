@@ -22,12 +22,14 @@ pub mod facade;
 pub mod generated_columns;
 pub mod input_semantics;
 pub mod meta_columns;
+pub mod migration_control;
 pub mod morphism;
 pub mod number_theory;
 pub mod output_semantics;
 pub mod output_syntax;
 pub mod package_integrity;
 pub mod parallel_execution;
+pub mod parity_harness;
 pub mod parameter_runtime;
 pub mod persistence;
 pub mod presheaf;
@@ -41,6 +43,7 @@ pub mod prompt_session;
 pub mod row_filtering;
 pub mod row_ranges;
 pub mod runtime_compat;
+pub mod runtime_switch;
 pub mod schema;
 pub mod semantics_builder;
 pub mod sheaf;
@@ -108,6 +111,7 @@ pub use console_io::{
 };
 pub use dataflow::{
     bootstrap_execution_network, deterministic_reduce, execute_tasks_deterministically,
+    execute_tasks_threaded_ordered,
     DataflowDiscipline, ExecutionNetworkBundle, ExecutionNetworkConfig, ExecutionResult,
     ExecutionRunResult, ExecutionTask, FifoTaskQueue, FullDuplexChannel, HalfDuplexChannel,
     LifoTaskStack, PriorityTaskQueue, ResourceSemaphore, EXECUTION_NETWORK_SNAPSHOT,
@@ -136,6 +140,11 @@ pub use meta_columns::{
     spalte_meta_konkret_abstrakt_is_ganzzahlig, switching_meta_pair, MetaColumnSpec,
     MetaColumnSpecSnapshot, MetaColumnsBundle, MetaColumnsSnapshot, MetaVorwort,
     PrimeCrossColumnClass, Rational,
+};
+pub use migration_control::{
+    bootstrap_migration_control, ActivationTransactionSpec, ActivationUnitSpec,
+    MigrationControlBundle, MigrationControlSnapshot, MigrationControlValidation,
+    MigrationStepSpec, MigrationWaveSpec,
 };
 pub use morphism::{MorphismEdge, MorphismGraph, MorphismKind};
 pub use number_theory::{
@@ -166,6 +175,10 @@ pub use parallel_execution::{
     prime_factors_in_processes, ParallelExecutionBundle, ParallelExecutionConfig,
     ParallelExecutionConfigSnapshot, ParallelExecutionSnapshot, ParallelOperationResult,
     ParallelOperationSnapshot, ParallelRowsResult, ProcessorCoreCounts,
+};
+pub use parity_harness::{
+    bootstrap_parity_harness, ParityCommandCase, ParityHarnessBundle, ParityHarnessSnapshot,
+    ParityOracle, ParityProbePlan,
 };
 pub use parameter_runtime::{
     bootstrap_parameter_runtime, MainParameter, ParameterCommandSets, ParameterParseResult,
@@ -225,6 +238,11 @@ pub use row_ranges::{
 };
 pub use runtime_compat::{
     bootstrap_runtime_compat, NPmEnum, RuntimeCompatBundle, RuntimeCompatSnapshot,
+};
+pub use runtime_switch::{
+    bootstrap_runtime_switch, extract_architecture_switch_from_argv, ArchitectureSwitchConfig,
+    ArchitectureSwitchMode, ArchitectureSwitchSnapshot, RuntimeSwitchBundle,
+    RuntimeSwitchBundleSnapshot, SwitchGateDecision,
 };
 pub use schema::{
     bootstrap_schema, AliasGroup, ParameterMatrixEntry, RetaContextSchema,

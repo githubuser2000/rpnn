@@ -139,6 +139,50 @@ pub extern "C" fn reta_architecture_snapshot_json() -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_cli_plan_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let plan = reta_architecture::RetaRunArchitecture::from_cli_args(&args);
+        serde_json::to_string(&plan)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_cli_plan_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_activation_plan_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let switch_bundle = reta_architecture::bootstrap_runtime_switch(Some(switch_config.clone()));
+        let migration_control = reta_architecture::bootstrap_migration_control();
+        let units = migration_control.activation_units_for_switch(&switch_bundle, &switch_config);
+        serde_json::to_string(&units)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_activation_plan_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_parity_probe_plan_json() -> *mut c_char {
+    ffi_json_result(|| {
+        let harness = reta_architecture::bootstrap_parity_harness();
+        let config = reta_architecture::ArchitectureSwitchConfig::from_environment();
+        serde_json::to_string(&harness.plans_for_switch(&config))
+    })
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(
