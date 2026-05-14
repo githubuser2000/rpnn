@@ -27,10 +27,11 @@ impl AliasGroup {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ParameterMatrixEntry {
     pub main_aliases: Vec<String>,
     pub parameter_aliases: Vec<String>,
+    pub columns: Vec<i64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

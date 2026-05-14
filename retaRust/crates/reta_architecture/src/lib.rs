@@ -201,7 +201,11 @@ pub use migration_control::{
     MigrationControlBundle, MigrationControlSnapshot, MigrationControlValidation,
     MigrationStepSpec, MigrationWaveSpec,
 };
-pub use morphism::{MorphismEdge, MorphismGraph, MorphismKind};
+pub use morphism::{
+    bootstrap_semantic_morphisms, morphism_snapshot_terms, AliasMorphisms, MorphismBundle,
+    MorphismBundleSnapshot, MorphismEdge, MorphismGraph, MorphismKind, PromptMorphisms,
+    RangeMorphisms, RendererMorphisms,
+};
 pub use number_theory::{
     bootstrap_number_theory, could_be_prime_number_primzahlkreuz,
     could_be_prime_number_primzahlkreuz_fuer_aussen,
@@ -244,7 +248,10 @@ pub use persistence::{
     ExecutionRunRecord, PersistedRecord, PersistedSection, PersistenceBundle, PersistenceConfig,
     PersistenceConfigSnapshot, PersistenceSnapshot, PersistenceStore, SheafSnapshotRecord,
 };
-pub use presheaf::{LocalSection, Presheaf, PresheafBundle};
+pub use presheaf::{
+    bootstrap_presheaves, LocalSection, LocalSectionSnapshot, Presheaf, PresheafBundle,
+    PresheafBundleSnapshot, PresheafSnapshot,
+};
 pub use program_workflow::{
     bootstrap_program_workflow, ProgramWorkflowBundle, ProgramWorkflowSnapshot, WorkflowStep,
     WorkflowTrace,
@@ -307,7 +314,12 @@ pub use semantics_builder::{
     bootstrap_semantics_builder, ParameterSemanticsBuildResult, ParameterSemanticsBuildSnapshot,
     ParameterSemanticsBuilder, SemanticsBuilderBundle,
 };
-pub use sheaf::{GluedSection, Sheaf, SheafBundle};
+pub use sheaf::{
+    bootstrap_sheaves, ColumnParameterMeta, GeneratedColumnsSheaf,
+    GeneratedColumnsSheafSnapshot, GluedSection, HtmlReferenceSheaf, ParameterSemanticsSheaf,
+    ParameterSemanticsSheafSnapshot, Sheaf, SheafBundle, SheafBundleSnapshot, TableOutputSection,
+    TableOutputSheaf,
+};
 pub use shadow_pipeline::{
     bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_prompt_commit,
     evaluate_shadow_table_commit, prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision,

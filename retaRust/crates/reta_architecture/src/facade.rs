@@ -29,7 +29,9 @@ use crate::generated_columns::{bootstrap_generated_columns, GeneratedColumnsBund
 use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
 use crate::meta_columns::{bootstrap_meta_columns, MetaColumnsBundle};
 use crate::migration_control::{bootstrap_migration_control, MigrationControlBundle};
-use crate::morphism::{MorphismEdge, MorphismGraph, MorphismKind};
+use crate::morphism::{
+    bootstrap_semantic_morphisms, MorphismBundle, MorphismEdge, MorphismGraph, MorphismKind,
+};
 use crate::number_theory::{bootstrap_number_theory, NumberTheoryBundle};
 use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
 use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
@@ -38,7 +40,7 @@ use crate::parallel_execution::{bootstrap_parallel_execution, ParallelExecutionB
 use crate::parity_harness::{bootstrap_parity_harness, ParityHarnessBundle};
 use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
 use crate::persistence::{bootstrap_persistence, PersistenceBundle};
-use crate::presheaf::PresheafBundle;
+use crate::presheaf::{bootstrap_presheaves, PresheafBundle};
 use crate::program_workflow::{bootstrap_program_workflow, ProgramWorkflowBundle};
 use crate::prompt_execution::{bootstrap_prompt_execution, PromptExecutionBundle};
 use crate::prompt_interaction::{bootstrap_prompt_interaction, PromptInteractionBundle};
@@ -54,7 +56,7 @@ use crate::runtime_switch::{
 };
 use crate::schema::{bootstrap_schema, RetaContextSchema};
 use crate::semantics_builder::{bootstrap_semantics_builder, SemanticsBuilderBundle};
-use crate::sheaf::SheafBundle;
+use crate::sheaf::{bootstrap_sheaves, SheafBundle};
 use crate::shadow_pipeline::{bootstrap_shadow_pipeline, ShadowPipelineBundle};
 use crate::split_i18n::{build_split_i18n_proxy, SplitI18nProxy};
 use crate::table_adapters::{bootstrap_table_adapters, TableAdaptersBundle};
@@ -124,6 +126,7 @@ pub struct ArchitectureRuntime {
     pub schema: RetaContextSchema,
     pub semantics_builder: SemanticsBuilderBundle,
     pub sheaves: SheafBundle,
+    pub semantic_morphisms: MorphismBundle,
     pub shadow_pipeline: ShadowPipelineBundle,
     pub split_i18n: SplitI18nProxy,
     pub tag_schema: TagSchemaBundle,
@@ -171,6 +174,12 @@ impl ArchitectureRuntime {
         ));
 
         let schema = bootstrap_schema();
+        let topology = RetaContextTopology::standard();
+        let output_semantics = bootstrap_output_semantics();
+        let output_syntax = bootstrap_output_syntax();
+        let sheaves = bootstrap_sheaves(Some(&schema));
+        let semantic_morphisms =
+            bootstrap_semantic_morphisms(&topology, &sheaves, Some(output_semantics.clone()));
         let architecture_map = bootstrap_architecture_map();
         let architecture_contracts = bootstrap_architecture_contracts(Some(&architecture_map));
         let architecture_witnesses = bootstrap_architecture_witnesses(&architecture_map, &architecture_contracts);
@@ -211,7 +220,7 @@ impl ArchitectureRuntime {
             &architecture_progress,
         );
         Self {
-            topology: RetaContextTopology::standard(),
+            topology,
             architecture_activation,
             architecture_boundaries,
             architecture_coherence,
@@ -240,8 +249,8 @@ impl ArchitectureRuntime {
             meta_columns: bootstrap_meta_columns(),
             migration_control: bootstrap_migration_control(),
             number_theory: bootstrap_number_theory(),
-            output_semantics: bootstrap_output_semantics(),
-            output_syntax: bootstrap_output_syntax(),
+            output_semantics,
+            output_syntax,
             package_integrity: bootstrap_package_integrity(),
             parallel_execution: bootstrap_parallel_execution(None),
             parity_harness: bootstrap_parity_harness(),
@@ -254,14 +263,15 @@ impl ArchitectureRuntime {
             prompt_execution: bootstrap_prompt_execution(),
             prompt_interaction: bootstrap_prompt_interaction(),
             prompt_language: bootstrap_prompt_language(),
-            presheaves: PresheafBundle::default(),
+            presheaves: bootstrap_presheaves(Some(&ContextSelection::cli())),
             row_filtering: bootstrap_row_filtering(),
             row_ranges: bootstrap_row_range_morphisms(None),
             runtime_compat: bootstrap_runtime_compat(None, &[]),
             runtime_switch: bootstrap_runtime_switch(None),
             schema: schema.clone(),
             semantics_builder: bootstrap_semantics_builder(Some(schema)),
-            sheaves: SheafBundle::default(),
+            sheaves,
+            semantic_morphisms,
             shadow_pipeline: bootstrap_shadow_pipeline(),
             split_i18n: build_split_i18n_proxy(None),
             tag_schema: bootstrap_tag_schema(),
@@ -344,6 +354,7 @@ impl ArchitectureRuntime {
             "prompt_preparation",
             "prompt_execution",
             "prompt_interaction",
+            "semantic_morphisms",
             "morphism",
             "universal_property",
             "presheaf",
@@ -434,6 +445,17 @@ impl ArchitectureRuntime {
             rust_shadow_pipeline_morphism_count: self.shadow_pipeline.snapshot().morphisms.len(),
             rust_migration_control_step_count: self.migration_control.steps.len(),
             rust_parity_harness_case_count: self.parity_harness.cases.len(),
+            rust_semantic_morphism_available_count: self
+                .semantic_morphisms
+                .snapshot()
+                .available
+                .len(),
+            rust_parameter_sheaf_alias_count: self.sheaves.parameter_semantics.main_alias_map.len(),
+            rust_parameter_sheaf_pair_count: self.sheaves.parameter_semantics.pair_to_columns.len(),
+            rust_presheaf_section_count: self.presheaves.snapshot().csv.section_count
+                + self.presheaves.snapshot().translations.section_count
+                + self.presheaves.snapshot().assets.section_count
+                + self.presheaves.snapshot().prompt_state.section_count,
         }
     }
 }
@@ -502,6 +524,10 @@ pub struct ArchitectureSnapshotRef {
     pub rust_shadow_pipeline_morphism_count: usize,
     pub rust_migration_control_step_count: usize,
     pub rust_parity_harness_case_count: usize,
+    pub rust_semantic_morphism_available_count: usize,
+    pub rust_parameter_sheaf_alias_count: usize,
+    pub rust_parameter_sheaf_pair_count: usize,
+    pub rust_presheaf_section_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

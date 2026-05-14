@@ -191,6 +191,7 @@ impl ParameterSemanticsBuilder {
             para_n_data_matrix.push(ParameterMatrixEntry {
                 main_aliases: self.alles_parameter_names.clone(),
                 parameter_aliases: Vec::new(),
+                columns: Vec::new(),
             });
         }
 

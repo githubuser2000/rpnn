@@ -666,7 +666,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn prompt_commit_requires_same_reta_argv() {
         let report = ShadowPromptReport {
             morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -711,6 +710,7 @@ mod tests {
         assert_eq!(decision.reason, "gate_not_allowed_to_commit");
     }
 
+    #[test]
     fn force_can_commit_mismatch_but_dry_run_cannot() {
         let report = ShadowTableReport {
             morphism: "shadow_pipeline.table_adapter".to_string(),
