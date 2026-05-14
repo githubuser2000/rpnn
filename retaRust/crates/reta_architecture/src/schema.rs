@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::parameter_matrix::parameter_matrix_entries;
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AliasGroup {
     pub canonical: String,
@@ -221,6 +223,7 @@ pub fn bootstrap_schema() -> RetaContextSchema {
         vec!["ausgabe".to_string(), "a".to_string()],
         vec!["debug".to_string(), "d".to_string()],
     ];
+    schema.para_n_data_matrix = parameter_matrix_entries();
     schema
 }
 
@@ -238,6 +241,17 @@ mod tests {
             schema.main_alias_map().get("s"),
             Some(&"spalten".to_string())
         );
+    }
+
+    #[test]
+    fn bootstrap_schema_contains_generated_parameter_matrix() {
+        let schema = bootstrap_schema();
+        assert!(schema.para_n_data_matrix.len() >= 400);
+        assert!(schema.para_n_data_matrix.iter().any(|entry| {
+            entry.main_aliases.iter().any(|alias| alias == "kontinuum")
+                && entry.parameter_aliases.iter().any(|alias| alias == "m")
+                && entry.columns.contains(&744)
+        }));
     }
 }
 

@@ -112,15 +112,24 @@ impl PromptVocabularyBuilder {
             .map(|group| format!("-{}", group.canonical))
             .collect::<Vec<_>>();
 
-        let mut spalten = self
-            .schema
-            .sub_parameter_alias_groups()
-            .keys()
-            .map(|main| format!("--{main}="))
-            .collect::<Vec<_>>();
+        let mut spalten_dict_sets: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for entry in &self.schema.para_n_data_matrix {
+            for main_alias in &entry.main_aliases {
+                let key = format!("--{main_alias}=");
+                let values = spalten_dict_sets.entry(key).or_default();
+                for parameter_alias in &entry.parameter_aliases {
+                    values.insert(parameter_alias.clone());
+                }
+            }
+        }
+        let mut spalten = spalten_dict_sets.keys().cloned().collect::<Vec<_>>();
         if !spalten.iter().any(|value| value == "--=") {
             spalten.push("--=".to_string());
         }
+        let spalten_dict = spalten_dict_sets
+            .into_iter()
+            .map(|(key, values)| (key, values.into_iter().collect::<Vec<_>>()))
+            .collect::<BTreeMap<_, _>>();
 
         let ausgabe_paras = self
             .schema
@@ -162,6 +171,7 @@ impl PromptVocabularyBuilder {
         not_parameter_values.extend(zeilen_paras.iter().cloned());
         not_parameter_values.extend(kombi_main_paras.iter().cloned());
         not_parameter_values.extend(spalten.iter().cloned());
+        not_parameter_values.extend(spalten_dict.values().flat_map(|values| values.iter().cloned()));
         not_parameter_values.extend(main_parameters.iter().cloned());
 
         let mut befehle = vec![
@@ -180,6 +190,7 @@ impl PromptVocabularyBuilder {
         PromptVocabulary {
             main_parameters,
             spalten,
+            spalten_dict,
             ausgabe_paras,
             kombi_main_paras,
             zeilen_paras,
@@ -338,4 +349,24 @@ pub type RowRangeSyntax = crate::row_ranges::RowRangeSyntax;
 
 pub fn __init__() -> InputBundle {
     bootstrap_input_semantics(None)
+}
+#[cfg(test)]
+mod stage17_tests {
+    use super::*;
+
+    #[test]
+    fn prompt_vocabulary_uses_generated_parameter_matrix() {
+        let bundle = bootstrap_input_semantics(None);
+        let vocabulary = bundle.build_prompt_vocabulary();
+        assert!(vocabulary.spalten.iter().any(|value| value == "--Kontinuum="));
+        assert!(vocabulary
+            .spalten_dict
+            .get("--Kontinuum=")
+            .is_some_and(|values| values.iter().any(|value| value == "m")));
+        assert!(vocabulary
+            .spalten_dict
+            .get("--kontinuum=")
+            .is_some_and(|values| values.iter().any(|value| value == "m")));
+        assert!(vocabulary.not_parameter_values.iter().any(|value| value == "m"));
+    }
 }

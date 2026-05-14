@@ -9,6 +9,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::input_semantics::bootstrap_input_semantics;
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct CompletionSortKey {
     pub group: u8,
@@ -93,6 +95,71 @@ impl Default for CompletionRuntimeBundle {
 }
 
 impl CompletionRuntimeBundle {
+    pub fn from_input_semantics() -> Self {
+        let mut bundle = Self::default();
+        let vocabulary = bootstrap_input_semantics(None).build_prompt_vocabulary();
+        let trim_command = |value: &str| {
+            value
+                .trim_start_matches("--")
+                .trim_start_matches('-')
+                .trim_end_matches('=')
+                .to_string()
+        };
+        let trim_parameter = |value: &str| {
+            value
+                .trim_start_matches("--")
+                .trim_start_matches('-')
+                .to_string()
+        };
+
+        bundle.main_parameters = vocabulary
+            .main_parameters
+            .iter()
+            .map(|value| trim_command(value))
+            .filter(|value| !value.is_empty())
+            .collect();
+        bundle.spalten = vocabulary
+            .spalten
+            .iter()
+            .map(|value| trim_parameter(value))
+            .filter(|value| !value.is_empty())
+            .collect();
+        bundle.spalten.sort();
+        bundle.spalten.dedup();
+        bundle.spalten_dict = vocabulary
+            .spalten_dict
+            .into_iter()
+            .map(|(key, mut values)| {
+                values.sort();
+                values.dedup();
+                (trim_command(&key), values)
+            })
+            .filter(|(key, _values)| !key.is_empty())
+            .collect();
+        bundle.ausgabe_paras = vocabulary
+            .ausgabe_paras
+            .iter()
+            .map(|value| trim_parameter(value))
+            .filter(|value| !value.is_empty())
+            .collect();
+        bundle.kombi_main_paras = vocabulary
+            .kombi_main_paras
+            .iter()
+            .map(|value| trim_parameter(value))
+            .filter(|value| !value.is_empty())
+            .collect();
+        bundle.zeilen_paras = vocabulary
+            .zeilen_paras
+            .iter()
+            .map(|value| trim_parameter(value))
+            .filter(|value| !value.is_empty())
+            .collect();
+        if !vocabulary.ausgabe_art.is_empty() {
+            bundle.ausgabe_art = vocabulary.ausgabe_art;
+        }
+        bundle
+    }
+
     pub fn start_commands(&self, include_numeric_shortcuts: bool) -> Vec<String> {
         let mut commands = self.befehle.clone();
         if include_numeric_shortcuts {
@@ -133,7 +200,7 @@ pub struct CompletionRuntimeSnapshot {
 }
 
 pub fn bootstrap_completion_runtime() -> CompletionRuntimeBundle {
-    CompletionRuntimeBundle::default()
+    CompletionRuntimeBundle::from_input_semantics()
 }
 
 #[cfg(test)]
@@ -151,6 +218,16 @@ mod tests {
         let bundle = bootstrap_completion_runtime();
         assert!(bundle.start_commands(true).contains(&"15_".to_string()));
         assert!(bundle.snapshot().befehle_len > 0);
+    }
+
+    #[test]
+    fn bundle_loads_spalten_aliases_from_generated_matrix() {
+        let bundle = bootstrap_completion_runtime();
+        assert!(bundle.spalten.iter().any(|value| value == "kontinuum="));
+        assert!(bundle
+            .spalten_dict
+            .get("kontinuum")
+            .is_some_and(|values| values.iter().any(|value| value == "m")));
     }
 }
 

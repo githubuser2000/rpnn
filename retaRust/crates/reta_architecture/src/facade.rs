@@ -38,6 +38,7 @@ use crate::output_syntax::{bootstrap_output_syntax as bootstrap_output_syntax_im
 use crate::package_integrity::{bootstrap_package_integrity, PackageIntegrityBundle};
 use crate::parallel_execution::{bootstrap_parallel_execution as bootstrap_parallel_execution_impl, ParallelExecutionBundle};
 use crate::parity_harness::{bootstrap_parity_harness, ParityHarnessBundle};
+use crate::parameter_matrix::{integer_column_projection_count, parameter_matrix_seed_count};
 use crate::parameter_runtime::{bootstrap_parameter_runtime as bootstrap_parameter_runtime_impl, ParameterRuntimeBundle};
 use crate::persistence::{bootstrap_persistence as bootstrap_persistence_impl, PersistenceBundle};
 use crate::presheaf::{bootstrap_presheaves, PresheafBundle};
@@ -331,6 +332,7 @@ impl ArchitectureRuntime {
             "number_theory",
             "column_selection",
             "parameter_runtime",
+            "parameter_matrix",
             "output_syntax",
             "output_semantics",
             "table_state",
@@ -389,6 +391,9 @@ impl ArchitectureRuntime {
             rust_column_bucket_count: self.column_selection.bucket_values().len(),
             rust_output_mode_count: self.output_syntax.modes().len(),
             rust_parameter_main_count: self.parameter_runtime.main_commands.len(),
+            rust_parameter_matrix_seed_count: parameter_matrix_seed_count(),
+            rust_parameter_matrix_integer_column_count: integer_column_projection_count(),
+            rust_schema_parameter_pair_count: self.schema.para_n_data_matrix.len(),
             rust_prompt_start_command_count: self.completion_runtime.start_commands(true).len(),
             rust_row_filter_condition_count: self.row_filtering.snapshot().condition_families.len(),
             rust_table_preparation_morphism_count: self
@@ -494,6 +499,9 @@ pub struct ArchitectureSnapshotRef {
     pub rust_column_bucket_count: usize,
     pub rust_output_mode_count: usize,
     pub rust_parameter_main_count: usize,
+    pub rust_parameter_matrix_seed_count: usize,
+    pub rust_parameter_matrix_integer_column_count: usize,
+    pub rust_schema_parameter_pair_count: usize,
     pub rust_prompt_start_command_count: usize,
     pub rust_row_filter_condition_count: usize,
     pub rust_table_preparation_morphism_count: usize,
@@ -540,6 +548,9 @@ pub struct RetaRunArchitecture {
     pub parameter_main_count: usize,
     pub selected_output_mode: Option<String>,
     pub upper_limit: Option<i64>,
+    pub selected_column_count: usize,
+    pub excluded_column_count: usize,
+    pub resolved_column_pair_count: usize,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -583,6 +594,9 @@ impl RetaRunArchitecture {
                 .selected_output_mode
                 .map(|mode| mode.canonical_name().to_string()),
             upper_limit: parsed.upper_limit,
+            selected_column_count: parsed.command_sets.selected_columns.len(),
+            excluded_column_count: parsed.command_sets.excluded_columns.len(),
+            resolved_column_pair_count: parsed.command_sets.resolved_alias_pairs.len(),
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -598,7 +612,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -606,6 +620,9 @@ impl RetaRunArchitecture {
             self.parameter_main_count,
             self.selected_output_mode,
             self.upper_limit,
+            self.selected_column_count,
+            self.excluded_column_count,
+            self.resolved_column_pair_count,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,

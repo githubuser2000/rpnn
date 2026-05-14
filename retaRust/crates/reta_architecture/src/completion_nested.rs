@@ -683,3 +683,18 @@ pub fn runtime_view(bundle: &NestedCompletionMorphismBundle) -> &NestedCompletio
 pub fn text(document: &Document) -> &str {
     &document.text
 }
+
+#[cfg(test)]
+mod stage17_parameter_matrix_tests {
+    use super::*;
+
+    #[test]
+    fn nested_completion_suggests_kontinuum_parameter_and_m_value() {
+        let bundle = bootstrap_nested_completion_morphisms();
+        let parameter_candidates = bundle.complete("reta -spalten --kont");
+        assert!(parameter_candidates.iter().any(|candidate| candidate.text == "--kontinuum="));
+
+        let value_candidates = bundle.complete("reta -spalten --kontinuum=");
+        assert!(value_candidates.iter().any(|candidate| candidate.text == "m"));
+    }
+}

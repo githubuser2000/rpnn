@@ -160,6 +160,28 @@ impl ParameterSemanticsSheaf {
             }
         }
 
+        for entry in &self.para_n_data_matrix {
+            let aliases = entry
+                .main_aliases
+                .iter()
+                .filter(|value| !value.is_empty())
+                .cloned()
+                .collect::<Vec<_>>();
+            let Some(canonical) = aliases.first().cloned() else {
+                continue;
+            };
+            if !self.main_alias_groups.iter().any(|group| group.canonical == canonical) {
+                self.main_alias_groups.push(AliasGroup {
+                    canonical: canonical.clone(),
+                    aliases: aliases.clone(),
+                });
+            }
+            self.main_alias_map.insert(canonical.clone(), canonical.clone());
+            for alias in aliases {
+                self.main_alias_map.insert(alias, canonical.clone());
+            }
+        }
+
         let mut parameter_groups: BTreeMap<String, BTreeMap<String, Vec<String>>> = BTreeMap::new();
         let mut pair_to_columns: BTreeMap<(String, String), BTreeSet<i64>> = BTreeMap::new();
 
@@ -583,6 +605,18 @@ mod tests {
             sheaf.reverse_map_canonical_pairs().get(&744).cloned(),
             Some(vec![("spalten".into(), "kontinuum".into())])
         );
+    }
+
+
+    #[test]
+    fn bootstrap_sheaf_resolves_generated_kontinuum_aliases() {
+        let sheaves = bootstrap_sheaves(None);
+        let parameter = &sheaves.parameter_semantics;
+        assert_eq!(parameter.resolve_main_alias("kontinuum"), Some("Kontinuum".to_string()));
+        assert_eq!(parameter.resolve_parameter_alias("kontinuum", "m"), Some("M".to_string()));
+        let columns = parameter.column_numbers_for_pair("kontinuum", "m");
+        assert!(columns.contains(&493));
+        assert!(columns.contains(&744));
     }
 
     #[test]

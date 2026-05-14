@@ -43,6 +43,7 @@ pub mod output_syntax;
 pub mod package_integrity;
 pub mod parallel_execution;
 pub mod parity_harness;
+pub mod parameter_matrix;
 pub mod parameter_runtime;
 pub mod persistence;
 pub mod presheaf;
@@ -238,6 +239,10 @@ pub use parallel_execution::{
 pub use parity_harness::{
     bootstrap_parity_harness, ParityCommandCase, ParityHarnessBundle, ParityHarnessSnapshot,
     ParityOracle, ParityProbePlan,
+};
+pub use parameter_matrix::{
+    canonical_pair_for_aliases, columns_for_alias_pair, integer_column_projection_count,
+    parameter_matrix_entries, parameter_matrix_seed_count, ParameterMatrixSeed, PARAMETER_MATRIX_SEEDS,
 };
 pub use parameter_runtime::{
     bootstrap_parameter_runtime, MainParameter, ParameterCommandSets, ParameterParseResult,

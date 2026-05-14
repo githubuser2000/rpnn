@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::output_syntax::OutputMode;
+use crate::parameter_matrix::{canonical_pair_for_aliases, columns_for_alias_pair, parameter_matrix_seed_count};
 use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -94,6 +95,10 @@ pub struct ParameterCommandSets {
     pub param_lines: BTreeSet<String>,
     pub rows_as_numbers: BTreeSet<i64>,
     pub rows_of_combi: BTreeSet<i64>,
+    pub selected_columns: BTreeSet<i64>,
+    pub excluded_columns: BTreeSet<i64>,
+    pub resolved_alias_pairs: Vec<(String, String)>,
+    pub unresolved_column_pairs: Vec<(String, String)>,
     pub spaltenreihenfolgeundnurdiese: Vec<i64>,
     pub puniverseprims_only: BTreeSet<i64>,
     pub gener_rows: BTreeSet<i64>,
@@ -161,7 +166,10 @@ impl ParameterRuntimeBundle {
             class: "ParameterRuntimeBundle".to_string(),
             column_function: "produce_all_spalten_numbers".to_string(),
             width_function: "apply_width_parameter".to_string(),
-            parse_function: "parameters_to_commands_and_numbers".to_string(),
+            parse_function: format!(
+                "parameters_to_commands_and_numbers/parameter_matrix_entries={}",
+                parameter_matrix_seed_count()
+            ),
             upper_limit_argument_function: "upper_limit_values_for_argument".to_string(),
             upper_limit_aggregate_function: "upper_limit_from_arguments".to_string(),
             upper_limit_apply_function: "apply_upper_limit_argument".to_string(),
@@ -407,9 +415,51 @@ fn apply_output_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, s
 }
 
 fn apply_column_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets: &mut ParameterCommandSets) {
+    let Some(key) = token.key.as_deref() else {
+        return;
+    };
     if let Some(value) = token.value.as_deref() {
-        for number in bundle.row_ranges.range_to_numbers(value, false, 0, false) {
-            sets.rows_as_numbers.insert(number);
+        let mut resolved_any = false;
+        for raw_item in split_comma_values(value) {
+            let trimmed = raw_item.trim();
+            let negated = trimmed.starts_with('-');
+            let item = trimmed.trim_start_matches('-');
+            let columns = columns_for_alias_pair(key, item);
+            if !columns.is_empty() {
+                resolved_any = true;
+                if let Some((canonical_main, canonical_parameter)) = canonical_pair_for_aliases(key, item) {
+                    sets.resolved_alias_pairs.push((canonical_main, canonical_parameter));
+                }
+                for column in columns {
+                    if negated {
+                        sets.excluded_columns.insert(column);
+                    } else {
+                        sets.selected_columns.insert(column);
+                    }
+                }
+            } else if bundle.row_ranges.is_row_range(item) {
+                resolved_any = true;
+                for number in bundle.row_ranges.range_to_numbers(item, false, 0, false) {
+                    if negated {
+                        sets.excluded_columns.insert(number);
+                    } else {
+                        sets.selected_columns.insert(number);
+                        sets.rows_as_numbers.insert(number);
+                    }
+                }
+            }
+        }
+        if !resolved_any {
+            sets.unresolved_column_pairs.push((key.to_string(), value.to_string()));
+        }
+    } else {
+        let columns = columns_for_alias_pair(key, "");
+        if columns.is_empty() {
+            sets.unresolved_column_pairs.push((key.to_string(), String::new()));
+        } else {
+            for column in columns {
+                sets.selected_columns.insert(column);
+            }
         }
     }
 }
@@ -439,6 +489,38 @@ mod tests {
         assert!(parsed.has_main(MainParameter::Zeilen));
         assert_eq!(parsed.selected_output_mode, Some(OutputMode::Html));
         assert!(parsed.command_sets.param_lines.contains("a1"));
+    }
+
+    #[test]
+    fn column_alias_matrix_resolves_kontinuum_m_744() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-spalten",
+            "--kontinuum=m",
+        ]);
+        assert!(parsed.command_sets.selected_columns.contains(&493));
+        assert!(parsed.command_sets.selected_columns.contains(&744));
+        assert!(parsed
+            .command_sets
+            .resolved_alias_pairs
+            .contains(&("Kontinuum".to_string(), "M".to_string())));
+        let args = vec!["reta".to_string(), "-spalten".to_string(), "--kontinuum=m".to_string()];
+        assert_eq!(produce_all_spalten_numbers(&args), vec![493, 744]);
+    }
+
+    #[test]
+    fn column_alias_matrix_supports_negation() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-spalten",
+            "--kontinuum=m,-m",
+        ]);
+        assert!(parsed.command_sets.selected_columns.contains(&744));
+        assert!(parsed.command_sets.excluded_columns.contains(&744));
+        let args = vec!["reta".to_string(), "-spalten".to_string(), "--kontinuum=m,-m".to_string()];
+        assert!(produce_all_spalten_numbers(&args).is_empty());
     }
 
     #[test]
@@ -484,16 +566,9 @@ pub fn spalten_removeDoublesNthenRemoveOneFromAnother(positive: &[i64], negative
 pub fn produce_all_spalten_numbers(args: &[String]) -> Vec<i64> {
     let bundle = bootstrap_parameter_runtime();
     let parsed = bundle.parse_cli_args(args);
-    let mut out = Vec::new();
-    for token in parsed.subparameters_for(MainParameter::Spalten) {
-        if let Some(value) = &token.value {
-            for part in value.split(',') {
-                if let Ok(number) = part.trim().parse::<i64>() {
-                    out.push(number);
-                }
-            }
-        }
-    }
+    let mut out = parsed.command_sets.selected_columns.iter().copied().collect::<Vec<_>>();
+    let excluded = parsed.command_sets.excluded_columns;
+    out.retain(|column| !excluded.contains(column));
     resultingSpaltenFromTuple(&out)
 }
 

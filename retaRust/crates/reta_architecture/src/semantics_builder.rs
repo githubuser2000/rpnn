@@ -107,9 +107,12 @@ impl ParameterSemanticsBuilder {
     ) -> (Vec<BTreeSet<i64>>, BTreeSet<i64>) {
         let mut all_values = vec![BTreeSet::new(); 12];
         for entry in para_n_data_matrix {
+            for column in &entry.columns {
+                all_values[0].insert(*column);
+            }
             for alias in &entry.parameter_aliases {
                 if let Ok(value) = alias.parse::<i64>() {
-                    all_values[0].insert(value);
+                    all_values[2].insert(value);
                 }
             }
         }
@@ -280,6 +283,14 @@ mod tests {
         assert!(primes.contains(&"2".to_string()));
         assert!(primes.contains(&"31".to_string()));
         assert!(!primes.contains(&"4".to_string()));
+    }
+
+    #[test]
+    fn semantics_builder_uses_generated_column_projection() {
+        let bundle = bootstrap_semantics_builder(None);
+        let result = bundle.build();
+        assert!(result.all_simple_command_columns.contains(&744));
+        assert!(result.para_n_data_matrix.len() >= 400);
     }
 }
 
