@@ -272,6 +272,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "materialized_sections_glue_to_same_ordered_renderable_rows",
         ),
         step(
+            "step-table-view-output",
+            "wave-02-table-adapters",
+            "MaterializedTableView",
+            "table_view_output.render",
+            "table_view_output.render",
+            "table-view-output-shadow-diff",
+            "output_mode_projection_preserves_materialized_row_order",
+        ),
+        step(
             "step-shadow-table-adapter",
             "wave-02-table-adapters",
             "Program.__resultingTable + Program.finallyDisplayLines",

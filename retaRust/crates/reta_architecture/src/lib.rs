@@ -69,6 +69,7 @@ pub mod table_adapters;
 pub mod table_generation;
 pub mod table_materialization;
 pub mod table_view;
+pub mod table_view_output;
 pub mod table_output;
 pub mod table_preparation;
 pub mod table_runtime;
@@ -379,6 +380,13 @@ pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
     MaterializedTableViewConfig, MaterializedTableViewRow, TableViewBundle, TableViewSnapshot,
     VirtualColumnDisplayPolicy,
+};
+pub use table_view_output::{
+    bbcode_escape_cell, bootstrap_table_view_output, continuum_m_table_view_output_smoke,
+    csv_escape_cell, html_escape_cell, markdown_escape_cell, render_materialized_table_view,
+    render_table_view_for_cli_args, render_table_view_rows_as_mode, row_values,
+    TableViewOutputBundle, TableViewOutputConfig, TableViewOutputReport,
+    TableViewOutputSnapshot,
 };
 pub use table_output::{
     bootstrap_table_output, colorize, determine_row_width, max_cell_text_len, only_that_columns_fn,

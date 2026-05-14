@@ -26,6 +26,9 @@ use crate::table_materialization::{
 use crate::table_view::{
     bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
 };
+use crate::table_view_output::{
+    bootstrap_table_view_output, TableViewOutputConfig, TableViewOutputReport,
+};
 use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
 use crate::table_preparation::{prepare_row_cells, PreparedTable};
 use crate::table_wrapping::TableWidthContext;
@@ -289,6 +292,7 @@ pub struct ShadowCliPlan {
     pub execution_network_plan: ExecutionNetworkPlan,
     pub materialization_report: TableMaterializationReport,
     pub table_view: MaterializedTableView,
+    pub table_view_output: TableViewOutputReport,
     pub universal_property: String,
 }
 
@@ -318,6 +322,7 @@ impl ShadowPipelineBundle {
                 "shadow_pipeline.diff_lines".to_string(),
                 "table_materialization.generation_plan".to_string(),
                 "table_view.materialized_view".to_string(),
+                "table_view_output.render".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -350,6 +355,12 @@ impl ShadowPipelineBundle {
             &materialization_report,
             &MaterializedTableViewConfig::default(),
         );
+        let parsed = crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
+        let output_mode = parsed.selected_output_mode.unwrap_or(OutputMode::Shell);
+        let table_view_output = bootstrap_table_view_output().render_view(
+            &table_view,
+            &TableViewOutputConfig::default().with_mode(output_mode),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -360,6 +371,7 @@ impl ShadowPipelineBundle {
             execution_network_plan,
             materialization_report,
             table_view,
+            table_view_output,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }
