@@ -2,16 +2,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::category::{bootstrap_category_theory, CategoryTheoryBundle};
 use crate::column_selection::{bootstrap_column_selection, ColumnSelectionBundle};
+use crate::combi_join::{bootstrap_combi_join, KombiJoinBundle};
 use crate::completion_runtime::{bootstrap_completion_runtime, CompletionRuntimeBundle};
+use crate::completion_nested::{bootstrap_nested_completion_morphisms, NestedCompletionMorphismBundle};
 use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletionMorphismBundle};
+use crate::concat_csv::{bootstrap_concat_csv, ConcatCsvBundle};
 use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, ExecutionTask};
+use crate::generated_columns::{bootstrap_generated_columns, GeneratedColumnsBundle};
 use crate::morphism::{MorphismEdge, MorphismGraph, MorphismKind};
+use crate::meta_columns::{bootstrap_meta_columns, MetaColumnsBundle};
 use crate::number_theory::{bootstrap_number_theory, NumberTheoryBundle};
 use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
 use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
 use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
 use crate::presheaf::PresheafBundle;
 use crate::program_workflow::{bootstrap_program_workflow, ProgramWorkflowBundle};
+use crate::prompt_execution::{bootstrap_prompt_execution, PromptExecutionBundle};
+use crate::prompt_interaction::{bootstrap_prompt_interaction, PromptInteractionBundle};
+use crate::prompt_preparation::{bootstrap_prompt_preparation, PromptPreparationBundle};
+use crate::prompt_runtime::{bootstrap_prompt_runtime, PromptRuntimeBundle};
+use crate::prompt_session::{bootstrap_prompt_session, PromptSessionBundle};
 use crate::prompt_language::{bootstrap_prompt_language, PromptLanguageBundle};
 use crate::row_filtering::{bootstrap_row_filtering, RowFilteringBundle};
 use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
@@ -35,13 +45,23 @@ pub struct ArchitectureRuntime {
     pub category_theory: CategoryTheoryBundle,
     pub execution_network: ExecutionNetworkBundle,
     pub column_selection: ColumnSelectionBundle,
+    pub combi_join: KombiJoinBundle,
     pub completion_runtime: CompletionRuntimeBundle,
+    pub completion_nested: NestedCompletionMorphismBundle,
     pub completion_word: WordCompletionMorphismBundle,
+    pub concat_csv: ConcatCsvBundle,
+    pub generated_columns: GeneratedColumnsBundle,
+    pub meta_columns: MetaColumnsBundle,
     pub number_theory: NumberTheoryBundle,
     pub output_semantics: RetaOutputSemantics,
     pub output_syntax: OutputSyntaxBundle,
     pub parameter_runtime: ParameterRuntimeBundle,
     pub program_workflow: ProgramWorkflowBundle,
+    pub prompt_runtime: PromptRuntimeBundle,
+    pub prompt_session: PromptSessionBundle,
+    pub prompt_preparation: PromptPreparationBundle,
+    pub prompt_execution: PromptExecutionBundle,
+    pub prompt_interaction: PromptInteractionBundle,
     pub prompt_language: PromptLanguageBundle,
     pub presheaves: PresheafBundle,
     pub row_filtering: RowFilteringBundle,
@@ -95,13 +115,23 @@ impl ArchitectureRuntime {
             category_theory: bootstrap_category_theory(),
             execution_network: bootstrap_execution_network(None),
             column_selection: bootstrap_column_selection(),
+            combi_join: bootstrap_combi_join(),
             completion_runtime: bootstrap_completion_runtime(),
+            completion_nested: bootstrap_nested_completion_morphisms(),
             completion_word: bootstrap_word_completion_morphisms(),
+            concat_csv: bootstrap_concat_csv(),
+            generated_columns: bootstrap_generated_columns(),
+            meta_columns: bootstrap_meta_columns(),
             number_theory: bootstrap_number_theory(),
             output_semantics: bootstrap_output_semantics(),
             output_syntax: bootstrap_output_syntax(),
             parameter_runtime: bootstrap_parameter_runtime(),
             program_workflow: bootstrap_program_workflow(),
+            prompt_runtime: bootstrap_prompt_runtime(),
+            prompt_session: bootstrap_prompt_session(),
+            prompt_preparation: bootstrap_prompt_preparation(),
+            prompt_execution: bootstrap_prompt_execution(),
+            prompt_interaction: bootstrap_prompt_interaction(),
             prompt_language: bootstrap_prompt_language(),
             presheaves: PresheafBundle::default(),
             row_filtering: bootstrap_row_filtering(),
@@ -144,10 +174,20 @@ impl ArchitectureRuntime {
             "table_preparation",
             "table_output",
             "table_wrapping",
+            "generated_columns",
+            "meta_columns",
+            "concat_csv",
+            "combi_join",
             "program_workflow",
             "prompt_language",
             "completion_runtime",
             "completion_word",
+            "completion_nested",
+            "prompt_runtime",
+            "prompt_session",
+            "prompt_preparation",
+            "prompt_execution",
+            "prompt_interaction",
             "morphism",
             "universal_property",
             "presheaf",
@@ -178,6 +218,16 @@ impl ArchitectureRuntime {
                 .len(),
             rust_table_output_morphism_count: self.table_output.snapshot().morphisms.len(),
             rust_word_completion_morphism_count: self.completion_word.snapshot().morphisms.len(),
+            rust_nested_completion_morphism_count: self.completion_nested.snapshot().morphisms.len(),
+            rust_prompt_runtime_main_count: self.prompt_runtime.snapshot().main_para_cmds.len(),
+            rust_prompt_session_end_command_count: self.prompt_session.snapshot().befehle_beenden_len,
+            rust_prompt_preparation_domain_count: self.prompt_preparation.snapshot().cached_parameter_value_domains.len(),
+            rust_prompt_execution_command_count: self.prompt_execution.snapshot().known_commands_len,
+            rust_prompt_interaction_command_count: self.prompt_interaction.snapshot().befehle_len,
+            rust_generated_column_morphism_count: self.generated_columns.snapshot().count,
+            rust_meta_column_morphism_count: self.meta_columns.snapshot().count,
+            rust_concat_csv_morphism_count: self.concat_csv.snapshot().count,
+            rust_combi_join_morphism_count: self.combi_join.snapshot().count,
         }
     }
 }
@@ -208,6 +258,16 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_preparation_morphism_count: usize,
     pub rust_table_output_morphism_count: usize,
     pub rust_word_completion_morphism_count: usize,
+    pub rust_nested_completion_morphism_count: usize,
+    pub rust_prompt_runtime_main_count: usize,
+    pub rust_prompt_session_end_command_count: usize,
+    pub rust_prompt_preparation_domain_count: usize,
+    pub rust_prompt_execution_command_count: usize,
+    pub rust_prompt_interaction_command_count: usize,
+    pub rust_generated_column_morphism_count: usize,
+    pub rust_meta_column_morphism_count: usize,
+    pub rust_concat_csv_morphism_count: usize,
+    pub rust_combi_join_morphism_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -263,6 +323,9 @@ pub struct PromptArchitectureContext {
     pub token_count: usize,
     pub start_command_count: usize,
     pub word_completion_sample_count: usize,
+    pub nested_completion_preview_count: usize,
+    pub prepared_token_count: usize,
+    pub execution_plan_argv_count: usize,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -273,12 +336,28 @@ impl PromptArchitectureContext {
         let token_count = input.split_whitespace().count();
         let completion_runtime = bootstrap_completion_runtime();
         let word_completion = bootstrap_word_completion_morphisms();
+        let nested_completion = bootstrap_nested_completion_morphisms();
+        let prompt_preparation = bootstrap_prompt_preparation();
+        let prompt_execution = bootstrap_prompt_execution();
+        let text_state = crate::prompt_session::PromptTextState::new(input);
+        let prepared = prompt_preparation.prepare_large_output(
+            "",
+            crate::prompt_language::PromptModus::Normal,
+            crate::prompt_language::PromptModus::Normal,
+            crate::prompt_language::PromptModus::Normal,
+            input,
+            &[],
+        );
+        let execution_plan = prompt_execution.plan_prompt_execution(&prepared, &text_state);
         Self {
             program_name: program_name.to_string(),
             input_len: input.chars().count(),
             token_count,
             start_command_count: completion_runtime.start_commands(true).len(),
             word_completion_sample_count: word_completion.sample_completions("re").len(),
+            nested_completion_preview_count: nested_completion.complete(input).len(),
+            prepared_token_count: prepared.tokens.len(),
+            execution_plan_argv_count: execution_plan.reta_argv.len(),
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
             universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"

@@ -10,17 +10,27 @@
 
 pub mod category;
 pub mod column_selection;
+pub mod combi_join;
 pub mod completion_runtime;
+pub mod completion_nested;
 pub mod completion_word;
+pub mod concat_csv;
 pub mod dataflow;
 pub mod facade;
+pub mod generated_columns;
 pub mod morphism;
+pub mod meta_columns;
 pub mod number_theory;
 pub mod output_semantics;
 pub mod output_syntax;
 pub mod parameter_runtime;
 pub mod presheaf;
 pub mod program_workflow;
+pub mod prompt_execution;
+pub mod prompt_interaction;
+pub mod prompt_preparation;
+pub mod prompt_runtime;
+pub mod prompt_session;
 pub mod prompt_language;
 pub mod row_filtering;
 pub mod row_ranges;
@@ -39,6 +49,11 @@ pub use category::{
     bootstrap_category_theory, CategoryMorphismSpec, CategoryObjectSpec, CategorySpec,
     CategoryTheoryBundle, FunctorSpec, NaturalTransformationSpec, PYTHON_CATEGORY_THEORY_SNAPSHOT,
 };
+pub use combi_join::{
+    bootstrap_combi_join, prepare_table_join, remove_number_from_cell, remove_one_number,
+    rows_of_combi_from_relation, table_join, KombiJoinBundle, KombiJoinSnapshot,
+    KombiJoinSpec, KombiSubTable,
+};
 pub use column_selection::{
     bootstrap_column_selection, ColumnBucketKey, ColumnBucketSnapshot, ColumnSelectionBundle,
     ColumnSelectionSnapshot, COLUMN_BUCKET_NAMES, COLUMN_BUCKET_VALUES,
@@ -46,6 +61,21 @@ pub use column_selection::{
 pub use completion_runtime::{
     bootstrap_completion_runtime, sort_completion_key, CompletionRuntimeBundle,
     CompletionRuntimeSnapshot, CompletionSortKey,
+};
+pub use completion_nested::{
+    bootstrap_nested_completion_morphisms, candidates_for_situation,
+    classify_nested_completion_context, match_text_alx, nested_completion_candidates,
+    prompt_document_for_nested_text, word_options_for_nested, ComplSitua,
+    NestedCompletionCandidate, NestedCompletionContext, NestedCompletionMorphismBundle,
+    NestedCompletionOptions, NestedCompletionRuntimeSnapshot, NestedCompletionRuntimeView,
+    NestedCompletionSnapshot, HUNDERT,
+};
+pub use concat_csv::{
+    bootstrap_concat_csv, combine_dicts, convert_fractions_to_dict_of_num_to_pairs_of_mul_of_int_and_fraction,
+    convert_set_of_pairs_to_dict_of_num_to_pairs_div, convert_set_of_pairs_to_dict_of_num_to_pairs_mul,
+    normalize_fraction, rational_div, rational_mul, read_concat_csv_tabelle_dazu_colchange,
+    ConcatCsvBundle, ConcatCsvSnapshot, ConcatCsvSpec, ConcatCsvSpecSnapshot,
+    FractionPair, FractionPairMap,
 };
 pub use completion_word::{
     bootstrap_word_completion_morphisms, iter_word_completions, resolve_words, word_before_cursor,
@@ -61,6 +91,21 @@ pub use dataflow::{
 pub use facade::{
     bootstrap_architecture_runtime, ArchitectureRuntime, ArchitectureSnapshotRef,
     PromptArchitectureContext, RetaRunArchitecture, ARCHITECTURE_COUNTS_SNAPSHOT,
+};
+pub use generated_columns::{
+    bootstrap_generated_columns, concat_prim_creativity_type, create_spalte_gestirn,
+    default_generated_column_registry, ensure_generated_parameter_slot_free,
+    equality_freedom_domination_type, generated_parameter_index, love_polygon_cell,
+    mind_emotion_energy_matter_topology_type, GeneratedColumnRegistry,
+    GeneratedColumnRegistrySnapshot, GeneratedColumnSpec, GeneratedColumnSpecSnapshot,
+    GeneratedColumnsBundle,
+};
+pub use meta_columns::{
+    bootstrap_meta_columns, find_all_brueche_and_their_combinations, gcd_i64,
+    make_vorwort, meta_number_signature, spalte_fuer_gegen_innen_aussen_seitlich_prim,
+    spalte_meta_konkret_abstrakt_is_ganzzahlig, switching_meta_pair, MetaColumnSpec,
+    MetaColumnSpecSnapshot, MetaColumnsBundle, MetaColumnsSnapshot, MetaVorwort,
+    PrimeCrossColumnClass, Rational,
 };
 pub use morphism::{MorphismEdge, MorphismGraph, MorphismKind};
 pub use number_theory::{
@@ -86,6 +131,33 @@ pub use presheaf::{LocalSection, Presheaf, PresheafBundle};
 pub use program_workflow::{
     bootstrap_program_workflow, ProgramWorkflowBundle, ProgramWorkflowSnapshot, WorkflowStep,
     WorkflowTrace,
+};
+pub use prompt_execution::{
+    another_oberes_maximum, bootstrap_prompt_execution, bruch_spalt,
+    create_ranges_for_bruch_parts, fraction_range_management, get_dict_limited_by_key_list,
+    greater_and_less_than_anchor, if_print_cmd_again, plan_prompt_execution,
+    return_only_paras_as_list, split_reta_argv_like_python,
+    vorher_von_ausschnitt_oder_zaehlung, BruchPart, FractionRangeManagementResult,
+    PromptExecutionBundle, PromptExecutionPlan, PromptExecutionSnapshot,
+};
+pub use prompt_interaction::{
+    bootstrap_prompt_interaction, PromptInteractionBundle, PromptInteractionPlan,
+    PromptInteractionSnapshot, PromptStorageDecision,
+};
+pub use prompt_preparation::{
+    bootstrap_prompt_preparation, prepare_large_output, regex_replace, rotate_where_reta_command,
+    simple_pattern_match, vorher_von_ausschnitt_or_zaehlung, PreparedPromptOutput,
+    PromptPreparationBundle, PromptPreparationSnapshot,
+};
+pub use prompt_runtime::{
+    bootstrap_prompt_runtime, build_main_parameter_commands, prime_command_predicate,
+    PromptProgramView, PromptRuntimeBundle, PromptRuntimeBuilder, PromptRuntimeSnapshot,
+    PromptRuntimeValidation, PromptTablesView, PromptVocabulary, PromptVocabularySnapshot,
+};
+pub use prompt_session::{
+    bootstrap_prompt_session, split_command_words, split_prompt_text, PromptLoopSetup,
+    PromptLoopSetupSnapshot, PromptSessionBundle, PromptSessionSnapshot, PromptStoreResult,
+    PromptTextState,
 };
 pub use prompt_language::{
     bootstrap_prompt_language, custom_split, custom_split2, is_15_or_16_command, is_reta_parameter,
