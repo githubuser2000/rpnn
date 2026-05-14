@@ -263,6 +263,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "parameter_projection_to_same_csv_cells",
         ),
         step(
+            "step-table-view",
+            "wave-02-table-adapters",
+            "materialized_csv_sections + virtual_column_witnesses",
+            "table_view.materialized_view",
+            "table_view.render_lines",
+            "table-view-shadow-diff",
+            "materialized_sections_glue_to_same_ordered_renderable_rows",
+        ),
+        step(
             "step-shadow-table-adapter",
             "wave-02-table-adapters",
             "Program.__resultingTable + Program.finallyDisplayLines",

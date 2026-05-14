@@ -149,6 +149,10 @@ use crate::table_materialization::{
     bootstrap_table_materialization as bootstrap_table_materialization_impl,
     TableMaterializationBundle, TableMaterializationConfig,
 };
+use crate::table_view::{
+    bootstrap_table_view as bootstrap_table_view_impl, MaterializedTableViewConfig,
+    TableViewBundle,
+};
 use crate::table_output::{
     bootstrap_table_output as bootstrap_table_output_impl, TableOutputBundle,
 };
@@ -231,6 +235,7 @@ pub struct ArchitectureRuntime {
     pub table_adapters: TableAdaptersBundle,
     pub table_generation: TableGenerationBundle,
     pub table_materialization: TableMaterializationBundle,
+    pub table_view: TableViewBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -384,6 +389,7 @@ impl ArchitectureRuntime {
             table_adapters: bootstrap_table_adapters(),
             table_generation: bootstrap_table_generation_impl(),
             table_materialization: bootstrap_table_materialization_impl(),
+            table_view: bootstrap_table_view_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -586,6 +592,21 @@ impl ArchitectureRuntime {
                     &TableMaterializationConfig::default(),
                 )
                 .materialized_cell_count,
+            rust_table_view_morphism_count: self.table_view.snapshot().morphisms.len(),
+            rust_table_view_smoke_row_count: self
+                .table_view
+                .view_for_cli_args(
+                    &[
+                        "reta",
+                        "-zeilen",
+                        "--vorhervonausschnitt=1-1",
+                        "-spalten",
+                        "--kontinuum=m",
+                    ],
+                    &TableMaterializationConfig::default(),
+                    &MaterializedTableViewConfig::default(),
+                )
+                .row_count,
             rust_parallel_execution_morphism_count: self
                 .parallel_execution
                 .snapshot()
@@ -686,6 +707,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_html_class_unique_column_count: usize,
     pub rust_table_materialization_morphism_count: usize,
     pub rust_table_materialization_smoke_cell_count: usize,
+    pub rust_table_view_morphism_count: usize,
+    pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
     pub rust_persistence_table_count: usize,
     pub rust_schema_main_alias_count: usize,
@@ -724,6 +747,8 @@ pub struct RetaRunArchitecture {
     pub materialized_csv_section_count: usize,
     pub materialized_csv_cell_count: usize,
     pub materialized_continuum_m: bool,
+    pub materialized_table_view_row_count: usize,
+    pub materialized_table_view_virtual_cell_count: usize,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -757,6 +782,10 @@ impl RetaRunArchitecture {
                 &table_generation_plan,
                 &TableMaterializationConfig::default(),
             );
+        let materialized_table_view = crate::table_view::bootstrap_table_view().view_from_report(
+            &materialization_report,
+            &MaterializedTableViewConfig::default(),
+        );
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
         let activation_units =
@@ -789,6 +818,8 @@ impl RetaRunArchitecture {
             materialized_csv_section_count: materialization_report.section_count(),
             materialized_csv_cell_count: materialization_report.materialized_cell_count,
             materialized_continuum_m: materialization_report.continuum_m_columns_present,
+            materialized_table_view_row_count: materialized_table_view.row_count,
+            materialized_table_view_virtual_cell_count: materialized_table_view.rendered_virtual_cell_count,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -805,7 +836,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} view_rows={} view_virtual_cells={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -822,6 +853,8 @@ impl RetaRunArchitecture {
             self.materialized_csv_section_count,
             self.materialized_csv_cell_count,
             self.materialized_continuum_m,
+            self.materialized_table_view_row_count,
+            self.materialized_table_view_virtual_cell_count,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,

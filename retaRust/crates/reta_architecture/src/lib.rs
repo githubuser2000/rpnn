@@ -68,6 +68,7 @@ pub mod split_i18n;
 pub mod table_adapters;
 pub mod table_generation;
 pub mod table_materialization;
+pub mod table_view;
 pub mod table_output;
 pub mod table_preparation;
 pub mod table_runtime;
@@ -370,6 +371,14 @@ pub use table_materialization::{
     plan_rows_to_source_indices, CsvProjectionRequest, MaterializedCsvCell, MaterializedCsvRow,
     MaterializedCsvSection, SymbolicBucketMaterialization, TableMaterializationBundle,
     TableMaterializationConfig, TableMaterializationReport, TableMaterializationSnapshot,
+    VirtualColumnMaterialization,
+};
+pub use table_view::{
+    bootstrap_table_view, build_materialized_table_view, continuum_m_table_view_smoke,
+    render_table_view_lines, view_for_cli_args as table_view_for_cli_args, virtual_column_value,
+    MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
+    MaterializedTableViewConfig, MaterializedTableViewRow, TableViewBundle, TableViewSnapshot,
+    VirtualColumnDisplayPolicy,
 };
 pub use table_output::{
     bootstrap_table_output, colorize, determine_row_width, max_cell_text_len, only_that_columns_fn,

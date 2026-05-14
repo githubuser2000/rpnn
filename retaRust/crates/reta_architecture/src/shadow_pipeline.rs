@@ -23,6 +23,9 @@ use crate::runtime_switch::{
 use crate::table_materialization::{
     bootstrap_table_materialization, TableMaterializationConfig, TableMaterializationReport,
 };
+use crate::table_view::{
+    bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
+};
 use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
 use crate::table_preparation::{prepare_row_cells, PreparedTable};
 use crate::table_wrapping::TableWidthContext;
@@ -285,6 +288,7 @@ pub struct ShadowCliPlan {
     pub parity_plans: Vec<ParityProbePlan>,
     pub execution_network_plan: ExecutionNetworkPlan,
     pub materialization_report: TableMaterializationReport,
+    pub table_view: MaterializedTableView,
     pub universal_property: String,
 }
 
@@ -313,6 +317,7 @@ impl ShadowPipelineBundle {
                 "shadow_pipeline.prompt_commit".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
                 "table_materialization.generation_plan".to_string(),
+                "table_view.materialized_view".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -341,6 +346,10 @@ impl ShadowPipelineBundle {
             execution_network_plan_for_indices(&task_indices, DataflowDiscipline::Fifo);
         let materialization_report = bootstrap_table_materialization()
             .materialize_cli_args(&cleaned_args, &TableMaterializationConfig::default());
+        let table_view = bootstrap_table_view().view_from_report(
+            &materialization_report,
+            &MaterializedTableViewConfig::default(),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -350,6 +359,7 @@ impl ShadowPipelineBundle {
             parity_plans,
             execution_network_plan,
             materialization_report,
+            table_view,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }
