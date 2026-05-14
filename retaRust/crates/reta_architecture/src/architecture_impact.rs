@@ -230,3 +230,34 @@ fn validate_impact(sources: &[ImpactSourceSpec], contracts: &[ImpactContractSpec
         .collect();
     ImpactValidationSpec { status: "ready".to_string(), sources_without_contract, candidates_without_gate, unknown_gate_references, checked_candidates: candidates.len() }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "ImpactCheckSpec",
+    "Stage33ArchitecturePlan",
+    "_base_gates",
+    "_boundary_edges_for",
+    "_candidate_status",
+    "_dedupe",
+    "_diagram_probe_map",
+    "_gate_names_for",
+    "_impact_contracts",
+    "_impact_sources",
+    "_mermaid_diagram",
+    "_migration_candidates",
+    "_plan",
+    "_source_kind",
+    "_text_diagram",
+    "_validate",
+    "source_named",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

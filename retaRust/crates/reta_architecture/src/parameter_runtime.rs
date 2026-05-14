@@ -448,3 +448,23 @@ mod tests {
         assert_eq!(runtime.upper_limit_from_arguments(&["--vorhervonausschnitt=3"], Some(10)), Some(1024));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_ensure_runtime_imports",
+    "resultingSpaltenFromTuple",
+    "spalten_removeDoublesNthenRemoveOneFromAnother",
+    "apply_upper_limit_argument",
+    "apply_width_parameter",
+    "produce_all_spalten_numbers",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

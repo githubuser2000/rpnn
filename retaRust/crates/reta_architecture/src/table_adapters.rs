@@ -491,3 +491,33 @@ mod tests {
         assert!(!concat.concat_love_polygon(13).is_empty());
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "spalteMetaKontretTheorieAbstrakt_etc",
+    "Concat",
+    "Prepare",
+    "prepare4out_LoopBody",
+    "prepare4out_Tagging",
+    "prepare4out_beforeForLoop_SpaltenZeilenBestimmen",
+    "readConcatCSV_choseCsvFile",
+    "readConcatCsv",
+    "readConcatCsv_ChangeTableToAddToTable",
+    "readConcatCsv_LoopBody",
+    "readConcatCsv_SetHtmlParamaters",
+    "readOneCSVAndReturn",
+    "spalteMetaKonkretAbstrakt_UeberschriftenUndTags",
+    "spalteMetaKonkretTheorieAbstrakt_SetHtmlParameters",
+    "spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta",
+    "spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

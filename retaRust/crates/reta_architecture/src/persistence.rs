@@ -490,3 +490,28 @@ mod tests {
         assert_eq!(events[0].subject, "b");
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_json_dumps",
+    "_prepare_cache_entries_worker",
+    "_prepare_persistence_entries_in_processes",
+    "_prepare_section_entries_worker",
+    "_prepare_sheaf_snapshot_entries_worker",
+    "connect",
+    "initialise_persistence_schema",
+    "load_sheaf_snapshot",
+    "stable_digest",
+    "persist_sections_batch",
+    "persist_sheaf_snapshots_batch",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

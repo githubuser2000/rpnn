@@ -203,3 +203,29 @@ mod tests {
         assert!(!normalized.contains_key(&ColumnBucketKey::negative(0)));
     }
 }
+
+
+
+// Stage 15: concrete adapter for the old bind_program_sections helper.  The
+// input is already the local bucket map extracted from a Program-like state;
+// the output is the globally glued, negative-bucket-normalised section map.
+pub fn bind_program_sections(
+    buckets: &BTreeMap<ColumnBucketKey, BTreeSet<i64>>,
+) -> BTreeMap<ColumnBucketKey, BTreeSet<i64>> {
+    bootstrap_column_selection().normalize_bucket_map(buckets)
+}
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "bind_program_sections",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

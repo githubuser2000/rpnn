@@ -256,3 +256,47 @@ mod tests {
         assert!(!could_be_prime_number_primzahlkreuz(9));
     }
 }
+
+
+
+// Stage 15: concrete legacy-name wrappers for the number-theory surface.
+// They keep the historical Python spelling callable from Rust while routing to
+// the typed snake_case morphisms above.
+pub fn primFak(value: i64) -> Vec<i64> {
+    prime_factors(value)
+}
+
+pub fn primRepeat(values: &[i64]) -> Vec<(i64, i64)> {
+    prime_repeat(values)
+}
+
+pub fn primCreativity(value: i64) -> i64 {
+    prime_creativity(value)
+}
+
+pub fn primMultiple(value: i64) -> Vec<(i64, i64)> {
+    prime_multiple(value)
+}
+
+pub fn isPrimMultiple(value: i64, multiples: &[i64]) -> bool {
+    is_prime_multiple(value, multiples)
+}
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "isPrimMultiple",
+    "primCreativity",
+    "primFak",
+    "primMultiple",
+    "primRepeat",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

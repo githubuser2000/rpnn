@@ -309,3 +309,25 @@ mod tests {
         assert_eq!(repeated, vec!["2^2".to_string(), "3".to_string()]);
     }
 }
+
+
+
+// Stage 15: concrete legacy-name wrapper for the modulo table printer.
+pub fn print_modulo_table(values: &[i64], classifier_name: Option<&str>) -> String {
+    modulo_table_lines(values, classifier_name).join("\n")
+}
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "print_modulo_table",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

@@ -260,3 +260,24 @@ mod tests {
         assert_eq!(width_for_row_context(&context, 3, 0), 21);
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "Wraptype",
+    "get_shell_rows_amount",
+    "get_wrapping_type",
+    "refresh_textwrap_runtime",
+    "set_shell_rows_amount",
+    "set_wrapping_type",
+    "textwrap_runtime",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

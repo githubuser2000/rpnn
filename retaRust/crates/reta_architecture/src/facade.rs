@@ -750,3 +750,67 @@ mod tests {
         assert!(context.context.scopes.unwrap().contains("embedded_reta"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "RetaArchitecture",
+    "bootstrap",
+    "bootstrap_arithmetic",
+    "bootstrap_console_io",
+    "bootstrap_nested_completion",
+    "bootstrap_row_ranges",
+    "bootstrap_word_completion",
+    "sync_program_semantics",
+    "sync_tables",
+    "update_prompt_state",
+    "bootstrap_architecture_activation",
+    "bootstrap_architecture_boundaries",
+    "bootstrap_architecture_coherence",
+    "bootstrap_architecture_contracts",
+    "bootstrap_architecture_impact",
+    "bootstrap_architecture_map",
+    "bootstrap_architecture_migration",
+    "bootstrap_architecture_progress",
+    "bootstrap_architecture_rehearsal",
+    "bootstrap_architecture_traces",
+    "bootstrap_architecture_validation",
+    "bootstrap_architecture_witnesses",
+    "bootstrap_category_theory",
+    "bootstrap_column_selection",
+    "bootstrap_combi_join",
+    "bootstrap_completion_runtime",
+    "bootstrap_concat_csv",
+    "bootstrap_execution_network",
+    "bootstrap_generated_columns",
+    "bootstrap_meta_columns",
+    "bootstrap_number_theory",
+    "bootstrap_output_syntax",
+    "bootstrap_parallel_execution",
+    "bootstrap_parameter_runtime",
+    "bootstrap_persistence",
+    "bootstrap_program_workflow",
+    "bootstrap_prompt_execution",
+    "bootstrap_prompt_interaction",
+    "bootstrap_prompt_language",
+    "bootstrap_prompt_preparation",
+    "bootstrap_prompt_runtime",
+    "bootstrap_prompt_session",
+    "bootstrap_row_filtering",
+    "bootstrap_table_generation",
+    "bootstrap_table_output",
+    "bootstrap_table_preparation",
+    "bootstrap_table_runtime",
+    "bootstrap_table_state",
+    "bootstrap_table_wrapping",
+    "snapshot",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

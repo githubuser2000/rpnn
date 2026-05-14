@@ -266,3 +266,27 @@ mod tests {
         assert!(!language.is_reta_parameter("-1-3"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "__post_init__",
+    "_default_prompt_language",
+    "_is_zeilenbruch_or_ganzzahl_angabe",
+    "befehle",
+    "befehle2",
+    "is15or16command",
+    "isReTaParameter",
+    "is_zeilenangabe_between_kommas",
+    "is_zeilenbruch_between_kommas",
+    "stextFromKleinKleinKleinBefehl",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

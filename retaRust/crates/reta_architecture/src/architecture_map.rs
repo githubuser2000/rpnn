@@ -471,3 +471,20 @@ mod tests {
         assert!(map.owner_for_legacy_surface("libs/lib4tables_Enum.py").is_some());
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// Marker-only names still need semantic Rust implementation before activation.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_capsule",
+    "_capsules",
+    "_containment",
+    "_flows",
+    "_mapping",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

@@ -827,3 +827,24 @@ mod tests {
         );
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_prepare_row_chunk_worker",
+    "decode_kombi_rows_in_processes",
+    "decode_religion_rows_in_processes",
+    "max_cell_text_len_in_processes",
+    "prepare_kombi_join_tables_in_processes",
+    "prepare_rows_in_processes",
+    "select_columns_in_processes",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

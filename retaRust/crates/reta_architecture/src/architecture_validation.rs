@@ -134,3 +134,40 @@ fn summary_from_checks(checks: &[ArchitectureValidationCheckSpec]) -> Architectu
     let failed_checks = checks.iter().filter(|check| check.status != "passed").count();
     ArchitectureValidationSummarySpec { status: if failed_checks == 0 { "ready" } else { "needs-attention" }.to_string(), passed_checks: checks.len() - failed_checks, failed_checks, total_checks: checks.len(), failed_items }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "Stage31ArchitecturePlan",
+    "_activation_checks",
+    "_arithmetic_checks",
+    "_boundary_checks",
+    "_category_checks",
+    "_console_io_checks",
+    "_contract_checks",
+    "_impact_checks",
+    "_map_checks",
+    "_migration_checks",
+    "_nested_completion_checks",
+    "_plan",
+    "_rehearsal_checks",
+    "_repo_checks",
+    "_row_range_checks",
+    "_trace_checks",
+    "_witness_checks",
+    "_word_completion_checks",
+    "assert_passed",
+    "check_named",
+    "_layers",
+    "_passed",
+    "_summary",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

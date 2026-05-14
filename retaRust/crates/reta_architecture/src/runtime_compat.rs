@@ -168,3 +168,29 @@ mod tests {
         assert_eq!(compat.bereich_to_numbers2("1-3", false, 10, false).len(), 3);
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "nPmEnum",
+    "alxp",
+    "unique_everseen",
+    "x",
+    "getTextWrapThings",
+    "invert_dict_B",
+    "moduloA",
+    "primRepeat",
+    "primRepeat2",
+    "primfaktoren",
+    "retaHilfe",
+    "retaPromptHilfe",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

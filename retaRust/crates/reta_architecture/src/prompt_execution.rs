@@ -356,3 +356,34 @@ mod tests {
         assert_eq!(plan.reta_argv.first().map(String::as_str), Some("reta"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "PromptGrosseAusgabe",
+    "PromptVonGrosserAusgabeSonderBefehlAusgaben",
+    "addMoreVals",
+    "addMoreVals2",
+    "bruchBereichsManagementAndWbefehl",
+    "configure_prompt_execution",
+    "createRangesForBruchLists",
+    "dictToList",
+    "findEqualNennerZaehler",
+    "findNennerZaehlerMakesWholeNum",
+    "getDictLimtedByKeyList",
+    "grKl",
+    "maxMenge",
+    "retaCmdAbstraction_n_and_1pron",
+    "retaExecuteNprint",
+    "run_grosse_ausgabe",
+    "zeiln1234create",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

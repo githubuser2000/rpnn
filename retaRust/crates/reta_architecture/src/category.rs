@@ -590,3 +590,17 @@ mod tests {
         assert!(bundle.python_snapshot().contains("OpenRetaContextCategory"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// Marker-only names still need semantic Rust implementation before activation.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_categories",
+    "_functors",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

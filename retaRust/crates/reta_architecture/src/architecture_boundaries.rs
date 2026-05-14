@@ -145,3 +145,30 @@ fn capsule_for_owner(map: &ArchitectureMapBundle, owner: &str) -> Option<String>
         .find(|capsule| capsule.code_owners.iter().any(|candidate| candidate == owner))
         .map(|capsule| capsule.name.clone())
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "BoundaryCheckSpec",
+    "Stage32BoundaryPlan",
+    "_capsule_boundaries",
+    "_capsule_edges",
+    "_import_edges",
+    "_imports_in_file",
+    "_mermaid_diagram",
+    "_module_name_from_path",
+    "_norm",
+    "_resolve_import",
+    "_text_diagram",
+    "_validate",
+    "_ownership",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

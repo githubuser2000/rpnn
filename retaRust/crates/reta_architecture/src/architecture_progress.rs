@@ -120,3 +120,38 @@ pub fn bootstrap_architecture_progress(map: &ArchitectureMapBundle, migration: &
     let validation = ProgressValidationSpec { status: "ready".to_string(), unmapped_surfaces: Vec::new(), waves_without_steps: wave_progress.iter().filter(|wave| wave.planned_steps == 0).map(|wave| wave.wave_id.clone()).collect(), outstanding_items: outstanding_work.len() };
     ArchitectureProgressBundle { surfaces, step_progress, wave_progress, outstanding_work, validation, text_diagram: "surface -> step -> wave -> outstanding work".to_string(), mermaid_diagram: "flowchart LR\n  Surface --> Step --> Wave --> Outstanding".to_string() }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "ProgressCheckSpec",
+    "Stage42ArchitecturePlan",
+    "_PythonFileAnalysis",
+    "_analyse_python_file",
+    "_architecture_import_names",
+    "_execution_status_for_surface",
+    "_git_progress_command",
+    "_is_wrapper_like",
+    "_iter_function_nodes",
+    "_mentions_architecture",
+    "_mermaid_diagram",
+    "_norm",
+    "_outstanding_work",
+    "_parity_reference_state",
+    "_step_progress",
+    "_strip_docstring",
+    "_surface_for_owner",
+    "_text_diagram",
+    "_wave_progress",
+    "surface_named",
+    "_validation",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

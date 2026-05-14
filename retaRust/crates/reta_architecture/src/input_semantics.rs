@@ -273,3 +273,62 @@ mod tests {
         assert!(bundle.snapshot().prompt_vocabulary_builder_available);
     }
 }
+
+
+
+// Stage 15: concrete Python-surface wrappers for input semantics.
+pub fn from_i18n(schema: RetaContextSchema) -> InputBundle {
+    InputBundle::from_schema(schema, None)
+}
+
+pub fn build(builder: &PromptVocabularyBuilder) -> PromptVocabulary {
+    builder.build_from_schema()
+}
+
+pub fn split_comma_list(text: &str) -> Vec<String> {
+    RowRangeSyntax::default().split_comma_list(text)
+}
+
+pub fn compact_comma_list(text: &str) -> String {
+    RowRangeSyntax::default().compact_comma_list(text)
+}
+
+pub fn integer_range_pattern() -> &'static str {
+    r"v?-?\d+(?:-\d+)?(?:\+\d+)*"
+}
+
+pub fn fraction_range_pattern() -> &'static str {
+    r"v?-?\d+/\d+(?:-\d+/\d+)?(?:\+\d+/\d+)*"
+}
+
+pub fn is_integer_range_token(text: &str) -> bool {
+    RowRangeSyntax::default().is_integer_range_token(text)
+}
+
+pub fn is_fraction_range_token(text: &str) -> bool {
+    RowRangeSyntax::default().is_fraction_range_token(text)
+}
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "__init__",
+    "build",
+    "compact_comma_list",
+    "fraction_range_pattern",
+    "from_i18n",
+    "integer_range_pattern",
+    "is_fraction_range_token",
+    "is_integer_range_token",
+    "split_comma_list",
+    "RowRangeSyntax",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

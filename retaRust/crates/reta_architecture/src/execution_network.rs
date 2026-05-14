@@ -230,3 +230,32 @@ mod tests {
         assert!(plan.universal_property.contains("deterministically"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// Marker-only names still need semantic Rust implementation before activation.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "ExecutionNetworkBundle",
+    "ExecutionNetworkConfig",
+    "ExecutionResult",
+    "ExecutionRunResult",
+    "ExecutionTask",
+    "FifoTaskQueue",
+    "FullDuplexChannel",
+    "HalfDuplexChannel",
+    "LifoTaskStack",
+    "PriorityTaskQueue",
+    "ResourceSemaphore",
+    "__len__",
+    "bootstrap_execution_network",
+    "deterministic_reduce",
+    "execute_tasks_deterministically",
+    "order_tasks",
+    "workers_for",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}

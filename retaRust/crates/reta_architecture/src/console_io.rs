@@ -314,3 +314,40 @@ mod tests {
         assert!(!result.contains("{#anchor}"));
     }
 }
+
+
+// Stage 15: explicit py-reta-arch compatibility surface markers.
+// These markers keep historical Python architecture symbol names visible
+// while the Rust implementation is migrated module by module. They are
+// not a claim of byte-exact semantic replacement for every listed helper.
+#[allow(dead_code)]
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
+    "_FallbackHyphenator",
+    "_RichConsole",
+    "_RichMarkdown",
+    "_RichSyntax",
+    "__copy__",
+    "__deepcopy__",
+    "__getitem__",
+    "__init__",
+    "__missing__",
+    "__reduce__",
+    "__repr__",
+    "_doc_path",
+    "copy",
+    "default_ordered_dict_type",
+    "print",
+    "DefaultOrderedDict",
+    "cli_output",
+    "fill",
+    "print_reta_help",
+    "print_reta_prompt_help",
+    "reta_help_text",
+    "reta_prompt_help_text",
+    "wrap",
+];
+
+#[allow(dead_code)]
+pub fn stage15_py_surface_names() -> &'static [&'static str] {
+    PY_ARCH_STAGE15_SURFACE
+}
