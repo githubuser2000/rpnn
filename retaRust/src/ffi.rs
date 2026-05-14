@@ -362,7 +362,8 @@ pub unsafe extern "C" fn reta_architecture_table_view_html_attributes_json(
             output_config.suppress_headers,
             output_config.include_empty_rows,
         );
-        let output_report = reta_architecture::render_materialized_table_view(&view, &output_config);
+        let output_report =
+            reta_architecture::render_materialized_table_view(&view, &output_config);
         serde_json::to_string(&serde_json::json!({
             "args": args,
             "options": options,
@@ -372,7 +373,51 @@ pub unsafe extern "C" fn reta_architecture_table_view_html_attributes_json(
     })) {
         Ok(Ok(json)) => into_c_string(json),
         Ok(Err(error)) => json_error_string(&error.to_string()),
-        Err(_) => json_error_string("panic inside reta_architecture_table_view_html_attributes_json"),
+        Err(_) => {
+            json_error_string("panic inside reta_architecture_table_view_html_attributes_json")
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_row_styles_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let options = reta_architecture::parse_table_view_output_cli_options(&args);
+        let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
+        let mode = parsed
+            .selected_output_mode
+            .unwrap_or(reta_architecture::OutputMode::Html);
+        let output_config = reta_architecture::TableViewOutputConfig::default()
+            .with_mode(mode)
+            .with_cli_options(options.clone());
+        let view = reta_architecture::table_view_for_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::MaterializedTableViewConfig::default()
+                .with_virtual_policy(output_config.virtual_column_policy),
+        );
+        let row_styles = reta_architecture::row_style_report_for_rows(
+            &view.rows,
+            output_config.mode,
+            &output_config.row_styles,
+            output_config.suppress_headers,
+            output_config.include_empty_rows,
+        );
+        let output = reta_architecture::render_materialized_table_view(&view, &output_config);
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "options": options,
+            "row_styles": row_styles,
+            "output": output,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_row_styles_json"),
     }
 }
 

@@ -78,6 +78,7 @@ pub mod table_view_layout;
 pub mod table_view_numbering;
 pub mod table_view_output;
 pub mod table_view_output_parity;
+pub mod table_view_row_styles;
 pub mod table_wrapping;
 pub mod tag_schema;
 pub mod topology;
@@ -396,10 +397,9 @@ pub use table_view_html_attributes::{
     bootstrap_table_view_html_attributes, continuum_m_html_attribute_smoke,
     find_html_record_by_row_text, html_attribute_for_cell, html_attribute_report_for_rows,
     html_attribute_rows_for_view_rows, html_escape_attribute, render_html_cell_with_attribute,
-    render_html_table_with_attributes,
-    TableViewHtmlAttributeBundle, TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy,
-    TableViewHtmlAttributeReport, TableViewHtmlAttributeRow, TableViewHtmlAttributeSnapshot,
-    TableViewHtmlCellAttribute,
+    render_html_table_with_attributes, TableViewHtmlAttributeBundle, TableViewHtmlAttributeConfig,
+    TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport, TableViewHtmlAttributeRow,
+    TableViewHtmlAttributeSnapshot, TableViewHtmlCellAttribute,
 };
 pub use table_view_layout::{
     bootstrap_table_view_layout, column_pages_for_widths, display_width, effective_column_widths,
@@ -424,6 +424,7 @@ pub use table_view_output::{
     TableViewOutputBundle, TableViewOutputCliOptions, TableViewOutputConfig, TableViewOutputReport,
     TableViewOutputSnapshot,
 };
+
 pub use table_view_output_parity::{
     bootstrap_table_view_output_parity, canonicalize_cell,
     compare_output_lines as compare_table_view_output_lines, compare_table_view_output_to_legacy,
@@ -431,6 +432,12 @@ pub use table_view_output_parity::{
     strip_ansi_escape_sequences, NormalizedOutputLine, NormalizedOutputReport,
     TableViewOutputParityBundle, TableViewOutputParityConfig, TableViewOutputParityReport,
     TableViewOutputParitySnapshot,
+};
+pub use table_view_row_styles::{
+    bootstrap_table_view_row_styles, continuum_m_row_style_smoke, row_style_for_row,
+    row_style_for_source_row, row_style_report_for_rows, styled_begin_row_for_row,
+    TableViewRowStyle, TableViewRowStyleBundle, TableViewRowStyleConfig, TableViewRowStylePolicy,
+    TableViewRowStyleReport, TableViewRowStyleSnapshot,
 };
 pub use tag_schema::{
     bootstrap_tag_schema, columns_for_tags_in_selector, groups_for_selector,

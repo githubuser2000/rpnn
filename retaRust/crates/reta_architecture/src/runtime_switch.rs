@@ -192,6 +192,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_html_attributes")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
+                    || morphism.starts_with("table_view_row_styles")
                     || morphism.starts_with("table_view_output.parity")
                     || morphism.starts_with("table_view_output.semantic_diff")
                     || morphism.starts_with("shadow_pipeline.table_adapter")
@@ -344,6 +345,9 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_numbering.legacy_prefix".to_string(),
             "table_view_numbering.zaehlung".to_string(),
             "table_view_numbering.nummerierung".to_string(),
+            "table_view_row_styles.legacy_colored_begin_col".to_string(),
+            "table_view_row_styles.html_row_color".to_string(),
+            "table_view_row_styles.bbcode_row_color".to_string(),
             "table_view_output.render".to_string(),
             "table_view_output.mode_projection".to_string(),
             "table_view_output.output_flags".to_string(),

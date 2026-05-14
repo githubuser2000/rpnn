@@ -9,6 +9,8 @@
 //! instead of leaving it hidden inside the renderer.
 //! Stage 31 connects `htmlclassesPy.jsonl` witnesses to the HTML projection via
 //! a disabled-by-default class/style policy.
+//! Stage 32 adds a disabled-by-default row-style projection backed by the
+//! legacy `coloredBeginCol` output syntax.
 //! The legacy renderer is still the behaviour oracle; this module makes those
 //! options inspectable and shadow-comparable before any guarded commit.
 
@@ -22,12 +24,16 @@ use crate::table_view::{
     MaterializedTableViewRow, VirtualColumnDisplayPolicy,
 };
 use crate::table_view_html_attributes::{
-    html_attribute_report_for_rows, render_html_table_with_attributes, TableViewHtmlAttributeConfig,
-    TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport,
+    html_attribute_report_for_rows, render_html_table_with_attributes,
+    TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport,
 };
 use crate::table_view_layout::{layout_value_rows, TableViewLayoutConfig, TableViewLayoutReport};
 use crate::table_view_numbering::{
     numbering_values_for_source_row, TableViewNumberingConfig, TableViewNumberingMode,
+};
+use crate::table_view_row_styles::{
+    row_style_report_for_rows, styled_begin_row_for_row, TableViewRowStyleConfig,
+    TableViewRowStyleReport,
 };
 use crate::table_wrapping::alxwrap;
 
@@ -45,6 +51,8 @@ pub struct TableViewOutputCliOptions {
     pub htmlclasses: bool,
     pub htmlrawclasses: bool,
     pub htmlclasswitness: bool,
+    pub rowcolors: bool,
+    pub rowcolorwitness: bool,
     pub width: Option<usize>,
     pub widths: Vec<usize>,
     pub recognized_option_count: usize,
@@ -66,6 +74,8 @@ impl Default for TableViewOutputCliOptions {
             htmlclasses: false,
             htmlrawclasses: false,
             htmlclasswitness: false,
+            rowcolors: false,
+            rowcolorwitness: false,
             width: None,
             widths: Vec::new(),
             recognized_option_count: 0,
@@ -91,6 +101,8 @@ impl TableViewOutputCliOptions {
             || self.htmlclasses
             || self.htmlrawclasses
             || self.htmlclasswitness
+            || self.rowcolors
+            || self.rowcolorwitness
     }
 
     pub fn apply_to_config(&self, base: &TableViewOutputConfig) -> TableViewOutputConfig {
@@ -123,8 +135,12 @@ impl TableViewOutputCliOptions {
                 TableViewHtmlAttributePolicy::ClassOnly
             };
         }
+        if self.rowcolors || self.rowcolorwitness {
+            config.row_styles = TableViewRowStyleConfig::legacy_colored();
+        }
         if config.nocolor {
             config.html_attributes.include_inline_style = false;
+            config.row_styles = config.row_styles.clone().without_color();
         }
         if self.width.is_some() || self.dontwrap {
             config.wrap_cell_width = self.width;
@@ -167,6 +183,7 @@ pub struct TableViewOutputConfig {
     pub numbering: TableViewNumberingConfig,
     pub layout: TableViewLayoutConfig,
     pub html_attributes: TableViewHtmlAttributeConfig,
+    pub row_styles: TableViewRowStyleConfig,
     pub wrap_cell_width: Option<usize>,
     pub per_column_widths: Vec<usize>,
     pub dontwrap: bool,
@@ -193,6 +210,7 @@ impl Default for TableViewOutputConfig {
             numbering: TableViewNumberingConfig::disabled(),
             layout: TableViewLayoutConfig::default(),
             html_attributes: TableViewHtmlAttributeConfig::default(),
+            row_styles: TableViewRowStyleConfig::default(),
             wrap_cell_width: None,
             per_column_widths: Vec::new(),
             dontwrap: false,
@@ -264,6 +282,7 @@ pub struct TableViewOutputSnapshot {
     pub default_virtual_policy: String,
     pub stage28_cli_options: Vec<String>,
     pub stage29_numbering_modes: Vec<String>,
+    pub stage32_row_style_policies: Vec<String>,
     pub universal_property: String,
 }
 
@@ -293,6 +312,11 @@ pub struct TableViewOutputReport {
     pub html_attribute_cell_count: usize,
     pub html_attribute_class_cell_count: usize,
     pub html_attribute_report: Option<TableViewHtmlAttributeReport>,
+    pub row_style_enabled: bool,
+    pub row_style_policy: String,
+    pub row_style_row_count: usize,
+    pub row_style_colored_row_count: usize,
+    pub row_style_report: Option<TableViewRowStyleReport>,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -334,6 +358,8 @@ impl TableViewOutputBundle {
                 "column_pages_for_widths".to_string(),
                 "html_attribute_report_for_rows".to_string(),
                 "render_html_table_with_attributes".to_string(),
+                "row_style_report_for_rows".to_string(),
+                "styled_begin_row_for_row".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -363,12 +389,19 @@ impl TableViewOutputBundle {
                 "htmlclasses".to_string(),
                 "htmlrawclasses".to_string(),
                 "htmlclasswitness".to_string(),
+                "rowcolors".to_string(),
+                "zeilenfarben".to_string(),
+                "rowcolorwitness".to_string(),
             ],
             stage29_numbering_modes: vec![
                 TableViewNumberingMode::Disabled.canonical().to_string(),
                 TableViewNumberingMode::LegacyPair.canonical().to_string(),
                 TableViewNumberingMode::NumberOnly.canonical().to_string(),
                 TableViewNumberingMode::CountingOnly.canonical().to_string(),
+            ],
+            stage32_row_style_policies: vec![
+                "plain".to_string(),
+                "legacy-colored-begin-col".to_string(),
             ],
             universal_property:
                 "one materialized table view has deterministic images in every output syntax, output-option and numbering context"
@@ -466,6 +499,15 @@ pub fn parse_table_view_output_cli_options<S: AsRef<str>>(args: &[S]) -> TableVi
                 options.htmlclasswitness = true;
                 true
             }
+            "rowcolors" | "zeilenfarben" => {
+                options.rowcolors = true;
+                true
+            }
+            "rowcolorwitness" | "zeilenfarbenwitness" => {
+                options.rowcolors = true;
+                options.rowcolorwitness = true;
+                true
+            }
             "breite" => {
                 if let Some(value) = value.as_deref() {
                     options.width = parse_positive_width(value);
@@ -547,10 +589,22 @@ pub fn render_materialized_table_view(
     config: &TableViewOutputConfig,
 ) -> TableViewOutputReport {
     let layout_report = shell_layout_report_for_rows(&view.rows, config);
-    let html_attribute_report = if config.mode == OutputMode::Html && config.html_attributes.enabled {
+    let html_attribute_report = if config.mode == OutputMode::Html && config.html_attributes.enabled
+    {
         Some(html_attribute_report_for_rows(
             &view.rows,
             &config.html_attributes,
+            config.suppress_headers,
+            config.include_empty_rows,
+        ))
+    } else {
+        None
+    };
+    let row_style_report = if config.row_styles.activates_mode(config.mode) {
+        Some(row_style_report_for_rows(
+            &view.rows,
+            config.mode,
+            &config.row_styles,
             config.suppress_headers,
             config.include_empty_rows,
         ))
@@ -593,6 +647,11 @@ pub fn render_materialized_table_view(
             .map(|report| report.class_string_cell_count)
             .unwrap_or_default(),
         html_attribute_report,
+        row_style_enabled: config.row_styles.enabled,
+        row_style_policy: config.row_styles.policy.canonical().to_string(),
+        row_style_row_count: row_style_report.as_ref().map(|report| report.row_count).unwrap_or_default(),
+        row_style_colored_row_count: row_style_report.as_ref().map(|report| report.colored_row_count).unwrap_or_default(),
+        row_style_report,
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -859,6 +918,7 @@ pub fn render_html_rows_with_config(
     config: &TableViewOutputConfig,
 ) -> Vec<String> {
     if config.html_attributes.enabled
+        && !config.row_styles.activates_mode(OutputMode::Html)
         && config.wrap_cell_width.is_none()
         && !config.include_row_numbers
         && !config.numbering.is_enabled()
@@ -870,20 +930,25 @@ pub fn render_html_rows_with_config(
             config.include_empty_rows,
         );
     }
-    let row_lines = rendered_row_value_lines(rows, config);
-    if row_lines.is_empty() {
+    let filtered_rows = filtered_output_rows(rows, config);
+    if filtered_rows.is_empty() {
         return Vec::new();
     }
     let mut out = vec![r#"<table border=0 id="bigtable">"#.to_string()];
-    for values in row_lines {
-        if values.is_empty() && !config.include_empty_rows {
-            continue;
+    for (display_index, row) in filtered_rows.into_iter().enumerate() {
+        let expanded = expand_row_to_value_lines(row, config, display_index);
+        for (line_index, values) in expanded.into_iter().enumerate() {
+            if values.is_empty() && !config.include_empty_rows {
+                continue;
+            }
+            let begin =
+                styled_begin_row_for_row(row, OutputMode::Html, line_index > 0, &config.row_styles);
+            out.push(clean_row_begin(&begin, "<tr>"));
+            for value in values {
+                out.push(format!("<td>{}</td>", html_escape_cell(&value)));
+            }
+            out.push("</tr>".to_string());
         }
-        out.push("<tr>".to_string());
-        for value in values {
-            out.push(format!("<td>{}</td>", html_escape_cell(&value)));
-        }
-        out.push("</tr>".to_string());
     }
     out.push("</table>".to_string());
     out
@@ -905,24 +970,42 @@ pub fn render_bbcode_rows_with_config(
     rows: &[MaterializedTableViewRow],
     config: &TableViewOutputConfig,
 ) -> Vec<String> {
-    let row_lines = rendered_row_value_lines(rows, config);
-    if row_lines.is_empty() {
+    let filtered_rows = filtered_output_rows(rows, config);
+    if filtered_rows.is_empty() {
         return Vec::new();
     }
     let mut out = vec!["[table]".to_string()];
-    for values in row_lines {
-        if values.is_empty() && !config.include_empty_rows {
-            continue;
+    for (display_index, row) in filtered_rows.into_iter().enumerate() {
+        let expanded = expand_row_to_value_lines(row, config, display_index);
+        for (line_index, values) in expanded.into_iter().enumerate() {
+            if values.is_empty() && !config.include_empty_rows {
+                continue;
+            }
+            let begin = styled_begin_row_for_row(
+                row,
+                OutputMode::Bbcode,
+                line_index > 0,
+                &config.row_styles,
+            );
+            let cells = values
+                .iter()
+                .map(|value| format!("[td]{}[/td]", bbcode_escape_cell(value)))
+                .collect::<Vec<_>>()
+                .join("");
+            out.push(format!("{}{cells}[/tr]", clean_row_begin(&begin, "[tr]")));
         }
-        let cells = values
-            .iter()
-            .map(|value| format!("[td]{}[/td]", bbcode_escape_cell(value)))
-            .collect::<Vec<_>>()
-            .join("");
-        out.push(format!("[tr]{cells}[/tr]"));
     }
     out.push("[/table]".to_string());
     out
+}
+
+fn clean_row_begin(begin: &str, fallback: &str) -> String {
+    let trimmed = begin.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 pub fn row_values(row: &MaterializedTableViewRow) -> Vec<String> {
@@ -1129,7 +1212,6 @@ mod tests {
         assert!(!report.layout_column_widths.is_empty());
     }
 
-
     #[test]
     fn htmlclasses_option_uses_catalog_but_default_html_stays_plain() {
         let plain = continuum_m_table_view_output_smoke(OutputMode::Html);
@@ -1154,7 +1236,10 @@ mod tests {
         assert!(report.html_attribute_enabled);
         assert_eq!(report.html_attribute_policy, "class-only");
         assert!(report.html_attribute_cell_count > 0);
-        assert!(report.rendered_lines.iter().any(|line| line.contains("class=\"")));
+        assert!(report
+            .rendered_lines
+            .iter()
+            .any(|line| line.contains("class=\"")));
     }
 
     #[test]
@@ -1176,7 +1261,77 @@ mod tests {
             &TableViewOutputConfig::default(),
         );
         assert!(report.html_attribute_enabled);
-        assert!(!report.rendered_lines.iter().any(|line| line.contains("style=\"")));
+        assert!(!report
+            .rendered_lines
+            .iter()
+            .any(|line| line.contains("style=\"")));
+    }
+
+    #[test]
+    fn rowcolors_option_styles_html_and_bbcode_rows_but_nocolor_disables() {
+        let html_args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--rowcolors".to_string(),
+        ];
+        let html_report = render_table_view_for_cli_args(
+            &html_args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(html_report.row_style_enabled);
+        assert!(html_report.row_style_colored_row_count >= 1);
+        assert!(html_report
+            .rendered_lines
+            .iter()
+            .any(|line| line.contains("background-color")));
+
+        let bbcode_args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=bbcode".to_string(),
+            "--zeilenfarben".to_string(),
+        ];
+        let bbcode_report = render_table_view_for_cli_args(
+            &bbcode_args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(bbcode_report
+            .rendered_lines
+            .iter()
+            .any(|line| line.starts_with("[tr=")));
+
+        let nocolor_args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--rowcolors".to_string(),
+            "--nocolor".to_string(),
+        ];
+        let nocolor_report = render_table_view_for_cli_args(
+            &nocolor_args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(!nocolor_report.row_style_enabled);
+        assert!(!nocolor_report
+            .rendered_lines
+            .iter()
+            .any(|line| line.contains("background-color")));
     }
 
     #[test]

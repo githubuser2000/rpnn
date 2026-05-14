@@ -180,6 +180,10 @@ use crate::table_view_output_parity::{
     bootstrap_table_view_output_parity as bootstrap_table_view_output_parity_impl,
     TableViewOutputParityBundle, TableViewOutputParityConfig,
 };
+use crate::table_view_row_styles::{
+    bootstrap_table_view_row_styles as bootstrap_table_view_row_styles_impl,
+    TableViewRowStyleBundle,
+};
 use crate::table_wrapping::{
     bootstrap_table_wrapping as bootstrap_table_wrapping_impl, TableWrappingBundle,
 };
@@ -258,6 +262,7 @@ pub struct ArchitectureRuntime {
     pub table_view_numbering: TableViewNumberingBundle,
     pub table_view_output: TableViewOutputBundle,
     pub table_view_output_parity: TableViewOutputParityBundle,
+    pub table_view_row_styles: TableViewRowStyleBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -417,6 +422,7 @@ impl ArchitectureRuntime {
             table_view_numbering: bootstrap_table_view_numbering_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
             table_view_output_parity: bootstrap_table_view_output_parity_impl(),
+            table_view_row_styles: bootstrap_table_view_row_styles_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -486,6 +492,7 @@ impl ArchitectureRuntime {
             "table_view_numbering",
             "table_view_output",
             "table_view_output_parity",
+            "table_view_row_styles",
             "table_preparation",
             "table_output",
             "table_wrapping",
@@ -673,6 +680,16 @@ impl ArchitectureRuntime {
                 )
                 .left
                 .semantic_row_count,
+            rust_table_view_row_style_morphism_count: self
+                .table_view_row_styles
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_row_style_smoke_colored_count:
+                crate::table_view_row_styles::continuum_m_row_style_smoke(
+                    crate::output_syntax::OutputMode::Html,
+                )
+                .colored_row_count,
             rust_table_view_output_smoke_line_count: self
                 .table_view_output
                 .render_cli_args(
@@ -813,6 +830,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_output_morphism_count: usize,
     pub rust_table_view_output_parity_morphism_count: usize,
     pub rust_table_view_output_parity_smoke_row_count: usize,
+    pub rust_table_view_row_style_morphism_count: usize,
+    pub rust_table_view_row_style_smoke_colored_count: usize,
     pub rust_table_view_output_smoke_line_count: usize,
     pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
@@ -1323,6 +1342,10 @@ pub fn bootstrap_table_materialization() -> TableMaterializationBundle {
 }
 pub fn bootstrap_table_view_html_attributes() -> TableViewHtmlAttributeBundle {
     bootstrap_table_view_html_attributes_impl()
+}
+
+pub fn bootstrap_table_view_row_styles() -> TableViewRowStyleBundle {
+    bootstrap_table_view_row_styles_impl()
 }
 
 pub fn bootstrap_table_view_output() -> TableViewOutputBundle {
