@@ -299,6 +299,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "output_mode_projection_preserves_materialized_row_order",
         ),
         step(
+            "step-table-view-output-flags",
+            "wave-02-table-adapters",
+            "Ausgabe CLI flags + MaterializedTableView",
+            "table_view_output.output_flags",
+            "table_view_output.output_flags",
+            "table-view-output-flags-shadow-diff",
+            "output_flags_filter_headers_empty_rows_and_width_without_changing_materialized_sections",
+        ),
+        step(
             "step-table-view-output-commit",
             "wave-02-table-adapters",
             "TableViewOutputReport",
@@ -512,18 +521,16 @@ fn validate_migration_control(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime_switch::{ArchitectureSwitchMode, bootstrap_runtime_switch};
+    use crate::runtime_switch::{bootstrap_runtime_switch, ArchitectureSwitchMode};
 
     #[test]
     fn migration_control_is_validation_ready() {
         let bundle = bootstrap_migration_control();
         assert!(bundle.validation.is_ready());
-        assert!(
-            bundle
-                .steps
-                .iter()
-                .any(|step| step.morphism == "table_adapters.prepare")
-        );
+        assert!(bundle
+            .steps
+            .iter()
+            .any(|step| step.morphism == "table_adapters.prepare"));
     }
 
     #[test]

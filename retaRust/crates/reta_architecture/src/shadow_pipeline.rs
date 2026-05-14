@@ -23,17 +23,15 @@ use crate::runtime_switch::{
 use crate::table_materialization::{
     bootstrap_table_materialization, TableMaterializationConfig, TableMaterializationReport,
 };
-use crate::table_view::{
-    bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
-};
+use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
+use crate::table_preparation::{prepare_row_cells, PreparedTable};
+use crate::table_view::{bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig};
 use crate::table_view_output::{
     bootstrap_table_view_output, TableViewOutputConfig, TableViewOutputReport,
 };
 use crate::table_view_output_parity::{
     bootstrap_table_view_output_parity, TableViewOutputParityConfig, TableViewOutputParityReport,
 };
-use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
-use crate::table_preparation::{prepare_row_cells, PreparedTable};
 use crate::table_wrapping::TableWidthContext;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -414,10 +412,12 @@ impl ShadowPipelineBundle {
             &materialization_report,
             &MaterializedTableViewConfig::default(),
         );
-        let parsed = crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
+        let parsed =
+            crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
         let output_mode = parsed.selected_output_mode.unwrap_or(OutputMode::Shell);
-        let table_view_output = bootstrap_table_view_output().render_view(
-            &table_view,
+        let table_view_output = bootstrap_table_view_output().render_cli_args(
+            &cleaned_args,
+            &TableMaterializationConfig::default(),
             &TableViewOutputConfig::default().with_mode(output_mode),
         );
         ShadowCliPlan {
@@ -491,7 +491,8 @@ impl ShadowPipelineBundle {
                 Some(config.clone()),
             );
         let gate = switch_config.gate_for_morphism("table_view_output.render");
-        let parsed = crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
+        let parsed =
+            crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
         let output_mode = parsed.selected_output_mode.unwrap_or(OutputMode::Shell);
         let output_config = TableViewOutputConfig::default().with_mode(output_mode);
         let output_report = bootstrap_table_view_output().render_cli_args(
@@ -505,11 +506,12 @@ impl ShadowPipelineBundle {
             legacy_display_lines,
             &output_report.rendered_lines,
         );
-        let semantic_diff = bootstrap_table_view_output_parity().compare_table_view_output_to_legacy(
-            &output_report,
-            legacy_display_lines,
-            &TableViewOutputParityConfig::default().with_mode(output_mode),
-        );
+        let semantic_diff = bootstrap_table_view_output_parity()
+            .compare_table_view_output_to_legacy(
+                &output_report,
+                legacy_display_lines,
+                &TableViewOutputParityConfig::default().with_mode(output_mode),
+            );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -522,12 +524,16 @@ impl ShadowPipelineBundle {
             output_mode: output_report.mode.clone(),
             diff,
             semantic_diff,
-            rendered_preview: output_report.rendered_lines.iter().take(8).cloned().collect(),
+            rendered_preview: output_report
+                .rendered_lines
+                .iter()
+                .take(8)
+                .cloned()
+                .collect(),
             output_report,
             commit_candidate,
             universal_property:
-                "materialized_table_view_output_must_match_legacy_lines_before_commit"
-                    .to_string(),
+                "materialized_table_view_output_must_match_legacy_lines_before_commit".to_string(),
         }
     }
 
@@ -710,8 +716,7 @@ pub fn evaluate_shadow_table_view_output_commit(
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),
         universal_property:
-            "materialized_view_output_commits_only_when_gate_and_diff_policy_commute"
-                .to_string(),
+            "materialized_view_output_commits_only_when_gate_and_diff_policy_commute".to_string(),
     }
 }
 
@@ -901,12 +906,25 @@ mod tests {
                 class: "TableViewOutputReport".to_string(),
                 mode: "shell".to_string(),
                 row_count: 1,
+                rendered_row_count: 1,
                 cell_count: 1,
                 virtual_cell_count: 0,
                 rendered_line_count: 1,
                 rendered_lines: vec!["view".to_string()],
                 rendered_text: "view".to_string(),
                 table_view_policy: "suppress".to_string(),
+                suppress_headers: false,
+                include_empty_rows: true,
+                include_row_numbers: false,
+                wrap_cell_width: None,
+                per_column_width_count: 0,
+                dontwrap: false,
+                nocolor: false,
+                justtext: false,
+                onetable: false,
+                endlessscreen: false,
+                endless: false,
+                cli_options: crate::table_view_output::TableViewOutputCliOptions::default(),
                 continuum_m_direct_header_present: false,
                 continuum_m_virtual_744_kept_as_witness: false,
                 visible_output_is_empty: false,

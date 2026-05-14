@@ -1,179 +1,179 @@
 use serde::{Deserialize, Serialize};
 
 use crate::architecture_activation::{
-    ArchitectureActivationBundle,
     bootstrap_architecture_activation as bootstrap_architecture_activation_impl,
+    ArchitectureActivationBundle,
 };
 use crate::architecture_boundaries::{
-    ArchitectureBoundariesBundle,
     bootstrap_architecture_boundaries as bootstrap_architecture_boundaries_impl,
+    ArchitectureBoundariesBundle,
 };
 use crate::architecture_coherence::{
-    ArchitectureCoherenceBundle,
     bootstrap_architecture_coherence as bootstrap_architecture_coherence_impl,
+    ArchitectureCoherenceBundle,
 };
 use crate::architecture_contracts::{
-    ArchitectureContractsBundle,
     bootstrap_architecture_contracts as bootstrap_architecture_contracts_impl,
+    ArchitectureContractsBundle,
 };
 use crate::architecture_impact::{
-    ArchitectureImpactBundle, bootstrap_architecture_impact as bootstrap_architecture_impact_impl,
+    bootstrap_architecture_impact as bootstrap_architecture_impact_impl, ArchitectureImpactBundle,
 };
 use crate::architecture_map::{
-    ArchitectureMapBundle, bootstrap_architecture_map as bootstrap_architecture_map_impl,
+    bootstrap_architecture_map as bootstrap_architecture_map_impl, ArchitectureMapBundle,
 };
 use crate::architecture_migration::{
-    ArchitectureMigrationBundle,
     bootstrap_architecture_migration as bootstrap_architecture_migration_impl,
+    ArchitectureMigrationBundle,
 };
 use crate::architecture_progress::{
-    ArchitectureProgressBundle,
     bootstrap_architecture_progress as bootstrap_architecture_progress_impl,
+    ArchitectureProgressBundle,
 };
 use crate::architecture_rehearsal::{
-    ArchitectureRehearsalBundle,
     bootstrap_architecture_rehearsal as bootstrap_architecture_rehearsal_impl,
+    ArchitectureRehearsalBundle,
 };
 use crate::architecture_traces::{
-    ArchitectureTraceBundle, bootstrap_architecture_traces as bootstrap_architecture_traces_impl,
+    bootstrap_architecture_traces as bootstrap_architecture_traces_impl, ArchitectureTraceBundle,
 };
 use crate::architecture_validation::{
-    ArchitectureValidationBundle,
     bootstrap_architecture_validation as bootstrap_architecture_validation_impl,
+    ArchitectureValidationBundle,
 };
 use crate::architecture_witnesses::{
-    ArchitectureWitnessBundle,
     bootstrap_architecture_witnesses as bootstrap_architecture_witnesses_impl,
+    ArchitectureWitnessBundle,
 };
-use crate::arithmetic::{ArithmeticMorphismBundle, bootstrap_arithmetic_morphisms};
+use crate::arithmetic::{bootstrap_arithmetic_morphisms, ArithmeticMorphismBundle};
 use crate::category::{
-    CategoryTheoryBundle, bootstrap_category_theory as bootstrap_category_theory_impl,
+    bootstrap_category_theory as bootstrap_category_theory_impl, CategoryTheoryBundle,
 };
 use crate::column_selection::{
-    ColumnSelectionBundle, bootstrap_column_selection as bootstrap_column_selection_impl,
+    bootstrap_column_selection as bootstrap_column_selection_impl, ColumnSelectionBundle,
 };
-use crate::combi_join::{KombiJoinBundle, bootstrap_combi_join as bootstrap_combi_join_impl};
+use crate::combi_join::{bootstrap_combi_join as bootstrap_combi_join_impl, KombiJoinBundle};
 use crate::completion_nested::{
-    NestedCompletionMorphismBundle, bootstrap_nested_completion_morphisms,
+    bootstrap_nested_completion_morphisms, NestedCompletionMorphismBundle,
 };
 use crate::completion_runtime::{
-    CompletionRuntimeBundle, bootstrap_completion_runtime as bootstrap_completion_runtime_impl,
+    bootstrap_completion_runtime as bootstrap_completion_runtime_impl, CompletionRuntimeBundle,
 };
-use crate::completion_word::{WordCompletionMorphismBundle, bootstrap_word_completion_morphisms};
-use crate::concat_csv::{ConcatCsvBundle, bootstrap_concat_csv as bootstrap_concat_csv_impl};
-use crate::console_io::{ConsoleIOMorphismBundle, bootstrap_console_io_morphisms};
+use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletionMorphismBundle};
+use crate::concat_csv::{bootstrap_concat_csv as bootstrap_concat_csv_impl, ConcatCsvBundle};
+use crate::console_io::{bootstrap_console_io_morphisms, ConsoleIOMorphismBundle};
 use crate::csv_catalog::{
-    CsvCatalogBundle, bootstrap_csv_catalog, csv_asset_count, csv_language_variant_count,
-    csv_total_row_count,
+    bootstrap_csv_catalog, csv_asset_count, csv_language_variant_count, csv_total_row_count,
+    CsvCatalogBundle,
 };
 use crate::dataflow::{
-    ExecutionNetworkBundle, ExecutionTask,
-    bootstrap_execution_network as bootstrap_execution_network_impl,
+    bootstrap_execution_network as bootstrap_execution_network_impl, ExecutionNetworkBundle,
+    ExecutionTask,
 };
-use crate::execution_network::{ExecutionNetworkBridgeBundle, bootstrap_execution_network_bridge};
+use crate::execution_network::{bootstrap_execution_network_bridge, ExecutionNetworkBridgeBundle};
 use crate::generated_columns::{
-    GeneratedColumnsBundle, bootstrap_generated_columns as bootstrap_generated_columns_impl,
+    bootstrap_generated_columns as bootstrap_generated_columns_impl, GeneratedColumnsBundle,
 };
 use crate::html_class_catalog::{
-    HtmlClassCatalogBundle, bootstrap_html_class_catalog, html_class_record_count,
-    html_class_unique_column_count,
+    bootstrap_html_class_catalog, html_class_record_count, html_class_unique_column_count,
+    HtmlClassCatalogBundle,
 };
-use crate::input_semantics::{InputBundle, bootstrap_input_semantics};
+use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
 use crate::meta_columns::{
-    MetaColumnsBundle, bootstrap_meta_columns as bootstrap_meta_columns_impl,
+    bootstrap_meta_columns as bootstrap_meta_columns_impl, MetaColumnsBundle,
 };
-use crate::migration_control::{MigrationControlBundle, bootstrap_migration_control};
+use crate::migration_control::{bootstrap_migration_control, MigrationControlBundle};
 use crate::morphism::{
-    MorphismBundle, MorphismEdge, MorphismGraph, MorphismKind, bootstrap_semantic_morphisms,
+    bootstrap_semantic_morphisms, MorphismBundle, MorphismEdge, MorphismGraph, MorphismKind,
 };
 use crate::number_theory::{
-    NumberTheoryBundle, bootstrap_number_theory as bootstrap_number_theory_impl,
+    bootstrap_number_theory as bootstrap_number_theory_impl, NumberTheoryBundle,
 };
-use crate::output_semantics::{RetaOutputSemantics, bootstrap_output_semantics};
+use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
 use crate::output_syntax::{
-    OutputSyntaxBundle, bootstrap_output_syntax as bootstrap_output_syntax_impl,
+    bootstrap_output_syntax as bootstrap_output_syntax_impl, OutputSyntaxBundle,
 };
-use crate::package_integrity::{PackageIntegrityBundle, bootstrap_package_integrity};
+use crate::package_integrity::{bootstrap_package_integrity, PackageIntegrityBundle};
 use crate::parallel_execution::{
-    ParallelExecutionBundle, bootstrap_parallel_execution as bootstrap_parallel_execution_impl,
+    bootstrap_parallel_execution as bootstrap_parallel_execution_impl, ParallelExecutionBundle,
 };
 use crate::parameter_matrix::{
     integer_column_projection_count, nonempty_bucket_projection_count, parameter_matrix_seed_count,
     symbolic_bucket_projection_count,
 };
 use crate::parameter_runtime::{
-    ParameterRuntimeBundle, bootstrap_parameter_runtime as bootstrap_parameter_runtime_impl,
+    bootstrap_parameter_runtime as bootstrap_parameter_runtime_impl, ParameterRuntimeBundle,
 };
-use crate::parity_harness::{ParityHarnessBundle, bootstrap_parity_harness};
-use crate::persistence::{PersistenceBundle, bootstrap_persistence as bootstrap_persistence_impl};
-use crate::presheaf::{PresheafBundle, bootstrap_presheaves};
+use crate::parity_harness::{bootstrap_parity_harness, ParityHarnessBundle};
+use crate::persistence::{bootstrap_persistence as bootstrap_persistence_impl, PersistenceBundle};
+use crate::presheaf::{bootstrap_presheaves, PresheafBundle};
 use crate::program_workflow::{
-    ProgramWorkflowBundle, bootstrap_program_workflow as bootstrap_program_workflow_impl,
+    bootstrap_program_workflow as bootstrap_program_workflow_impl, ProgramWorkflowBundle,
 };
 use crate::prompt_execution::{
-    PromptExecutionBundle, bootstrap_prompt_execution as bootstrap_prompt_execution_impl,
+    bootstrap_prompt_execution as bootstrap_prompt_execution_impl, PromptExecutionBundle,
 };
 use crate::prompt_interaction::{
-    PromptInteractionBundle, bootstrap_prompt_interaction as bootstrap_prompt_interaction_impl,
+    bootstrap_prompt_interaction as bootstrap_prompt_interaction_impl, PromptInteractionBundle,
 };
 use crate::prompt_language::{
-    PromptLanguageBundle, bootstrap_prompt_language as bootstrap_prompt_language_impl,
+    bootstrap_prompt_language as bootstrap_prompt_language_impl, PromptLanguageBundle,
 };
 use crate::prompt_preparation::{
-    PromptPreparationBundle, bootstrap_prompt_preparation as bootstrap_prompt_preparation_impl,
+    bootstrap_prompt_preparation as bootstrap_prompt_preparation_impl, PromptPreparationBundle,
 };
 use crate::prompt_runtime::{
-    PromptRuntimeBundle, bootstrap_prompt_runtime as bootstrap_prompt_runtime_impl,
+    bootstrap_prompt_runtime as bootstrap_prompt_runtime_impl, PromptRuntimeBundle,
 };
 use crate::prompt_session::{
-    PromptSessionBundle, bootstrap_prompt_session as bootstrap_prompt_session_impl,
+    bootstrap_prompt_session as bootstrap_prompt_session_impl, PromptSessionBundle,
 };
 use crate::row_filtering::{
-    RowFilteringBundle, bootstrap_row_filtering as bootstrap_row_filtering_impl,
+    bootstrap_row_filtering as bootstrap_row_filtering_impl, RowFilteringBundle,
 };
-use crate::row_ranges::{RowRangeMorphismBundle, bootstrap_row_range_morphisms};
-use crate::runtime_compat::{RuntimeCompatBundle, bootstrap_runtime_compat};
+use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
+use crate::runtime_compat::{bootstrap_runtime_compat, RuntimeCompatBundle};
 use crate::runtime_switch::{
-    RuntimeSwitchBundle, bootstrap_runtime_switch, extract_architecture_switch_from_argv,
+    bootstrap_runtime_switch, extract_architecture_switch_from_argv, RuntimeSwitchBundle,
 };
-use crate::schema::{RetaContextSchema, bootstrap_schema};
-use crate::semantics_builder::{SemanticsBuilderBundle, bootstrap_semantics_builder};
-use crate::shadow_pipeline::{ShadowPipelineBundle, bootstrap_shadow_pipeline};
-use crate::sheaf::{SheafBundle, bootstrap_sheaves};
-use crate::split_i18n::{SplitI18nProxy, build_split_i18n_proxy};
-use crate::table_adapters::{TableAdaptersBundle, bootstrap_table_adapters};
+use crate::schema::{bootstrap_schema, RetaContextSchema};
+use crate::semantics_builder::{bootstrap_semantics_builder, SemanticsBuilderBundle};
+use crate::shadow_pipeline::{bootstrap_shadow_pipeline, ShadowPipelineBundle};
+use crate::sheaf::{bootstrap_sheaves, SheafBundle};
+use crate::split_i18n::{build_split_i18n_proxy, SplitI18nProxy};
+use crate::table_adapters::{bootstrap_table_adapters, TableAdaptersBundle};
 use crate::table_generation::{
-    TableGenerationBundle, bootstrap_table_generation as bootstrap_table_generation_impl,
+    bootstrap_table_generation as bootstrap_table_generation_impl, TableGenerationBundle,
 };
 use crate::table_materialization::{
-    TableMaterializationBundle, TableMaterializationConfig,
     bootstrap_table_materialization as bootstrap_table_materialization_impl,
+    TableMaterializationBundle, TableMaterializationConfig,
 };
 use crate::table_output::{
-    TableOutputBundle, bootstrap_table_output as bootstrap_table_output_impl,
+    bootstrap_table_output as bootstrap_table_output_impl, TableOutputBundle,
 };
 use crate::table_preparation::{
-    TablePreparationBundle, bootstrap_table_preparation as bootstrap_table_preparation_impl,
+    bootstrap_table_preparation as bootstrap_table_preparation_impl, TablePreparationBundle,
 };
 use crate::table_runtime::{
-    TableRuntimeBundle, bootstrap_table_runtime as bootstrap_table_runtime_impl,
+    bootstrap_table_runtime as bootstrap_table_runtime_impl, TableRuntimeBundle,
 };
-use crate::table_state::{TableStateBundle, bootstrap_table_state as bootstrap_table_state_impl};
+use crate::table_state::{bootstrap_table_state as bootstrap_table_state_impl, TableStateBundle};
 use crate::table_view::{
-    MaterializedTableViewConfig, TableViewBundle, bootstrap_table_view as bootstrap_table_view_impl,
+    bootstrap_table_view as bootstrap_table_view_impl, MaterializedTableViewConfig, TableViewBundle,
 };
 use crate::table_view_output::{
-    TableViewOutputBundle, TableViewOutputConfig,
-    bootstrap_table_view_output as bootstrap_table_view_output_impl,
+    bootstrap_table_view_output as bootstrap_table_view_output_impl, TableViewOutputBundle,
+    TableViewOutputConfig,
 };
 use crate::table_view_output_parity::{
-    TableViewOutputParityBundle, TableViewOutputParityConfig,
     bootstrap_table_view_output_parity as bootstrap_table_view_output_parity_impl,
+    TableViewOutputParityBundle, TableViewOutputParityConfig,
 };
 use crate::table_wrapping::{
-    TableWrappingBundle, bootstrap_table_wrapping as bootstrap_table_wrapping_impl,
+    bootstrap_table_wrapping as bootstrap_table_wrapping_impl, TableWrappingBundle,
 };
-use crate::tag_schema::{TagSchemaBundle, bootstrap_tag_schema};
+use crate::tag_schema::{bootstrap_tag_schema, TagSchemaBundle};
 use crate::topology::{ContextSelection, RetaContextTopology};
 use crate::universal::UniversalBundle;
 
@@ -855,8 +855,9 @@ impl RetaRunArchitecture {
             .selected_output_mode
             .unwrap_or(crate::output_syntax::OutputMode::Shell);
         let materialized_table_output = crate::table_view_output::bootstrap_table_view_output()
-            .render_view(
-                &materialized_table_view,
+            .render_cli_args(
+                &clean_args,
+                &TableMaterializationConfig::default(),
                 &TableViewOutputConfig::default().with_mode(table_output_mode),
             );
         let materialized_table_output_semantic =
@@ -1102,17 +1103,13 @@ mod tests {
     fn runtime_exposes_architecture_terms() {
         let runtime = bootstrap_architecture_runtime();
         assert!(runtime.architecture_terms().contains(&"fifo"));
-        assert!(
-            runtime
-                .architecture_terms()
-                .contains(&"natural_transformation")
-        );
-        assert!(
-            runtime
-                .snapshot_ref()
-                .py_category_theory_json
-                .contains("Functor")
-        );
+        assert!(runtime
+            .architecture_terms()
+            .contains(&"natural_transformation"));
+        assert!(runtime
+            .snapshot_ref()
+            .py_category_theory_json
+            .contains("Functor"));
     }
 
     #[test]

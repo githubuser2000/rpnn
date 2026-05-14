@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 use std::os::raw::c_char;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
-use crate::{RetaRuntime, build_cli_request, run_reta};
+use crate::{build_cli_request, run_reta, RetaRuntime};
 
 pub const RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_ARGC: usize = 4096;
@@ -275,6 +275,33 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_json(
         Ok(Ok(json)) => into_c_string(json),
         Ok(Err(error)) => json_error_string(&error.to_string()),
         Err(_) => json_error_string("panic inside reta_architecture_table_view_output_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_output_options_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let options = reta_architecture::parse_table_view_output_cli_options(&args);
+        let report = reta_architecture::render_table_view_for_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableViewOutputConfig::default(),
+        );
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "options": options,
+            "report": report,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => {
+            json_error_string("panic inside reta_architecture_table_view_output_options_json")
+        }
     }
 }
 

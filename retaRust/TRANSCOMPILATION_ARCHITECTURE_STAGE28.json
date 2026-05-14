@@ -1,0 +1,42 @@
+{
+  "stage": 28,
+  "name": "table_view_output_flags",
+  "date": "2026-05-14",
+  "base": "Stage 27",
+  "summary": "Routes Ausgabe output flags through the Rust materialized table-view output path and removes the unused limit_set warning.",
+  "main_changes": [
+    "Added TableViewOutputCliOptions and parse_table_view_output_cli_options.",
+    "TableViewOutputConfig now carries header suppression, empty-row filtering, width wrapping, per-column widths, and legacy Ausgabe flags.",
+    "render_table_view_for_cli_args now applies CLI output options before building the shadow/diagnostic output report.",
+    "Shadow CLI plan and RetaRunArchitecture now use render_cli_args so Ausgabe flags are visible in the Rust architecture path.",
+    "Added FFI export reta_architecture_table_view_output_options_json and inspect binary rreta_arch_output_flags.",
+    "Removed unused limit_set helper from table_materialization.rs."
+  ],
+  "new_or_changed_files": [
+    "Cargo.toml",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/shadow_pipeline.rs",
+    "crates/reta_architecture/src/table_materialization.rs",
+    "crates/reta_architecture/src/table_view_output.rs",
+    "src/bin/reta_arch_output_flags.rs",
+    "src/ffi.rs",
+    "tools/architecture_output_flags_probe.py"
+  ],
+  "checks": {
+    "isolated_reta_architecture_cargo_check_with_local_serde_stubs": "passed",
+    "isolated_reta_architecture_cargo_test_with_local_serde_stubs": "158 passed, 0 failed",
+    "architecture_output_flags_probe": "passed",
+    "column_order_probe": "passed",
+    "row_order_probe": "passed",
+    "table_view_output_parity_probe": "passed",
+    "table_view_output_commit_probe": "passed",
+    "coverage": "1096/1096 functions, 239/239 classes",
+    "semantic_surface": "0 marker-only, 0 missing",
+    "full_workspace_build_in_this_container": "not run to completion because external crates.io dependencies are not cached/resolvable here"
+  },
+  "user_reported_stage27_build": "Stage 27 compiled successfully in the user's Termux environment; only an unused limit_set warning remained.",
+  "next_recommended_stage": "Connect explicit row-number policy and richer shell width/alignment parity against legacy visible output."
+}

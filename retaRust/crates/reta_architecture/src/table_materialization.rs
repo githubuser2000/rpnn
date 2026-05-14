@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::column_selection::ColumnBucketKey;
-use crate::csv_catalog::{CsvAssetKind, CsvLanguage, csv_asset_by_name, csv_rows_by_name};
+use crate::csv_catalog::{csv_asset_by_name, csv_rows_by_name, CsvAssetKind, CsvLanguage};
 use crate::html_class_catalog::html_class_record;
-use crate::parameter_runtime::{ParameterCommandSets, bootstrap_parameter_runtime};
+use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterCommandSets};
 use crate::table_generation::TableGenerationPlan;
 use crate::tag_schema::ordinary_tags_for_column;
 
@@ -675,7 +675,10 @@ pub fn asset_name_for_language(base_name: &str, language: CsvLanguage) -> String
     }
 }
 
-pub fn ordered_rows_for_projection(request: &CsvProjectionRequest, source_has_rows: bool) -> Vec<usize> {
+pub fn ordered_rows_for_projection(
+    request: &CsvProjectionRequest,
+    source_has_rows: bool,
+) -> Vec<usize> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
     if request.include_header && source_has_rows && seen.insert(0) {
@@ -758,13 +761,6 @@ pub fn numeric_selectors_from_symbols(symbols: &BTreeSet<String>) -> Vec<usize> 
         .collect()
 }
 
-fn limit_set<T: Ord + Clone>(values: BTreeSet<T>, limit: Option<usize>) -> BTreeSet<T> {
-    match limit {
-        Some(limit) => values.into_iter().take(limit).collect(),
-        None => values,
-    }
-}
-
 pub fn materialize_cli_args<S: AsRef<str>>(
     args: &[S],
     config: &TableMaterializationConfig,
@@ -803,18 +799,14 @@ mod tests {
                 && column.tag_names.iter().any(|tag| tag == "sternPolygon")
                 && column.tag_names.iter().any(|tag| tag == "keinParaOdMetaP")
         }));
-        assert!(
-            report
-                .continuum_m_header_preview
-                .iter()
-                .any(|cell| cell.contains("M Kontinuum"))
-        );
-        assert!(
-            report
-                .continuum_m_first_data_preview
-                .iter()
-                .any(|cell| cell.contains("Wege-Gabelung"))
-        );
+        assert!(report
+            .continuum_m_header_preview
+            .iter()
+            .any(|cell| cell.contains("M Kontinuum")));
+        assert!(report
+            .continuum_m_first_data_preview
+            .iter()
+            .any(|cell| cell.contains("Wege-Gabelung")));
         assert_eq!(
             report.ordinary_sections[0].selected_columns_legacy,
             vec![493, 744]
