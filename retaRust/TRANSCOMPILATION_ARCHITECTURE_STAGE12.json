@@ -1,0 +1,28 @@
+{
+  "stage": 12,
+  "status": "implemented_static_checked",
+  "main_focus": "guarded rretaPrompt shadow commit",
+  "new_gates": [
+    "shadow_pipeline.prompt_commit"
+  ],
+  "new_or_changed_modules": [
+    "crates/reta_architecture/src/shadow_pipeline.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/parity_harness.rs",
+    "src/prompt/app.rs",
+    "crates/retaprompt_commands/src/lib.rs",
+    "crates/retaprompt_frontends/src/bin/retaprompt_arch_inspect.rs",
+    "tools/architecture_prompt_commit_probe.py",
+    "src/ffi.rs"
+  ],
+  "prompt_commit_rule": {
+    "requires_gate": true,
+    "requires_legacy_kind": "reta",
+    "requires_same_argv": true,
+    "default_force_mismatch": false
+  },
+  "visible_behavior": "unchanged unless explicit prompt commit gate and argv equality both pass",
+  "cargo_build_verified": false,
+  "cargo_blocker": "cargo and rustc are not installed in this container shell"
+}

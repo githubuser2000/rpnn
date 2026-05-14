@@ -165,6 +165,81 @@ pub struct ShadowCommitDecision {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ShadowPromptLegacyCommand {
+    pub kind: String,
+    pub argv: Vec<String>,
+    pub argv_batches: Vec<Vec<String>>,
+    pub description: String,
+}
+
+impl ShadowPromptLegacyCommand {
+    pub fn reta(argv: Vec<String>) -> Self {
+        Self {
+            kind: "reta".to_string(),
+            argv,
+            argv_batches: Vec::new(),
+            description: "legacy_prompt_command_reta".to_string(),
+        }
+    }
+
+    pub fn reta_batch(argv_batches: Vec<Vec<String>>) -> Self {
+        Self {
+            kind: "reta_batch".to_string(),
+            argv: Vec::new(),
+            argv_batches,
+            description: "legacy_prompt_command_reta_batch".to_string(),
+        }
+    }
+
+    pub fn other(kind: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            kind: kind.into(),
+            argv: Vec::new(),
+            argv_batches: Vec::new(),
+            description: description.into(),
+        }
+    }
+
+    pub fn visible_argv(&self) -> &[String] {
+        &self.argv
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ShadowPromptCommitPolicy {
+    pub require_gate_commit: bool,
+    pub require_same_argv: bool,
+    pub allow_force_mismatch_commit: bool,
+}
+
+impl Default for ShadowPromptCommitPolicy {
+    fn default() -> Self {
+        Self {
+            require_gate_commit: true,
+            require_same_argv: true,
+            allow_force_mismatch_commit: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ShadowPromptCommitDecision {
+    pub morphism: String,
+    pub use_shadow_prompt_plan: bool,
+    pub reason: String,
+    pub switch_mode: String,
+    pub gate_reason: String,
+    pub gate_allowed_to_commit: bool,
+    pub legacy_kind: String,
+    pub same_argv: bool,
+    pub force_override: bool,
+    pub planned_argv: Vec<String>,
+    pub legacy_argv: Vec<String>,
+    pub rollback_anchor: Option<String>,
+    pub universal_property: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ShadowPromptInput {
     pub program_name: String,
     pub prompt_text: String,
@@ -231,6 +306,7 @@ impl ShadowPipelineBundle {
                 "shadow_pipeline.table_adapter".to_string(),
                 "shadow_pipeline.table_commit".to_string(),
                 "shadow_pipeline.prompt_adapter".to_string(),
+                "shadow_pipeline.prompt_commit".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
@@ -341,6 +417,15 @@ impl ShadowPipelineBundle {
                 .to_string(),
         }
     }
+
+    pub fn prompt_commit_decision(
+        &self,
+        report: &ShadowPromptReport,
+        legacy: &ShadowPromptLegacyCommand,
+        config: &ArchitectureSwitchConfig,
+    ) -> ShadowPromptCommitDecision {
+        evaluate_shadow_prompt_commit(report, legacy, config, &ShadowPromptCommitPolicy::default())
+    }
 }
 
 pub fn bootstrap_shadow_pipeline() -> ShadowPipelineBundle {
@@ -420,6 +505,55 @@ pub fn evaluate_shadow_table_commit(
         rollback_anchor: config.rollback_anchor.clone(),
         universal_property:
             "committed_shadow_output_is_allowed_only_when_gate_and_parity_policy_commute"
+                .to_string(),
+    }
+}
+
+pub fn evaluate_shadow_prompt_commit(
+    report: &ShadowPromptReport,
+    legacy: &ShadowPromptLegacyCommand,
+    config: &ArchitectureSwitchConfig,
+    policy: &ShadowPromptCommitPolicy,
+) -> ShadowPromptCommitDecision {
+    let commit_gate = config.gate_for_morphism("shadow_pipeline.prompt_commit");
+    let gate_ok = !policy.require_gate_commit || commit_gate.allowed_to_commit;
+    let kind_ok = legacy.kind == "reta";
+    let same_argv = kind_ok && legacy.visible_argv() == report.planned_argv.as_slice();
+    let force_override = config.mode == ArchitectureSwitchMode::Force
+        && policy.allow_force_mismatch_commit
+        && commit_gate.allowed_to_commit;
+    let argv_ok = !policy.require_same_argv || same_argv || force_override;
+    let use_shadow_prompt_plan = gate_ok && kind_ok && argv_ok;
+    let reason = if use_shadow_prompt_plan {
+        if force_override && !same_argv {
+            "force_commit_prompt_mismatch".to_string()
+        } else {
+            "commit_same_prompt_argv".to_string()
+        }
+    } else if !gate_ok {
+        "gate_not_allowed_to_commit".to_string()
+    } else if !kind_ok {
+        "unsupported_legacy_prompt_kind".to_string()
+    } else if !argv_ok {
+        "prompt_argv_not_equal".to_string()
+    } else {
+        "prompt_commit_policy_rejected".to_string()
+    };
+    ShadowPromptCommitDecision {
+        morphism: "shadow_pipeline.prompt_commit".to_string(),
+        use_shadow_prompt_plan,
+        reason,
+        switch_mode: config.mode.canonical().to_string(),
+        gate_reason: commit_gate.reason,
+        gate_allowed_to_commit: commit_gate.allowed_to_commit,
+        legacy_kind: legacy.kind.clone(),
+        same_argv,
+        force_override,
+        planned_argv: report.planned_argv.clone(),
+        legacy_argv: legacy.argv.clone(),
+        rollback_anchor: config.rollback_anchor.clone(),
+        universal_property:
+            "prompt_shadow_plan_commits_only_when_legacy_compile_and_rust_prompt_execution_commute"
                 .to_string(),
     }
 }
@@ -532,6 +666,51 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn prompt_commit_requires_same_reta_argv() {
+        let report = ShadowPromptReport {
+            morphism: "shadow_pipeline.prompt_adapter".to_string(),
+            gate: SwitchGateDecision::allowed(
+                "shadow_pipeline.prompt_adapter",
+                "commit_gate",
+                ArchitectureSwitchMode::Commit,
+            ),
+            switch_mode: "commit".to_string(),
+            prepared_token_count: 3,
+            execution_argv_count: 3,
+            completion_preview_count: 0,
+            planned_argv: vec!["reta".to_string(), "-zeilen".to_string(), "--alles".to_string()],
+            completion_preview: Vec::new(),
+            commit_candidate: true,
+            universal_property: "test".to_string(),
+        };
+        let config = ArchitectureSwitchConfig::default()
+            .with_mode(ArchitectureSwitchMode::Commit, "test");
+        let same = ShadowPromptLegacyCommand::reta(vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--alles".to_string(),
+        ]);
+        let decision = evaluate_shadow_prompt_commit(&report, &same, &config, &Default::default());
+        assert!(decision.use_shadow_prompt_plan);
+        assert_eq!(decision.reason, "commit_same_prompt_argv");
+
+        let different = ShadowPromptLegacyCommand::reta(vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--alles".to_string(),
+        ]);
+        let decision = evaluate_shadow_prompt_commit(&report, &different, &config, &Default::default());
+        assert!(!decision.use_shadow_prompt_plan);
+        assert_eq!(decision.reason, "prompt_argv_not_equal");
+
+        let dry_run = ArchitectureSwitchConfig::default()
+            .with_mode(ArchitectureSwitchMode::DryRun, "test");
+        let decision = evaluate_shadow_prompt_commit(&report, &same, &dry_run, &Default::default());
+        assert!(!decision.use_shadow_prompt_plan);
+        assert_eq!(decision.reason, "gate_not_allowed_to_commit");
+    }
+
     fn force_can_commit_mismatch_but_dry_run_cannot() {
         let report = ShadowTableReport {
             morphism: "shadow_pipeline.table_adapter".to_string(),

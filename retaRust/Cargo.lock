@@ -1184,6 +1184,7 @@ version = "0.6.0"
 dependencies = [
  "retaprompt_commands",
  "retaprompt_input",
+ "serde_json",
 ]
 
 [[package]]

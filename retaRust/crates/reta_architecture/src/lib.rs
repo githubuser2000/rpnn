@@ -309,10 +309,11 @@ pub use semantics_builder::{
 };
 pub use sheaf::{GluedSection, Sheaf, SheafBundle};
 pub use shadow_pipeline::{
-    bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_table_commit,
-    prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision, ShadowCommitPolicy,
-    ShadowDiffSummary, ShadowPipelineBundle, ShadowPipelineSnapshot, ShadowPromptInput,
-    ShadowPromptReport, ShadowTableInput, ShadowTableReport,
+    bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_prompt_commit,
+    evaluate_shadow_table_commit, prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision,
+    ShadowCommitPolicy, ShadowDiffSummary, ShadowPipelineBundle, ShadowPipelineSnapshot,
+    ShadowPromptCommitDecision, ShadowPromptCommitPolicy, ShadowPromptInput,
+    ShadowPromptLegacyCommand, ShadowPromptReport, ShadowTableInput, ShadowTableReport,
 };
 pub use split_i18n::{
     build_split_i18n_proxy, SplitI18nProxy, SplitI18nProxySnapshot, DEFAULT_MODULE_NAMES,

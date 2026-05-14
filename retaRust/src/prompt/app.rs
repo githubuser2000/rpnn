@@ -241,6 +241,108 @@ fn apply_rpe_emacs_output_to_command(command: PromptCommand, input: &str) -> Pro
     }
 }
 
+fn architecture_prompt_modus(mode: PromptModus) -> reta_architecture::PromptModus {
+    match mode {
+        PromptModus::Normal => reta_architecture::PromptModus::Normal,
+        PromptModus::Speichern => reta_architecture::PromptModus::Speichern,
+        PromptModus::LoeschenStart => reta_architecture::PromptModus::LoeschenStart,
+        PromptModus::SpeicherungAusgaben => reta_architecture::PromptModus::SpeicherungAusgaben,
+        PromptModus::LoeschenSelect => reta_architecture::PromptModus::LoeschenSelect,
+        PromptModus::SpeicherungAusgabenMitZusatz => {
+            reta_architecture::PromptModus::SpeicherungAusgabenMitZusatz
+        }
+        PromptModus::AusgabeSelektiv => reta_architecture::PromptModus::AusgabeSelektiv,
+    }
+}
+
+fn legacy_prompt_command_snapshot(command: &PromptCommand) -> reta_architecture::ShadowPromptLegacyCommand {
+    match command {
+        PromptCommand::Reta(argv) => reta_architecture::ShadowPromptLegacyCommand::reta(argv.clone()),
+        PromptCommand::RetaBatch(argvs) => {
+            reta_architecture::ShadowPromptLegacyCommand::reta_batch(argvs.clone())
+        }
+        PromptCommand::Sequence(commands) => {
+            let description = format!("legacy_prompt_command_sequence_len_{}", commands.len());
+            reta_architecture::ShadowPromptLegacyCommand::other("sequence", description)
+        }
+        PromptCommand::Noop => reta_architecture::ShadowPromptLegacyCommand::other("noop", "legacy_prompt_command_noop"),
+        PromptCommand::Exit => reta_architecture::ShadowPromptLegacyCommand::other("exit", "legacy_prompt_command_exit"),
+        PromptCommand::SaveBefore => reta_architecture::ShadowPromptLegacyCommand::other("save_before", "legacy_prompt_command_save_before"),
+        PromptCommand::SaveAfter => reta_architecture::ShadowPromptLegacyCommand::other("save_after", "legacy_prompt_command_save_after"),
+        PromptCommand::StoreCurrentInput(_) => reta_architecture::ShadowPromptLegacyCommand::other("store_current_input", "legacy_prompt_command_store_current_input"),
+        PromptCommand::StoreInline(_) => reta_architecture::ShadowPromptLegacyCommand::other("store_inline", "legacy_prompt_command_store_inline"),
+        PromptCommand::DeleteStoredStart => reta_architecture::ShadowPromptLegacyCommand::other("delete_stored_start", "legacy_prompt_command_delete_stored_start"),
+        PromptCommand::DeleteStoredSelection(_) => reta_architecture::ShadowPromptLegacyCommand::other("delete_stored_selection", "legacy_prompt_command_delete_stored_selection"),
+        PromptCommand::EnterStoredOutputMode(_) => reta_architecture::ShadowPromptLegacyCommand::other("enter_stored_output_mode", "legacy_prompt_command_enter_stored_output_mode"),
+        PromptCommand::ShowStored(_) => reta_architecture::ShadowPromptLegacyCommand::other("show_stored", "legacy_prompt_command_show_stored"),
+        PromptCommand::Clear => reta_architecture::ShadowPromptLegacyCommand::other("clear", "legacy_prompt_command_clear"),
+        PromptCommand::LaunchUi => reta_architecture::ShadowPromptLegacyCommand::other("launch_ui", "legacy_prompt_command_launch_ui"),
+        PromptCommand::PrintHelp => reta_architecture::ShadowPromptLegacyCommand::other("print_help", "legacy_prompt_command_print_help"),
+        PromptCommand::PrintCommands => reta_architecture::ShadowPromptLegacyCommand::other("print_commands", "legacy_prompt_command_print_commands"),
+        PromptCommand::PrintHistory => reta_architecture::ShadowPromptLegacyCommand::other("print_history", "legacy_prompt_command_print_history"),
+        PromptCommand::SwitchMode(_) => reta_architecture::ShadowPromptLegacyCommand::other("switch_mode", "legacy_prompt_command_switch_mode"),
+        PromptCommand::ToggleLogging(_) => reta_architecture::ShadowPromptLegacyCommand::other("toggle_logging", "legacy_prompt_command_toggle_logging"),
+        PromptCommand::Shell(_) => reta_architecture::ShadowPromptLegacyCommand::other("shell", "legacy_prompt_command_shell"),
+        PromptCommand::Python(_) => reta_architecture::ShadowPromptLegacyCommand::other("python", "legacy_prompt_command_python"),
+        PromptCommand::Math(_) => reta_architecture::ShadowPromptLegacyCommand::other("math", "legacy_prompt_command_math"),
+        PromptCommand::Immediate(_) => reta_architecture::ShadowPromptLegacyCommand::other("immediate", "legacy_prompt_command_immediate"),
+    }
+}
+
+fn prompt_shadow_input_for_state(
+    input: &str,
+    state: &SessionState,
+) -> reta_architecture::ShadowPromptInput {
+    reta_architecture::ShadowPromptInput {
+        program_name: state.program_name.clone(),
+        prompt_text: input.to_string(),
+        placeholder: state.stored_placeholder.clone(),
+        prompt_mode: architecture_prompt_modus(state.prompt_mode),
+    }
+}
+
+fn apply_prompt_shadow_commit_if_safe(
+    compiled: PromptCommand,
+    input: &str,
+    log_path: &PathBuf,
+    state: &SessionState,
+    architecture_switch_config: &reta_architecture::ArchitectureSwitchConfig,
+) -> PromptCommand {
+    if !architecture_switch_config.mode.should_shadow_execute()
+        && !architecture_switch_config.visible_behaviour_may_change()
+    {
+        return compiled;
+    }
+
+    let pipeline = reta_architecture::bootstrap_shadow_pipeline();
+    let shadow_input = prompt_shadow_input_for_state(input, state);
+    let report = pipeline.shadow_prompt(&shadow_input, architecture_switch_config);
+    let legacy = legacy_prompt_command_snapshot(&compiled);
+    let commit = pipeline.prompt_commit_decision(&report, &legacy, architecture_switch_config);
+
+    if state.logging_enabled || architecture_switch_config.trace {
+        append_log_line(
+            log_path,
+            "ARCH_PROMPT_SHADOW",
+            &format!(
+                "mode={} legacy={} planned_argv={} commit={} reason={} same_argv={}",
+                report.switch_mode,
+                legacy.kind,
+                report.planned_argv.len(),
+                commit.use_shadow_prompt_plan,
+                commit.reason,
+                commit.same_argv
+            ),
+        );
+    }
+
+    if commit.use_shadow_prompt_plan {
+        PromptCommand::Reta(report.planned_argv)
+    } else {
+        compiled
+    }
+}
+
 fn should_append_exact_suffix(input: &str) -> bool {
     let tokens = libreta_prompt_custom_split(input);
 
@@ -423,7 +525,9 @@ pub fn run_prompt_command_frontend_with_profile(
 
 fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPreset) -> i32 {
     let program_name = program_name_from_argv(&argv);
-    let startup = parse_startup_args(&argv, &preset);
+    let (architecture_clean_argv, architecture_switch_config) =
+        reta_architecture::extract_architecture_switch_from_argv(&argv, None);
+    let startup = parse_startup_args(&architecture_clean_argv, &preset);
     let _frontend_architecture = reta_architecture::PromptArchitectureContext::from_prompt_input(
         &program_name,
         startup.command_text.as_deref().unwrap_or(""),
@@ -472,7 +576,13 @@ fn run_prompt_frontend_with_preset(argv: Vec<String>, preset: PromptFrontendPres
         let input = startup
             .command_text
             .unwrap_or_else(|| startup.trailing_args.join(" "));
-        return run_one_shot(input, &log_path, preset.emacs_output_mode, &mut state);
+        return run_one_shot(
+            input,
+            &log_path,
+            preset.emacs_output_mode,
+            &mut state,
+            &architecture_switch_config,
+        );
     }
 
     run_interactive_loop(
@@ -501,6 +611,7 @@ fn run_one_shot(
     log_path: &PathBuf,
     emacs_output_mode: bool,
     state: &mut SessionState,
+    architecture_switch_config: &reta_architecture::ArchitectureSwitchConfig,
 ) -> i32 {
     let _prompt_architecture =
         reta_architecture::PromptArchitectureContext::from_prompt_input(&state.program_name, &input);
@@ -540,6 +651,14 @@ fn run_one_shot(
             return output.exit_code;
         }
     };
+
+    let compiled = apply_prompt_shadow_commit_if_safe(
+        compiled,
+        &input,
+        log_path,
+        state,
+        architecture_switch_config,
+    );
 
     if matches!(&compiled, PromptCommand::Exit) {
         if state.logging_enabled {

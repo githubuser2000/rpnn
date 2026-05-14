@@ -846,14 +846,16 @@ fn run_command_one_shot_frontend(argv: Vec<String>, kind: PromptCommandFrontendK
         eprintln!("retaprompt_commands could not preload libreta.so: {message}");
     }
 
-    let startup = parse_command_startup_args(&argv, kind);
+    let (architecture_clean_argv, architecture_switch_config) =
+        reta_architecture::extract_architecture_switch_from_argv(&argv, None);
+    let startup = parse_command_startup_args(&architecture_clean_argv, kind);
     if startup.show_help {
         println!("{}", help_text());
         return 0;
     }
 
-    let program_name =
-        program_name_from_argv(&argv).unwrap_or_else(|| kind.program_name().to_string());
+    let program_name = program_name_from_argv(&architecture_clean_argv)
+        .unwrap_or_else(|| kind.program_name().to_string());
     let mut input = startup
         .command_text
         .unwrap_or_else(|| startup.trailing_args.join(" "));
@@ -867,6 +869,7 @@ fn run_command_one_shot_frontend(argv: Vec<String>, kind: PromptCommandFrontendK
         kind.emacs_output_mode(),
         kind.start_with_vi_mode(),
         kind.implicit_logging(),
+        architecture_switch_config,
     )
 }
 
@@ -876,6 +879,7 @@ fn run_command_one_shot(
     emacs_output_mode: bool,
     start_with_vi_mode: bool,
     implicit_logging: bool,
+    architecture_switch_config: reta_architecture::ArchitectureSwitchConfig,
 ) -> i32 {
     let _ = shared_retaprompt_architecture();
     let _prompt_architecture =
@@ -918,6 +922,13 @@ fn run_command_one_shot(
             return output.exit_code;
         }
     };
+
+    let compiled = apply_prompt_shadow_commit_if_safe(
+        compiled,
+        &input,
+        &state,
+        &architecture_switch_config,
+    );
 
     if matches!(&compiled, PromptCommand::Exit) {
         return 0;
@@ -969,6 +980,86 @@ fn run_command_one_shot(
             print_command_output(&mut state, output.clone());
             output.exit_code
         }
+    }
+}
+
+fn architecture_prompt_modus(mode: PromptModus) -> reta_architecture::PromptModus {
+    match mode {
+        PromptModus::Normal => reta_architecture::PromptModus::Normal,
+        PromptModus::Speichern => reta_architecture::PromptModus::Speichern,
+        PromptModus::LoeschenStart => reta_architecture::PromptModus::LoeschenStart,
+        PromptModus::SpeicherungAusgaben => reta_architecture::PromptModus::SpeicherungAusgaben,
+        PromptModus::LoeschenSelect => reta_architecture::PromptModus::LoeschenSelect,
+        PromptModus::SpeicherungAusgabenMitZusatz => {
+            reta_architecture::PromptModus::SpeicherungAusgabenMitZusatz
+        }
+        PromptModus::AusgabeSelektiv => reta_architecture::PromptModus::AusgabeSelektiv,
+    }
+}
+
+fn legacy_prompt_command_snapshot(command: &PromptCommand) -> reta_architecture::ShadowPromptLegacyCommand {
+    match command {
+        PromptCommand::Reta(argv) => reta_architecture::ShadowPromptLegacyCommand::reta(argv.clone()),
+        PromptCommand::RetaBatch(argvs) => {
+            reta_architecture::ShadowPromptLegacyCommand::reta_batch(argvs.clone())
+        }
+        PromptCommand::Sequence(commands) => {
+            let description = format!("legacy_prompt_command_sequence_len_{}", commands.len());
+            reta_architecture::ShadowPromptLegacyCommand::other("sequence", description)
+        }
+        PromptCommand::Noop => reta_architecture::ShadowPromptLegacyCommand::other("noop", "legacy_prompt_command_noop"),
+        PromptCommand::Exit => reta_architecture::ShadowPromptLegacyCommand::other("exit", "legacy_prompt_command_exit"),
+        PromptCommand::SaveBefore => reta_architecture::ShadowPromptLegacyCommand::other("save_before", "legacy_prompt_command_save_before"),
+        PromptCommand::SaveAfter => reta_architecture::ShadowPromptLegacyCommand::other("save_after", "legacy_prompt_command_save_after"),
+        PromptCommand::StoreCurrentInput(_) => reta_architecture::ShadowPromptLegacyCommand::other("store_current_input", "legacy_prompt_command_store_current_input"),
+        PromptCommand::StoreInline(_) => reta_architecture::ShadowPromptLegacyCommand::other("store_inline", "legacy_prompt_command_store_inline"),
+        PromptCommand::DeleteStoredStart => reta_architecture::ShadowPromptLegacyCommand::other("delete_stored_start", "legacy_prompt_command_delete_stored_start"),
+        PromptCommand::DeleteStoredSelection(_) => reta_architecture::ShadowPromptLegacyCommand::other("delete_stored_selection", "legacy_prompt_command_delete_stored_selection"),
+        PromptCommand::EnterStoredOutputMode(_) => reta_architecture::ShadowPromptLegacyCommand::other("enter_stored_output_mode", "legacy_prompt_command_enter_stored_output_mode"),
+        PromptCommand::ShowStored(_) => reta_architecture::ShadowPromptLegacyCommand::other("show_stored", "legacy_prompt_command_show_stored"),
+        PromptCommand::Clear => reta_architecture::ShadowPromptLegacyCommand::other("clear", "legacy_prompt_command_clear"),
+        PromptCommand::LaunchUi => reta_architecture::ShadowPromptLegacyCommand::other("launch_ui", "legacy_prompt_command_launch_ui"),
+        PromptCommand::PrintHelp => reta_architecture::ShadowPromptLegacyCommand::other("print_help", "legacy_prompt_command_print_help"),
+        PromptCommand::PrintCommands => reta_architecture::ShadowPromptLegacyCommand::other("print_commands", "legacy_prompt_command_print_commands"),
+        PromptCommand::PrintHistory => reta_architecture::ShadowPromptLegacyCommand::other("print_history", "legacy_prompt_command_print_history"),
+        PromptCommand::SwitchMode(_) => reta_architecture::ShadowPromptLegacyCommand::other("switch_mode", "legacy_prompt_command_switch_mode"),
+        PromptCommand::ToggleLogging(_) => reta_architecture::ShadowPromptLegacyCommand::other("toggle_logging", "legacy_prompt_command_toggle_logging"),
+        PromptCommand::Shell(_) => reta_architecture::ShadowPromptLegacyCommand::other("shell", "legacy_prompt_command_shell"),
+        PromptCommand::Python(_) => reta_architecture::ShadowPromptLegacyCommand::other("python", "legacy_prompt_command_python"),
+        PromptCommand::Math(_) => reta_architecture::ShadowPromptLegacyCommand::other("math", "legacy_prompt_command_math"),
+        PromptCommand::Immediate(_) => reta_architecture::ShadowPromptLegacyCommand::other("immediate", "legacy_prompt_command_immediate"),
+    }
+}
+
+fn apply_prompt_shadow_commit_if_safe(
+    compiled: PromptCommand,
+    input: &str,
+    state: &SessionState,
+    architecture_switch_config: &reta_architecture::ArchitectureSwitchConfig,
+) -> PromptCommand {
+    if !architecture_switch_config.mode.should_shadow_execute()
+        && !architecture_switch_config.visible_behaviour_may_change()
+    {
+        return compiled;
+    }
+
+    let pipeline = reta_architecture::bootstrap_shadow_pipeline();
+    let report = pipeline.shadow_prompt(
+        &reta_architecture::ShadowPromptInput {
+            program_name: state.program_name.clone(),
+            prompt_text: input.to_string(),
+            placeholder: state.stored_placeholder.clone(),
+            prompt_mode: architecture_prompt_modus(state.prompt_mode),
+        },
+        architecture_switch_config,
+    );
+    let legacy = legacy_prompt_command_snapshot(&compiled);
+    let commit = pipeline.prompt_commit_decision(&report, &legacy, architecture_switch_config);
+
+    if commit.use_shadow_prompt_plan {
+        PromptCommand::Reta(report.planned_argv)
+    } else {
+        compiled
     }
 }
 

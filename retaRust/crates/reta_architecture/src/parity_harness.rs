@@ -200,6 +200,26 @@ pub fn bootstrap_parity_harness() -> ParityHarnessBundle {
                 notes: "prompt command compiler should route to same reta argv".to_string(),
             },
             ParityCommandCase {
+                case_id: "prompt-kontinuum-m-744-regression".to_string(),
+                argv: vec![
+                    "rp".to_string(),
+                    "reta -zeilen --vorhervonausschnitt=1-1 -spalten --kontinuum=m --breite=0".to_string(),
+                ],
+                prompt_input: Some(
+                    "reta -zeilen --vorhervonausschnitt=1-1 -spalten --kontinuum=m --breite=0"
+                        .to_string(),
+                ),
+                category: "prompt".to_string(),
+                required_oracles: prompt.clone(),
+                expected_invariants: vec![
+                    "same_compiled_reta_argv".to_string(),
+                    "prompt_commit_gate_preserves_visible_output".to_string(),
+                    "contains_Neues_M_13_Kontinuum".to_string(),
+                ],
+                notes: "prompt wrapper must preserve the 744 regression command under shadow/commit"
+                    .to_string(),
+            },
+            ParityCommandCase {
                 case_id: "prompt-nested-completion-ausgabe".to_string(),
                 argv: vec!["rp".to_string(), "reta -ausgabe --art=h".to_string()],
                 prompt_input: Some("reta -ausgabe --art=h".to_string()),

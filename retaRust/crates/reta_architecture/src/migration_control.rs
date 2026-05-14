@@ -287,6 +287,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "prompt_shadow_plan_to_same_reta_argv_and_completion_context",
         ),
         step(
+            "step-shadow-prompt-commit",
+            "wave-03-prompt-interaction",
+            "shadow_pipeline.prompt_adapter",
+            "shadow_pipeline.prompt_commit",
+            "shadow_pipeline.prompt_commit",
+            "shadow-prompt-commit-gate",
+            "commit_only_when_legacy_compile_and_rust_prompt_argv_commute",
+        ),
+        step(
             "step-prompt-execution-argv",
             "wave-03-prompt-interaction",
             "PromptGrosseAusgabe.argv",
