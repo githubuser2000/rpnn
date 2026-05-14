@@ -807,6 +807,8 @@ pub struct RetaRunArchitecture {
     pub materialized_continuum_m: bool,
     pub materialized_column_order_override_applied: bool,
     pub materialized_column_order_preview: Vec<usize>,
+    pub materialized_row_order_override_applied: bool,
+    pub materialized_row_order_preview: Vec<usize>,
     pub materialized_table_view_row_count: usize,
     pub materialized_table_view_virtual_cell_count: usize,
     pub materialized_table_output_mode: String,
@@ -902,6 +904,14 @@ impl RetaRunArchitecture {
                 .copied()
                 .take(12)
                 .collect(),
+            materialized_row_order_override_applied: materialization_report
+                .row_order_override_applied,
+            materialized_row_order_preview: materialization_report
+                .materialized_row_order_zero_based
+                .iter()
+                .copied()
+                .take(12)
+                .collect(),
             materialized_table_view_row_count: materialized_table_view.row_count,
             materialized_table_view_virtual_cell_count: materialized_table_view
                 .rendered_virtual_cell_count,
@@ -925,7 +935,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} row_order_override={} row_order={:?} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -944,6 +954,8 @@ impl RetaRunArchitecture {
             self.materialized_continuum_m,
             self.materialized_column_order_override_applied,
             self.materialized_column_order_preview,
+            self.materialized_row_order_override_applied,
+            self.materialized_row_order_preview,
             self.materialized_table_view_row_count,
             self.materialized_table_view_virtual_cell_count,
             self.materialized_table_output_mode,

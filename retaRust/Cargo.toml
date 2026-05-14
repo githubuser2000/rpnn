@@ -44,6 +44,10 @@ name = "rreta_arch_column_order"
 path = "src/bin/reta_arch_column_order.rs"
 
 [[bin]]
+name = "rreta_arch_row_order"
+path = "src/bin/reta_arch_row_order.rs"
+
+[[bin]]
 name = "rreta_arch_view"
 path = "src/bin/reta_arch_view.rs"
 

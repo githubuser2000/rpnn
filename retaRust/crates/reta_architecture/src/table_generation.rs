@@ -53,6 +53,9 @@ pub struct TableGenerationResultSnapshot {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableGenerationPlan {
     pub selected_rows: BTreeSet<i64>,
+    /// Explicit row order from `-zeilen` selectors.  `selected_rows` remains
+    /// the membership witness while this vector preserves user order.
+    pub row_order_override: Vec<i64>,
     pub selected_columns: BTreeSet<i64>,
     pub generated_rows: BTreeSet<i64>,
     pub rows_of_combi: BTreeSet<i64>,
@@ -80,6 +83,7 @@ impl TableGenerationPlan {
         };
         Self {
             selected_rows: rows.into_iter().collect(),
+            row_order_override: Vec::new(),
             selected_columns: get(0),
             generated_rows: get(1),
             concat_columns: get(2),
@@ -107,6 +111,36 @@ impl TableGenerationPlan {
 
     pub fn requires_symbolic_generated_sections(&self) -> bool {
         !self.symbolic_column_buckets.is_empty()
+    }
+
+
+    /// Effective source row order for materialization/rendering.
+    ///
+    /// Without an explicit row selector order, this falls back to the sorted set
+    /// used by older Stage 4 code.  When `-zeilen --vorhervonausschnitt` or
+    /// `--zaehlung` was parsed, the vector keeps the user's order while still
+    /// restricting to selected rows.
+    pub fn ordered_selected_rows(&self) -> Vec<i64> {
+        if self.row_order_override.is_empty() {
+            return self.selected_rows.iter().copied().collect();
+        }
+        let mut out = Vec::new();
+        let selected_is_empty = self.selected_rows.is_empty();
+        for row in &self.row_order_override {
+            if *row < 0 {
+                continue;
+            }
+            if selected_is_empty || self.selected_rows.contains(row) {
+                if !out.contains(row) {
+                    out.push(*row);
+                }
+            }
+        }
+        out
+    }
+
+    pub fn row_order_override_applies(&self) -> bool {
+        !self.row_order_override.is_empty()
     }
 
     /// Effective legacy column order for materialization/rendering.
@@ -146,6 +180,7 @@ impl TableGenerationPlan {
         let normalized = crate::column_selection::bootstrap_column_selection()
             .normalize_bucket_map(&sets.column_buckets);
         let mut plan = Self::from_column_buckets(&normalized, sets.rows_as_numbers.iter().copied());
+        plan.row_order_override = sets.rows_as_ordered.clone();
         plan.symbolic_column_buckets = sets.symbolic_column_buckets.clone();
         plan.column_order_override = sets.spaltenreihenfolgeundnurdiese.clone();
         if plan.selected_columns.is_empty() && !plan.column_order_override.is_empty() {
@@ -327,6 +362,21 @@ mod tests {
                 .iter()
                 .any(|name| name == "gebrochen-rational-universum.csv")
         );
+    }
+
+    #[test]
+    fn generation_plan_honors_vorhervonausschnitt_order() {
+        let runtime = crate::parameter_runtime::bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=3,1-2",
+            "-spalten",
+            "--religion=493",
+        ]);
+        let plan = TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
+        assert_eq!(plan.ordered_selected_rows(), vec![3, 1, 2]);
+        assert!(plan.row_order_override_applies());
     }
 
     #[test]

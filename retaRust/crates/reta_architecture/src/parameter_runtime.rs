@@ -99,6 +99,10 @@ impl ParameterToken {
 pub struct ParameterCommandSets {
     pub param_lines: BTreeSet<String>,
     pub rows_as_numbers: BTreeSet<i64>,
+    /// Explicit row order from row selectors such as `--vorhervonausschnitt`.
+    /// The legacy visible table can be order-sensitive, so Stage 27 keeps this
+    /// sequence separate from the sorted `BTreeSet` membership witness.
+    pub rows_as_ordered: Vec<i64>,
     pub rows_of_combi: BTreeSet<i64>,
     pub selected_columns: BTreeSet<i64>,
     pub excluded_columns: BTreeSet<i64>,
@@ -401,15 +405,17 @@ fn apply_row_token(
             }
         }
         (Some("vorhervonausschnitt"), Some(value)) => {
-            for number in bundle.row_ranges.range_to_numbers(value, false, 0, false) {
+            for number in ordered_range_numbers(bundle, value) {
                 sets.param_lines.insert(format!("a{number}"));
                 sets.rows_as_numbers.insert(number);
+                push_ordered_number(&mut sets.rows_as_ordered, number);
             }
         }
         (Some("zaehlung"), Some(value)) => {
-            for number in bundle.row_ranges.range_to_numbers(value, false, 0, false) {
+            for number in ordered_range_numbers(bundle, value) {
                 sets.param_lines.insert(format!("n{number}"));
                 sets.rows_as_numbers.insert(number);
+                push_ordered_number(&mut sets.rows_as_ordered, number);
             }
         }
         _ => {}
@@ -445,6 +451,13 @@ fn ordered_range_numbers(bundle: &ParameterRuntimeBundle, value: &str) -> Vec<i6
         }
     }
     out
+}
+
+
+fn push_ordered_number(values: &mut Vec<i64>, number: i64) {
+    if !values.contains(&number) {
+        values.push(number);
+    }
 }
 
 fn apply_column_token(
@@ -490,7 +503,10 @@ fn apply_column_token(
                             .insert(number);
                     } else {
                         sets.selected_columns.insert(number);
-                        sets.rows_as_numbers.insert(number);
+                        // A numeric token inside the `-spalten` context is a
+                        // column selector, not a row selector.  Keep row order
+                        // owned by `-zeilen` so table materialization does not
+                        // accidentally treat column IDs as source row indices.
                         sets.column_buckets
                             .entry(ColumnBucketKey::positive(0))
                             .or_default()
@@ -679,6 +695,38 @@ mod tests {
             Some(1024)
         );
     }
+
+    #[test]
+    fn vorhervonausschnitt_preserves_explicit_row_order() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=3,1-2",
+        ]);
+        assert_eq!(parsed.command_sets.rows_as_ordered, vec![3, 1, 2]);
+        assert_eq!(
+            parsed.command_sets.rows_as_numbers.iter().copied().collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn numeric_spalten_range_does_not_select_rows() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-spalten",
+            "--religion=1-3",
+        ]);
+        assert!(parsed.command_sets.rows_as_numbers.is_empty());
+        assert!(parsed.command_sets.rows_as_ordered.is_empty());
+        assert_eq!(
+            parsed.command_sets.selected_columns.iter().copied().collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+    }
+
 }
 
 // Stage 16: concrete Python-name runtime wrappers.

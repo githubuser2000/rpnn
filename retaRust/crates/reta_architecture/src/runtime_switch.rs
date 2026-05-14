@@ -329,6 +329,7 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_materialization.csv_projection".to_string(),
             "table_materialization.generation_plan".to_string(),
             "table_materialization.column_order_override".to_string(),
+            "table_materialization.row_order_override".to_string(),
             "table_view.materialized_view".to_string(),
             "table_view.render_lines".to_string(),
             "table_view_output.render".to_string(),

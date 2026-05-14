@@ -33,6 +33,10 @@ pub struct TableMaterializationConfig {
     /// view.  This is enabled by default but only has an effect when the CLI
     /// actually provided an override.
     pub honor_column_order_override: bool,
+    /// Carry explicit row-selector order from `--vorhervonausschnitt`/`--zaehlung`
+    /// through materialization.  Membership still lives in a set, but rendering
+    /// should use this order when present.
+    pub honor_row_order_override: bool,
 }
 
 impl Default for TableMaterializationConfig {
@@ -43,6 +47,7 @@ impl Default for TableMaterializationConfig {
             max_rows: None,
             max_columns: None,
             honor_column_order_override: true,
+            honor_row_order_override: true,
         }
     }
 }
@@ -51,6 +56,9 @@ impl Default for TableMaterializationConfig {
 pub struct CsvProjectionRequest {
     pub asset_name: String,
     pub rows_zero_based: BTreeSet<usize>,
+    /// Optional ordered row projection.  Header row insertion is still handled
+    /// by `include_header`, but data rows follow this vector when present.
+    pub row_order_zero_based: Vec<usize>,
     pub columns_legacy: BTreeSet<usize>,
     /// Optional ordered projection.  When present, this preserves the explicit
     /// legacy output order from `--spaltenreihenfolgeundnurdiese` instead of the
@@ -66,6 +74,7 @@ impl CsvProjectionRequest {
         Self {
             asset_name: asset_name.into(),
             rows_zero_based: BTreeSet::new(),
+            row_order_zero_based: Vec::new(),
             columns_legacy: BTreeSet::new(),
             column_order_legacy: Vec::new(),
             include_header: true,
@@ -203,6 +212,9 @@ pub struct TableMaterializationReport {
     pub class: String,
     pub selected_column_count: usize,
     pub selected_row_count: usize,
+    pub requested_row_order_zero_based: Vec<usize>,
+    pub materialized_row_order_zero_based: Vec<usize>,
+    pub row_order_override_applied: bool,
     pub requested_column_order_legacy: Vec<usize>,
     pub materialized_column_order_legacy: Vec<usize>,
     pub column_order_override_applied: bool,
@@ -319,7 +331,9 @@ pub fn bootstrap_table_materialization() -> TableMaterializationBundle {
             "materialize_symbolic_bucket_sections".to_string(),
             "materialize_virtual_columns".to_string(),
             "ordered_columns_for_projection".to_string(),
+            "ordered_rows_for_projection".to_string(),
             "column_order_override".to_string(),
+            "row_order_override".to_string(),
             "cell_by_source_coordinates".to_string(),
             "column_headers".to_string(),
         ],
@@ -345,6 +359,9 @@ pub fn materialize_generation_plan(
         request.max_rows = config.max_rows;
         request.max_columns = config.max_columns;
         request.rows_zero_based = plan_rows_to_source_indices(&plan.selected_rows);
+        if config.honor_row_order_override {
+            request.row_order_zero_based = plan_rows_to_source_order(&plan.ordered_selected_rows());
+        }
         request.columns_legacy = plan
             .selected_columns
             .iter()
@@ -419,6 +436,18 @@ pub fn materialize_generation_plan(
         .unwrap_or_default();
     let continuum_m_virtual_column_present =
         virtual_columns.iter().any(|column| column.is_column(744));
+    let requested_row_order_zero_based = if config.honor_row_order_override {
+        plan_rows_to_source_order(&plan.ordered_selected_rows())
+    } else {
+        plan_rows_to_source_indices(&plan.selected_rows)
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    let materialized_row_order_zero_based = ordinary_sections
+        .first()
+        .map(|section| section.selected_rows_zero_based.clone())
+        .unwrap_or_default();
+
     let requested_column_order_legacy = if config.honor_column_order_override {
         plan.ordered_selected_columns()
             .into_iter()
@@ -441,6 +470,10 @@ pub fn materialize_generation_plan(
         class: "TableMaterializationReport".to_string(),
         selected_column_count: plan.selected_columns.len(),
         selected_row_count: plan.selected_rows.len(),
+        requested_row_order_zero_based,
+        materialized_row_order_zero_based,
+        row_order_override_applied: config.honor_row_order_override
+            && plan.row_order_override_applies(),
         requested_column_order_legacy,
         materialized_column_order_legacy,
         column_order_override_applied: config.honor_column_order_override
@@ -515,14 +548,7 @@ pub fn materialize_virtual_columns(
 pub fn materialize_csv_projection(request: CsvProjectionRequest) -> Option<MaterializedCsvSection> {
     let asset = csv_asset_by_name(&request.asset_name)?;
     let source_rows = csv_rows_by_name(&request.asset_name)?;
-    let mut selected_rows = request.rows_zero_based.clone();
-    if request.include_header && !source_rows.is_empty() {
-        selected_rows.insert(0);
-    }
-    if selected_rows.is_empty() && !source_rows.is_empty() {
-        selected_rows.insert(0);
-    }
-    let selected_rows = limit_set(selected_rows, request.max_rows);
+    let selected_rows = ordered_rows_for_projection(&request, !source_rows.is_empty());
 
     let selected_columns = ordered_columns_for_projection(&request);
 
@@ -560,7 +586,7 @@ pub fn materialize_csv_projection(request: CsvProjectionRequest) -> Option<Mater
         language: asset.language.canonical().to_string(),
         source_row_count: asset.row_count,
         source_max_columns: asset.max_columns,
-        selected_rows_zero_based: selected_rows.into_iter().collect(),
+        selected_rows_zero_based: selected_rows,
         selected_columns_legacy: selected_columns,
         missing_rows_zero_based: missing_rows,
         missing_columns_legacy: missing_columns.into_iter().collect(),
@@ -589,6 +615,9 @@ pub fn materialize_symbolic_bucket_sections(
             request.max_rows = config.max_rows;
             request.max_columns = config.max_columns;
             request.rows_zero_based = plan_rows_to_source_indices(selected_rows);
+            if config.honor_row_order_override {
+                request.row_order_zero_based = plan_rows_to_source_order_from_set(selected_rows);
+            }
             request.columns_legacy = numeric_selectors.iter().copied().collect();
             request.column_order_legacy = numeric_selectors.clone();
             match materialize_csv_projection(request) {
@@ -646,6 +675,31 @@ pub fn asset_name_for_language(base_name: &str, language: CsvLanguage) -> String
     }
 }
 
+pub fn ordered_rows_for_projection(request: &CsvProjectionRequest, source_has_rows: bool) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    if request.include_header && source_has_rows && seen.insert(0) {
+        out.push(0);
+    }
+    let source = if request.row_order_zero_based.is_empty() {
+        request.rows_zero_based.iter().copied().collect::<Vec<_>>()
+    } else {
+        request.row_order_zero_based.clone()
+    };
+    for row in source {
+        if seen.insert(row) {
+            out.push(row);
+        }
+    }
+    if out.is_empty() && source_has_rows {
+        out.push(0);
+    }
+    if let Some(limit) = request.max_rows {
+        out.truncate(limit);
+    }
+    out
+}
+
 pub fn ordered_columns_for_projection(request: &CsvProjectionRequest) -> Vec<usize> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
@@ -672,6 +726,25 @@ pub fn ordered_columns_for_projection(request: &CsvProjectionRequest) -> Vec<usi
 }
 
 pub fn plan_rows_to_source_indices(rows: &BTreeSet<i64>) -> BTreeSet<usize> {
+    rows.iter()
+        .filter_map(|row| usize::try_from(*row).ok())
+        .collect()
+}
+
+pub fn plan_rows_to_source_order(rows: &[i64]) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for row in rows {
+        if let Ok(value) = usize::try_from(*row) {
+            if seen.insert(value) {
+                out.push(value);
+            }
+        }
+    }
+    out
+}
+
+pub fn plan_rows_to_source_order_from_set(rows: &BTreeSet<i64>) -> Vec<usize> {
     rows.iter()
         .filter_map(|row| usize::try_from(*row).ok())
         .collect()
@@ -746,6 +819,29 @@ mod tests {
             report.ordinary_sections[0].selected_columns_legacy,
             vec![493, 744]
         );
+    }
+
+    #[test]
+    fn vorhervonausschnitt_preserves_requested_row_order() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=3,1-2",
+            "-spalten",
+            "--religion=493",
+        ];
+        let report = materialize_cli_args(&args, &TableMaterializationConfig::default());
+        assert!(report.row_order_override_applied);
+        assert_eq!(report.requested_row_order_zero_based, vec![3, 1, 2]);
+        assert_eq!(report.materialized_row_order_zero_based, vec![0, 3, 1, 2]);
+    }
+
+    #[test]
+    fn numeric_spalten_range_materializes_only_header_when_no_zeilen_selected() {
+        let args = ["reta", "-spalten", "--religion=493"];
+        let report = materialize_cli_args(&args, &TableMaterializationConfig::default());
+        assert_eq!(report.requested_row_order_zero_based, Vec::<usize>::new());
+        assert_eq!(report.materialized_row_order_zero_based, vec![0]);
     }
 
     #[test]

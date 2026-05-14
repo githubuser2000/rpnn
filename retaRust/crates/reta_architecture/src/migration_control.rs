@@ -272,6 +272,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "explicit_output_column_order_is_preserved_before_rendering",
         ),
         step(
+            "step-row-order-override",
+            "wave-02-table-adapters",
+            "vorhervonausschnitt/zaehlung + materialized_csv_projection",
+            "table_materialization.row_order_override",
+            "table_materialization.row_order_override",
+            "row-order-shadow-diff",
+            "explicit_output_row_order_is_preserved_before_rendering",
+        ),
+        step(
             "step-table-view",
             "wave-02-table-adapters",
             "materialized_csv_sections + virtual_column_witnesses",
