@@ -34,6 +34,7 @@ pub mod dataflow;
 pub mod execution_network;
 pub mod facade;
 pub mod generated_columns;
+pub mod html_class_catalog;
 pub mod input_semantics;
 pub mod meta_columns;
 pub mod migration_control;
@@ -43,9 +44,9 @@ pub mod output_semantics;
 pub mod output_syntax;
 pub mod package_integrity;
 pub mod parallel_execution;
-pub mod parity_harness;
 pub mod parameter_matrix;
 pub mod parameter_runtime;
+pub mod parity_harness;
 pub mod persistence;
 pub mod presheaf;
 pub mod program_workflow;
@@ -61,11 +62,12 @@ pub mod runtime_compat;
 pub mod runtime_switch;
 pub mod schema;
 pub mod semantics_builder;
-pub mod sheaf;
 pub mod shadow_pipeline;
+pub mod sheaf;
 pub mod split_i18n;
 pub mod table_adapters;
 pub mod table_generation;
+pub mod table_materialization;
 pub mod table_output;
 pub mod table_preparation;
 pub mod table_runtime;
@@ -126,9 +128,9 @@ pub use column_selection::{
     ColumnSelectionSnapshot, COLUMN_BUCKET_NAMES, COLUMN_BUCKET_VALUES,
 };
 pub use combi_join::{
-    bootstrap_combi_join, prepare_table_join, remove_number_from_cell, remove_one_number,
-    read_kombi_csv_by_name, rows_of_combi_from_relation, table_join, KombiJoinBundle, KombiJoinSnapshot, KombiJoinSpec,
-    KombiSubTable,
+    bootstrap_combi_join, prepare_table_join, read_kombi_csv_by_name, remove_number_from_cell,
+    remove_one_number, rows_of_combi_from_relation, table_join, KombiJoinBundle, KombiJoinSnapshot,
+    KombiJoinSpec, KombiSubTable,
 };
 pub use completion_nested::{
     bootstrap_nested_completion_morphisms, candidates_for_situation,
@@ -152,15 +154,8 @@ pub use concat_csv::{
     convert_fractions_to_dict_of_num_to_pairs_of_mul_of_int_and_fraction,
     convert_set_of_pairs_to_dict_of_num_to_pairs_div,
     convert_set_of_pairs_to_dict_of_num_to_pairs_mul, normalize_fraction, rational_div,
-    rational_mul, read_concat_csv_by_name, read_concat_csv_tabelle_dazu_colchange, ConcatCsvBundle, ConcatCsvSnapshot,
-    ConcatCsvSpec, ConcatCsvSpecSnapshot, FractionPair, FractionPairMap,
-};
-pub use csv_catalog::{
-    bootstrap_csv_catalog, csv_asset_by_name, csv_asset_count, csv_assets_by_kind,
-    csv_assets_by_language, csv_cell_by_name, csv_language_variant_count, csv_rows_by_name,
-    csv_text_by_name, csv_total_row_count, parse_csv_text, parse_csv_text_with_delimiter,
-    select_csv_rows_one_based, CsvAsset, CsvAssetKind, CsvCatalogBundle, CsvCatalogSnapshot,
-    CsvDelimiter, CsvLanguage, CSV_ASSETS,
+    rational_mul, read_concat_csv_by_name, read_concat_csv_tabelle_dazu_colchange, ConcatCsvBundle,
+    ConcatCsvSnapshot, ConcatCsvSpec, ConcatCsvSpecSnapshot, FractionPair, FractionPairMap,
 };
 pub use console_io::{
     bootstrap_console_io_morphisms, chunks as console_chunks, cli_output_text, debug_pair_text,
@@ -168,12 +163,20 @@ pub use console_io::{
     strip_markdown_anchors, unique_strings_everseen, ConsoleIOMorphismBundle, ConsoleIOSnapshot,
     DefaultOrderedDictSnapshot, TextWrapRuntimeSnapshot as ConsoleTextWrapRuntimeSnapshot,
 };
+pub use csv_catalog::{
+    bootstrap_csv_catalog, csv_asset_by_name, csv_asset_count, csv_asset_records,
+    csv_assets_by_kind, csv_assets_by_language, csv_catalog_owned, csv_cell_by_name,
+    csv_language_variant_count, csv_rows_by_name, csv_text_by_name, csv_total_row_count,
+    parse_csv_text, parse_csv_text_with_delimiter, select_csv_rows_one_based, CsvAsset,
+    CsvAssetKind, CsvCatalogBundle, CsvCatalogSnapshot, CsvDelimiter, CsvLanguage,
+    OwnedCsvAsset, OwnedCsvCatalogBundle, CSV_ASSETS,
+};
 pub use dataflow::{
     bootstrap_execution_network, deterministic_reduce, execute_tasks_deterministically,
-    execute_tasks_threaded_ordered,
-    DataflowDiscipline, ExecutionNetworkBundle, ExecutionNetworkConfig, ExecutionResult,
-    ExecutionRunResult, ExecutionTask, FifoTaskQueue, FullDuplexChannel, HalfDuplexChannel,
-    LifoTaskStack, PriorityTaskQueue, ResourceSemaphore, EXECUTION_NETWORK_SNAPSHOT,
+    execute_tasks_threaded_ordered, DataflowDiscipline, ExecutionNetworkBundle,
+    ExecutionNetworkConfig, ExecutionResult, ExecutionRunResult, ExecutionTask, FifoTaskQueue,
+    FullDuplexChannel, HalfDuplexChannel, LifoTaskStack, PriorityTaskQueue, ResourceSemaphore,
+    EXECUTION_NETWORK_SNAPSHOT,
 };
 pub use execution_network::{
     bootstrap_execution_network_bridge, execution_network_plan_for_indices,
@@ -191,6 +194,13 @@ pub use generated_columns::{
     mind_emotion_energy_matter_topology_type, GeneratedColumnRegistry,
     GeneratedColumnRegistrySnapshot, GeneratedColumnSpec, GeneratedColumnSpecSnapshot,
     GeneratedColumnsBundle,
+};
+pub use html_class_catalog::{
+    bootstrap_html_class_catalog, html_class_catalog_snapshot, html_class_class_record_count,
+    html_class_owned_records, html_class_record, html_class_record_count,
+    html_class_records_for_column, html_class_text_for_column_row,
+    html_class_text_record_count, html_class_unique_column_count, HtmlClassCatalogBundle,
+    HtmlClassCatalogSnapshot, HtmlClassRecord, OwnedHtmlClassRecord, HTML_CLASS_RECORDS,
 };
 pub use input_semantics::{
     bootstrap_input_semantics, InputBundle, InputBundleSnapshot,
@@ -244,17 +254,18 @@ pub use parallel_execution::{
     ParallelExecutionConfigSnapshot, ParallelExecutionSnapshot, ParallelOperationResult,
     ParallelOperationSnapshot, ParallelRowsResult, ProcessorCoreCounts,
 };
-pub use parity_harness::{
-    bootstrap_parity_harness, ParityCommandCase, ParityHarnessBundle, ParityHarnessSnapshot,
-    ParityOracle, ParityProbePlan,
-};
 pub use parameter_matrix::{
     canonical_pair_for_aliases, columns_for_alias_pair, integer_column_projection_count,
-    parameter_matrix_entries, parameter_matrix_seed_count, ParameterMatrixSeed, PARAMETER_MATRIX_SEEDS,
+    parameter_matrix_entries, parameter_matrix_seed_count, ParameterMatrixSeed,
+    PARAMETER_MATRIX_SEEDS,
 };
 pub use parameter_runtime::{
     bootstrap_parameter_runtime, MainParameter, ParameterCommandSets, ParameterParseResult,
     ParameterRuntimeBundle, ParameterRuntimeSnapshot, ParameterToken, ParameterTokenKind,
+};
+pub use parity_harness::{
+    bootstrap_parity_harness, ParityCommandCase, ParityHarnessBundle, ParityHarnessSnapshot,
+    ParityOracle, ParityProbePlan,
 };
 pub use persistence::{
     bootstrap_persistence, stable_digest_text, AuditEventRecord, CacheEntryRecord,
@@ -327,18 +338,17 @@ pub use semantics_builder::{
     bootstrap_semantics_builder, ParameterSemanticsBuildResult, ParameterSemanticsBuildSnapshot,
     ParameterSemanticsBuilder, SemanticsBuilderBundle,
 };
-pub use sheaf::{
-    bootstrap_sheaves, ColumnParameterMeta, GeneratedColumnsSheaf,
-    GeneratedColumnsSheafSnapshot, GluedSection, HtmlReferenceSheaf, ParameterSemanticsSheaf,
-    ParameterSemanticsSheafSnapshot, Sheaf, SheafBundle, SheafBundleSnapshot, TableOutputSection,
-    TableOutputSheaf,
-};
 pub use shadow_pipeline::{
     bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_prompt_commit,
     evaluate_shadow_table_commit, prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision,
     ShadowCommitPolicy, ShadowDiffSummary, ShadowPipelineBundle, ShadowPipelineSnapshot,
     ShadowPromptCommitDecision, ShadowPromptCommitPolicy, ShadowPromptInput,
     ShadowPromptLegacyCommand, ShadowPromptReport, ShadowTableInput, ShadowTableReport,
+};
+pub use sheaf::{
+    bootstrap_sheaves, ColumnParameterMeta, GeneratedColumnsSheaf, GeneratedColumnsSheafSnapshot,
+    GluedSection, HtmlReferenceSheaf, ParameterSemanticsSheaf, ParameterSemanticsSheafSnapshot,
+    Sheaf, SheafBundle, SheafBundleSnapshot, TableOutputSection, TableOutputSheaf,
 };
 pub use split_i18n::{
     build_split_i18n_proxy, SplitI18nProxy, SplitI18nProxySnapshot, DEFAULT_MODULE_NAMES,
@@ -348,8 +358,18 @@ pub use table_adapters::{
     TableAdaptersSnapshot,
 };
 pub use table_generation::{
-    bootstrap_table_generation, csv_asset_names_for_bucket_state, TableGenerationBundle, TableGenerationBundleSnapshot,
-    TableGenerationPlan, TableGenerationResult, TableGenerationResultSnapshot,
+    bootstrap_table_generation, csv_asset_names_for_bucket_state, TableGenerationBundle,
+    TableGenerationBundleSnapshot, TableGenerationPlan, TableGenerationResult,
+    TableGenerationResultSnapshot,
+};
+pub use table_materialization::{
+    asset_name_for_language, asset_names_for_symbolic_bucket, bootstrap_table_materialization,
+    csv_kind_for_asset, materialize_cli_args, materialize_csv_projection,
+    materialize_generation_plan, materialize_kontinuum_m_smoke,
+    materialize_symbolic_bucket_sections, numeric_selectors_from_symbols,
+    plan_rows_to_source_indices, CsvProjectionRequest, MaterializedCsvCell, MaterializedCsvRow,
+    MaterializedCsvSection, SymbolicBucketMaterialization, TableMaterializationBundle,
+    TableMaterializationConfig, TableMaterializationReport, TableMaterializationSnapshot,
 };
 pub use table_output::{
     bootstrap_table_output, colorize, determine_row_width, max_cell_text_len, only_that_columns_fn,

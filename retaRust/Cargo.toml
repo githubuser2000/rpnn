@@ -31,6 +31,14 @@ name = "rreta_arch_inspect"
 path = "src/bin/reta_arch_inspect.rs"
 
 [[bin]]
+name = "rreta_arch_materialize"
+path = "src/bin/reta_arch_materialize.rs"
+
+[[bin]]
+name = "rreta_arch_html_classes"
+path = "src/bin/reta_arch_html_classes.rs"
+
+[[bin]]
 name = "rgenerate4readme"
 path = "src/bin/generate4readme.rs"
 

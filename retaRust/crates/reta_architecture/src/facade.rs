@@ -74,6 +74,10 @@ use crate::execution_network::{bootstrap_execution_network_bridge, ExecutionNetw
 use crate::generated_columns::{
     bootstrap_generated_columns as bootstrap_generated_columns_impl, GeneratedColumnsBundle,
 };
+use crate::html_class_catalog::{
+    bootstrap_html_class_catalog, html_class_record_count, html_class_unique_column_count,
+    HtmlClassCatalogBundle,
+};
 use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
 use crate::meta_columns::{
     bootstrap_meta_columns as bootstrap_meta_columns_impl, MetaColumnsBundle,
@@ -141,6 +145,10 @@ use crate::table_adapters::{bootstrap_table_adapters, TableAdaptersBundle};
 use crate::table_generation::{
     bootstrap_table_generation as bootstrap_table_generation_impl, TableGenerationBundle,
 };
+use crate::table_materialization::{
+    bootstrap_table_materialization as bootstrap_table_materialization_impl,
+    TableMaterializationBundle, TableMaterializationConfig,
+};
 use crate::table_output::{
     bootstrap_table_output as bootstrap_table_output_impl, TableOutputBundle,
 };
@@ -189,6 +197,7 @@ pub struct ArchitectureRuntime {
     pub completion_word: WordCompletionMorphismBundle,
     pub concat_csv: ConcatCsvBundle,
     pub generated_columns: GeneratedColumnsBundle,
+    pub html_class_catalog: HtmlClassCatalogBundle,
     pub input_semantics: InputBundle,
     pub meta_columns: MetaColumnsBundle,
     pub migration_control: MigrationControlBundle,
@@ -221,6 +230,7 @@ pub struct ArchitectureRuntime {
     pub tag_schema: TagSchemaBundle,
     pub table_adapters: TableAdaptersBundle,
     pub table_generation: TableGenerationBundle,
+    pub table_materialization: TableMaterializationBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -340,6 +350,7 @@ impl ArchitectureRuntime {
             completion_word: bootstrap_word_completion_morphisms(),
             concat_csv: bootstrap_concat_csv_impl(),
             generated_columns: bootstrap_generated_columns_impl(),
+            html_class_catalog: bootstrap_html_class_catalog(),
             input_semantics: bootstrap_input_semantics(Some(schema.clone())),
             meta_columns: bootstrap_meta_columns_impl(),
             migration_control: bootstrap_migration_control(),
@@ -372,6 +383,7 @@ impl ArchitectureRuntime {
             tag_schema: bootstrap_tag_schema(),
             table_adapters: bootstrap_table_adapters(),
             table_generation: bootstrap_table_generation_impl(),
+            table_materialization: bootstrap_table_materialization_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -418,6 +430,7 @@ impl ArchitectureRuntime {
             "runtime_compat",
             "runtime_switch",
             "csv_catalog",
+            "html_class_catalog",
             "shadow_pipeline",
             "migration_control",
             "parity_harness",
@@ -433,6 +446,7 @@ impl ArchitectureRuntime {
             "table_state",
             "table_runtime",
             "table_generation",
+            "table_materialization",
             "table_preparation",
             "table_output",
             "table_wrapping",
@@ -548,7 +562,30 @@ impl ArchitectureRuntime {
             rust_csv_catalog_asset_count: csv_asset_count(),
             rust_csv_catalog_language_variant_count: csv_language_variant_count(),
             rust_csv_catalog_total_row_count: csv_total_row_count(),
-            rust_csv_catalog_nonempty_cell_count: self.csv_catalog.snapshot().total_nonempty_cell_count,
+            rust_csv_catalog_nonempty_cell_count: self
+                .csv_catalog
+                .snapshot()
+                .total_nonempty_cell_count,
+            rust_html_class_record_count: html_class_record_count(),
+            rust_html_class_unique_column_count: html_class_unique_column_count(),
+            rust_table_materialization_morphism_count: self
+                .table_materialization
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_materialization_smoke_cell_count: self
+                .table_materialization
+                .materialize_cli_args(
+                    &[
+                        "reta",
+                        "-zeilen",
+                        "--vorhervonausschnitt=1-1",
+                        "-spalten",
+                        "--kontinuum=m",
+                    ],
+                    &TableMaterializationConfig::default(),
+                )
+                .materialized_cell_count,
             rust_parallel_execution_morphism_count: self
                 .parallel_execution
                 .snapshot()
@@ -645,6 +682,10 @@ pub struct ArchitectureSnapshotRef {
     pub rust_csv_catalog_language_variant_count: usize,
     pub rust_csv_catalog_total_row_count: usize,
     pub rust_csv_catalog_nonempty_cell_count: usize,
+    pub rust_html_class_record_count: usize,
+    pub rust_html_class_unique_column_count: usize,
+    pub rust_table_materialization_morphism_count: usize,
+    pub rust_table_materialization_smoke_cell_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
     pub rust_persistence_table_count: usize,
     pub rust_schema_main_alias_count: usize,
@@ -680,6 +721,9 @@ pub struct RetaRunArchitecture {
     pub column_bucket_count: usize,
     pub symbolic_column_bucket_count: usize,
     pub required_csv_asset_count: usize,
+    pub materialized_csv_section_count: usize,
+    pub materialized_csv_cell_count: usize,
+    pub materialized_continuum_m: bool,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -704,7 +748,15 @@ impl RetaRunArchitecture {
         let execution_network_plan = execution_network_bridge.plan_for_tasks(&[task.clone()]);
         let parameter_runtime = bootstrap_parameter_runtime_impl();
         let parsed = parameter_runtime.parse_cli_args(&clean_args);
-        let table_generation_plan = crate::table_generation::TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
+        let table_generation_plan =
+            crate::table_generation::TableGenerationPlan::from_parameter_command_sets(
+                &parsed.command_sets,
+            );
+        let materialization_report =
+            crate::table_materialization::bootstrap_table_materialization().materialize_plan(
+                &table_generation_plan,
+                &TableMaterializationConfig::default(),
+            );
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
         let activation_units =
@@ -734,6 +786,9 @@ impl RetaRunArchitecture {
             column_bucket_count: parsed.command_sets.column_buckets.len(),
             symbolic_column_bucket_count: parsed.command_sets.symbolic_column_buckets.len(),
             required_csv_asset_count: table_generation_plan.csv_asset_names.len(),
+            materialized_csv_section_count: materialization_report.section_count(),
+            materialized_csv_cell_count: materialization_report.materialized_cell_count,
+            materialized_continuum_m: materialization_report.continuum_m_columns_present,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -750,7 +805,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -764,6 +819,9 @@ impl RetaRunArchitecture {
             self.column_bucket_count,
             self.symbolic_column_bucket_count,
             self.required_csv_asset_count,
+            self.materialized_csv_section_count,
+            self.materialized_csv_cell_count,
+            self.materialized_continuum_m,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,
@@ -1062,6 +1120,9 @@ pub fn bootstrap_row_filtering() -> RowFilteringBundle {
 }
 pub fn bootstrap_table_generation() -> TableGenerationBundle {
     bootstrap_table_generation_impl()
+}
+pub fn bootstrap_table_materialization() -> TableMaterializationBundle {
+    bootstrap_table_materialization_impl()
 }
 pub fn bootstrap_table_output() -> TableOutputBundle {
     bootstrap_table_output_impl()

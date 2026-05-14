@@ -5,9 +5,9 @@
 //! so concat/Kombi/religion tables can be inspected without falling back to the
 //! old Python runtime.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum CsvLanguage {
     Base,
     English,
@@ -28,7 +28,7 @@ impl CsvLanguage {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum CsvAssetKind {
     SymbolsAltCircleSphere,
     DualismTrinities,
@@ -75,7 +75,7 @@ impl CsvAssetKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum CsvDelimiter {
     Semicolon,
     Comma,
@@ -119,6 +119,42 @@ impl CsvAsset {
             .map(|text| parse_csv_text(text, self.delimiter))
             .unwrap_or_default()
     }
+
+    pub fn owned(self) -> OwnedCsvAsset {
+        OwnedCsvAsset {
+            name: self.name.to_string(),
+            base_name: self.base_name.to_string(),
+            language: self.language,
+            kind: self.kind,
+            delimiter: self.delimiter,
+            row_count: self.row_count,
+            max_columns: self.max_columns,
+            header_columns: self.header_columns,
+            nonempty_cell_count: self.nonempty_cell_count,
+            byte_len: self.byte_len,
+            header_preview: self.header_preview.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OwnedCsvAsset {
+    pub name: String,
+    pub base_name: String,
+    pub language: CsvLanguage,
+    pub kind: CsvAssetKind,
+    pub delimiter: CsvDelimiter,
+    pub row_count: usize,
+    pub max_columns: usize,
+    pub header_columns: usize,
+    pub nonempty_cell_count: usize,
+    pub byte_len: usize,
+    pub header_preview: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OwnedCsvCatalogBundle {
+    pub assets: Vec<OwnedCsvAsset>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -139,6 +175,12 @@ impl CsvCatalogBundle {
             comma_asset_count: self.assets.iter().filter(|asset| asset.delimiter == CsvDelimiter::Comma).count(),
             religion_row_count: csv_asset_by_name("religion.csv").map(|asset| asset.row_count).unwrap_or(0),
             kombi_meta_row_count: csv_asset_by_name("kombi-meta.csv").map(|asset| asset.row_count).unwrap_or(0),
+        }
+    }
+
+    pub fn owned(&self) -> OwnedCsvCatalogBundle {
+        OwnedCsvCatalogBundle {
+            assets: self.assets.iter().copied().map(CsvAsset::owned).collect(),
         }
     }
 
@@ -163,7 +205,7 @@ impl CsvCatalogBundle {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CsvCatalogSnapshot {
     pub class: String,
     pub asset_count: usize,
@@ -1209,6 +1251,14 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
 
 pub fn bootstrap_csv_catalog() -> CsvCatalogBundle {
     CsvCatalogBundle { assets: CSV_ASSETS.to_vec() }
+}
+
+pub fn csv_catalog_owned() -> OwnedCsvCatalogBundle {
+    bootstrap_csv_catalog().owned()
+}
+
+pub fn csv_asset_records() -> Vec<OwnedCsvAsset> {
+    CSV_ASSETS.iter().copied().map(CsvAsset::owned).collect()
 }
 
 pub fn csv_asset_count() -> usize {

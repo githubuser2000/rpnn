@@ -20,6 +20,9 @@ use crate::prompt_language::PromptModus;
 use crate::runtime_switch::{
     bootstrap_runtime_switch, ArchitectureSwitchConfig, ArchitectureSwitchMode, SwitchGateDecision,
 };
+use crate::table_materialization::{
+    bootstrap_table_materialization, TableMaterializationConfig, TableMaterializationReport,
+};
 use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
 use crate::table_preparation::{prepare_row_cells, PreparedTable};
 use crate::table_wrapping::TableWidthContext;
@@ -281,6 +284,7 @@ pub struct ShadowCliPlan {
     pub activation_units: Vec<ActivationUnitSpec>,
     pub parity_plans: Vec<ParityProbePlan>,
     pub execution_network_plan: ExecutionNetworkPlan,
+    pub materialization_report: TableMaterializationReport,
     pub universal_property: String,
 }
 
@@ -308,6 +312,7 @@ impl ShadowPipelineBundle {
                 "shadow_pipeline.prompt_adapter".to_string(),
                 "shadow_pipeline.prompt_commit".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
+                "table_materialization.generation_plan".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -320,18 +325,22 @@ impl ShadowPipelineBundle {
 
     pub fn cli_plan(&self, args: &[String], config: &ArchitectureSwitchConfig) -> ShadowCliPlan {
         let (cleaned_args, switch_config) =
-            crate::runtime_switch::extract_architecture_switch_from_argv(args, Some(config.clone()));
+            crate::runtime_switch::extract_architecture_switch_from_argv(
+                args,
+                Some(config.clone()),
+            );
         let switch_bundle = bootstrap_runtime_switch(Some(switch_config.clone()));
         let gates = switch_bundle.gate_matrix(&switch_config);
         let migration_control = bootstrap_migration_control();
-        let activation_units = migration_control.activation_units_for_switch(&switch_bundle, &switch_config);
+        let activation_units =
+            migration_control.activation_units_for_switch(&switch_bundle, &switch_config);
         let parity_harness = bootstrap_parity_harness();
         let parity_plans = parity_harness.plans_for_switch(&switch_config);
         let task_indices = (0..cleaned_args.len()).collect::<Vec<_>>();
-        let execution_network_plan = execution_network_plan_for_indices(
-            &task_indices,
-            DataflowDiscipline::Fifo,
-        );
+        let execution_network_plan =
+            execution_network_plan_for_indices(&task_indices, DataflowDiscipline::Fifo);
+        let materialization_report = bootstrap_table_materialization()
+            .materialize_cli_args(&cleaned_args, &TableMaterializationConfig::default());
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -340,6 +349,7 @@ impl ShadowPipelineBundle {
             activation_units,
             parity_plans,
             execution_network_plan,
+            materialization_report,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }
@@ -583,8 +593,8 @@ fn table_report_from_render(
         rendered_preview: rendered_lines.iter().take(8).cloned().collect(),
         rendered_lines,
         commit_candidate,
-        universal_property:
-            "legacy_visible_lines_and_rust_shadow_lines_are_compared_before_commit".to_string(),
+        universal_property: "legacy_visible_lines_and_rust_shadow_lines_are_compared_before_commit"
+            .to_string(),
     }
 }
 
@@ -614,8 +624,10 @@ mod tests {
             color: false,
             ..ShadowTableInput::empty_for_mode(OutputMode::Shell)
         };
-        let config = ArchitectureSwitchConfig::default()
-            .with_mode(crate::runtime_switch::ArchitectureSwitchMode::DryRun, "test");
+        let config = ArchitectureSwitchConfig::default().with_mode(
+            crate::runtime_switch::ArchitectureSwitchMode::DryRun,
+            "test",
+        );
         let report = bootstrap_shadow_pipeline().shadow_table(&input, &config);
         assert_eq!(report.switch_mode, "dry-run");
         assert!(report.rendered_rows > 0);
@@ -648,8 +660,8 @@ mod tests {
             commit_candidate: false,
             universal_property: "test".to_string(),
         };
-        let config = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::Commit, "test");
+        let config =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Commit, "test");
         let decision = evaluate_shadow_table_commit(&report, &config, &Default::default());
         assert!(!decision.use_shadow_output);
         assert_eq!(decision.reason, "shadow_diff_not_equal");
@@ -678,13 +690,17 @@ mod tests {
             prepared_token_count: 3,
             execution_argv_count: 3,
             completion_preview_count: 0,
-            planned_argv: vec!["reta".to_string(), "-zeilen".to_string(), "--alles".to_string()],
+            planned_argv: vec![
+                "reta".to_string(),
+                "-zeilen".to_string(),
+                "--alles".to_string(),
+            ],
             completion_preview: Vec::new(),
             commit_candidate: true,
             universal_property: "test".to_string(),
         };
-        let config = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::Commit, "test");
+        let config =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Commit, "test");
         let same = ShadowPromptLegacyCommand::reta(vec![
             "reta".to_string(),
             "-zeilen".to_string(),
@@ -699,12 +715,13 @@ mod tests {
             "-spalten".to_string(),
             "--alles".to_string(),
         ]);
-        let decision = evaluate_shadow_prompt_commit(&report, &different, &config, &Default::default());
+        let decision =
+            evaluate_shadow_prompt_commit(&report, &different, &config, &Default::default());
         assert!(!decision.use_shadow_prompt_plan);
         assert_eq!(decision.reason, "prompt_argv_not_equal");
 
-        let dry_run = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::DryRun, "test");
+        let dry_run =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::DryRun, "test");
         let decision = evaluate_shadow_prompt_commit(&report, &same, &dry_run, &Default::default());
         assert!(!decision.use_shadow_prompt_plan);
         assert_eq!(decision.reason, "gate_not_allowed_to_commit");
@@ -736,12 +753,16 @@ mod tests {
             commit_candidate: true,
             universal_property: "test".to_string(),
         };
-        let force = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::Force, "test");
-        assert!(evaluate_shadow_table_commit(&report, &force, &Default::default()).use_shadow_output);
+        let force =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Force, "test");
+        assert!(
+            evaluate_shadow_table_commit(&report, &force, &Default::default()).use_shadow_output
+        );
 
-        let dry_run = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::DryRun, "test");
-        assert!(!evaluate_shadow_table_commit(&report, &dry_run, &Default::default()).use_shadow_output);
+        let dry_run =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::DryRun, "test");
+        assert!(
+            !evaluate_shadow_table_commit(&report, &dry_run, &Default::default()).use_shadow_output
+        );
     }
 }

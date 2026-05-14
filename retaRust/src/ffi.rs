@@ -101,7 +101,8 @@ unsafe fn reta_run_argv_impl(
         }
         Err(error) => {
             let (stdout_text, stdout_len) = into_c_string_with_len(String::new());
-            let (stderr_text, stderr_len) = into_c_string_with_len(format!("reta failed: {error}\n"));
+            let (stderr_text, stderr_len) =
+                into_c_string_with_len(format!("reta failed: {error}\n"));
             RetaFfiResponse {
                 stdout_text,
                 stdout_len,
@@ -133,10 +134,45 @@ pub extern "C" fn reta_shared_words_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(crate::shared_words()))
 }
 
-
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_csv_catalog_snapshot_json() -> *mut c_char {
-    ffi_json_result(|| serde_json::to_string(&reta_architecture::bootstrap_csv_catalog().snapshot()))
+    ffi_json_result(|| {
+        serde_json::to_string(&reta_architecture::bootstrap_csv_catalog().snapshot())
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_csv_catalog_assets_json() -> *mut c_char {
+    ffi_json_result(|| serde_json::to_string(&reta_architecture::csv_asset_records()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_html_class_catalog_snapshot_json() -> *mut c_char {
+    ffi_json_result(|| serde_json::to_string(&reta_architecture::html_class_catalog_snapshot()))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_html_class_catalog_records_json() -> *mut c_char {
+    ffi_json_result(|| serde_json::to_string(&reta_architecture::html_class_owned_records()))
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_materialization_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let report = reta_architecture::bootstrap_table_materialization().materialize_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+        );
+        serde_json::to_string(&report)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_materialization_json"),
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -167,8 +203,10 @@ pub unsafe extern "C" fn reta_architecture_activation_plan_json(
 ) -> *mut c_char {
     match catch_unwind(AssertUnwindSafe(|| {
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
-        let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(&args, None);
-        let switch_bundle = reta_architecture::bootstrap_runtime_switch(Some(switch_config.clone()));
+        let (_, switch_config) =
+            reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let switch_bundle =
+            reta_architecture::bootstrap_runtime_switch(Some(switch_config.clone()));
         let migration_control = reta_architecture::bootstrap_migration_control();
         let units = migration_control.activation_units_for_switch(&switch_bundle, &switch_config);
         serde_json::to_string(&units)
@@ -186,7 +224,8 @@ pub unsafe extern "C" fn reta_architecture_shadow_cli_plan_json(
 ) -> *mut c_char {
     match catch_unwind(AssertUnwindSafe(|| {
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
-        let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let (_, switch_config) =
+            reta_architecture::extract_architecture_switch_from_argv(&args, None);
         let plan = reta_architecture::bootstrap_shadow_pipeline().cli_plan(&args, &switch_config);
         serde_json::to_string(&plan)
     })) {
@@ -202,7 +241,8 @@ pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
     prompt_input: *const c_char,
 ) -> *mut c_char {
     match catch_unwind(AssertUnwindSafe(|| {
-        let program_name = unsafe { read_required_string(program_name) }.unwrap_or_else(|_| "rp".to_string());
+        let program_name =
+            unsafe { read_required_string(program_name) }.unwrap_or_else(|_| "rp".to_string());
         let prompt_input = unsafe { read_required_string(prompt_input) }.unwrap_or_default();
         let input = reta_architecture::ShadowPromptInput::new(program_name, prompt_input);
         let config = reta_architecture::ArchitectureSwitchConfig::from_environment();
@@ -214,8 +254,6 @@ pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
         Err(_) => json_error_string("panic inside reta_architecture_prompt_shadow_plan_json"),
     }
 }
-
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_shadow_commit_policy_json() -> *mut c_char {

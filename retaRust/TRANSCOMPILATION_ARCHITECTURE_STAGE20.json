@@ -1,0 +1,42 @@
+{
+  "stage": 20,
+  "name": "csv_backed_table_materialization",
+  "new_files": [
+    "crates/reta_architecture/src/table_materialization.rs",
+    "src/bin/reta_arch_materialize.rs",
+    "tools/architecture_table_materialization_probe.py"
+  ],
+  "changed_files": [
+    "Cargo.toml",
+    "crates/reta_architecture/src/csv_catalog.rs",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/shadow_pipeline.rs",
+    "crates/reta_architecture/src/table_materialization.rs",
+    "src/bin/reta_arch_materialize.rs",
+    "src/ffi.rs",
+    "tools/architecture_table_materialization_probe.py"
+  ],
+  "core_semantics": {
+    "pipeline": "CLI args -> parameter_runtime -> TableGenerationPlan -> CSV projection -> MaterializedCsvSection",
+    "continuum_m_matrix_columns": [
+      493,
+      744
+    ],
+    "csv_materialized_column": 493,
+    "csv_missing_legacy_column": 744,
+    "ordinary_asset": "religion.csv"
+  },
+  "checks": {
+    "isolated_reta_architecture_cargo_check": "passed with local serde stubs",
+    "isolated_reta_architecture_tests": "132 passed, 0 failed",
+    "workspace_cargo_check": "blocked by crates.io DNS/hypher dependency",
+    "materialization_probe": "ok",
+    "coverage_functions": "1096/1096",
+    "coverage_classes": "239/239",
+    "semantic_surface_marker_only": 0,
+    "semantic_surface_missing": 0
+  }
+}

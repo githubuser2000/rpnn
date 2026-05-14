@@ -71,7 +71,10 @@ impl ArchitectureSwitchMode {
     }
 
     pub fn should_shadow_execute(self) -> bool {
-        matches!(self, Self::DryRun | Self::Adapter | Self::Commit | Self::Force)
+        matches!(
+            self,
+            Self::DryRun | Self::Adapter | Self::Commit | Self::Force
+        )
     }
 
     pub fn can_commit(self) -> bool {
@@ -174,12 +177,17 @@ impl ArchitectureSwitchConfig {
         }
         match self.mode {
             ArchitectureSwitchMode::Legacy => SwitchGateDecision::blocked(morphism, "legacy_mode"),
-            ArchitectureSwitchMode::Observe => SwitchGateDecision::shadow_only(morphism, "observe_only", self.mode),
-            ArchitectureSwitchMode::DryRun => SwitchGateDecision::shadow_only(morphism, "dry_run_only", self.mode),
+            ArchitectureSwitchMode::Observe => {
+                SwitchGateDecision::shadow_only(morphism, "observe_only", self.mode)
+            }
+            ArchitectureSwitchMode::DryRun => {
+                SwitchGateDecision::shadow_only(morphism, "dry_run_only", self.mode)
+            }
             ArchitectureSwitchMode::Adapter => {
                 let may_commit = morphism.starts_with("table_adapters")
                     || morphism.starts_with("prompt_interaction")
                     || morphism.starts_with("parallel_execution")
+                    || morphism.starts_with("table_materialization")
                     || morphism.starts_with("shadow_pipeline.table_adapter")
                     || morphism.starts_with("shadow_pipeline.table_commit")
                     || morphism.starts_with("shadow_pipeline.prompt_adapter")
@@ -240,7 +248,8 @@ impl SwitchGateDecision {
         Self {
             morphism: morphism.to_string(),
             allowed_to_commit: false,
-            shadow_execution: mode.should_shadow_execute() || mode == ArchitectureSwitchMode::Observe,
+            shadow_execution: mode.should_shadow_execute()
+                || mode == ArchitectureSwitchMode::Observe,
             reason: reason.to_string(),
             mode: mode.canonical().to_string(),
         }
@@ -290,8 +299,8 @@ impl RuntimeSwitchBundle {
             class: "RuntimeSwitchBundle".to_string(),
             known_morphisms: self.known_morphisms.clone(),
             default_config: self.default_config.snapshot(),
-            universal_property: "guarded_activation_preserves_legacy_output_until_commit_gate_passes"
-                .to_string(),
+            universal_property:
+                "guarded_activation_preserves_legacy_output_until_commit_gate_passes".to_string(),
         }
     }
 }
@@ -311,6 +320,8 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "runtime_switch.extract_architecture_switch_from_argv".to_string(),
             "table_adapters.prepare".to_string(),
             "table_adapters.render".to_string(),
+            "table_materialization.csv_projection".to_string(),
+            "table_materialization.generation_plan".to_string(),
             "shadow_pipeline.table_adapter".to_string(),
             "shadow_pipeline.table_commit".to_string(),
             "shadow_pipeline.prompt_adapter".to_string(),
@@ -464,7 +475,8 @@ mod tests {
             "--reta-arch-allow=table_adapters.prepare,prompt_interaction.plan".to_string(),
             "-zeilen".to_string(),
         ];
-        let (clean, config) = extract_architecture_switch_from_argv(&argv, Some(Default::default()));
+        let (clean, config) =
+            extract_architecture_switch_from_argv(&argv, Some(Default::default()));
         assert_eq!(clean, vec!["reta".to_string(), "-zeilen".to_string()]);
         assert_eq!(config.mode, ArchitectureSwitchMode::DryRun);
         assert!(config.allowed_morphisms.contains("table_adapters.prepare"));
@@ -472,13 +484,17 @@ mod tests {
 
     #[test]
     fn adapter_mode_allows_only_adapter_family_to_commit_by_default() {
-        let config = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::Adapter, "test");
-        assert!(config
-            .gate_for_morphism("table_adapters.prepare")
-            .allowed_to_commit);
-        assert!(!config
-            .gate_for_morphism("prompt_execution.argv")
-            .allowed_to_commit);
+        let config =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Adapter, "test");
+        assert!(
+            config
+                .gate_for_morphism("table_adapters.prepare")
+                .allowed_to_commit
+        );
+        assert!(
+            !config
+                .gate_for_morphism("prompt_execution.argv")
+                .allowed_to_commit
+        );
     }
 }

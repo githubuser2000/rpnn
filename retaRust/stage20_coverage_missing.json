@@ -1,0 +1,10 @@
+{
+  "classes": 239,
+  "classes_represented_by_name": 239,
+  "functions": 1096,
+  "functions_represented_by_name": 1096,
+  "module_count": 59,
+  "modules": [],
+  "python_directory": "python_arch_reference/reta_architecture",
+  "rust_directory": "crates/reta_architecture/src"
+}

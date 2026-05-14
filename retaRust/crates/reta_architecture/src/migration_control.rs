@@ -124,7 +124,9 @@ impl MigrationControlBundle {
     }
 
     pub fn transaction_for_wave(&self, wave_id: &str) -> Option<&ActivationTransactionSpec> {
-        self.transactions.iter().find(|item| item.wave_id == wave_id)
+        self.transactions
+            .iter()
+            .find(|item| item.wave_id == wave_id)
     }
 
     pub fn snapshot(&self) -> MigrationControlSnapshot {
@@ -134,9 +136,13 @@ impl MigrationControlBundle {
             steps: self.steps.len(),
             transactions: self.transactions.len(),
             validation: self.validation.clone(),
-            step_morphisms: self.steps.iter().map(|step| step.morphism.clone()).collect(),
-            universal_property: "local_rehearsal_sections_glue_to_one_guarded_activation_transaction"
-                .to_string(),
+            step_morphisms: self
+                .steps
+                .iter()
+                .map(|step| step.morphism.clone())
+                .collect(),
+            universal_property:
+                "local_rehearsal_sections_glue_to_one_guarded_activation_transaction".to_string(),
         }
     }
 }
@@ -172,7 +178,10 @@ fn default_waves() -> Vec<MigrationWaveSpec> {
             order: 1,
             title: "Guarded activation envelope".to_string(),
             capsule: "RuntimeSwitchCapsule".to_string(),
-            owner_modules: vec!["runtime_switch.rs".to_string(), "migration_control.rs".to_string()],
+            owner_modules: vec![
+                "runtime_switch.rs".to_string(),
+                "migration_control.rs".to_string(),
+            ],
             universal_property: "switch_flags_strip_to_same_legacy_cli_args".to_string(),
         },
         MigrationWaveSpec {
@@ -206,7 +215,10 @@ fn default_waves() -> Vec<MigrationWaveSpec> {
             order: 4,
             title: "Threaded dataflow with deterministic gluing".to_string(),
             capsule: "ExecutionNetworkCapsule".to_string(),
-            owner_modules: vec!["dataflow.rs".to_string(), "parallel_execution.rs".to_string()],
+            owner_modules: vec![
+                "dataflow.rs".to_string(),
+                "parallel_execution.rs".to_string(),
+            ],
             universal_property: "fifo_lifo_priority_schedules_reduce_to_ordered_result".to_string(),
         },
     ]
@@ -240,6 +252,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "table_adapters.render",
             "table-render-shadow-diff",
             "py_reta_vs_py_arch_vs_rust_rendered_lines",
+        ),
+        step(
+            "step-table-materialization",
+            "wave-02-table-adapters",
+            "parameter_matrix + csv_catalog",
+            "table_materialization.generation_plan",
+            "table_materialization.generation_plan",
+            "csv-materialization-shadow",
+            "parameter_projection_to_same_csv_cells",
         ),
         step(
             "step-shadow-table-adapter",
@@ -371,7 +392,10 @@ fn validate_migration_control(
     steps: &[MigrationStepSpec],
     transactions: &[ActivationTransactionSpec],
 ) -> MigrationControlValidation {
-    let wave_ids = waves.iter().map(|wave| wave.wave_id.clone()).collect::<BTreeSet<_>>();
+    let wave_ids = waves
+        .iter()
+        .map(|wave| wave.wave_id.clone())
+        .collect::<BTreeSet<_>>();
     let transaction_wave_ids = transactions
         .iter()
         .map(|tx| tx.wave_id.clone())
@@ -422,15 +446,18 @@ mod tests {
     fn migration_control_is_validation_ready() {
         let bundle = bootstrap_migration_control();
         assert!(bundle.validation.is_ready());
-        assert!(bundle.steps.iter().any(|step| step.morphism == "table_adapters.prepare"));
+        assert!(bundle
+            .steps
+            .iter()
+            .any(|step| step.morphism == "table_adapters.prepare"));
     }
 
     #[test]
     fn activation_units_obey_switch_gates() {
         let bundle = bootstrap_migration_control();
         let switch = bootstrap_runtime_switch(None);
-        let config = ArchitectureSwitchConfig::default()
-            .with_mode(ArchitectureSwitchMode::Adapter, "test");
+        let config =
+            ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Adapter, "test");
         let units = bundle.activation_units_for_switch(&switch, &config);
         let table = units
             .iter()

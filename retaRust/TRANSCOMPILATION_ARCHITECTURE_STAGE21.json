@@ -1,0 +1,46 @@
+{
+  "stage": 21,
+  "status": "finished",
+  "primary_fix": "Remove Deserialize from static borrowed CsvAsset/CsvCatalogBundle and add owned serializable/deserializable records.",
+  "reported_error_fixed": true,
+  "new_modules": [
+    "crates/reta_architecture/src/html_class_catalog.rs"
+  ],
+  "new_tools": [
+    "tools/generate_html_class_catalog.py",
+    "tools/architecture_html_class_catalog_probe.py"
+  ],
+  "new_binaries": [
+    "rreta_arch_html_classes"
+  ],
+  "ffi_exports": [
+    "reta_csv_catalog_assets_json",
+    "reta_html_class_catalog_snapshot_json",
+    "reta_html_class_catalog_records_json"
+  ],
+  "html_class_catalog": {
+    "records": 1372,
+    "unique_columns": 1041,
+    "text_records": 1254,
+    "class_records": 695,
+    "column_744_records": 1
+  },
+  "virtual_materialization": {
+    "enabled": true,
+    "continuum_m_744_virtual_witness": true
+  },
+  "isolated_reta_architecture_checks": {
+    "cargo_check": "passed",
+    "cargo_test_lib": "134 passed, 0 failed"
+  },
+  "full_workspace_build": {
+    "status": "not_run_successfully",
+    "reason": "crates.io/indexmap dependency resolution unavailable in container"
+  },
+  "coverage": {
+    "functions": "1096/1096",
+    "classes": "239/239",
+    "marker_only": 0,
+    "missing": 0
+  }
+}
