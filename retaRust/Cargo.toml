@@ -27,6 +27,10 @@ name = "rgrundStrukHtml"
 path = "src/bin/grundStrukHtml.rs"
 
 [[bin]]
+name = "rreta_arch_inspect"
+path = "src/bin/reta_arch_inspect.rs"
+
+[[bin]]
 name = "rgenerate4readme"
 path = "src/bin/generate4readme.rs"
 

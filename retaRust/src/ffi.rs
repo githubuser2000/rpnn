@@ -173,6 +173,42 @@ pub unsafe extern "C" fn reta_architecture_activation_plan_json(
     }
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_shadow_cli_plan_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let plan = reta_architecture::bootstrap_shadow_pipeline().cli_plan(&args, &switch_config);
+        serde_json::to_string(&plan)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_shadow_cli_plan_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
+    program_name: *const c_char,
+    prompt_input: *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let program_name = unsafe { read_required_string(program_name) }.unwrap_or_else(|_| "rp".to_string());
+        let prompt_input = unsafe { read_required_string(prompt_input) }.unwrap_or_default();
+        let input = reta_architecture::ShadowPromptInput::new(program_name, prompt_input);
+        let config = reta_architecture::ArchitectureSwitchConfig::from_environment();
+        let report = reta_architecture::bootstrap_shadow_pipeline().shadow_prompt(&input, &config);
+        serde_json::to_string(&report)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_prompt_shadow_plan_json"),
+    }
+}
+
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {

@@ -9,6 +9,7 @@ pub mod reta_program_types;
 pub mod reta_resulting_table_py;
 pub mod reta_spalten_py;
 pub mod reta_workflow_py;
+pub mod reta_arch_shadow;
 
 mod reta_runtime_bridge;
 

@@ -55,6 +55,7 @@ use crate::runtime_switch::{
 use crate::schema::{bootstrap_schema, RetaContextSchema};
 use crate::semantics_builder::{bootstrap_semantics_builder, SemanticsBuilderBundle};
 use crate::sheaf::SheafBundle;
+use crate::shadow_pipeline::{bootstrap_shadow_pipeline, ShadowPipelineBundle};
 use crate::split_i18n::{build_split_i18n_proxy, SplitI18nProxy};
 use crate::table_adapters::{bootstrap_table_adapters, TableAdaptersBundle};
 use crate::table_generation::{bootstrap_table_generation, TableGenerationBundle};
@@ -123,6 +124,7 @@ pub struct ArchitectureRuntime {
     pub schema: RetaContextSchema,
     pub semantics_builder: SemanticsBuilderBundle,
     pub sheaves: SheafBundle,
+    pub shadow_pipeline: ShadowPipelineBundle,
     pub split_i18n: SplitI18nProxy,
     pub tag_schema: TagSchemaBundle,
     pub table_adapters: TableAdaptersBundle,
@@ -260,6 +262,7 @@ impl ArchitectureRuntime {
             schema: schema.clone(),
             semantics_builder: bootstrap_semantics_builder(Some(schema)),
             sheaves: SheafBundle::default(),
+            shadow_pipeline: bootstrap_shadow_pipeline(),
             split_i18n: build_split_i18n_proxy(None),
             tag_schema: bootstrap_tag_schema(),
             table_adapters: bootstrap_table_adapters(),
@@ -309,6 +312,7 @@ impl ArchitectureRuntime {
             "semantics_builder",
             "runtime_compat",
             "runtime_switch",
+            "shadow_pipeline",
             "migration_control",
             "parity_harness",
             "split_i18n",
@@ -427,6 +431,7 @@ impl ArchitectureRuntime {
             rust_split_i18n_module_count: self.split_i18n.source_modules.len(),
             rust_table_adapter_morphism_count: self.table_adapters.snapshot().morphisms.len(),
             rust_runtime_switch_morphism_count: self.runtime_switch.known_morphisms.len(),
+            rust_shadow_pipeline_morphism_count: self.shadow_pipeline.snapshot().morphisms.len(),
             rust_migration_control_step_count: self.migration_control.steps.len(),
             rust_parity_harness_case_count: self.parity_harness.cases.len(),
         }
@@ -494,6 +499,7 @@ pub struct ArchitectureSnapshotRef {
     pub rust_split_i18n_module_count: usize,
     pub rust_table_adapter_morphism_count: usize,
     pub rust_runtime_switch_morphism_count: usize,
+    pub rust_shadow_pipeline_morphism_count: usize,
     pub rust_migration_control_step_count: usize,
     pub rust_parity_harness_case_count: usize,
 }

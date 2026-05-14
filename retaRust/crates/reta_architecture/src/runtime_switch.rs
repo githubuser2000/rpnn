@@ -179,7 +179,9 @@ impl ArchitectureSwitchConfig {
             ArchitectureSwitchMode::Adapter => {
                 let may_commit = morphism.starts_with("table_adapters")
                     || morphism.starts_with("prompt_interaction")
-                    || morphism.starts_with("parallel_execution");
+                    || morphism.starts_with("parallel_execution")
+                    || morphism.starts_with("shadow_pipeline.table_adapter")
+                    || morphism.starts_with("shadow_pipeline.prompt_adapter");
                 if may_commit {
                     SwitchGateDecision::allowed(morphism, "adapter_gate", self.mode)
                 } else {
@@ -307,6 +309,9 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "runtime_switch.extract_architecture_switch_from_argv".to_string(),
             "table_adapters.prepare".to_string(),
             "table_adapters.render".to_string(),
+            "shadow_pipeline.table_adapter".to_string(),
+            "shadow_pipeline.prompt_adapter".to_string(),
+            "shadow_pipeline.cli_plan".to_string(),
             "parallel_execution.rows".to_string(),
             "prompt_interaction.plan".to_string(),
             "prompt_execution.argv".to_string(),

@@ -39,6 +39,22 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         });
     }
 
+    if let Some(shadow_report) = crate::reta_arch_shadow::shadow_table_report_for_program(&program, &argv) {
+        diagnostics.push(RetaDiagnostic {
+            level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
+            code: "ARCH_SHADOW_TABLE".to_string(),
+            message: format!(
+                "Rust-Architektur-Shadow-Renderer: mode={} gate={} legacy_rows={} shadow_rows={} equal={} first_diff={:?}",
+                shadow_report.switch_mode,
+                shadow_report.gate.reason,
+                shadow_report.legacy_rows,
+                shadow_report.rendered_rows,
+                shadow_report.diff.equal,
+                shadow_report.diff.first_mismatch_index,
+            ),
+        });
+    }
+
     diagnostics.extend(program.cliErrors.iter().cloned().map(|message| RetaDiagnostic {
         level: DiagnosticLevel::Error,
         code: "CLI_ERROR".to_string(),
