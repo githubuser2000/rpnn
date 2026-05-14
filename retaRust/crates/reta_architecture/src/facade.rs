@@ -162,6 +162,9 @@ use crate::table_state::{bootstrap_table_state as bootstrap_table_state_impl, Ta
 use crate::table_view::{
     bootstrap_table_view as bootstrap_table_view_impl, MaterializedTableViewConfig, TableViewBundle,
 };
+use crate::table_view_layout::{
+    bootstrap_table_view_layout as bootstrap_table_view_layout_impl, TableViewLayoutBundle,
+};
 use crate::table_view_numbering::{
     bootstrap_table_view_numbering as bootstrap_table_view_numbering_impl, TableViewNumberingBundle,
 };
@@ -246,6 +249,7 @@ pub struct ArchitectureRuntime {
     pub table_generation: TableGenerationBundle,
     pub table_materialization: TableMaterializationBundle,
     pub table_view: TableViewBundle,
+    pub table_view_layout: TableViewLayoutBundle,
     pub table_view_numbering: TableViewNumberingBundle,
     pub table_view_output: TableViewOutputBundle,
     pub table_view_output_parity: TableViewOutputParityBundle,
@@ -403,6 +407,7 @@ impl ArchitectureRuntime {
             table_generation: bootstrap_table_generation_impl(),
             table_materialization: bootstrap_table_materialization_impl(),
             table_view: bootstrap_table_view_impl(),
+            table_view_layout: bootstrap_table_view_layout_impl(),
             table_view_numbering: bootstrap_table_view_numbering_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
             table_view_output_parity: bootstrap_table_view_output_parity_impl(),
@@ -470,6 +475,7 @@ impl ArchitectureRuntime {
             "table_generation",
             "table_materialization",
             "table_view",
+            "table_view_layout",
             "table_view_numbering",
             "table_view_output",
             "table_view_output_parity",
@@ -613,8 +619,21 @@ impl ArchitectureRuntime {
                 )
                 .materialized_cell_count,
             rust_table_view_morphism_count: self.table_view.snapshot().morphisms.len(),
-            rust_table_view_numbering_morphism_count: self.table_view_numbering.snapshot().morphisms.len(),
-            rust_table_view_numbering_smoke_column_count: crate::table_view_numbering::numbering_smoke_report().numbering_column_count,
+            rust_table_view_layout_morphism_count: self
+                .table_view_layout
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_layout_smoke_page_count: crate::table_view_layout::layout_smoke_report(
+            )
+            .page_count,
+            rust_table_view_numbering_morphism_count: self
+                .table_view_numbering
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_numbering_smoke_column_count:
+                crate::table_view_numbering::numbering_smoke_report().numbering_column_count,
             rust_table_view_output_morphism_count: self
                 .table_view_output
                 .snapshot()
@@ -770,6 +789,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_materialization_morphism_count: usize,
     pub rust_table_materialization_smoke_cell_count: usize,
     pub rust_table_view_morphism_count: usize,
+    pub rust_table_view_layout_morphism_count: usize,
+    pub rust_table_view_layout_smoke_page_count: usize,
     pub rust_table_view_numbering_morphism_count: usize,
     pub rust_table_view_numbering_smoke_column_count: usize,
     pub rust_table_view_output_morphism_count: usize,
@@ -932,8 +953,11 @@ impl RetaRunArchitecture {
             materialized_table_output_line_count: materialized_table_output.rendered_line_count,
             materialized_table_output_semantic_row_count: materialized_table_output_semantic
                 .semantic_row_count,
-            materialized_table_output_numbering_mode: materialized_table_output.numbering_mode.clone(),
-            materialized_table_output_numbering_column_count: materialized_table_output.numbering_column_count,
+            materialized_table_output_numbering_mode: materialized_table_output
+                .numbering_mode
+                .clone(),
+            materialized_table_output_numbering_column_count: materialized_table_output
+                .numbering_column_count,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),

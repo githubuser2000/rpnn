@@ -189,6 +189,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("parallel_execution")
                     || morphism.starts_with("table_materialization")
                     || morphism.starts_with("table_view")
+                    || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_output.parity")
                     || morphism.starts_with("table_view_output.semantic_diff")
@@ -333,6 +334,9 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_materialization.row_order_override".to_string(),
             "table_view.materialized_view".to_string(),
             "table_view.render_lines".to_string(),
+            "table_view_layout.column_widths".to_string(),
+            "table_view_layout.horizontal_pages".to_string(),
+            "table_view_layout.shell_padding".to_string(),
             "table_view_numbering.legacy_prefix".to_string(),
             "table_view_numbering.zaehlung".to_string(),
             "table_view_numbering.nummerierung".to_string(),

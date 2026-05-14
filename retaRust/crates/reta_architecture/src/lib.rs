@@ -73,6 +73,7 @@ pub mod table_preparation;
 pub mod table_runtime;
 pub mod table_state;
 pub mod table_view;
+pub mod table_view_layout;
 pub mod table_view_numbering;
 pub mod table_view_output;
 pub mod table_view_output_parity;
@@ -390,6 +391,12 @@ pub use table_view::{
     MaterializedTableViewConfig, MaterializedTableViewRow, TableViewBundle, TableViewSnapshot,
     VirtualColumnDisplayPolicy,
 };
+pub use table_view_layout::{
+    bootstrap_table_view_layout, column_pages_for_widths, display_width, effective_column_widths,
+    layout_materialized_rows, layout_smoke_report, layout_value_rows, measure_column_widths,
+    pad_to_width, TableViewColumnPage, TableViewLayoutBundle, TableViewLayoutConfig,
+    TableViewLayoutReport, TableViewLayoutSnapshot,
+};
 pub use table_view_numbering::{
     bootstrap_table_view_numbering, legacy_zaehlung_for_row, legacy_zaehlung_map,
     numbering_projection_for_source_row, numbering_report_for_rows, numbering_smoke_report,
@@ -400,9 +407,10 @@ pub use table_view_numbering::{
 pub use table_view_output::{
     bbcode_escape_cell, bootstrap_table_view_output, continuum_m_table_view_output_smoke,
     csv_escape_cell, expand_row_to_value_lines, filtered_output_rows, html_escape_cell,
-    markdown_escape_cell, output_flags_smoke, parse_table_view_output_cli_options,
-    render_materialized_table_view, render_table_view_for_cli_args, render_table_view_rows_as_mode,
-    rendered_row_value_lines, row_values, row_values_with_options, wrap_output_cell,
+    markdown_escape_cell, output_flags_smoke, output_layout_smoke,
+    parse_table_view_output_cli_options, render_materialized_table_view,
+    render_table_view_for_cli_args, render_table_view_rows_as_mode, rendered_row_value_lines,
+    row_values, row_values_with_options, shell_layout_report_for_rows, wrap_output_cell,
     TableViewOutputBundle, TableViewOutputCliOptions, TableViewOutputConfig, TableViewOutputReport,
     TableViewOutputSnapshot,
 };

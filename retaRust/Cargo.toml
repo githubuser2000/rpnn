@@ -64,6 +64,10 @@ name = "rreta_arch_numbering"
 path = "src/bin/reta_arch_numbering.rs"
 
 [[bin]]
+name = "rreta_arch_layout"
+path = "src/bin/reta_arch_layout.rs"
+
+[[bin]]
 name = "rreta_arch_view_output_shadow"
 path = "src/bin/reta_arch_view_output_shadow.rs"
 

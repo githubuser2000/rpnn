@@ -19,6 +19,7 @@ use crate::table_view::{
     bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
     MaterializedTableViewRow, VirtualColumnDisplayPolicy,
 };
+use crate::table_view_layout::{layout_value_rows, TableViewLayoutConfig, TableViewLayoutReport};
 use crate::table_view_numbering::{
     numbering_values_for_source_row, TableViewNumberingConfig, TableViewNumberingMode,
 };
@@ -72,6 +73,9 @@ impl TableViewOutputCliOptions {
             || self.width.is_some()
             || !self.widths.is_empty()
             || self.dontwrap
+            || self.onetable
+            || self.endlessscreen
+            || self.endless
     }
 
     pub fn apply_to_config(&self, base: &TableViewOutputConfig) -> TableViewOutputConfig {
@@ -100,6 +104,15 @@ impl TableViewOutputCliOptions {
             config.wrap_cell_width = None;
             config.per_column_widths.clear();
         }
+        config.layout.separator = config.shell_separator.clone();
+        config.layout.width_overrides = config.per_column_widths.clone();
+        config.layout.onetable = config.onetable;
+        // Activate shell-layout only for explicit layout-affecting CLI options.
+        // Default output stays byte-stable with earlier shadow stages.
+        config.layout.enabled |= !config.per_column_widths.is_empty()
+            || config.onetable
+            || config.endlessscreen
+            || config.endless;
         config.cli_options = self.clone();
         config
     }
@@ -123,6 +136,7 @@ pub struct TableViewOutputConfig {
     pub include_row_numbers: bool,
     pub row_number_header: String,
     pub numbering: TableViewNumberingConfig,
+    pub layout: TableViewLayoutConfig,
     pub wrap_cell_width: Option<usize>,
     pub per_column_widths: Vec<usize>,
     pub dontwrap: bool,
@@ -147,6 +161,7 @@ impl Default for TableViewOutputConfig {
             include_row_numbers: false,
             row_number_header: "#".to_string(),
             numbering: TableViewNumberingConfig::disabled(),
+            layout: TableViewLayoutConfig::default(),
             wrap_cell_width: None,
             per_column_widths: Vec::new(),
             dontwrap: false,
@@ -233,6 +248,10 @@ pub struct TableViewOutputReport {
     pub include_row_numbers: bool,
     pub numbering_mode: String,
     pub numbering_column_count: usize,
+    pub layout_enabled: bool,
+    pub layout_page_count: usize,
+    pub layout_column_count: usize,
+    pub layout_column_widths: Vec<usize>,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -270,6 +289,8 @@ impl TableViewOutputBundle {
                 "rendered_row_value_lines".to_string(),
                 "wrap_output_cell".to_string(),
                 "numbering_values_for_source_row".to_string(),
+                "layout_value_rows".to_string(),
+                "column_pages_for_widths".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -467,6 +488,7 @@ pub fn render_materialized_table_view(
     view: &MaterializedTableView,
     config: &TableViewOutputConfig,
 ) -> TableViewOutputReport {
+    let layout_report = shell_layout_report_for_rows(&view.rows, config);
     let rendered_lines = render_table_view_rows_as_mode(&view.rows, config);
     let rendered_text = rendered_lines.join("\n");
     let visible_output_is_empty = rendered_text.is_empty();
@@ -488,6 +510,10 @@ pub fn render_materialized_table_view(
         include_row_numbers: config.include_row_numbers,
         numbering_mode: config.numbering.mode.canonical().to_string(),
         numbering_column_count: config.numbering.column_count(),
+        layout_enabled: layout_report.enabled,
+        layout_page_count: layout_report.page_count,
+        layout_column_count: layout_report.column_count,
+        layout_column_widths: layout_report.column_widths,
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -601,11 +627,33 @@ pub fn wrap_output_cell(value: &str, width: Option<usize>) -> Vec<String> {
     }
 }
 
+pub fn shell_layout_report_for_rows(
+    rows: &[MaterializedTableViewRow],
+    config: &TableViewOutputConfig,
+) -> TableViewLayoutReport {
+    let value_lines = rendered_row_value_lines(rows, config);
+    let mut layout_config = config.layout.clone();
+    layout_config.separator = config.shell_separator.clone();
+    if layout_config.width_overrides.is_empty() {
+        layout_config.width_overrides = config.per_column_widths.clone();
+    }
+    layout_value_rows(&value_lines, &layout_config)
+}
+
 pub fn render_shell_rows(
     rows: &[MaterializedTableViewRow],
     config: &TableViewOutputConfig,
 ) -> Vec<String> {
-    rendered_row_value_lines(rows, config)
+    let value_lines = rendered_row_value_lines(rows, config);
+    if config.layout.activates_layout() {
+        let mut layout_config = config.layout.clone();
+        layout_config.separator = config.shell_separator.clone();
+        if layout_config.width_overrides.is_empty() {
+            layout_config.width_overrides = config.per_column_widths.clone();
+        }
+        return layout_value_rows(&value_lines, &layout_config).rendered_lines;
+    }
+    value_lines
         .into_iter()
         .filter_map(|values| {
             if values.is_empty() && !config.include_empty_rows {
@@ -837,6 +885,22 @@ pub fn continuum_m_table_view_output_smoke(mode: OutputMode) -> TableViewOutputR
     )
 }
 
+pub fn output_layout_smoke() -> TableViewOutputReport {
+    let args = vec![
+        "reta".to_string(),
+        "-zeilen".to_string(),
+        "--vorhervonausschnitt=1-2".to_string(),
+        "-spalten".to_string(),
+        "--kontinuum=m".to_string(),
+        "-ausgabe".to_string(),
+        "--breiten=4,12".to_string(),
+        "--breite=0".to_string(),
+    ];
+    let mut config = TableViewOutputConfig::default();
+    config.layout = TableViewLayoutConfig::enabled_shell();
+    render_table_view_for_cli_args(&args, &TableMaterializationConfig::default(), &config)
+}
+
 pub fn output_flags_smoke() -> TableViewOutputReport {
     let args = vec![
         "reta".to_string(),
@@ -963,6 +1027,15 @@ mod tests {
         assert_eq!(report.numbering_column_count, 2);
         assert!(report.rendered_lines[0].contains("Zählung"));
         assert!(report.rendered_lines[0].contains("Nummerierung"));
+    }
+
+    #[test]
+    fn layout_is_disabled_by_default_but_can_be_enabled_by_breiten() {
+        let report = output_layout_smoke();
+        assert!(report.layout_enabled);
+        assert!(report.layout_column_count >= 1);
+        assert!(report.layout_page_count >= 1);
+        assert!(!report.layout_column_widths.is_empty());
     }
 
     #[test]

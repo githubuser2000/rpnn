@@ -290,6 +290,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "materialized_sections_glue_to_same_ordered_renderable_rows",
         ),
         step(
+            "step-table-view-layout",
+            "wave-02-table-adapters",
+            "MaterializedTableView + shell width policy",
+            "table_view_layout.horizontal_pages",
+            "table_view_layout.horizontal_pages",
+            "table-view-layout-shadow-diff",
+            "column_widths_and_horizontal_pages_preserve_ordered_row_cell_matrix",
+        ),
+        step(
             "step-table-view-numbering",
             "wave-02-table-adapters",
             "MaterializedTableViewRow.source_row_zero_based",
