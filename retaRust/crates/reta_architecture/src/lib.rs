@@ -8,6 +8,18 @@
 //! architecture explicit so later ports can target Rust modules instead of the
 //! historical Python monolith.
 
+pub mod architecture_activation;
+pub mod architecture_boundaries;
+pub mod architecture_coherence;
+pub mod architecture_contracts;
+pub mod architecture_impact;
+pub mod architecture_map;
+pub mod architecture_migration;
+pub mod architecture_progress;
+pub mod architecture_rehearsal;
+pub mod architecture_traces;
+pub mod architecture_validation;
+pub mod architecture_witnesses;
 pub mod arithmetic;
 pub mod category;
 pub mod column_selection;
@@ -18,6 +30,7 @@ pub mod completion_word;
 pub mod concat_csv;
 pub mod console_io;
 pub mod dataflow;
+pub mod execution_network;
 pub mod facade;
 pub mod generated_columns;
 pub mod input_semantics;
@@ -59,6 +72,42 @@ pub mod tag_schema;
 pub mod topology;
 pub mod universal;
 
+pub use architecture_activation::{
+    bootstrap_architecture_activation, ArchitectureActivationBundle, ArchitectureActivationSnapshot,
+};
+pub use architecture_boundaries::{
+    bootstrap_architecture_boundaries, ArchitectureBoundariesBundle, ArchitectureBoundariesSnapshot,
+};
+pub use architecture_coherence::{
+    bootstrap_architecture_coherence, ArchitectureCoherenceBundle, ArchitectureCoherenceSnapshot,
+};
+pub use architecture_contracts::{
+    bootstrap_architecture_contracts, ArchitectureContractsBundle, ArchitectureContractsSnapshot,
+};
+pub use architecture_impact::{
+    bootstrap_architecture_impact, ArchitectureImpactBundle, ArchitectureImpactSnapshot,
+};
+pub use architecture_map::{
+    bootstrap_architecture_map, ArchitectureMapBundle, ArchitectureMapSnapshot,
+};
+pub use architecture_migration::{
+    bootstrap_architecture_migration, ArchitectureMigrationBundle, ArchitectureMigrationSnapshot,
+};
+pub use architecture_progress::{
+    bootstrap_architecture_progress, ArchitectureProgressBundle, ArchitectureProgressSnapshot,
+};
+pub use architecture_rehearsal::{
+    bootstrap_architecture_rehearsal, ArchitectureRehearsalBundle, ArchitectureRehearsalSnapshot,
+};
+pub use architecture_traces::{
+    bootstrap_architecture_traces, ArchitectureTraceBundle, ArchitectureTraceSnapshot,
+};
+pub use architecture_validation::{
+    bootstrap_architecture_validation, ArchitectureValidationBundle, ArchitectureValidationSnapshot,
+};
+pub use architecture_witnesses::{
+    bootstrap_architecture_witnesses, ArchitectureWitnessBundle, ArchitectureWitnessSnapshot,
+};
 pub use arithmetic::{
     bootstrap_arithmetic_morphisms, divisor_range, factor_pairs, has_digit, invert_int_value_dict,
     modulo_table_lines, prime_factors_legacy as arithmetic_prime_factors, prime_repeat_legacy,
@@ -115,6 +164,11 @@ pub use dataflow::{
     DataflowDiscipline, ExecutionNetworkBundle, ExecutionNetworkConfig, ExecutionResult,
     ExecutionRunResult, ExecutionTask, FifoTaskQueue, FullDuplexChannel, HalfDuplexChannel,
     LifoTaskStack, PriorityTaskQueue, ResourceSemaphore, EXECUTION_NETWORK_SNAPSHOT,
+};
+pub use execution_network::{
+    bootstrap_execution_network_bridge, execution_network_plan_for_indices,
+    ExecutionNetworkBridgeBundle, ExecutionNetworkBridgeSnapshot, ExecutionNetworkGate,
+    ExecutionNetworkPlan,
 };
 pub use facade::{
     bootstrap_architecture_runtime, ArchitectureRuntime, ArchitectureSnapshotRef,

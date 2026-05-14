@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+use crate::architecture_activation::{bootstrap_architecture_activation, ArchitectureActivationBundle};
+use crate::architecture_boundaries::{bootstrap_architecture_boundaries, ArchitectureBoundariesBundle};
+use crate::architecture_coherence::{bootstrap_architecture_coherence, ArchitectureCoherenceBundle};
+use crate::architecture_contracts::{bootstrap_architecture_contracts, ArchitectureContractsBundle};
+use crate::architecture_impact::{bootstrap_architecture_impact, ArchitectureImpactBundle};
+use crate::architecture_map::{bootstrap_architecture_map, ArchitectureMapBundle};
+use crate::architecture_migration::{bootstrap_architecture_migration, ArchitectureMigrationBundle};
+use crate::architecture_progress::{bootstrap_architecture_progress, ArchitectureProgressBundle};
+use crate::architecture_rehearsal::{bootstrap_architecture_rehearsal, ArchitectureRehearsalBundle};
+use crate::architecture_traces::{bootstrap_architecture_traces, ArchitectureTraceBundle};
+use crate::architecture_validation::{bootstrap_architecture_validation, ArchitectureValidationBundle};
+use crate::architecture_witnesses::{bootstrap_architecture_witnesses, ArchitectureWitnessBundle};
 use crate::arithmetic::{bootstrap_arithmetic_morphisms, ArithmeticMorphismBundle};
 use crate::category::{bootstrap_category_theory, CategoryTheoryBundle};
 use crate::column_selection::{bootstrap_column_selection, ColumnSelectionBundle};
@@ -12,6 +24,7 @@ use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletion
 use crate::concat_csv::{bootstrap_concat_csv, ConcatCsvBundle};
 use crate::console_io::{bootstrap_console_io_morphisms, ConsoleIOMorphismBundle};
 use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, ExecutionTask};
+use crate::execution_network::{bootstrap_execution_network_bridge, ExecutionNetworkBridgeBundle};
 use crate::generated_columns::{bootstrap_generated_columns, GeneratedColumnsBundle};
 use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
 use crate::meta_columns::{bootstrap_meta_columns, MetaColumnsBundle};
@@ -60,10 +73,23 @@ pub const ARCHITECTURE_COUNTS_SNAPSHOT: &str =
 #[derive(Clone, Debug)]
 pub struct ArchitectureRuntime {
     pub topology: RetaContextTopology,
+    pub architecture_activation: ArchitectureActivationBundle,
+    pub architecture_boundaries: ArchitectureBoundariesBundle,
+    pub architecture_coherence: ArchitectureCoherenceBundle,
+    pub architecture_contracts: ArchitectureContractsBundle,
+    pub architecture_impact: ArchitectureImpactBundle,
+    pub architecture_map: ArchitectureMapBundle,
+    pub architecture_migration: ArchitectureMigrationBundle,
+    pub architecture_progress: ArchitectureProgressBundle,
+    pub architecture_rehearsal: ArchitectureRehearsalBundle,
+    pub architecture_traces: ArchitectureTraceBundle,
+    pub architecture_validation: ArchitectureValidationBundle,
+    pub architecture_witnesses: ArchitectureWitnessBundle,
     pub arithmetic: ArithmeticMorphismBundle,
     pub category_theory: CategoryTheoryBundle,
     pub console_io: ConsoleIOMorphismBundle,
     pub execution_network: ExecutionNetworkBundle,
+    pub execution_network_bridge: ExecutionNetworkBridgeBundle,
     pub column_selection: ColumnSelectionBundle,
     pub combi_join: KombiJoinBundle,
     pub completion_runtime: CompletionRuntimeBundle,
@@ -143,12 +169,64 @@ impl ArchitectureRuntime {
         ));
 
         let schema = bootstrap_schema();
+        let architecture_map = bootstrap_architecture_map();
+        let architecture_contracts = bootstrap_architecture_contracts(Some(&architecture_map));
+        let architecture_witnesses = bootstrap_architecture_witnesses(&architecture_map, &architecture_contracts);
+        let architecture_coherence = bootstrap_architecture_coherence(&architecture_map, &architecture_contracts);
+        let architecture_boundaries = bootstrap_architecture_boundaries(&architecture_map, &architecture_coherence);
+        let architecture_traces = bootstrap_architecture_traces(
+            &architecture_map,
+            &architecture_contracts,
+            &architecture_witnesses,
+            &architecture_coherence,
+        );
+        let architecture_impact = bootstrap_architecture_impact(
+            &architecture_map,
+            &architecture_contracts,
+            &architecture_witnesses,
+            &architecture_boundaries,
+            &architecture_traces,
+        );
+        let architecture_migration = bootstrap_architecture_migration(&architecture_impact);
+        let architecture_rehearsal = bootstrap_architecture_rehearsal(&architecture_migration, &architecture_contracts);
+        let architecture_activation = bootstrap_architecture_activation(&architecture_rehearsal);
+        let architecture_progress = bootstrap_architecture_progress(
+            &architecture_map,
+            &architecture_migration,
+            &architecture_activation,
+        );
+        let architecture_validation = bootstrap_architecture_validation(
+            &architecture_map,
+            &architecture_contracts,
+            &architecture_witnesses,
+            &architecture_coherence,
+            &architecture_boundaries,
+            &architecture_traces,
+            &architecture_impact,
+            &architecture_migration,
+            &architecture_rehearsal,
+            &architecture_activation,
+            &architecture_progress,
+        );
         Self {
             topology: RetaContextTopology::standard(),
+            architecture_activation,
+            architecture_boundaries,
+            architecture_coherence,
+            architecture_contracts,
+            architecture_impact,
+            architecture_map,
+            architecture_migration,
+            architecture_progress,
+            architecture_rehearsal,
+            architecture_traces,
+            architecture_validation,
+            architecture_witnesses,
             arithmetic: bootstrap_arithmetic_morphisms(None, None),
             category_theory: bootstrap_category_theory(),
             console_io: bootstrap_console_io_morphisms(None),
             execution_network: bootstrap_execution_network(None),
+            execution_network_bridge: bootstrap_execution_network_bridge(None),
             column_selection: bootstrap_column_selection(),
             combi_join: bootstrap_combi_join(),
             completion_runtime: bootstrap_completion_runtime(),
@@ -198,6 +276,19 @@ impl ArchitectureRuntime {
 
     pub fn architecture_terms(&self) -> Vec<&'static str> {
         vec![
+            "architecture_map",
+            "architecture_contracts",
+            "architecture_witnesses",
+            "architecture_coherence",
+            "architecture_boundaries",
+            "architecture_traces",
+            "architecture_impact",
+            "architecture_migration",
+            "architecture_rehearsal",
+            "architecture_activation",
+            "architecture_progress",
+            "architecture_validation",
+            "execution_network_bridge",
             "network",
             "queue",
             "stack",
@@ -264,6 +355,19 @@ impl ArchitectureRuntime {
             py_architecture_counts_json: ARCHITECTURE_COUNTS_SNAPSHOT,
             py_category_theory_json: self.category_theory.python_snapshot(),
             py_execution_network_json: crate::dataflow::EXECUTION_NETWORK_SNAPSHOT,
+            rust_architecture_map_capsule_count: self.architecture_map.capsules.len(),
+            rust_architecture_contract_diagram_count: self.architecture_contracts.diagrams.len(),
+            rust_architecture_witness_anchor_count: self.architecture_witnesses.anchor_witnesses.len(),
+            rust_architecture_coherence_route_count: self.architecture_coherence.functorial_routes.len(),
+            rust_architecture_boundary_edge_count: self.architecture_boundaries.import_edges.len(),
+            rust_architecture_trace_component_count: self.architecture_traces.component_traces.len(),
+            rust_architecture_impact_candidate_count: self.architecture_impact.migration_candidates.len(),
+            rust_architecture_migration_step_count: self.architecture_migration.steps.len(),
+            rust_architecture_rehearsal_move_count: self.architecture_rehearsal.moves.len(),
+            rust_architecture_activation_unit_count: self.architecture_activation.units.len(),
+            rust_architecture_progress_outstanding_count: self.architecture_progress.outstanding_work.len(),
+            rust_architecture_validation_status: self.architecture_validation.summary.status.clone(),
+            rust_execution_network_gate_count: self.execution_network_bridge.gates.len(),
             rust_category_count: self.category_theory.categories.len(),
             rust_functor_count: self.category_theory.functors.len(),
             rust_natural_transformation_count: self.category_theory.natural_transformations.len(),
@@ -344,6 +448,19 @@ pub struct ArchitectureSnapshotRef {
     pub py_architecture_counts_json: &'static str,
     pub py_category_theory_json: &'static str,
     pub py_execution_network_json: &'static str,
+    pub rust_architecture_map_capsule_count: usize,
+    pub rust_architecture_contract_diagram_count: usize,
+    pub rust_architecture_witness_anchor_count: usize,
+    pub rust_architecture_coherence_route_count: usize,
+    pub rust_architecture_boundary_edge_count: usize,
+    pub rust_architecture_trace_component_count: usize,
+    pub rust_architecture_impact_candidate_count: usize,
+    pub rust_architecture_migration_step_count: usize,
+    pub rust_architecture_rehearsal_move_count: usize,
+    pub rust_architecture_activation_unit_count: usize,
+    pub rust_architecture_progress_outstanding_count: usize,
+    pub rust_architecture_validation_status: String,
+    pub rust_execution_network_gate_count: usize,
     pub rust_category_count: usize,
     pub rust_functor_count: usize,
     pub rust_natural_transformation_count: usize,
@@ -387,6 +504,7 @@ pub struct RetaRunArchitecture {
     pub args_len: usize,
     pub clean_args_len: usize,
     pub scheduled_task_count: usize,
+    pub execution_network_plan_mode: String,
     pub parameter_main_count: usize,
     pub selected_output_mode: Option<String>,
     pub upper_limit: Option<i64>,
@@ -409,6 +527,8 @@ impl RetaRunArchitecture {
         let (clean_args, parallel_config) =
             crate::parallel_execution::extract_parallel_config_from_argv(&arch_clean_args, None);
         let task = ExecutionTask::new(0usize, clean_args.clone()).with_operation("rreta_cli_run");
+        let execution_network_bridge = bootstrap_execution_network_bridge(None);
+        let execution_network_plan = execution_network_bridge.plan_for_tasks(&[task.clone()]);
         let parameter_runtime = bootstrap_parameter_runtime();
         let parsed = parameter_runtime.parse_cli_args(&clean_args);
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
@@ -425,6 +545,7 @@ impl RetaRunArchitecture {
             args_len: args.len(),
             clean_args_len: clean_args.len(),
             scheduled_task_count: usize::from(!task.payload.is_empty()),
+            execution_network_plan_mode: execution_network_plan.mode,
             parameter_main_count: parsed.main_context_history.len(),
             selected_output_mode: parsed
                 .selected_output_mode
@@ -445,10 +566,11 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} mains={} output={:?} upper={:?} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
+            self.execution_network_plan_mode,
             self.parameter_main_count,
             self.selected_output_mode,
             self.upper_limit,
@@ -476,6 +598,7 @@ pub struct PromptArchitectureContext {
     pub execution_plan_argv_count: usize,
     pub architecture_mode: String,
     pub activation_preview_count: usize,
+    pub architecture_validation_status: String,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -494,6 +617,45 @@ impl PromptArchitectureContext {
         let activation_units = migration_control.activation_units_for_switch(
             &switch_bundle,
             &switch_bundle.default_config,
+        );
+        let prompt_architecture_map = bootstrap_architecture_map();
+        let prompt_architecture_contracts = bootstrap_architecture_contracts(Some(&prompt_architecture_map));
+        let prompt_architecture_witnesses = bootstrap_architecture_witnesses(&prompt_architecture_map, &prompt_architecture_contracts);
+        let prompt_architecture_coherence = bootstrap_architecture_coherence(&prompt_architecture_map, &prompt_architecture_contracts);
+        let prompt_architecture_boundaries = bootstrap_architecture_boundaries(&prompt_architecture_map, &prompt_architecture_coherence);
+        let prompt_architecture_traces = bootstrap_architecture_traces(
+            &prompt_architecture_map,
+            &prompt_architecture_contracts,
+            &prompt_architecture_witnesses,
+            &prompt_architecture_coherence,
+        );
+        let prompt_architecture_impact = bootstrap_architecture_impact(
+            &prompt_architecture_map,
+            &prompt_architecture_contracts,
+            &prompt_architecture_witnesses,
+            &prompt_architecture_boundaries,
+            &prompt_architecture_traces,
+        );
+        let prompt_architecture_migration = bootstrap_architecture_migration(&prompt_architecture_impact);
+        let prompt_architecture_rehearsal = bootstrap_architecture_rehearsal(&prompt_architecture_migration, &prompt_architecture_contracts);
+        let prompt_architecture_activation = bootstrap_architecture_activation(&prompt_architecture_rehearsal);
+        let prompt_architecture_progress = bootstrap_architecture_progress(
+            &prompt_architecture_map,
+            &prompt_architecture_migration,
+            &prompt_architecture_activation,
+        );
+        let prompt_architecture_validation = bootstrap_architecture_validation(
+            &prompt_architecture_map,
+            &prompt_architecture_contracts,
+            &prompt_architecture_witnesses,
+            &prompt_architecture_coherence,
+            &prompt_architecture_boundaries,
+            &prompt_architecture_traces,
+            &prompt_architecture_impact,
+            &prompt_architecture_migration,
+            &prompt_architecture_rehearsal,
+            &prompt_architecture_activation,
+            &prompt_architecture_progress,
         );
         let text_state = crate::prompt_session::PromptTextState::new(input);
         let prepared = prompt_preparation.prepare_large_output(
@@ -516,6 +678,7 @@ impl PromptArchitectureContext {
             execution_plan_argv_count: execution_plan.reta_argv.len(),
             architecture_mode: switch_bundle.default_config.mode.canonical().to_string(),
             activation_preview_count: activation_units.len(),
+            architecture_validation_status: prompt_architecture_validation.summary.status,
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
             universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"

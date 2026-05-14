@@ -173,6 +173,42 @@ pub unsafe extern "C" fn reta_architecture_activation_plan_json(
     }
 }
 
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {
+    ffi_json_result(|| {
+        let runtime = crate::shared_architecture();
+        serde_json::to_string(&(
+            runtime.architecture_map.snapshot(),
+            runtime.architecture_contracts.snapshot(),
+            runtime.architecture_witnesses.snapshot(),
+            runtime.architecture_coherence.snapshot(),
+            runtime.architecture_validation.snapshot(),
+            runtime.architecture_progress.snapshot(),
+        ))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_execution_network_plan_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let indices = (0..args.len()).collect::<Vec<_>>();
+        let plan = reta_architecture::execution_network_plan_for_indices(
+            &indices,
+            reta_architecture::DataflowDiscipline::Fifo,
+        );
+        serde_json::to_string(&plan)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_execution_network_plan_json"),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_parity_probe_plan_json() -> *mut c_char {
     ffi_json_result(|| {
