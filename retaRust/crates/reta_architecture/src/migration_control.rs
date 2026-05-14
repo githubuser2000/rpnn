@@ -326,6 +326,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "legacy_row_colours_are_policy_controlled_and_do_not_change_cells",
         ),
         step(
+            "step-table-view-cell-styles",
+            "wave-02-table-adapters",
+            "MaterializedTableViewCell + output_syntax.generateCell",
+            "table_view_cell_styles.legacy_generate_cell",
+            "table_view_cell_styles.legacy_generate_cell",
+            "table-view-cell-style-shadow-diff",
+            "legacy_cell_wrappers_are_policy_controlled_and_do_not_change_cell_values",
+        ),
+        step(
             "step-table-view-output",
             "wave-02-table-adapters",
             "MaterializedTableView",

@@ -74,6 +74,7 @@ pub mod table_runtime;
 pub mod table_state;
 pub mod table_view;
 pub mod table_view_html_attributes;
+pub mod table_view_cell_styles;
 pub mod table_view_layout;
 pub mod table_view_numbering;
 pub mod table_view_output;
@@ -401,6 +402,14 @@ pub use table_view_html_attributes::{
     TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport, TableViewHtmlAttributeRow,
     TableViewHtmlAttributeSnapshot, TableViewHtmlCellAttribute,
 };
+
+pub use table_view_cell_styles::{
+    bootstrap_table_view_cell_styles, cell_style_for_output_value, cell_style_for_row_cell,
+    cell_style_report_for_rows, continuum_m_cell_style_smoke, styled_begin_cell_for_output_value,
+    styled_end_cell_for_mode, TableViewCellStyle, TableViewCellStyleBundle,
+    TableViewCellStyleConfig, TableViewCellStylePolicy, TableViewCellStyleReport,
+    TableViewCellStyleSnapshot,
+};
 pub use table_view_layout::{
     bootstrap_table_view_layout, column_pages_for_widths, display_width, effective_column_widths,
     layout_materialized_rows, layout_smoke_report, layout_value_rows, measure_column_widths,
@@ -417,7 +426,7 @@ pub use table_view_numbering::{
 pub use table_view_output::{
     bbcode_escape_cell, bootstrap_table_view_output, continuum_m_table_view_output_smoke,
     csv_escape_cell, expand_row_to_value_lines, filtered_output_rows, html_escape_cell,
-    markdown_escape_cell, output_flags_smoke, output_layout_smoke,
+    markdown_escape_cell, output_flags_smoke, output_layout_smoke, output_prefix_column_count,
     parse_table_view_output_cli_options, render_materialized_table_view,
     render_table_view_for_cli_args, render_table_view_rows_as_mode, rendered_row_value_lines,
     row_values, row_values_with_options, shell_layout_report_for_rows, wrap_output_cell,

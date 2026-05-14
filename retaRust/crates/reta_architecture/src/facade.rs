@@ -166,6 +166,10 @@ use crate::table_view_html_attributes::{
     bootstrap_table_view_html_attributes as bootstrap_table_view_html_attributes_impl,
     TableViewHtmlAttributeBundle,
 };
+use crate::table_view_cell_styles::{
+    bootstrap_table_view_cell_styles as bootstrap_table_view_cell_styles_impl,
+    TableViewCellStyleBundle,
+};
 use crate::table_view_layout::{
     bootstrap_table_view_layout as bootstrap_table_view_layout_impl, TableViewLayoutBundle,
 };
@@ -258,6 +262,7 @@ pub struct ArchitectureRuntime {
     pub table_materialization: TableMaterializationBundle,
     pub table_view: TableViewBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
+    pub table_view_cell_styles: TableViewCellStyleBundle,
     pub table_view_layout: TableViewLayoutBundle,
     pub table_view_numbering: TableViewNumberingBundle,
     pub table_view_output: TableViewOutputBundle,
@@ -418,6 +423,7 @@ impl ArchitectureRuntime {
             table_materialization: bootstrap_table_materialization_impl(),
             table_view: bootstrap_table_view_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
+            table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
             table_view_layout: bootstrap_table_view_layout_impl(),
             table_view_numbering: bootstrap_table_view_numbering_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
@@ -488,6 +494,7 @@ impl ArchitectureRuntime {
             "table_materialization",
             "table_view",
             "table_view_html_attributes",
+            "table_view_cell_styles",
             "table_view_layout",
             "table_view_numbering",
             "table_view_output",
@@ -641,6 +648,16 @@ impl ArchitectureRuntime {
             rust_table_view_html_attribute_smoke_cell_count:
                 crate::table_view_html_attributes::continuum_m_html_attribute_smoke()
                     .attributed_cell_count,
+            rust_table_view_cell_style_morphism_count: self
+                .table_view_cell_styles
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_cell_style_smoke_styled_count:
+                crate::table_view_cell_styles::continuum_m_cell_style_smoke(
+                    crate::output_syntax::OutputMode::Html,
+                )
+                .styled_cell_count,
             rust_table_view_layout_morphism_count: self
                 .table_view_layout
                 .snapshot()
@@ -823,6 +840,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_morphism_count: usize,
     pub rust_table_view_html_attribute_morphism_count: usize,
     pub rust_table_view_html_attribute_smoke_cell_count: usize,
+    pub rust_table_view_cell_style_morphism_count: usize,
+    pub rust_table_view_cell_style_smoke_styled_count: usize,
     pub rust_table_view_layout_morphism_count: usize,
     pub rust_table_view_layout_smoke_page_count: usize,
     pub rust_table_view_numbering_morphism_count: usize,
@@ -1342,6 +1361,10 @@ pub fn bootstrap_table_materialization() -> TableMaterializationBundle {
 }
 pub fn bootstrap_table_view_html_attributes() -> TableViewHtmlAttributeBundle {
     bootstrap_table_view_html_attributes_impl()
+}
+
+pub fn bootstrap_table_view_cell_styles() -> TableViewCellStyleBundle {
+    bootstrap_table_view_cell_styles_impl()
 }
 
 pub fn bootstrap_table_view_row_styles() -> TableViewRowStyleBundle {

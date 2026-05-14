@@ -11,6 +11,8 @@
 //! a disabled-by-default class/style policy.
 //! Stage 32 adds a disabled-by-default row-style projection backed by the
 //! legacy `coloredBeginCol` output syntax.
+//! Stage 33 adds a disabled-by-default cell-style projection backed by the
+//! legacy `generateCell`/`generate_cell_begin` syntax.
 //! The legacy renderer is still the behaviour oracle; this module makes those
 //! options inspectable and shadow-comparable before any guarded commit.
 
@@ -26,6 +28,10 @@ use crate::table_view::{
 use crate::table_view_html_attributes::{
     html_attribute_report_for_rows, render_html_table_with_attributes,
     TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport,
+};
+use crate::table_view_cell_styles::{
+    cell_style_report_for_rows, styled_begin_cell_for_output_value, styled_end_cell_for_mode,
+    TableViewCellStyleConfig, TableViewCellStylePolicy, TableViewCellStyleReport,
 };
 use crate::table_view_layout::{layout_value_rows, TableViewLayoutConfig, TableViewLayoutReport};
 use crate::table_view_numbering::{
@@ -53,6 +59,8 @@ pub struct TableViewOutputCliOptions {
     pub htmlclasswitness: bool,
     pub rowcolors: bool,
     pub rowcolorwitness: bool,
+    pub cellstyles: bool,
+    pub cellstylewitness: bool,
     pub width: Option<usize>,
     pub widths: Vec<usize>,
     pub recognized_option_count: usize,
@@ -76,6 +84,8 @@ impl Default for TableViewOutputCliOptions {
             htmlclasswitness: false,
             rowcolors: false,
             rowcolorwitness: false,
+            cellstyles: false,
+            cellstylewitness: false,
             width: None,
             widths: Vec::new(),
             recognized_option_count: 0,
@@ -103,6 +113,8 @@ impl TableViewOutputCliOptions {
             || self.htmlclasswitness
             || self.rowcolors
             || self.rowcolorwitness
+            || self.cellstyles
+            || self.cellstylewitness
     }
 
     pub fn apply_to_config(&self, base: &TableViewOutputConfig) -> TableViewOutputConfig {
@@ -138,9 +150,17 @@ impl TableViewOutputCliOptions {
         if self.rowcolors || self.rowcolorwitness {
             config.row_styles = TableViewRowStyleConfig::legacy_colored();
         }
+        if self.cellstyles || self.cellstylewitness {
+            config.cell_styles = if self.cellstylewitness {
+                TableViewCellStyleConfig::legacy_generate_cell_witness()
+            } else {
+                TableViewCellStyleConfig::legacy_generate_cell()
+            };
+        }
         if config.nocolor {
             config.html_attributes.include_inline_style = false;
             config.row_styles = config.row_styles.clone().without_color();
+            config.cell_styles = config.cell_styles.clone().without_color();
         }
         if self.width.is_some() || self.dontwrap {
             config.wrap_cell_width = self.width;
@@ -184,6 +204,7 @@ pub struct TableViewOutputConfig {
     pub layout: TableViewLayoutConfig,
     pub html_attributes: TableViewHtmlAttributeConfig,
     pub row_styles: TableViewRowStyleConfig,
+    pub cell_styles: TableViewCellStyleConfig,
     pub wrap_cell_width: Option<usize>,
     pub per_column_widths: Vec<usize>,
     pub dontwrap: bool,
@@ -211,6 +232,7 @@ impl Default for TableViewOutputConfig {
             layout: TableViewLayoutConfig::default(),
             html_attributes: TableViewHtmlAttributeConfig::default(),
             row_styles: TableViewRowStyleConfig::default(),
+            cell_styles: TableViewCellStyleConfig::default(),
             wrap_cell_width: None,
             per_column_widths: Vec::new(),
             dontwrap: false,
@@ -256,6 +278,11 @@ impl TableViewOutputConfig {
         self
     }
 
+    pub fn with_cell_styles(mut self, cell_styles: TableViewCellStyleConfig) -> Self {
+        self.cell_styles = cell_styles;
+        self
+    }
+
     pub fn with_numbering(mut self, numbering: TableViewNumberingConfig) -> Self {
         self.include_row_numbers = numbering.is_enabled();
         self.numbering = numbering;
@@ -283,6 +310,7 @@ pub struct TableViewOutputSnapshot {
     pub stage28_cli_options: Vec<String>,
     pub stage29_numbering_modes: Vec<String>,
     pub stage32_row_style_policies: Vec<String>,
+    pub stage33_cell_style_policies: Vec<String>,
     pub universal_property: String,
 }
 
@@ -317,6 +345,12 @@ pub struct TableViewOutputReport {
     pub row_style_row_count: usize,
     pub row_style_colored_row_count: usize,
     pub row_style_report: Option<TableViewRowStyleReport>,
+    pub cell_style_enabled: bool,
+    pub cell_style_policy: String,
+    pub cell_style_cell_count: usize,
+    pub cell_style_styled_cell_count: usize,
+    pub cell_style_virtual_cell_count: usize,
+    pub cell_style_report: Option<TableViewCellStyleReport>,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -360,6 +394,9 @@ impl TableViewOutputBundle {
                 "render_html_table_with_attributes".to_string(),
                 "row_style_report_for_rows".to_string(),
                 "styled_begin_row_for_row".to_string(),
+                "cell_style_report_for_rows".to_string(),
+                "styled_begin_cell_for_output_value".to_string(),
+                "styled_end_cell_for_mode".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -392,6 +429,9 @@ impl TableViewOutputBundle {
                 "rowcolors".to_string(),
                 "zeilenfarben".to_string(),
                 "rowcolorwitness".to_string(),
+                "cellstyles".to_string(),
+                "zellstyles".to_string(),
+                "cellstylewitness".to_string(),
             ],
             stage29_numbering_modes: vec![
                 TableViewNumberingMode::Disabled.canonical().to_string(),
@@ -402,6 +442,11 @@ impl TableViewOutputBundle {
             stage32_row_style_policies: vec![
                 "plain".to_string(),
                 "legacy-colored-begin-col".to_string(),
+            ],
+            stage33_cell_style_policies: vec![
+                TableViewCellStylePolicy::Plain.canonical().to_string(),
+                TableViewCellStylePolicy::LegacyGenerateCell.canonical().to_string(),
+                TableViewCellStylePolicy::LegacyGenerateCellWitness.canonical().to_string(),
             ],
             universal_property:
                 "one materialized table view has deterministic images in every output syntax, output-option and numbering context"
@@ -508,6 +553,15 @@ pub fn parse_table_view_output_cli_options<S: AsRef<str>>(args: &[S]) -> TableVi
                 options.rowcolorwitness = true;
                 true
             }
+            "cellstyles" | "cellstyle" | "zellstyles" | "zellstile" | "zellfarben" => {
+                options.cellstyles = true;
+                true
+            }
+            "cellstylewitness" | "zellstylewitness" | "zellfarbenwitness" => {
+                options.cellstyles = true;
+                options.cellstylewitness = true;
+                true
+            }
             "breite" => {
                 if let Some(value) = value.as_deref() {
                     options.width = parse_positive_width(value);
@@ -611,6 +665,19 @@ pub fn render_materialized_table_view(
     } else {
         None
     };
+    let prefix_column_count = output_prefix_column_count(config);
+    let cell_style_report = if config.cell_styles.activates_mode(config.mode) {
+        Some(cell_style_report_for_rows(
+            &view.rows,
+            config.mode,
+            &config.cell_styles,
+            config.suppress_headers,
+            config.include_empty_rows,
+            prefix_column_count,
+        ))
+    } else {
+        None
+    };
     let rendered_lines = render_table_view_rows_as_mode(&view.rows, config);
     let rendered_text = rendered_lines.join("\n");
     let visible_output_is_empty = rendered_text.is_empty();
@@ -652,6 +719,12 @@ pub fn render_materialized_table_view(
         row_style_row_count: row_style_report.as_ref().map(|report| report.row_count).unwrap_or_default(),
         row_style_colored_row_count: row_style_report.as_ref().map(|report| report.colored_row_count).unwrap_or_default(),
         row_style_report,
+        cell_style_enabled: config.cell_styles.enabled,
+        cell_style_policy: config.cell_styles.policy.canonical().to_string(),
+        cell_style_cell_count: cell_style_report.as_ref().map(|report| report.cell_count).unwrap_or_default(),
+        cell_style_styled_cell_count: cell_style_report.as_ref().map(|report| report.styled_cell_count).unwrap_or_default(),
+        cell_style_virtual_cell_count: cell_style_report.as_ref().map(|report| report.virtual_cell_style_count).unwrap_or_default(),
+        cell_style_report,
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -919,6 +992,7 @@ pub fn render_html_rows_with_config(
 ) -> Vec<String> {
     if config.html_attributes.enabled
         && !config.row_styles.activates_mode(OutputMode::Html)
+        && !config.cell_styles.activates_mode(OutputMode::Html)
         && config.wrap_cell_width.is_none()
         && !config.include_row_numbers
         && !config.numbering.is_enabled()
@@ -944,8 +1018,18 @@ pub fn render_html_rows_with_config(
             let begin =
                 styled_begin_row_for_row(row, OutputMode::Html, line_index > 0, &config.row_styles);
             out.push(clean_row_begin(&begin, "<tr>"));
-            for value in values {
-                out.push(format!("<td>{}</td>", html_escape_cell(&value)));
+            let prefix_column_count = output_prefix_column_count(config);
+            for (value_index, value) in values.into_iter().enumerate() {
+                let begin = styled_begin_cell_for_output_value(
+                    row,
+                    OutputMode::Html,
+                    value_index,
+                    line_index > 0,
+                    prefix_column_count,
+                    &config.cell_styles,
+                );
+                let end = styled_end_cell_for_mode(OutputMode::Html);
+                out.push(format!("{}{}{}", begin, html_escape_cell(&value), end));
             }
             out.push("</tr>".to_string());
         }
@@ -987,9 +1071,22 @@ pub fn render_bbcode_rows_with_config(
                 line_index > 0,
                 &config.row_styles,
             );
+            let prefix_column_count = output_prefix_column_count(config);
             let cells = values
                 .iter()
-                .map(|value| format!("[td]{}[/td]", bbcode_escape_cell(value)))
+                .enumerate()
+                .map(|(value_index, value)| {
+                    let begin = styled_begin_cell_for_output_value(
+                        row,
+                        OutputMode::Bbcode,
+                        value_index,
+                        line_index > 0,
+                        prefix_column_count,
+                        &config.cell_styles,
+                    );
+                    let end = styled_end_cell_for_mode(OutputMode::Bbcode);
+                    format!("{}{}{}", begin, bbcode_escape_cell(value), end)
+                })
                 .collect::<Vec<_>>()
                 .join("");
             out.push(format!("{}{cells}[/tr]", clean_row_begin(&begin, "[tr]")));
@@ -1005,6 +1102,16 @@ fn clean_row_begin(begin: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         trimmed.to_string()
+    }
+}
+
+pub fn output_prefix_column_count(config: &TableViewOutputConfig) -> usize {
+    if config.numbering.is_enabled() {
+        config.numbering.column_count()
+    } else if config.include_row_numbers {
+        1
+    } else {
+        0
     }
 }
 
@@ -1361,4 +1468,69 @@ mod tests {
         );
         assert_eq!(numbered, vec!["7".to_string(), "x".to_string()]);
     }
+
+    #[test]
+    fn cellstyles_option_uses_legacy_generate_cell_for_html_and_bbcode() {
+        let html_args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--cellstyles".to_string(),
+        ];
+        let html_report = render_table_view_for_cli_args(
+            &html_args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(html_report.cell_style_enabled);
+        assert_eq!(html_report.cell_style_policy, "legacy-generate-cell");
+        assert!(html_report.cell_style_styled_cell_count > 0);
+        assert!(html_report.rendered_lines.iter().any(|line| line.contains("<td")));
+
+        let bbcode_args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=bbcode".to_string(),
+            "--cellstylewitness".to_string(),
+        ];
+        let bbcode_report = render_table_view_for_cli_args(
+            &bbcode_args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(bbcode_report.cell_style_enabled);
+        assert_eq!(bbcode_report.cell_style_policy, "legacy-generate-cell-witness");
+        assert!(bbcode_report.rendered_lines.iter().any(|line| line.contains("[td")));
+    }
+
+    #[test]
+    fn nocolor_disables_cellstyles_like_other_style_projections() {
+        let args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--cellstyles".to_string(),
+            "--nocolor".to_string(),
+        ];
+        let report = render_table_view_for_cli_args(
+            &args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(!report.cell_style_enabled);
+        assert_eq!(report.cell_style_styled_cell_count, 0);
+    }
+
 }
