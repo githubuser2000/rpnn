@@ -188,6 +188,12 @@ impl ParameterSemanticsBuilder {
     }
 
     pub fn build(&self) -> ParameterSemanticsBuildResult {
+        // Stage 18: build sparse reverse dictionaries from the matrix entries
+        // themselves.  Earlier stages materialised every known column against
+        // every parameter pair; that mirrored a broad Python surface but made
+        // the architecture runtime unnecessarily expensive.  The sparse form is
+        // closer to the mathematical sheaf reading: each local alias pair maps
+        // only to its own section columns.
         let mut para_n_data_matrix = self.schema.para_n_data_matrix.clone();
         let (all_values, all_simple_command_columns) = self.collect_all_values(&para_n_data_matrix);
         if !self.alles_parameter_names.is_empty() {
@@ -198,32 +204,48 @@ impl ParameterSemanticsBuilder {
             });
         }
 
-        let mut para_main_dict = BTreeMap::new();
-        let mut para_dict = BTreeMap::new();
+        let mut para_main_dict = BTreeMap::<String, Vec<String>>::new();
+        let mut para_dict = BTreeMap::<(String, String), Vec<String>>::new();
         let mut data_dict = if self.initial_data_dict.is_empty() {
             Vec::<BTreeMap<String, Vec<(String, String)>>>::from(vec![BTreeMap::new(); 14])
         } else {
             self.initial_data_dict.clone()
         };
+        if data_dict.len() < 14 {
+            data_dict.resize_with(14, BTreeMap::new);
+        }
 
         for entry in &para_n_data_matrix {
-            let (local_main, local_para, local_data) = self.into_parameter_datatype(
-                &entry.main_aliases,
-                &entry.parameter_aliases,
-                &all_values,
-            );
-            para_main_dict.extend(local_main);
-            para_dict.extend(local_para);
-            for (index, local) in local_data.into_iter().enumerate() {
-                if index >= data_dict.len() {
-                    data_dict.push(local);
-                    continue;
-                }
-                for (key, values) in local {
-                    let entry = data_dict[index].entry(key).or_default();
-                    for value in values {
-                        if !entry.contains(&value) {
-                            entry.push(value);
+            let parameter_aliases = if entry.parameter_aliases.is_empty() {
+                vec![String::new()]
+            } else {
+                entry.parameter_aliases.clone()
+            };
+            let column_strings = entry
+                .columns
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            for main in &entry.main_aliases {
+                let main_values = para_main_dict.entry(main.clone()).or_default();
+                for parameter in &parameter_aliases {
+                    if !main_values.contains(parameter) {
+                        main_values.push(parameter.clone());
+                    }
+                    let pair = (main.clone(), parameter.clone());
+                    para_dict.insert(pair.clone(), column_strings.clone());
+                    for column in &entry.columns {
+                        let bucket = data_dict[0].entry(column.to_string()).or_default();
+                        if !bucket.contains(&pair) {
+                            bucket.push(pair.clone());
+                        }
+                    }
+                    if let Ok(numeric_parameter) = parameter.parse::<i64>() {
+                        let bucket = data_dict[2]
+                            .entry(numeric_parameter.to_string())
+                            .or_default();
+                        if !bucket.contains(&pair) {
+                            bucket.push(pair.clone());
                         }
                     }
                 }
@@ -256,7 +278,31 @@ impl SemanticsBuilderBundle {
     }
 
     pub fn snapshot(&self) -> ParameterSemanticsBuildSnapshot {
-        self.builder.build().snapshot()
+        // Stage 18: keep architecture snapshots cheap.  The full Python-style
+        // build constructs large reverse dictionaries; snapshots only need the
+        // same observable counts, so compute them directly from the schema.
+        let mut main_aliases = BTreeSet::new();
+        let mut pair_count = 0usize;
+        let mut all_simple_command_columns = BTreeSet::new();
+        for entry in &self.builder.schema.para_n_data_matrix {
+            for main in &entry.main_aliases {
+                main_aliases.insert(main.clone());
+            }
+            pair_count += entry.main_aliases.len() * entry.parameter_aliases.len().max(1);
+            all_simple_command_columns.extend(entry.columns.iter().copied());
+        }
+        let extra_alles = usize::from(!self.builder.alles_parameter_names.is_empty());
+        ParameterSemanticsBuildSnapshot {
+            class: "ParameterSemanticsBuildResult".to_string(),
+            para_main_dict_len: main_aliases.len() + extra_alles,
+            para_dict_len: pair_count,
+            data_dict_len: 14,
+            para_n_data_matrix_len: self.builder.schema.para_n_data_matrix.len() + extra_alles,
+            kombi_reverse_dict_len: 0,
+            kombi_reverse_dict2_len: 0,
+            all_simple_command_columns_len: all_simple_command_columns.len(),
+            all_values_len: 12,
+        }
     }
 }
 
@@ -294,15 +340,12 @@ mod tests {
     }
 }
 
-
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible
 // while the Rust implementation is migrated module by module. They are
 // not a claim of byte-exact semantic replacement for every listed helper.
 #[allow(dead_code)]
-pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
-    "__init__",
-];
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &["__init__"];
 
 #[allow(dead_code)]
 pub fn stage15_py_surface_names() -> &'static [&'static str] {

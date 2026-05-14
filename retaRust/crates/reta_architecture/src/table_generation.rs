@@ -56,6 +56,7 @@ pub struct TableGenerationPlan {
     pub rows_of_combi: BTreeSet<i64>,
     pub rows_of_combi2: BTreeSet<i64>,
     pub concat_columns: BTreeSet<i64>,
+    pub symbolic_column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<String>>,
 }
 
 impl TableGenerationPlan {
@@ -76,6 +77,7 @@ impl TableGenerationPlan {
             concat_columns: get(2),
             rows_of_combi: get(3),
             rows_of_combi2: get(8),
+            symbolic_column_buckets: BTreeMap::new(),
         }
     }
 
@@ -85,6 +87,20 @@ impl TableGenerationPlan {
 
     pub fn requires_concat_csv(&self) -> bool {
         !self.concat_columns.is_empty()
+    }
+
+    pub fn requires_symbolic_generated_sections(&self) -> bool {
+        !self.symbolic_column_buckets.is_empty()
+    }
+
+    pub fn from_parameter_command_sets(
+        sets: &crate::parameter_runtime::ParameterCommandSets,
+    ) -> Self {
+        let normalized = crate::column_selection::bootstrap_column_selection()
+            .normalize_bucket_map(&sets.column_buckets);
+        let mut plan = Self::from_column_buckets(&normalized, sets.rows_as_numbers.iter().copied());
+        plan.symbolic_column_buckets = sets.symbolic_column_buckets.clone();
+        plan
     }
 }
 
@@ -111,7 +127,8 @@ impl TableGenerationBundle {
         }
         TableGenerationResult {
             rows_of_combi: plan.rows_of_combi.clone(),
-            prim_spalten_present: plan.requires_concat_csv(),
+            prim_spalten_present: plan.requires_concat_csv()
+                || plan.requires_symbolic_generated_sections(),
             gebr,
             ..TableGenerationResult::default()
         }
@@ -165,16 +182,51 @@ mod tests {
         assert_eq!(plan.selected_columns, BTreeSet::from([1, 2]));
         assert!(plan.requires_kombi());
     }
+
+    #[test]
+    fn generation_plan_carries_symbolic_parameter_buckets() {
+        let runtime = crate::parameter_runtime::bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-spalten",
+            "--multiplikationen=motivstern",
+            "--gebrochenuniversum=2",
+        ]);
+        let plan = TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
+        assert!(plan.requires_symbolic_generated_sections());
+        assert!(
+            plan.symbolic_column_buckets[&ColumnBucketKey::positive(7)].contains("primMotivStern")
+        );
+        assert!(plan.symbolic_column_buckets[&ColumnBucketKey::positive(5)].contains("2"));
+    }
 }
 
 // Stage 16 continued: concrete table_generation.py compatibility wrappers.
-pub fn _set_last_line_number(rows: &[Vec<String>]) -> usize { rows.len().saturating_sub(1) }
-pub fn _concat_csv_inputs(columns: &[i64]) -> Vec<i64> { columns.iter().copied().filter(|value| *value > 0).collect() }
-pub fn _read_kombi_tables(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
-pub fn _apply_generated_column_morphisms(row_number: i64) -> Vec<String> { crate::generated_columns::bootstrap_generated_columns().registry.names().into_iter().map(|name| format!("{name}:{row_number}")).collect() }
+pub fn _set_last_line_number(rows: &[Vec<String>]) -> usize {
+    rows.len().saturating_sub(1)
+}
+pub fn _concat_csv_inputs(columns: &[i64]) -> Vec<i64> {
+    columns.iter().copied().filter(|value| *value > 0).collect()
+}
+pub fn _read_kombi_tables(text: &str) -> Vec<Vec<String>> {
+    text.lines()
+        .map(|line| line.split(';').map(str::to_string).collect())
+        .collect()
+}
+pub fn _apply_generated_column_morphisms(row_number: i64) -> Vec<String> {
+    crate::generated_columns::bootstrap_generated_columns()
+        .registry
+        .names()
+        .into_iter()
+        .map(|name| format!("{name}:{row_number}"))
+        .collect()
+}
 pub fn build_for_program(columns: &[i64]) -> TableGenerationPlan {
     let mut buckets: BTreeMap<ColumnBucketKey, BTreeSet<i64>> = BTreeMap::new();
-    buckets.insert(ColumnBucketKey::positive(0), columns.iter().copied().collect());
+    buckets.insert(
+        ColumnBucketKey::positive(0),
+        columns.iter().copied().collect(),
+    );
     TableGenerationPlan::from_column_buckets(&buckets, std::iter::empty::<i64>())
 }
 

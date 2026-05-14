@@ -1,0 +1,45 @@
+{
+  "stage": 18,
+  "date": "2026-05-14",
+  "project": "Transcompilierung reta python rust",
+  "summary": "Preserve py reta arch paraNdataMatrix bucket projections in Rust, including symbolic generated/fraction selectors, and connect them to parameter runtime and table generation.",
+  "changed_files": [
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/parameter_matrix.rs",
+    "crates/reta_architecture/src/parameter_runtime.rs",
+    "crates/reta_architecture/src/semantics_builder.rs",
+    "crates/reta_architecture/src/sheaf.rs",
+    "crates/reta_architecture/src/table_generation.rs",
+    "tools/generate_parameter_matrix.py"
+  ],
+  "new_or_strengthened_semantics": [
+    "alias_to_bucket_projection",
+    "symbolic_generated_column_selectors",
+    "gebrochen_rational_symbolic_bucket_selectors",
+    "negative_symbolic_bucket_subtraction",
+    "parameter_runtime_bucket_maps",
+    "table_generation_symbolic_bucket_plan",
+    "sparse_semantics_builder_reverse_lookup",
+    "schema_backed_default_sheaf"
+  ],
+  "regressions_covered": [
+    "kontinuum/m includes 493 and 744",
+    "multiplikationen/motivstern preserves primMotivStern in bucket 7",
+    "gebrochenuniversum/2 preserves string selector in bucket 5",
+    "gebrochenuniversum=2,-2 removes the symbolic selector"
+  ],
+  "checks": {
+    "workspace_cargo_check": "blocked by crates.io DNS/index resolution for hypher",
+    "isolated_reta_architecture_cargo_check_offline_with_local_serde_stub": "passed",
+    "isolated_reta_architecture_cargo_test_offline_with_local_serde_stub": "122 passed, 0 failed",
+    "parameter_matrix_generator_deterministic": true,
+    "python_tools_py_compile": true,
+    "coverage_functions": "1096/1096",
+    "coverage_classes": "239/239",
+    "semantic_surface_functions_declared": "1096/1096",
+    "semantic_surface_classes_declared": "239/239",
+    "semantic_surface_marker_only": 0,
+    "semantic_surface_missing": 0
+  },
+  "visible_behavior_switch": "unchanged; shadow/commit gates remain the safe activation path"
+}

@@ -170,13 +170,18 @@ impl ParameterSemanticsSheaf {
             let Some(canonical) = aliases.first().cloned() else {
                 continue;
             };
-            if !self.main_alias_groups.iter().any(|group| group.canonical == canonical) {
+            if !self
+                .main_alias_groups
+                .iter()
+                .any(|group| group.canonical == canonical)
+            {
                 self.main_alias_groups.push(AliasGroup {
                     canonical: canonical.clone(),
                     aliases: aliases.clone(),
                 });
             }
-            self.main_alias_map.insert(canonical.clone(), canonical.clone());
+            self.main_alias_map
+                .insert(canonical.clone(), canonical.clone());
             for alias in aliases {
                 self.main_alias_map.insert(alias, canonical.clone());
             }
@@ -264,11 +269,7 @@ impl ParameterSemanticsSheaf {
             .unwrap_or_default()
     }
 
-    pub fn resolve_parameter_alias(
-        &self,
-        main_name: &str,
-        parameter_name: &str,
-    ) -> Option<String> {
+    pub fn resolve_parameter_alias(&self, main_name: &str, parameter_name: &str) -> Option<String> {
         let canonical_main = self
             .resolve_main_alias(main_name)
             .unwrap_or_else(|| main_name.to_string());
@@ -539,7 +540,9 @@ impl SheafBundle {
             parameter_semantics: ParameterSemanticsSheaf::from_schema(schema),
             generated_columns: GeneratedColumnsSheaf::default(),
             table_output: TableOutputSheaf::default(),
-            html_reference: HtmlReferenceSheaf::from_jsonl(Some(&repo_root.join("htmlclassesPy.jsonl"))),
+            html_reference: HtmlReferenceSheaf::from_jsonl(Some(
+                &repo_root.join("htmlclassesPy.jsonl"),
+            )),
         }
     }
 
@@ -575,7 +578,10 @@ pub struct SheafBundleSnapshot {
 pub fn bootstrap_sheaves(schema: Option<&RetaContextSchema>) -> SheafBundle {
     match schema {
         Some(schema) => SheafBundle::from_schema(schema),
-        None => SheafBundle::default(),
+        None => {
+            let schema = crate::schema::bootstrap_schema();
+            SheafBundle::from_schema(&schema)
+        }
     }
 }
 
@@ -607,13 +613,18 @@ mod tests {
         );
     }
 
-
     #[test]
     fn bootstrap_sheaf_resolves_generated_kontinuum_aliases() {
         let sheaves = bootstrap_sheaves(None);
         let parameter = &sheaves.parameter_semantics;
-        assert_eq!(parameter.resolve_main_alias("kontinuum"), Some("Kontinuum".to_string()));
-        assert_eq!(parameter.resolve_parameter_alias("kontinuum", "m"), Some("M".to_string()));
+        assert_eq!(
+            parameter.resolve_main_alias("kontinuum"),
+            Some("Kontinuum".to_string())
+        );
+        assert_eq!(
+            parameter.resolve_parameter_alias("kontinuum", "m"),
+            Some("M".to_string())
+        );
         let columns = parameter.column_numbers_for_pair("kontinuum", "m");
         assert!(columns.contains(&493));
         assert!(columns.contains(&744));
@@ -646,15 +657,12 @@ mod tests {
     }
 }
 
-
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible
 // while the Rust implementation is migrated module by module. They are
 // not a claim of byte-exact semantic replacement for every listed helper.
 #[allow(dead_code)]
-pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
-    "__init__",
-];
+pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &["__init__"];
 
 #[allow(dead_code)]
 pub fn stage15_py_surface_names() -> &'static [&'static str] {

@@ -6,12 +6,17 @@
 //! ports: main-command context, sub-parameter tokenization, output-mode
 //! extraction and upper-limit inference from row ranges.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::column_selection::ColumnBucketKey;
 use crate::output_syntax::OutputMode;
-use crate::parameter_matrix::{canonical_pair_for_aliases, columns_for_alias_pair, parameter_matrix_seed_count};
+use crate::parameter_matrix::{
+    bucket_projections_for_alias_pair, canonical_pair_for_aliases, columns_for_alias_pair,
+    nonempty_bucket_projection_count, parameter_matrix_seed_count,
+    symbolic_bucket_projection_count,
+};
 use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -97,6 +102,9 @@ pub struct ParameterCommandSets {
     pub rows_of_combi: BTreeSet<i64>,
     pub selected_columns: BTreeSet<i64>,
     pub excluded_columns: BTreeSet<i64>,
+    pub column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<i64>>,
+    pub symbolic_column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<String>>,
+    pub excluded_symbolic_column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<String>>,
     pub resolved_alias_pairs: Vec<(String, String)>,
     pub unresolved_column_pairs: Vec<(String, String)>,
     pub spaltenreihenfolgeundnurdiese: Vec<i64>,
@@ -167,8 +175,10 @@ impl ParameterRuntimeBundle {
             column_function: "produce_all_spalten_numbers".to_string(),
             width_function: "apply_width_parameter".to_string(),
             parse_function: format!(
-                "parameters_to_commands_and_numbers/parameter_matrix_entries={}",
-                parameter_matrix_seed_count()
+                "parameters_to_commands_and_numbers/parameter_matrix_entries={}/bucket_projections={}/symbols={}",
+                parameter_matrix_seed_count(),
+                nonempty_bucket_projection_count(),
+                symbolic_bucket_projection_count()
             ),
             upper_limit_argument_function: "upper_limit_values_for_argument".to_string(),
             upper_limit_aggregate_function: "upper_limit_from_arguments".to_string(),
@@ -191,10 +201,7 @@ impl ParameterRuntimeBundle {
             if raw.starts_with("--") {
                 let body = &raw[2..];
                 let (key, value) = split_key_value(body);
-                let value_items = value
-                    .as_deref()
-                    .map(split_comma_values)
-                    .unwrap_or_default();
+                let value_items = value.as_deref().map(split_comma_values).unwrap_or_default();
                 let negated_value = value
                     .as_ref()
                     .is_some_and(|item| item.trim_start().starts_with('-'));
@@ -246,7 +253,8 @@ impl ParameterRuntimeBundle {
                     });
                     continue;
                 }
-                let main = MainParameter::from_cli(body).unwrap_or(MainParameter::Unknown(body.to_string()));
+                let main = MainParameter::from_cli(body)
+                    .unwrap_or(MainParameter::Unknown(body.to_string()));
                 active_main = Some(main.clone());
                 result.main_context_history.push(main.clone());
                 result.tokens.push(ParameterToken {
@@ -356,7 +364,11 @@ fn output_mode_from_token(token: &ParameterToken) -> Option<OutputMode> {
     }
 }
 
-fn apply_row_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets: &mut ParameterCommandSets) {
+fn apply_row_token(
+    bundle: &ParameterRuntimeBundle,
+    token: &ParameterToken,
+    sets: &mut ParameterCommandSets,
+) {
     match (token.key.as_deref(), token.value.as_deref()) {
         (Some("alles"), _) => {
             sets.param_lines.insert("all".to_string());
@@ -380,7 +392,10 @@ fn apply_row_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets
         (Some("typ"), Some(value)) => {
             for item in split_comma_values(value) {
                 let cleaned = item.trim_start_matches('-');
-                if matches!(cleaned, "sonne" | "schwarzesonne" | "planet" | "mond" | "SonneMitMondanteil") {
+                if matches!(
+                    cleaned,
+                    "sonne" | "schwarzesonne" | "planet" | "mond" | "SonneMitMondanteil"
+                ) {
                     sets.param_lines.insert(cleaned.to_string());
                 }
             }
@@ -401,7 +416,11 @@ fn apply_row_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets
     }
 }
 
-fn apply_output_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets: &mut ParameterCommandSets) {
+fn apply_output_token(
+    bundle: &ParameterRuntimeBundle,
+    token: &ParameterToken,
+    sets: &mut ParameterCommandSets,
+) {
     match (token.key.as_deref(), token.value.as_deref()) {
         (Some("spaltenreihenfolgeundnurdiese"), Some(value)) => {
             sets.spaltenreihenfolgeundnurdiese = bundle
@@ -414,7 +433,11 @@ fn apply_output_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, s
     }
 }
 
-fn apply_column_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets: &mut ParameterCommandSets) {
+fn apply_column_token(
+    bundle: &ParameterRuntimeBundle,
+    token: &ParameterToken,
+    sets: &mut ParameterCommandSets,
+) {
     let Some(key) = token.key.as_deref() else {
         return;
     };
@@ -424,12 +447,17 @@ fn apply_column_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, s
             let trimmed = raw_item.trim();
             let negated = trimmed.starts_with('-');
             let item = trimmed.trim_start_matches('-');
+            let projections = bucket_projections_for_alias_pair(key, item);
             let columns = columns_for_alias_pair(key, item);
-            if !columns.is_empty() {
+            if !projections.is_empty() || !columns.is_empty() {
                 resolved_any = true;
-                if let Some((canonical_main, canonical_parameter)) = canonical_pair_for_aliases(key, item) {
-                    sets.resolved_alias_pairs.push((canonical_main, canonical_parameter));
+                if let Some((canonical_main, canonical_parameter)) =
+                    canonical_pair_for_aliases(key, item)
+                {
+                    sets.resolved_alias_pairs
+                        .push((canonical_main, canonical_parameter));
                 }
+                apply_bucket_projections(sets, &projections, negated);
                 for column in columns {
                     if negated {
                         sets.excluded_columns.insert(column);
@@ -442,21 +470,33 @@ fn apply_column_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, s
                 for number in bundle.row_ranges.range_to_numbers(item, false, 0, false) {
                     if negated {
                         sets.excluded_columns.insert(number);
+                        sets.column_buckets
+                            .entry(ColumnBucketKey::negative(0))
+                            .or_default()
+                            .insert(number);
                     } else {
                         sets.selected_columns.insert(number);
                         sets.rows_as_numbers.insert(number);
+                        sets.column_buckets
+                            .entry(ColumnBucketKey::positive(0))
+                            .or_default()
+                            .insert(number);
                     }
                 }
             }
         }
         if !resolved_any {
-            sets.unresolved_column_pairs.push((key.to_string(), value.to_string()));
+            sets.unresolved_column_pairs
+                .push((key.to_string(), value.to_string()));
         }
     } else {
+        let projections = bucket_projections_for_alias_pair(key, "");
         let columns = columns_for_alias_pair(key, "");
-        if columns.is_empty() {
-            sets.unresolved_column_pairs.push((key.to_string(), String::new()));
+        if projections.is_empty() && columns.is_empty() {
+            sets.unresolved_column_pairs
+                .push((key.to_string(), String::new()));
         } else {
+            apply_bucket_projections(sets, &projections, false);
             for column in columns {
                 sets.selected_columns.insert(column);
             }
@@ -464,7 +504,42 @@ fn apply_column_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, s
     }
 }
 
-fn apply_kombi_token(bundle: &ParameterRuntimeBundle, token: &ParameterToken, sets: &mut ParameterCommandSets) {
+fn apply_bucket_projections(
+    sets: &mut ParameterCommandSets,
+    projections: &[crate::parameter_matrix::OwnedParameterBucketProjection],
+    negated: bool,
+) {
+    for projection in projections {
+        let key = if negated {
+            ColumnBucketKey::negative(projection.bucket)
+        } else {
+            ColumnBucketKey::positive(projection.bucket)
+        };
+        if !projection.integers.is_empty() {
+            sets.column_buckets
+                .entry(key)
+                .or_default()
+                .extend(projection.integers.iter().copied());
+        }
+        if !projection.symbols.is_empty() {
+            let target = if negated {
+                &mut sets.excluded_symbolic_column_buckets
+            } else {
+                &mut sets.symbolic_column_buckets
+            };
+            target
+                .entry(key)
+                .or_default()
+                .extend(projection.symbols.iter().cloned());
+        }
+    }
+}
+
+fn apply_kombi_token(
+    bundle: &ParameterRuntimeBundle,
+    token: &ParameterToken,
+    sets: &mut ParameterCommandSets,
+) {
     if let Some(value) = token.value.as_deref() {
         for number in bundle.row_ranges.range_to_numbers(value, false, 0, false) {
             sets.rows_of_combi.insert(number);
@@ -494,40 +569,83 @@ mod tests {
     #[test]
     fn column_alias_matrix_resolves_kontinuum_m_744() {
         let runtime = bootstrap_parameter_runtime();
-        let parsed = runtime.parse_cli_args(&[
-            "reta",
-            "-spalten",
-            "--kontinuum=m",
-        ]);
+        let parsed = runtime.parse_cli_args(&["reta", "-spalten", "--kontinuum=m"]);
         assert!(parsed.command_sets.selected_columns.contains(&493));
         assert!(parsed.command_sets.selected_columns.contains(&744));
         assert!(parsed
             .command_sets
             .resolved_alias_pairs
             .contains(&("Kontinuum".to_string(), "M".to_string())));
-        let args = vec!["reta".to_string(), "-spalten".to_string(), "--kontinuum=m".to_string()];
+        let args = vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+        ];
         assert_eq!(produce_all_spalten_numbers(&args), vec![493, 744]);
     }
 
     #[test]
     fn column_alias_matrix_supports_negation() {
         let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&["reta", "-spalten", "--kontinuum=m,-m"]);
+        assert!(parsed.command_sets.selected_columns.contains(&744));
+        assert!(parsed.command_sets.excluded_columns.contains(&744));
+        let args = vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m,-m".to_string(),
+        ];
+        assert!(produce_all_spalten_numbers(&args).is_empty());
+    }
+
+    #[test]
+    fn column_alias_matrix_preserves_legacy_bucket_coordinates() {
+        let runtime = bootstrap_parameter_runtime();
         let parsed = runtime.parse_cli_args(&[
             "reta",
             "-spalten",
-            "--kontinuum=m,-m",
+            "--kontinuum=m",
+            "--multiplikationen=motivstern",
+            "--gebrochenuniversum=2",
         ]);
-        assert!(parsed.command_sets.selected_columns.contains(&744));
-        assert!(parsed.command_sets.excluded_columns.contains(&744));
-        let args = vec!["reta".to_string(), "-spalten".to_string(), "--kontinuum=m,-m".to_string()];
-        assert!(produce_all_spalten_numbers(&args).is_empty());
+        assert_eq!(
+            parsed.command_sets.column_buckets[&ColumnBucketKey::positive(0)],
+            BTreeSet::from([493, 744])
+        );
+        assert!(
+            parsed.command_sets.symbolic_column_buckets[&ColumnBucketKey::positive(7)]
+                .contains("primMotivStern")
+        );
+        assert!(
+            parsed.command_sets.symbolic_column_buckets[&ColumnBucketKey::positive(5)]
+                .contains("2")
+        );
+    }
+
+    #[test]
+    fn symbolic_bucket_negation_removes_matching_local_sections() {
+        let args = vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--gebrochenuniversum=2,-2".to_string(),
+        ];
+        let symbolic = produce_all_symbolic_column_buckets(&args);
+        assert!(!symbolic
+            .get(&ColumnBucketKey::positive(5))
+            .is_some_and(|values| values.contains("2")));
     }
 
     #[test]
     fn upper_limit_matches_python_cases() {
         let runtime = bootstrap_parameter_runtime();
-        assert_eq!(runtime.upper_limit_values_for_argument("--oberesmaximum=55"), vec![55]);
-        assert_eq!(runtime.upper_limit_from_arguments(&["--vorhervonausschnitt=3"], Some(10)), Some(1024));
+        assert_eq!(
+            runtime.upper_limit_values_for_argument("--oberesmaximum=55"),
+            vec![55]
+        );
+        assert_eq!(
+            runtime.upper_limit_from_arguments(&["--vorhervonausschnitt=3"], Some(10)),
+            Some(1024)
+        );
     }
 }
 
@@ -556,9 +674,15 @@ pub fn resultingSpaltenFromTuple(columns: &[i64]) -> Vec<i64> {
 }
 
 #[allow(non_snake_case)]
-pub fn spalten_removeDoublesNthenRemoveOneFromAnother(positive: &[i64], negative: &[i64]) -> Vec<i64> {
+pub fn spalten_removeDoublesNthenRemoveOneFromAnother(
+    positive: &[i64],
+    negative: &[i64],
+) -> Vec<i64> {
     let mut out = resultingSpaltenFromTuple(positive);
-    let remove = negative.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let remove = negative
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     out.retain(|value| !remove.contains(value));
     out
 }
@@ -566,10 +690,55 @@ pub fn spalten_removeDoublesNthenRemoveOneFromAnother(positive: &[i64], negative
 pub fn produce_all_spalten_numbers(args: &[String]) -> Vec<i64> {
     let bundle = bootstrap_parameter_runtime();
     let parsed = bundle.parse_cli_args(args);
-    let mut out = parsed.command_sets.selected_columns.iter().copied().collect::<Vec<_>>();
+    let mut out = parsed
+        .command_sets
+        .selected_columns
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
     let excluded = parsed.command_sets.excluded_columns;
     out.retain(|column| !excluded.contains(column));
     resultingSpaltenFromTuple(&out)
+}
+
+/// Return the legacy `(negation, bucket)` integer column sections produced by
+/// the Stage-18 parameter matrix.  Negative bucket sections are subtracted from
+/// their positive counterpart just like `column_selection::normalize_bucket_map`.
+pub fn produce_all_column_bucket_numbers(
+    args: &[String],
+) -> BTreeMap<ColumnBucketKey, BTreeSet<i64>> {
+    let bundle = bootstrap_parameter_runtime();
+    let parsed = bundle.parse_cli_args(args);
+    crate::column_selection::bootstrap_column_selection()
+        .normalize_bucket_map(&parsed.command_sets.column_buckets)
+}
+
+/// Return symbolic generated/fraction/Kombi bucket payloads from the matrix.
+/// These values are intentionally kept as strings because Python used them as
+/// generated-column and gebrochen-rational selectors, not only as integers.
+pub fn produce_all_symbolic_column_buckets(
+    args: &[String],
+) -> BTreeMap<ColumnBucketKey, BTreeSet<String>> {
+    let bundle = bootstrap_parameter_runtime();
+    let parsed = bundle.parse_cli_args(args);
+    let mut out = parsed.command_sets.symbolic_column_buckets;
+    for bucket in 0..12u8 {
+        let positive = ColumnBucketKey::positive(bucket);
+        let negative = ColumnBucketKey::negative(bucket);
+        if let Some(negative_values) = parsed
+            .command_sets
+            .excluded_symbolic_column_buckets
+            .get(&negative)
+        {
+            if let Some(positive_values) = out.get_mut(&positive) {
+                for value in negative_values {
+                    positive_values.remove(value);
+                }
+            }
+        }
+    }
+    out.retain(|_, values| !values.is_empty());
+    out
 }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
