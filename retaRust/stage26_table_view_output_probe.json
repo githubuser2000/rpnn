@@ -1,0 +1,31 @@
+{
+  "status": "ok",
+  "module_present": true,
+  "public_exports_present": true,
+  "facade_runtime_field_present": true,
+  "facade_snapshot_counts_present": true,
+  "shadow_plan_contains_output_report": true,
+  "runtime_gate_present": true,
+  "migration_step_present": true,
+  "ffi_export_present": true,
+  "binary_present": true,
+  "module_symbols_present": {
+    "TableViewOutputBundle": true,
+    "TableViewOutputConfig": true,
+    "render_materialized_table_view": true,
+    "render_table_view_for_cli_args": true,
+    "render_html_rows": true,
+    "render_markdown_rows": true,
+    "render_csv_rows": true,
+    "continuum_m_table_view_output_smoke": true
+  },
+  "all_module_symbols_present": true,
+  "religion_header_493": "M Kontinuum (dreizehn)",
+  "religion_first_row_493_contains_wege_gabelung": true,
+  "direct_493_ok": true,
+  "column_744_directly_addressable": false,
+  "virtual_744_policy_default_suppress": true,
+  "markdown_separator_supported": true,
+  "html_escape_supported": true,
+  "csv_escape_supported": true
+}

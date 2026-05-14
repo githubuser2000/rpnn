@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::column_selection::ColumnBucketKey;
-use crate::csv_catalog::{csv_asset_by_name, csv_rows_by_name, CsvAssetKind, CsvLanguage};
+use crate::csv_catalog::{CsvAssetKind, CsvLanguage, csv_asset_by_name, csv_rows_by_name};
 use crate::html_class_catalog::html_class_record;
-use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterCommandSets};
+use crate::parameter_runtime::{ParameterCommandSets, bootstrap_parameter_runtime};
 use crate::table_generation::TableGenerationPlan;
 use crate::tag_schema::ordinary_tags_for_column;
 
@@ -29,6 +29,10 @@ pub struct TableMaterializationConfig {
     /// Limit selected columns in preview/materialized sections.  `None` means
     /// all selected columns.
     pub max_columns: Option<usize>,
+    /// Carry `--spaltenreihenfolgeundnurdiese` through to the Rust materialized
+    /// view.  This is enabled by default but only has an effect when the CLI
+    /// actually provided an override.
+    pub honor_column_order_override: bool,
 }
 
 impl Default for TableMaterializationConfig {
@@ -38,6 +42,7 @@ impl Default for TableMaterializationConfig {
             include_header: true,
             max_rows: None,
             max_columns: None,
+            honor_column_order_override: true,
         }
     }
 }
@@ -47,6 +52,10 @@ pub struct CsvProjectionRequest {
     pub asset_name: String,
     pub rows_zero_based: BTreeSet<usize>,
     pub columns_legacy: BTreeSet<usize>,
+    /// Optional ordered projection.  When present, this preserves the explicit
+    /// legacy output order from `--spaltenreihenfolgeundnurdiese` instead of the
+    /// sorted `BTreeSet` column order.
+    pub column_order_legacy: Vec<usize>,
     pub include_header: bool,
     pub max_rows: Option<usize>,
     pub max_columns: Option<usize>,
@@ -58,6 +67,7 @@ impl CsvProjectionRequest {
             asset_name: asset_name.into(),
             rows_zero_based: BTreeSet::new(),
             columns_legacy: BTreeSet::new(),
+            column_order_legacy: Vec::new(),
             include_header: true,
             max_rows: None,
             max_columns: None,
@@ -193,6 +203,9 @@ pub struct TableMaterializationReport {
     pub class: String,
     pub selected_column_count: usize,
     pub selected_row_count: usize,
+    pub requested_column_order_legacy: Vec<usize>,
+    pub materialized_column_order_legacy: Vec<usize>,
+    pub column_order_override_applied: bool,
     pub required_csv_assets: Vec<String>,
     pub ordinary_sections: Vec<MaterializedCsvSection>,
     pub symbolic_sections: Vec<SymbolicBucketMaterialization>,
@@ -305,6 +318,8 @@ pub fn bootstrap_table_materialization() -> TableMaterializationBundle {
             "materialize_ordinary_religion_section".to_string(),
             "materialize_symbolic_bucket_sections".to_string(),
             "materialize_virtual_columns".to_string(),
+            "ordered_columns_for_projection".to_string(),
+            "column_order_override".to_string(),
             "cell_by_source_coordinates".to_string(),
             "column_headers".to_string(),
         ],
@@ -336,6 +351,14 @@ pub fn materialize_generation_plan(
             .filter_map(|column| usize::try_from(*column).ok())
             .filter(|column| *column > 0)
             .collect();
+        if config.honor_column_order_override {
+            request.column_order_legacy = plan
+                .ordered_selected_columns()
+                .into_iter()
+                .filter_map(|column| usize::try_from(column).ok())
+                .filter(|column| *column > 0)
+                .collect();
+        }
         match materialize_csv_projection(request) {
             Some(section) => ordinary_sections.push(section),
             None => missing_assets.push(asset_name_for_language("religion.csv", config.language)),
@@ -394,12 +417,34 @@ pub fn materialize_generation_plan(
                 .map(MaterializedCsvRow::values)
         })
         .unwrap_or_default();
-    let continuum_m_virtual_column_present = virtual_columns.iter().any(|column| column.is_column(744));
+    let continuum_m_virtual_column_present =
+        virtual_columns.iter().any(|column| column.is_column(744));
+    let requested_column_order_legacy = if config.honor_column_order_override {
+        plan.ordered_selected_columns()
+            .into_iter()
+            .filter_map(|column| usize::try_from(column).ok())
+            .filter(|column| *column > 0)
+            .collect::<Vec<_>>()
+    } else {
+        plan.selected_columns
+            .iter()
+            .filter_map(|column| usize::try_from(*column).ok())
+            .filter(|column| *column > 0)
+            .collect::<Vec<_>>()
+    };
+    let materialized_column_order_legacy = ordinary_sections
+        .first()
+        .map(|section| section.selected_columns_legacy.clone())
+        .unwrap_or_default();
 
     TableMaterializationReport {
         class: "TableMaterializationReport".to_string(),
         selected_column_count: plan.selected_columns.len(),
         selected_row_count: plan.selected_rows.len(),
+        requested_column_order_legacy,
+        materialized_column_order_legacy,
+        column_order_override_applied: config.honor_column_order_override
+            && plan.column_order_override_applies(),
         required_csv_assets: plan.csv_asset_names.clone(),
         ordinary_sections,
         symbolic_sections,
@@ -437,7 +482,11 @@ pub fn materialize_virtual_columns(
             let predecessor_source_column_index = if section.source_max_columns == 0 {
                 None
             } else {
-                Some((*column).saturating_sub(1).min(section.source_max_columns - 1))
+                Some(
+                    (*column)
+                        .saturating_sub(1)
+                        .min(section.source_max_columns - 1),
+                )
             };
             let predecessor_header = predecessor_source_column_index
                 .and_then(|index| header.and_then(|row| row.get(index)).cloned());
@@ -475,14 +524,7 @@ pub fn materialize_csv_projection(request: CsvProjectionRequest) -> Option<Mater
     }
     let selected_rows = limit_set(selected_rows, request.max_rows);
 
-    let mut selected_columns = request.columns_legacy.clone();
-    if selected_columns.is_empty() {
-        // A symbolic selector without a concrete column still gets a stable
-        // preview of the local section.  Keeping the first source column avoids
-        // materializing huge tables while preserving a data witness.
-        selected_columns.insert(0);
-    }
-    let selected_columns = limit_set(selected_columns, request.max_columns);
+    let selected_columns = ordered_columns_for_projection(&request);
 
     let mut missing_rows = Vec::new();
     let mut missing_columns = BTreeSet::new();
@@ -519,7 +561,7 @@ pub fn materialize_csv_projection(request: CsvProjectionRequest) -> Option<Mater
         source_row_count: asset.row_count,
         source_max_columns: asset.max_columns,
         selected_rows_zero_based: selected_rows.into_iter().collect(),
-        selected_columns_legacy: selected_columns.into_iter().collect(),
+        selected_columns_legacy: selected_columns,
         missing_rows_zero_based: missing_rows,
         missing_columns_legacy: missing_columns.into_iter().collect(),
         rows,
@@ -548,6 +590,7 @@ pub fn materialize_symbolic_bucket_sections(
             request.max_columns = config.max_columns;
             request.rows_zero_based = plan_rows_to_source_indices(selected_rows);
             request.columns_legacy = numeric_selectors.iter().copied().collect();
+            request.column_order_legacy = numeric_selectors.clone();
             match materialize_csv_projection(request) {
                 Some(section) => sections.push(section),
                 None => missing_assets.push(asset_name.clone()),
@@ -601,6 +644,31 @@ pub fn asset_name_for_language(base_name: &str, language: CsvLanguage) -> String
     } else {
         base_name.to_string()
     }
+}
+
+pub fn ordered_columns_for_projection(request: &CsvProjectionRequest) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    let source = if request.column_order_legacy.is_empty() {
+        request.columns_legacy.iter().copied().collect::<Vec<_>>()
+    } else {
+        request.column_order_legacy.clone()
+    };
+    for column in source {
+        if seen.insert(column) {
+            out.push(column);
+        }
+    }
+    if out.is_empty() {
+        // A symbolic selector without a concrete column still gets a stable
+        // preview of the local section.  Keeping the first source column avoids
+        // materializing huge tables while preserving a data witness.
+        out.push(0);
+    }
+    if let Some(limit) = request.max_columns {
+        out.truncate(limit);
+    }
+    out
 }
 
 pub fn plan_rows_to_source_indices(rows: &BTreeSet<i64>) -> BTreeSet<usize> {
@@ -662,14 +730,18 @@ mod tests {
                 && column.tag_names.iter().any(|tag| tag == "sternPolygon")
                 && column.tag_names.iter().any(|tag| tag == "keinParaOdMetaP")
         }));
-        assert!(report
-            .continuum_m_header_preview
-            .iter()
-            .any(|cell| cell.contains("M Kontinuum")));
-        assert!(report
-            .continuum_m_first_data_preview
-            .iter()
-            .any(|cell| cell.contains("Wege-Gabelung")));
+        assert!(
+            report
+                .continuum_m_header_preview
+                .iter()
+                .any(|cell| cell.contains("M Kontinuum"))
+        );
+        assert!(
+            report
+                .continuum_m_first_data_preview
+                .iter()
+                .any(|cell| cell.contains("Wege-Gabelung"))
+        );
         assert_eq!(
             report.ordinary_sections[0].selected_columns_legacy,
             vec![493, 744]
@@ -677,13 +749,33 @@ mod tests {
     }
 
     #[test]
+    fn spaltenreihenfolgeundnurdiese_preserves_requested_materialization_order() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=1-1",
+            "-spalten",
+            "--kontinuum=m",
+            "-ausgabe",
+            "--spaltenreihenfolgeundnurdiese=744,493",
+        ];
+        let report = materialize_cli_args(&args, &TableMaterializationConfig::default());
+        assert!(report.column_order_override_applied);
+        assert_eq!(report.requested_column_order_legacy, vec![744, 493]);
+        assert_eq!(report.materialized_column_order_legacy, vec![744, 493]);
+        assert!(report.continuum_m_missing_columns.contains(&744));
+    }
+
+    #[test]
     fn symbolic_bucket_materializes_fraction_csv() {
         let args = ["reta", "-spalten", "--gebrochenuniversum=2"];
         let report = materialize_cli_args(&args, &TableMaterializationConfig::default());
-        assert!(report.symbolic_sections.iter().any(|section| section
-            .asset_names
-            .iter()
-            .any(|name| name == "gebrochen-rational-universum.csv")));
+        assert!(report.symbolic_sections.iter().any(|section| {
+            section
+                .asset_names
+                .iter()
+                .any(|name| name == "gebrochen-rational-universum.csv")
+        }));
         assert!(report.materialized_cell_count > 0);
     }
 

@@ -263,6 +263,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "parameter_projection_to_same_csv_cells",
         ),
         step(
+            "step-column-order-override",
+            "wave-02-table-adapters",
+            "spaltenreihenfolgeundnurdiese + materialized_csv_projection",
+            "table_materialization.column_order_override",
+            "table_materialization.column_order_override",
+            "column-order-shadow-diff",
+            "explicit_output_column_order_is_preserved_before_rendering",
+        ),
+        step(
             "step-table-view",
             "wave-02-table-adapters",
             "materialized_csv_sections + virtual_column_witnesses",
@@ -494,16 +503,18 @@ fn validate_migration_control(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime_switch::{bootstrap_runtime_switch, ArchitectureSwitchMode};
+    use crate::runtime_switch::{ArchitectureSwitchMode, bootstrap_runtime_switch};
 
     #[test]
     fn migration_control_is_validation_ready() {
         let bundle = bootstrap_migration_control();
         assert!(bundle.validation.is_ready());
-        assert!(bundle
-            .steps
-            .iter()
-            .any(|step| step.morphism == "table_adapters.prepare"));
+        assert!(
+            bundle
+                .steps
+                .iter()
+                .any(|step| step.morphism == "table_adapters.prepare")
+        );
     }
 
     #[test]

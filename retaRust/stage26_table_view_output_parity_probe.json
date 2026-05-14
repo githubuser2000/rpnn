@@ -1,0 +1,44 @@
+{
+  "checks": {
+    "binary_declared": true,
+    "binary_reads_legacy_file": true,
+    "csv_separator_inside_quotes_kept": true,
+    "facade_runtime_field_present": true,
+    "facade_snapshot_count_present": true,
+    "ffi_export_present": true,
+    "html_wrappers_ignored": true,
+    "markdown_separator_ignored": true,
+    "migration_step_present": true,
+    "module_declared": true,
+    "module_file_present": true,
+    "module_has_csv_quote_parser": true,
+    "module_has_html_parser": true,
+    "module_has_markdown_separator_logic": true,
+    "public_exports_present": true,
+    "runtime_switch_gate_present": true,
+    "shadow_commit_carries_semantic_equal": true,
+    "shadow_report_carries_semantic_diff": true,
+    "workflow_diagnostic_mentions_semantic_equal": true
+  },
+  "csv_semantic_rows": [
+    [
+      "a",
+      "b;c"
+    ]
+  ],
+  "expected_commit_rule": "raw equality is still the only normal commit criterion; semantic equality is diagnostic until an explicit future gate changes policy",
+  "html_semantic_rows": [
+    [
+      "A & B"
+    ]
+  ],
+  "markdown_semantic_rows": [
+    [
+      "A"
+    ],
+    [
+      "x"
+    ]
+  ],
+  "status": "ok"
+}

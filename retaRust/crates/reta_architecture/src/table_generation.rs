@@ -59,6 +59,11 @@ pub struct TableGenerationPlan {
     pub rows_of_combi2: BTreeSet<i64>,
     pub concat_columns: BTreeSet<i64>,
     pub symbolic_column_buckets: BTreeMap<ColumnBucketKey, BTreeSet<String>>,
+    /// Explicit legacy output order from `--spaltenreihenfolgeundnurdiese`.
+    /// Python treats this as both order and restriction for the rendered image;
+    /// Stage 26 carries it through generation/materialization without changing
+    /// the default path when the option is absent.
+    pub column_order_override: Vec<i64>,
     pub csv_asset_names: Vec<String>,
 }
 
@@ -81,7 +86,14 @@ impl TableGenerationPlan {
             rows_of_combi: get(3),
             rows_of_combi2: get(8),
             symbolic_column_buckets: BTreeMap::new(),
-            csv_asset_names: csv_asset_names_for_bucket_state(&get(0), &get(2), &get(3), &get(8), &BTreeMap::new()),
+            column_order_override: Vec::new(),
+            csv_asset_names: csv_asset_names_for_bucket_state(
+                &get(0),
+                &get(2),
+                &get(3),
+                &get(8),
+                &BTreeMap::new(),
+            ),
         }
     }
 
@@ -97,6 +109,37 @@ impl TableGenerationPlan {
         !self.symbolic_column_buckets.is_empty()
     }
 
+    /// Effective legacy column order for materialization/rendering.
+    ///
+    /// Without an explicit override, the stable sorted `BTreeSet` order is used.
+    /// With `--spaltenreihenfolgeundnurdiese`, Python's option name says exactly
+    /// what should happen: use this order and only these columns.  If no `-spalten`
+    /// selection was parsed, the override itself becomes the selected ordinary
+    /// column set so the materialization probe can still render the requested
+    /// columns.
+    pub fn ordered_selected_columns(&self) -> Vec<i64> {
+        if self.column_order_override.is_empty() {
+            return self.selected_columns.iter().copied().collect();
+        }
+        let mut out = Vec::new();
+        let selected_is_empty = self.selected_columns.is_empty();
+        for column in &self.column_order_override {
+            if *column <= 0 {
+                continue;
+            }
+            if selected_is_empty || self.selected_columns.contains(column) {
+                if !out.contains(column) {
+                    out.push(*column);
+                }
+            }
+        }
+        out
+    }
+
+    pub fn column_order_override_applies(&self) -> bool {
+        !self.column_order_override.is_empty()
+    }
+
     pub fn from_parameter_command_sets(
         sets: &crate::parameter_runtime::ParameterCommandSets,
     ) -> Self {
@@ -104,6 +147,15 @@ impl TableGenerationPlan {
             .normalize_bucket_map(&sets.column_buckets);
         let mut plan = Self::from_column_buckets(&normalized, sets.rows_as_numbers.iter().copied());
         plan.symbolic_column_buckets = sets.symbolic_column_buckets.clone();
+        plan.column_order_override = sets.spaltenreihenfolgeundnurdiese.clone();
+        if plan.selected_columns.is_empty() && !plan.column_order_override.is_empty() {
+            plan.selected_columns = plan
+                .column_order_override
+                .iter()
+                .copied()
+                .filter(|column| *column > 0)
+                .collect();
+        }
         plan.csv_asset_names = csv_asset_names_for_bucket_state(
             &plan.selected_columns,
             &plan.concat_columns,
@@ -114,7 +166,6 @@ impl TableGenerationPlan {
         plan
     }
 }
-
 
 pub fn csv_asset_names_for_bucket_state(
     selected_columns: &BTreeSet<i64>,
@@ -227,6 +278,7 @@ pub fn bootstrap_table_generation() -> TableGenerationBundle {
             "TableWrapping".to_string(),
             "TableOutput".to_string(),
             "RowFiltering".to_string(),
+            "ColumnOrderOverride".to_string(),
         ],
         universal_property:
             "compatible local CSV/generated/Kombi sections glue to one deterministic result table"
@@ -265,8 +317,31 @@ mod tests {
             plan.symbolic_column_buckets[&ColumnBucketKey::positive(7)].contains("primMotivStern")
         );
         assert!(plan.symbolic_column_buckets[&ColumnBucketKey::positive(5)].contains("2"));
-        assert!(plan.csv_asset_names.iter().any(|name| name == "primenumbers.csv"));
-        assert!(plan.csv_asset_names.iter().any(|name| name == "gebrochen-rational-universum.csv"));
+        assert!(
+            plan.csv_asset_names
+                .iter()
+                .any(|name| name == "primenumbers.csv")
+        );
+        assert!(
+            plan.csv_asset_names
+                .iter()
+                .any(|name| name == "gebrochen-rational-universum.csv")
+        );
+    }
+
+    #[test]
+    fn generation_plan_honors_spaltenreihenfolgeundnurdiese_order() {
+        let runtime = crate::parameter_runtime::bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-spalten",
+            "--kontinuum=m",
+            "-ausgabe",
+            "--spaltenreihenfolgeundnurdiese=744,493",
+        ]);
+        let plan = TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
+        assert_eq!(plan.column_order_override, vec![744, 493]);
+        assert_eq!(plan.ordered_selected_columns(), vec![744, 493]);
     }
 
     #[test]
@@ -276,7 +351,11 @@ mod tests {
         buckets.insert(ColumnBucketKey::positive(0), BTreeSet::from([493, 744]));
         buckets.insert(ColumnBucketKey::positive(3), BTreeSet::from([13]));
         let plan = TableGenerationPlan::from_column_buckets(&buckets, [1]);
-        assert!(plan.csv_asset_names.iter().any(|name| name == "religion.csv"));
+        assert!(
+            plan.csv_asset_names
+                .iter()
+                .any(|name| name == "religion.csv")
+        );
         assert!(plan.csv_asset_names.iter().any(|name| name == "kombi.csv"));
     }
 }

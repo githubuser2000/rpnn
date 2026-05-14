@@ -10,7 +10,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::table_materialization::{
-    bootstrap_table_materialization, MaterializedCsvSection, TableMaterializationConfig, TableMaterializationReport, VirtualColumnMaterialization,
+    MaterializedCsvSection, TableMaterializationConfig, TableMaterializationReport,
+    VirtualColumnMaterialization, bootstrap_table_materialization,
 };
 
 /// How virtual/non-direct columns are represented in a renderable table view.
@@ -177,7 +178,8 @@ impl TableViewBundle {
         materialization_config: &TableMaterializationConfig,
         view_config: &MaterializedTableViewConfig,
     ) -> MaterializedTableView {
-        let report = bootstrap_table_materialization().materialize_cli_args(args, materialization_config);
+        let report =
+            bootstrap_table_materialization().materialize_cli_args(args, materialization_config);
         self.view_from_report(&report, view_config)
     }
 
@@ -197,6 +199,7 @@ pub fn bootstrap_table_view() -> TableViewBundle {
             "build_materialized_table_view".to_string(),
             "render_table_view_lines".to_string(),
             "virtual_column_value".to_string(),
+            "spaltenreihenfolgeundnurdiese_order".to_string(),
             "view_for_cli_args".to_string(),
             "kontinuum_m_table_view_smoke".to_string(),
         ],
@@ -245,7 +248,8 @@ pub fn build_materialized_table_view(
                         Some(value)
                             if !(config.suppress_question_mark_virtuals
                                 && value.trim() == "?"
-                                && config.virtual_column_policy == VirtualColumnDisplayPolicy::Placeholder) =>
+                                && config.virtual_column_policy
+                                    == VirtualColumnDisplayPolicy::Placeholder) =>
                         {
                             rendered_virtual_cell_count += 1;
                             view_cells.push(MaterializedTableViewCell {
@@ -296,9 +300,10 @@ pub fn build_materialized_table_view(
     let rendered_lines = render_table_view_lines(&rows, &config.cell_separator, &config.empty_cell);
     let continuum_m_direct_header_present = rows.iter().any(|row| {
         row.source_row_zero_based == 0
-            && row.cells.iter().any(|cell| {
-                cell.column_legacy == 493 && cell.value.contains("M Kontinuum")
-            })
+            && row
+                .cells
+                .iter()
+                .any(|cell| cell.column_legacy == 493 && cell.value.contains("M Kontinuum"))
     });
     let continuum_m_virtual_744_kept_as_witness = report
         .virtual_columns
@@ -422,12 +427,9 @@ fn virtual_column_for<'a>(
     section: &MaterializedCsvSection,
     column: usize,
 ) -> Option<&'a VirtualColumnMaterialization> {
-    report
-        .virtual_columns
-        .iter()
-        .find(|virtual_column| {
-            virtual_column.column_legacy == column && virtual_column.asset_name == section.asset_name
-        })
+    report.virtual_columns.iter().find(|virtual_column| {
+        virtual_column.column_legacy == column && virtual_column.asset_name == section.asset_name
+    })
 }
 
 pub fn view_for_cli_args<S: AsRef<str>>(
@@ -470,5 +472,28 @@ mod tests {
         assert!(view.rendered_virtual_cell_count > 0);
         assert!(view.contains_text("744:sternPolygon,keinParaOdMetaP"));
     }
-}
 
+    #[test]
+    fn explicit_spaltenreihenfolge_places_virtual_744_before_493_when_policy_allows_it() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=1-1",
+            "-spalten",
+            "--kontinuum=m",
+            "-ausgabe",
+            "--spaltenreihenfolgeundnurdiese=744,493",
+        ];
+        let config = MaterializedTableViewConfig::default()
+            .with_virtual_policy(VirtualColumnDisplayPolicy::TagSummary);
+        let view = view_for_cli_args(&args, &TableMaterializationConfig::default(), &config);
+        let header = view
+            .rows
+            .iter()
+            .find(|row| row.source_row_zero_based == 0)
+            .unwrap();
+        assert_eq!(header.cells[0].column_legacy, 744);
+        assert_eq!(header.cells[1].column_legacy, 493);
+        assert!(header.cells[0].value.contains("744:sternPolygon"));
+    }
+}

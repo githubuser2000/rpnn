@@ -17,7 +17,7 @@ use crate::parameter_matrix::{
     nonempty_bucket_projection_count, parameter_matrix_seed_count,
     symbolic_bucket_projection_count,
 };
-use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
+use crate::row_ranges::{RowRangeMorphismBundle, bootstrap_row_range_morphisms};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum MainParameter {
@@ -423,14 +423,28 @@ fn apply_output_token(
 ) {
     match (token.key.as_deref(), token.value.as_deref()) {
         (Some("spaltenreihenfolgeundnurdiese"), Some(value)) => {
-            sets.spaltenreihenfolgeundnurdiese = bundle
-                .row_ranges
-                .range_to_numbers(value, false, 0, false)
-                .into_iter()
-                .collect();
+            sets.spaltenreihenfolgeundnurdiese = ordered_range_numbers(bundle, value);
         }
         _ => {}
     }
+}
+
+fn ordered_range_numbers(bundle: &ParameterRuntimeBundle, value: &str) -> Vec<i64> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for segment in bundle.row_ranges.syntax.split_comma_list(value) {
+        let trimmed = segment.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let expanded = bundle.row_ranges.range_to_numbers(trimmed, false, 0, false);
+        for number in expanded {
+            if seen.insert(number) {
+                out.push(number);
+            }
+        }
+    }
+    out
 }
 
 fn apply_column_token(
@@ -572,10 +586,12 @@ mod tests {
         let parsed = runtime.parse_cli_args(&["reta", "-spalten", "--kontinuum=m"]);
         assert!(parsed.command_sets.selected_columns.contains(&493));
         assert!(parsed.command_sets.selected_columns.contains(&744));
-        assert!(parsed
-            .command_sets
-            .resolved_alias_pairs
-            .contains(&("Kontinuum".to_string(), "M".to_string())));
+        assert!(
+            parsed
+                .command_sets
+                .resolved_alias_pairs
+                .contains(&("Kontinuum".to_string(), "M".to_string()))
+        );
         let args = vec![
             "reta".to_string(),
             "-spalten".to_string(),
@@ -596,6 +612,20 @@ mod tests {
             "--kontinuum=m,-m".to_string(),
         ];
         assert!(produce_all_spalten_numbers(&args).is_empty());
+    }
+
+    #[test]
+    fn output_spaltenreihenfolgeundnurdiese_preserves_explicit_order() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&[
+            "reta",
+            "-ausgabe",
+            "--spaltenreihenfolgeundnurdiese=744,493",
+        ]);
+        assert_eq!(
+            parsed.command_sets.spaltenreihenfolgeundnurdiese,
+            vec![744, 493]
+        );
     }
 
     #[test]
@@ -630,9 +660,11 @@ mod tests {
             "--gebrochenuniversum=2,-2".to_string(),
         ];
         let symbolic = produce_all_symbolic_column_buckets(&args);
-        assert!(!symbolic
-            .get(&ColumnBucketKey::positive(5))
-            .is_some_and(|values| values.contains("2")));
+        assert!(
+            !symbolic
+                .get(&ColumnBucketKey::positive(5))
+                .is_some_and(|values| values.contains("2"))
+        );
     }
 
     #[test]

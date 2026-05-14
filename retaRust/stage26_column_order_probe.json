@@ -1,0 +1,36 @@
+{
+  "checks": {
+    "ffi_export_present": true,
+    "generation_plan_carries_override": true,
+    "generation_plan_order_method_present": true,
+    "inspect_binary_declared": true,
+    "materialization_order_test_present": true,
+    "materialization_report_carries_order": true,
+    "materialization_request_carries_order": true,
+    "materialization_uses_ordered_projection": true,
+    "migration_step_present": true,
+    "ordered_range_parser_present": true,
+    "parameter_runtime_order_test_present": true,
+    "religion_493_is_direct": true,
+    "religion_744_is_virtual": true,
+    "runtime_gate_present": true,
+    "table_view_order_test_present": true
+  },
+  "direct_column_493_first_data_contains_wege_gabelung": true,
+  "direct_column_493_header": "M Kontinuum (dreizehn)",
+  "expected_requested_order": [
+    744,
+    493
+  ],
+  "source_max_columns": 744,
+  "stage26_invariant": "spaltenreihenfolgeundnurdiese order is preserved before rendering; virtual 744 remains a witness unless a virtual-column policy renders it",
+  "status": "ok",
+  "suppressed_policy_visible_columns": [
+    493
+  ],
+  "tag_summary_policy_visible_columns": [
+    744,
+    493
+  ],
+  "virtual_column_744_non_direct": true
+}

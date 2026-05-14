@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
-use crate::{build_cli_request, run_reta, RetaRuntime};
+use crate::{RetaRuntime, build_cli_request, run_reta};
 
 pub const RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_ARGC: usize = 4096;
@@ -176,6 +176,37 @@ pub unsafe extern "C" fn reta_architecture_table_materialization_json(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_column_order_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
+        let plan = reta_architecture::TableGenerationPlan::from_parameter_command_sets(
+            &parsed.command_sets,
+        );
+        let materialization = reta_architecture::bootstrap_table_materialization()
+            .materialize_plan(
+                &plan,
+                &reta_architecture::TableMaterializationConfig::default(),
+            );
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "selected_columns": plan.selected_columns.iter().copied().collect::<Vec<_>>(),
+            "column_order_override": plan.column_order_override.clone(),
+            "ordered_selected_columns": plan.ordered_selected_columns(),
+            "materialized_column_order_legacy": materialization.materialized_column_order_legacy,
+            "column_order_override_applied": materialization.column_order_override_applied,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_column_order_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_json(
     argc: usize,
     argv: *const *const c_char,
@@ -194,7 +225,6 @@ pub unsafe extern "C" fn reta_architecture_table_view_json(
         Err(_) => json_error_string("panic inside reta_architecture_table_view_json"),
     }
 }
-
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
@@ -216,7 +246,6 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     }
 }
 
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
     argc: usize,
@@ -225,10 +254,17 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
 ) -> *mut c_char {
     match catch_unwind(AssertUnwindSafe(|| {
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
-        let legacy_text = unsafe { read_optional_string(legacy_text) }.unwrap_or_default().unwrap_or_default();
-        let legacy_lines = legacy_text.lines().map(ToString::to_string).collect::<Vec<_>>();
+        let legacy_text = unsafe { read_optional_string(legacy_text) }
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let legacy_lines = legacy_text
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
         let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
-        let mode = parsed.selected_output_mode.unwrap_or(reta_architecture::OutputMode::Shell);
+        let mode = parsed
+            .selected_output_mode
+            .unwrap_or(reta_architecture::OutputMode::Shell);
         let output_report = reta_architecture::render_table_view_for_cli_args(
             &args,
             &reta_architecture::TableMaterializationConfig::default(),

@@ -1,0 +1,73 @@
+{
+  "changed_files": [
+    "Cargo.toml",
+    "RUST_STAGE26_CHECKS.md",
+    "TRANSCOMPILATION_ARCHITECTURE_STAGE26.json",
+    "TRANSCOMPILATION_ARCHITECTURE_STAGE26.md",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/parameter_runtime.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/table_generation.rs",
+    "crates/reta_architecture/src/table_materialization.rs",
+    "crates/reta_architecture/src/table_view.rs",
+    "src/bin/reta_arch_column_order.rs",
+    "src/ffi.rs",
+    "stage26_column_order_probe.json",
+    "stage26_coverage_full.json",
+    "stage26_coverage_missing.json",
+    "stage26_csv_catalog_probe.json",
+    "stage26_html_class_catalog_probe.json",
+    "stage26_semantic_surface_full.json",
+    "stage26_semantic_surface_marker_or_missing.json",
+    "stage26_table_materialization_probe.json",
+    "stage26_table_view_output_commit_probe.json",
+    "stage26_table_view_output_parity_probe.json",
+    "stage26_table_view_output_probe.json",
+    "stage26_table_view_probe.json",
+    "tools/architecture_column_order_probe.py"
+  ],
+  "checks": {
+    "cargo_available": true,
+    "column_order_expected_requested_order": [
+      744,
+      493
+    ],
+    "column_order_probe_status": "ok",
+    "column_order_virtual_744_non_direct": true,
+    "coverage_classes": 239,
+    "coverage_classes_represented_by_name": 239,
+    "coverage_functions": 1096,
+    "coverage_functions_represented_by_name": 1096,
+    "date_utc": "2026-05-14T16:41:50.830175Z",
+    "full_workspace_blocker": "Could not resolve host: index.crates.io",
+    "full_workspace_cargo_check_attempted": true,
+    "full_workspace_cargo_check_passed": false,
+    "isolated_reta_architecture_cargo_check_with_local_serde_stubs": true,
+    "isolated_reta_architecture_cargo_test_with_local_serde_stubs": 148,
+    "python_probes_passed": true,
+    "rustc_available": true,
+    "semantic_classes_declared": 239,
+    "semantic_classes_marker_only": 0,
+    "semantic_classes_missing": 0,
+    "semantic_functions_declared": 1096,
+    "semantic_functions_marker_only": 0,
+    "semantic_functions_missing": 0,
+    "stage": 26
+  },
+  "key_semantics": {
+    "default_safety": "Default virtual policy still suppresses 744, so visible legacy-like output remains protected.",
+    "materialization": "Adds column_order_legacy to CsvProjectionRequest and ordered projection to MaterializedCsvSection.",
+    "ordered_range_numbers": "Preserves comma order for --spaltenreihenfolgeundnurdiese instead of losing it through BTreeSet sorting.",
+    "table_generation_plan": "Adds column_order_override and ordered_selected_columns().",
+    "table_view": "Virtual column 744 can now be rendered before direct column 493 when the explicit order requests 744,493 and the virtual policy allows it."
+  },
+  "new_files": [
+    "src/bin/reta_arch_column_order.rs",
+    "tools/architecture_column_order_probe.py"
+  ],
+  "stage": 26,
+  "summary": "Carry explicit output column order from parameter runtime through generation, materialization, table view, diagnostics, FFI, and inspect binary.",
+  "title": "Explicit spaltenreihenfolgeundnurdiese column-order propagation"
+}

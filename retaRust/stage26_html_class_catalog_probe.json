@@ -1,0 +1,21 @@
+{
+  "source": {
+    "record_count": 1372,
+    "unique_column_count": 1041,
+    "text_record_count": 1254,
+    "class_record_count": 695,
+    "column_744_record_count": 1,
+    "column_744_texts": [
+      "?"
+    ]
+  },
+  "rust": {
+    "record_count": 1372,
+    "has_bootstrap": true,
+    "has_owned_record": true,
+    "has_column_744": true,
+    "has_column_744_text_question": true
+  },
+  "mismatches": [],
+  "status": "ok"
+}
