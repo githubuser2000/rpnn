@@ -1,22 +1,39 @@
 //! Root-crate bridge from the legacy-compatible `Program` run to the typed
 //! `reta_architecture` shadow pipeline.
 //!
-//! This module deliberately does not change visible output.  It builds a typed
-//! table-shadow report after the legacy path has produced its table and visible
-//! lines, so adapter activation can be audited before a commit gate is allowed.
+//! This module keeps legacy output as the default.  It builds a typed table-shadow
+//! report after the legacy path has produced its table and visible lines, and it
+//! returns a commit decision for explicit architecture modes.  A visible switch is
+//! only possible when the runtime gate and parity policy both allow it.
 
 use crate::shared::reta_program_types::Program;
+
+#[derive(Clone, Debug)]
+pub struct ShadowTableRuntimeReport {
+    pub report: reta_architecture::ShadowTableReport,
+    pub commit: reta_architecture::ShadowCommitDecision,
+}
 
 pub fn shadow_table_report_for_program(
     program: &Program,
     argv: &[String],
 ) -> Option<reta_architecture::ShadowTableReport> {
+    shadow_table_runtime_report_for_program(program, argv).map(|value| value.report)
+}
+
+pub fn shadow_table_runtime_report_for_program(
+    program: &Program,
+    argv: &[String],
+) -> Option<ShadowTableRuntimeReport> {
     let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(argv, None);
     if !switch_config.mode.should_shadow_execute() && !switch_config.trace {
         return None;
     }
     let input = shadow_table_input_from_program(program);
-    Some(reta_architecture::bootstrap_shadow_pipeline().shadow_table(&input, &switch_config))
+    let pipeline = reta_architecture::bootstrap_shadow_pipeline();
+    let report = pipeline.shadow_table(&input, &switch_config);
+    let commit = pipeline.table_commit_decision(&report, &switch_config);
+    Some(ShadowTableRuntimeReport { report, commit })
 }
 
 pub fn shadow_table_input_from_program(program: &Program) -> reta_architecture::ShadowTableInput {

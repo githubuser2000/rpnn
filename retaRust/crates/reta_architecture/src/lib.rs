@@ -309,7 +309,8 @@ pub use semantics_builder::{
 };
 pub use sheaf::{GluedSection, Sheaf, SheafBundle};
 pub use shadow_pipeline::{
-    bootstrap_shadow_pipeline, diff_shadow_lines, prepare_shadow_table, ShadowCliPlan,
+    bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_table_commit,
+    prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision, ShadowCommitPolicy,
     ShadowDiffSummary, ShadowPipelineBundle, ShadowPipelineSnapshot, ShadowPromptInput,
     ShadowPromptReport, ShadowTableInput, ShadowTableReport,
 };

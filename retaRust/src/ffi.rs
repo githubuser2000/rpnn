@@ -210,6 +210,12 @@ pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
 }
 
 
+
+#[unsafe(no_mangle)]
+pub extern "C" fn reta_architecture_shadow_commit_policy_json() -> *mut c_char {
+    ffi_json_result(|| serde_json::to_string(&reta_architecture::ShadowCommitPolicy::default()))
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {
     ffi_json_result(|| {

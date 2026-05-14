@@ -39,7 +39,10 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         });
     }
 
-    if let Some(shadow_report) = crate::reta_arch_shadow::shadow_table_report_for_program(&program, &argv) {
+    let mut committed_shadow_lines: Option<Vec<String>> = None;
+    if let Some(shadow_runtime) = crate::reta_arch_shadow::shadow_table_runtime_report_for_program(&program, &argv) {
+        let shadow_report = shadow_runtime.report;
+        let commit = shadow_runtime.commit;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -53,6 +56,27 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 shadow_report.diff.first_mismatch_index,
             ),
         });
+        diagnostics.push(RetaDiagnostic {
+            level: if commit.use_shadow_output || !commit.gate_allowed_to_commit {
+                DiagnosticLevel::Info
+            } else {
+                DiagnosticLevel::Warning
+            },
+            code: "ARCH_SHADOW_COMMIT".to_string(),
+            message: format!(
+                "Rust-Architektur-Commit-Gate: mode={} use_shadow={} reason={} gate={} diff_equal={} lines={} rollback={:?}",
+                commit.switch_mode,
+                commit.use_shadow_output,
+                commit.reason,
+                commit.gate_reason,
+                commit.diff_equal,
+                commit.rendered_line_count,
+                commit.rollback_anchor,
+            ),
+        });
+        if commit.use_shadow_output {
+            committed_shadow_lines = Some(shadow_report.rendered_lines.clone());
+        }
     }
 
     diagnostics.extend(program.cliErrors.iter().cloned().map(|message| RetaDiagnostic {
@@ -61,12 +85,10 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         message,
     }));
 
-    let rendered_text = if !program.finallyDisplayLines.is_empty() {
-        let mut text = program.finallyDisplayLines.join("\n");
-        if !text.is_empty() {
-            text.push('\n');
-        }
-        text
+    let rendered_text = if let Some(lines) = committed_shadow_lines.as_ref() {
+        join_output_lines(lines)
+    } else if !program.finallyDisplayLines.is_empty() {
+        join_output_lines(&program.finallyDisplayLines)
     } else {
         String::new()
     };
@@ -98,7 +120,10 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
             .iter()
             .map(ToString::to_string)
             .collect(),
-        rows_emitted: program.__resultingTable.len().max(program.finallyDisplayLines.len()),
+        rows_emitted: committed_shadow_lines
+            .as_ref()
+            .map(Vec::len)
+            .unwrap_or_else(|| program.__resultingTable.len().max(program.finallyDisplayLines.len())),
     };
 
     Ok(RetaResponse {
@@ -130,4 +155,15 @@ fn normalize_program_argv(raw_args: &[String]) -> Vec<String> {
         argv.extend(raw_args.iter().cloned());
         argv
     }
+}
+
+fn join_output_lines(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut text = lines.join("\n");
+    if !text.is_empty() {
+        text.push('\n');
+    }
+    text
 }

@@ -18,7 +18,7 @@ use crate::parity_harness::{bootstrap_parity_harness, ParityProbePlan};
 use crate::prompt_interaction::{bootstrap_prompt_interaction, PromptInteractionPlan};
 use crate::prompt_language::PromptModus;
 use crate::runtime_switch::{
-    bootstrap_runtime_switch, ArchitectureSwitchConfig, SwitchGateDecision,
+    bootstrap_runtime_switch, ArchitectureSwitchConfig, ArchitectureSwitchMode, SwitchGateDecision,
 };
 use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
 use crate::table_preparation::{prepare_row_cells, PreparedTable};
@@ -121,8 +121,46 @@ pub struct ShadowTableReport {
     pub selected_columns: usize,
     pub output_mode: String,
     pub diff: ShadowDiffSummary,
+    /// Full Rust-shadow output lines.  Stage 10 only exposed a preview; Stage 11
+    /// keeps the whole value so a guarded commit can actually reuse it without
+    /// re-rendering and without touching the legacy path.
+    pub rendered_lines: Vec<String>,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
+    pub universal_property: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ShadowCommitPolicy {
+    pub require_gate_commit: bool,
+    pub require_equal_diff: bool,
+    pub allow_force_mismatch_commit: bool,
+    pub max_shadow_lines: Option<usize>,
+}
+
+impl Default for ShadowCommitPolicy {
+    fn default() -> Self {
+        Self {
+            require_gate_commit: true,
+            require_equal_diff: true,
+            allow_force_mismatch_commit: true,
+            max_shadow_lines: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ShadowCommitDecision {
+    pub morphism: String,
+    pub use_shadow_output: bool,
+    pub reason: String,
+    pub switch_mode: String,
+    pub gate_reason: String,
+    pub gate_allowed_to_commit: bool,
+    pub diff_equal: bool,
+    pub force_override: bool,
+    pub rendered_line_count: usize,
+    pub rollback_anchor: Option<String>,
     pub universal_property: String,
 }
 
@@ -191,6 +229,7 @@ impl ShadowPipelineBundle {
             morphisms: vec![
                 "shadow_pipeline.cli_plan".to_string(),
                 "shadow_pipeline.table_adapter".to_string(),
+                "shadow_pipeline.table_commit".to_string(),
                 "shadow_pipeline.prompt_adapter".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
             ],
@@ -265,6 +304,14 @@ impl ShadowPipelineBundle {
         table_report_from_render(input, config, gate, prepared, render_result)
     }
 
+    pub fn table_commit_decision(
+        &self,
+        report: &ShadowTableReport,
+        config: &ArchitectureSwitchConfig,
+    ) -> ShadowCommitDecision {
+        evaluate_shadow_table_commit(report, config, &ShadowCommitPolicy::default())
+    }
+
     pub fn shadow_prompt(
         &self,
         input: &ShadowPromptInput,
@@ -327,6 +374,56 @@ pub fn diff_shadow_lines(left: &[String], right: &[String]) -> ShadowDiffSummary
     ShadowDiffSummary::from_lines("legacy", "rust_shadow", left, right)
 }
 
+pub fn evaluate_shadow_table_commit(
+    report: &ShadowTableReport,
+    config: &ArchitectureSwitchConfig,
+    policy: &ShadowCommitPolicy,
+) -> ShadowCommitDecision {
+    let commit_gate = config.gate_for_morphism("shadow_pipeline.table_commit");
+    let gate_ok = !policy.require_gate_commit || commit_gate.allowed_to_commit;
+    let force_override = config.mode == ArchitectureSwitchMode::Force
+        && policy.allow_force_mismatch_commit
+        && commit_gate.allowed_to_commit;
+    let diff_ok = !policy.require_equal_diff || report.diff.equal || force_override;
+    let size_ok = policy
+        .max_shadow_lines
+        .map(|limit| report.rendered_lines.len() <= limit)
+        .unwrap_or(true);
+    let use_shadow_output = gate_ok && diff_ok && size_ok;
+    let reason = if use_shadow_output {
+        if force_override && !report.diff.equal {
+            "force_commit_mismatch".to_string()
+        } else if report.diff.equal {
+            "commit_equal_shadow".to_string()
+        } else {
+            "commit_policy_allows_shadow".to_string()
+        }
+    } else if !gate_ok {
+        "gate_not_allowed_to_commit".to_string()
+    } else if !diff_ok {
+        "shadow_diff_not_equal".to_string()
+    } else if !size_ok {
+        "shadow_output_too_large_for_policy".to_string()
+    } else {
+        "commit_policy_rejected".to_string()
+    };
+    ShadowCommitDecision {
+        morphism: "shadow_pipeline.table_commit".to_string(),
+        use_shadow_output,
+        reason,
+        switch_mode: config.mode.canonical().to_string(),
+        gate_reason: commit_gate.reason,
+        gate_allowed_to_commit: commit_gate.allowed_to_commit,
+        diff_equal: report.diff.equal,
+        force_override,
+        rendered_line_count: report.rendered_lines.len(),
+        rollback_anchor: config.rollback_anchor.clone(),
+        universal_property:
+            "committed_shadow_output_is_allowed_only_when_gate_and_parity_policy_commute"
+                .to_string(),
+    }
+}
+
 fn table_report_from_render(
     input: &ShadowTableInput,
     config: &ArchitectureSwitchConfig,
@@ -334,19 +431,24 @@ fn table_report_from_render(
     prepared: PreparedTable,
     render_result: TableRenderResult,
 ) -> ShadowTableReport {
-    let diff = diff_shadow_lines(&input.legacy_display_lines, &render_result.resulting_table);
+    let rendered_lines = render_result.resulting_table;
+    let diff = diff_shadow_lines(&input.legacy_display_lines, &rendered_lines);
+    let commit_gate = config.gate_for_morphism("shadow_pipeline.table_commit");
+    let commit_candidate = commit_gate.allowed_to_commit
+        && (diff.equal || config.mode == ArchitectureSwitchMode::Force);
     ShadowTableReport {
         morphism: "shadow_pipeline.table_adapter".to_string(),
         gate: gate.clone(),
         switch_mode: config.mode.canonical().to_string(),
         legacy_rows: input.legacy_display_lines.len(),
         prepared_rows: prepared.len(),
-        rendered_rows: render_result.resulting_table.len(),
+        rendered_rows: rendered_lines.len(),
         selected_columns: input.selected_columns_zero_based.len(),
         output_mode: input.mode.canonical_name().to_string(),
         diff,
-        rendered_preview: render_result.resulting_table.into_iter().take(8).collect(),
-        commit_candidate: gate.allowed_to_commit,
+        rendered_preview: rendered_lines.iter().take(8).cloned().collect(),
+        rendered_lines,
+        commit_candidate,
         universal_property:
             "legacy_visible_lines_and_rust_shadow_lines_are_compared_before_commit".to_string(),
     }
@@ -384,5 +486,83 @@ mod tests {
         assert_eq!(report.switch_mode, "dry-run");
         assert!(report.rendered_rows > 0);
         assert!(!report.commit_candidate);
+    }
+
+    #[test]
+    fn commit_policy_requires_equal_shadow_in_commit_mode() {
+        let mut report = ShadowTableReport {
+            morphism: "shadow_pipeline.table_adapter".to_string(),
+            gate: SwitchGateDecision::allowed(
+                "shadow_pipeline.table_adapter",
+                "commit_gate",
+                ArchitectureSwitchMode::Commit,
+            ),
+            switch_mode: "commit".to_string(),
+            legacy_rows: 1,
+            prepared_rows: 1,
+            rendered_rows: 1,
+            selected_columns: 1,
+            output_mode: "shell".to_string(),
+            diff: ShadowDiffSummary::from_lines(
+                "legacy",
+                "rust_shadow",
+                &["a".to_string()],
+                &["b".to_string()],
+            ),
+            rendered_lines: vec!["b".to_string()],
+            rendered_preview: vec!["b".to_string()],
+            commit_candidate: false,
+            universal_property: "test".to_string(),
+        };
+        let config = ArchitectureSwitchConfig::default()
+            .with_mode(ArchitectureSwitchMode::Commit, "test");
+        let decision = evaluate_shadow_table_commit(&report, &config, &Default::default());
+        assert!(!decision.use_shadow_output);
+        assert_eq!(decision.reason, "shadow_diff_not_equal");
+
+        report.diff = ShadowDiffSummary::from_lines(
+            "legacy",
+            "rust_shadow",
+            &["b".to_string()],
+            &["b".to_string()],
+        );
+        let decision = evaluate_shadow_table_commit(&report, &config, &Default::default());
+        assert!(decision.use_shadow_output);
+        assert_eq!(decision.reason, "commit_equal_shadow");
+    }
+
+    #[test]
+    fn force_can_commit_mismatch_but_dry_run_cannot() {
+        let report = ShadowTableReport {
+            morphism: "shadow_pipeline.table_adapter".to_string(),
+            gate: SwitchGateDecision::allowed(
+                "shadow_pipeline.table_adapter",
+                "force_gate",
+                ArchitectureSwitchMode::Force,
+            ),
+            switch_mode: "force".to_string(),
+            legacy_rows: 1,
+            prepared_rows: 1,
+            rendered_rows: 1,
+            selected_columns: 1,
+            output_mode: "shell".to_string(),
+            diff: ShadowDiffSummary::from_lines(
+                "legacy",
+                "rust_shadow",
+                &["legacy".to_string()],
+                &["shadow".to_string()],
+            ),
+            rendered_lines: vec!["shadow".to_string()],
+            rendered_preview: vec!["shadow".to_string()],
+            commit_candidate: true,
+            universal_property: "test".to_string(),
+        };
+        let force = ArchitectureSwitchConfig::default()
+            .with_mode(ArchitectureSwitchMode::Force, "test");
+        assert!(evaluate_shadow_table_commit(&report, &force, &Default::default()).use_shadow_output);
+
+        let dry_run = ArchitectureSwitchConfig::default()
+            .with_mode(ArchitectureSwitchMode::DryRun, "test");
+        assert!(!evaluate_shadow_table_commit(&report, &dry_run, &Default::default()).use_shadow_output);
     }
 }

@@ -251,6 +251,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "legacy_visible_lines_vs_shadow_rendered_lines",
         ),
         step(
+            "step-shadow-table-commit",
+            "wave-02-table-adapters",
+            "shadow_pipeline.table_adapter",
+            "shadow_pipeline.table_commit",
+            "shadow_pipeline.table_commit",
+            "shadow-table-commit-gate",
+            "commit_only_when_gate_and_diff_policy_commute",
+        ),
+        step(
             "step-parallel-rows",
             "wave-04-dataflow",
             "multiprocessing_rows",
