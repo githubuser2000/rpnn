@@ -140,6 +140,9 @@ pub fn bootstrap_table_generation() -> TableGenerationBundle {
             "ConcatCsv".to_string(),
             "KombiJoin".to_string(),
             "TablePreparation".to_string(),
+            "TableWrapping".to_string(),
+            "TableOutput".to_string(),
+            "RowFiltering".to_string(),
         ],
         universal_property:
             "compatible local CSV/generated/Kombi sections glue to one deterministic result table"

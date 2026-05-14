@@ -1,27 +1,33 @@
 use serde::{Deserialize, Serialize};
 
 use crate::category::{bootstrap_category_theory, CategoryTheoryBundle};
-use crate::completion_runtime::{bootstrap_completion_runtime, CompletionRuntimeBundle};
 use crate::column_selection::{bootstrap_column_selection, ColumnSelectionBundle};
+use crate::completion_runtime::{bootstrap_completion_runtime, CompletionRuntimeBundle};
+use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletionMorphismBundle};
 use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, ExecutionTask};
 use crate::morphism::{MorphismEdge, MorphismGraph, MorphismKind};
-use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
-use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
 use crate::number_theory::{bootstrap_number_theory, NumberTheoryBundle};
+use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
+use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
+use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
 use crate::presheaf::PresheafBundle;
 use crate::program_workflow::{bootstrap_program_workflow, ProgramWorkflowBundle};
-use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
-use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::prompt_language::{bootstrap_prompt_language, PromptLanguageBundle};
+use crate::row_filtering::{bootstrap_row_filtering, RowFilteringBundle};
+use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::sheaf::SheafBundle;
-use crate::table_runtime::{bootstrap_table_runtime, TableRuntimeBundle};
 use crate::table_generation::{bootstrap_table_generation, TableGenerationBundle};
-use crate::tag_schema::{bootstrap_tag_schema, TagSchemaBundle};
+use crate::table_output::{bootstrap_table_output, TableOutputBundle};
+use crate::table_preparation::{bootstrap_table_preparation, TablePreparationBundle};
+use crate::table_runtime::{bootstrap_table_runtime, TableRuntimeBundle};
 use crate::table_state::{bootstrap_table_state, TableStateBundle};
+use crate::table_wrapping::{bootstrap_table_wrapping, TableWrappingBundle};
+use crate::tag_schema::{bootstrap_tag_schema, TagSchemaBundle};
 use crate::topology::{ContextSelection, RetaContextTopology};
 use crate::universal::UniversalBundle;
 
-pub const ARCHITECTURE_COUNTS_SNAPSHOT: &str = include_str!("../data/architecture_counts_snapshot.json");
+pub const ARCHITECTURE_COUNTS_SNAPSHOT: &str =
+    include_str!("../data/architecture_counts_snapshot.json");
 
 #[derive(Clone, Debug)]
 pub struct ArchitectureRuntime {
@@ -30,6 +36,7 @@ pub struct ArchitectureRuntime {
     pub execution_network: ExecutionNetworkBundle,
     pub column_selection: ColumnSelectionBundle,
     pub completion_runtime: CompletionRuntimeBundle,
+    pub completion_word: WordCompletionMorphismBundle,
     pub number_theory: NumberTheoryBundle,
     pub output_semantics: RetaOutputSemantics,
     pub output_syntax: OutputSyntaxBundle,
@@ -37,12 +44,16 @@ pub struct ArchitectureRuntime {
     pub program_workflow: ProgramWorkflowBundle,
     pub prompt_language: PromptLanguageBundle,
     pub presheaves: PresheafBundle,
+    pub row_filtering: RowFilteringBundle,
     pub row_ranges: RowRangeMorphismBundle,
     pub sheaves: SheafBundle,
     pub tag_schema: TagSchemaBundle,
     pub table_generation: TableGenerationBundle,
+    pub table_output: TableOutputBundle,
+    pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
     pub table_state: TableStateBundle,
+    pub table_wrapping: TableWrappingBundle,
     pub morphisms: MorphismGraph,
     pub universal: UniversalBundle,
 }
@@ -85,6 +96,7 @@ impl ArchitectureRuntime {
             execution_network: bootstrap_execution_network(None),
             column_selection: bootstrap_column_selection(),
             completion_runtime: bootstrap_completion_runtime(),
+            completion_word: bootstrap_word_completion_morphisms(),
             number_theory: bootstrap_number_theory(),
             output_semantics: bootstrap_output_semantics(),
             output_syntax: bootstrap_output_syntax(),
@@ -92,12 +104,16 @@ impl ArchitectureRuntime {
             program_workflow: bootstrap_program_workflow(),
             prompt_language: bootstrap_prompt_language(),
             presheaves: PresheafBundle::default(),
+            row_filtering: bootstrap_row_filtering(),
             row_ranges: bootstrap_row_range_morphisms(None),
             sheaves: SheafBundle::default(),
             tag_schema: bootstrap_tag_schema(),
             table_generation: bootstrap_table_generation(),
+            table_output: bootstrap_table_output(),
+            table_preparation: bootstrap_table_preparation(),
             table_runtime: bootstrap_table_runtime(),
             table_state: bootstrap_table_state(),
+            table_wrapping: bootstrap_table_wrapping(),
             morphisms,
             universal: UniversalBundle::new(),
         }
@@ -116,6 +132,7 @@ impl ArchitectureRuntime {
             "topology",
             "tag_schema",
             "row_ranges",
+            "row_filtering",
             "number_theory",
             "column_selection",
             "parameter_runtime",
@@ -124,9 +141,13 @@ impl ArchitectureRuntime {
             "table_state",
             "table_runtime",
             "table_generation",
+            "table_preparation",
+            "table_output",
+            "table_wrapping",
             "program_workflow",
             "prompt_language",
             "completion_runtime",
+            "completion_word",
             "morphism",
             "universal_property",
             "presheaf",
@@ -149,6 +170,14 @@ impl ArchitectureRuntime {
             rust_output_mode_count: self.output_syntax.modes().len(),
             rust_parameter_main_count: self.parameter_runtime.main_commands.len(),
             rust_prompt_start_command_count: self.completion_runtime.start_commands(true).len(),
+            rust_row_filter_condition_count: self.row_filtering.snapshot().condition_families.len(),
+            rust_table_preparation_morphism_count: self
+                .table_preparation
+                .snapshot()
+                .universal_operations
+                .len(),
+            rust_table_output_morphism_count: self.table_output.snapshot().morphisms.len(),
+            rust_word_completion_morphism_count: self.completion_word.snapshot().morphisms.len(),
         }
     }
 }
@@ -175,6 +204,10 @@ pub struct ArchitectureSnapshotRef {
     pub rust_output_mode_count: usize,
     pub rust_parameter_main_count: usize,
     pub rust_prompt_start_command_count: usize,
+    pub rust_row_filter_condition_count: usize,
+    pub rust_table_preparation_morphism_count: usize,
+    pub rust_table_output_morphism_count: usize,
+    pub rust_word_completion_morphism_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -205,8 +238,7 @@ impl RetaRunArchitecture {
                 .map(|mode| mode.canonical_name().to_string()),
             upper_limit: parsed.upper_limit,
             topology_owner: "OpenRetaContextCategory".to_string(),
-            universal_property:
-                "same_cli_context_maps_to_same_ordered_rreta_result".to_string(),
+            universal_property: "same_cli_context_maps_to_same_ordered_rreta_result".to_string(),
         }
     }
 
@@ -230,6 +262,7 @@ pub struct PromptArchitectureContext {
     pub input_len: usize,
     pub token_count: usize,
     pub start_command_count: usize,
+    pub word_completion_sample_count: usize,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -239,15 +272,17 @@ impl PromptArchitectureContext {
     pub fn from_prompt_input(program_name: &str, input: &str) -> Self {
         let token_count = input.split_whitespace().count();
         let completion_runtime = bootstrap_completion_runtime();
+        let word_completion = bootstrap_word_completion_morphisms();
         Self {
             program_name: program_name.to_string(),
             input_len: input.chars().count(),
             token_count,
             start_command_count: completion_runtime.start_commands(true).len(),
+            word_completion_sample_count: word_completion.sample_completions("re").len(),
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
-            universal_property:
-                "prompt_local_state_glues_to_same_compiled_reta_command".to_string(),
+            universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"
+                .to_string(),
         }
     }
 
@@ -267,8 +302,13 @@ mod tests {
     fn runtime_exposes_architecture_terms() {
         let runtime = bootstrap_architecture_runtime();
         assert!(runtime.architecture_terms().contains(&"fifo"));
-        assert!(runtime.architecture_terms().contains(&"natural_transformation"));
-        assert!(runtime.snapshot_ref().py_category_theory_json.contains("Functor"));
+        assert!(runtime
+            .architecture_terms()
+            .contains(&"natural_transformation"));
+        assert!(runtime
+            .snapshot_ref()
+            .py_category_theory_json
+            .contains("Functor"));
     }
 
     #[test]

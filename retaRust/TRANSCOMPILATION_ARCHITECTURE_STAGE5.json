@@ -1,0 +1,47 @@
+{
+  "stage": 5,
+  "project": "Transcompilierung reta python rust",
+  "source_architecture": "python_arch_reference/reta_architecture",
+  "new_modules": [
+    "crates/reta_architecture/src/table_wrapping.rs",
+    "crates/reta_architecture/src/row_filtering.rs",
+    "crates/reta_architecture/src/table_preparation.rs",
+    "crates/reta_architecture/src/table_output.rs",
+    "crates/reta_architecture/src/completion_word.rs"
+  ],
+  "modified_modules": [
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/table_generation.rs"
+  ],
+  "runtime_fields_added": [
+    "row_filtering",
+    "table_wrapping",
+    "table_preparation",
+    "table_output",
+    "completion_word"
+  ],
+  "rreta_progress": [
+    "table wrapping morphisms",
+    "row filtering morphisms",
+    "table preparation morphisms",
+    "table output/rendering morphisms"
+  ],
+  "rretaprompt_progress": [
+    "word completion morphism",
+    "PromptArchitectureContext word-completion sample count"
+  ],
+  "checks": {
+    "cargo_installed": true,
+    "rustc_installed": true,
+    "real_workspace_check": "blocked: crates.io dependencies are not cached/resolvable in container",
+    "isolated_reta_architecture_stub_check": "49 tests passed"
+  },
+  "byte_exact_claim": false,
+  "next_recommended_stage": [
+    "table_output byte-exact comparison against py reta arch",
+    "completion_nested.rs transcompilation",
+    "prompt_preparation.rs and prompt_execution.rs partial Rust port",
+    "parameter_runtime produce_all_spalten_numbers typed replacement"
+  ]
+}
