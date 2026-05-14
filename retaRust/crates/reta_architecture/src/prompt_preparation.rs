@@ -47,7 +47,11 @@ impl PromptPreparationBundle {
     }
 
     pub fn regex_replace(&self, text_state: &PromptTextState) -> Vec<String> {
-        regex_replace(text_state, &self.parameter_value_domains(), &self.completion_runtime)
+        regex_replace(
+            text_state,
+            &self.parameter_value_domains(),
+            &self.completion_runtime,
+        )
     }
 
     pub fn prepare_large_output(
@@ -76,15 +80,35 @@ impl PromptPreparationBundle {
             "zeilen".to_string(),
             BTreeMap::from([
                 ("alles".to_string(), BTreeSet::from([String::new()])),
-                ("vorhervonausschnitt".to_string(), HUNDERT_STRINGS.iter().map(|item| item.to_string()).collect()),
-                ("oberesmaximum".to_string(), HUNDERT_STRINGS.iter().map(|item| item.to_string()).collect()),
+                (
+                    "vorhervonausschnitt".to_string(),
+                    HUNDERT_STRINGS
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect(),
+                ),
+                (
+                    "oberesmaximum".to_string(),
+                    HUNDERT_STRINGS
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect(),
+                ),
                 (
                     "typ".to_string(),
-                    self.completion_runtime.zeilen_typen.iter().cloned().collect(),
+                    self.completion_runtime
+                        .zeilen_typen
+                        .iter()
+                        .cloned()
+                        .collect(),
                 ),
                 (
                     "zeit".to_string(),
-                    self.completion_runtime.zeilen_zeit.iter().cloned().collect(),
+                    self.completion_runtime
+                        .zeilen_zeit
+                        .iter()
+                        .cloned()
+                        .collect(),
                 ),
             ]),
         );
@@ -109,10 +133,26 @@ impl PromptPreparationBundle {
             BTreeMap::from([
                 (
                     "art".to_string(),
-                    self.completion_runtime.ausgabe_art.iter().cloned().collect(),
+                    self.completion_runtime
+                        .ausgabe_art
+                        .iter()
+                        .cloned()
+                        .collect(),
                 ),
-                ("breite".to_string(), HUNDERT_STRINGS.iter().map(|item| item.to_string()).collect()),
-                ("breiten".to_string(), HUNDERT_STRINGS.iter().map(|item| item.to_string()).collect()),
+                (
+                    "breite".to_string(),
+                    HUNDERT_STRINGS
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect(),
+                ),
+                (
+                    "breiten".to_string(),
+                    HUNDERT_STRINGS
+                        .iter()
+                        .map(|item| item.to_string())
+                        .collect(),
+                ),
             ]),
         );
         domains
@@ -149,7 +189,18 @@ pub struct PreparedPromptOutput {
 }
 
 impl PreparedPromptOutput {
-    pub fn as_legacy_tuple_shape(&self) -> (&bool, &Vec<String>, &String, &Vec<String>, &i64, &Vec<String>, &Vec<String>, &bool) {
+    pub fn as_legacy_tuple_shape(
+        &self,
+    ) -> (
+        &bool,
+        &Vec<String>,
+        &String,
+        &Vec<String>,
+        &i64,
+        &Vec<String>,
+        &Vec<String>,
+        &bool,
+    ) {
         (
             &self.is_pure_only_reta_cmd,
             &self.brueche,
@@ -164,11 +215,13 @@ impl PreparedPromptOutput {
 }
 
 const HUNDERT_STRINGS: [&str; 100] = [
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-    "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-    "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
-    "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79",
-    "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+    "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32",
+    "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48",
+    "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63", "64",
+    "65", "66", "67", "68", "69", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
+    "81", "82", "83", "84", "85", "86", "87", "88", "89", "90", "91", "92", "93", "94", "95", "96",
+    "97", "98", "99",
 ];
 
 pub fn bootstrap_prompt_preparation() -> PromptPreparationBundle {
@@ -200,7 +253,11 @@ pub fn regex_replace(
     domains: &BTreeMap<String, BTreeMap<String, BTreeSet<String>>>,
     completion_runtime: &CompletionRuntimeBundle,
 ) -> Vec<String> {
-    if !text_state.liste.iter().any(|item| item.contains("r\"") || item.contains('*')) {
+    if !text_state
+        .liste
+        .iter()
+        .any(|item| item.contains("r\"") || item.contains('*'))
+    {
         return text_state.liste.clone();
     }
     let if_reta = text_state.liste.first().is_some_and(|item| item == "reta");
@@ -211,7 +268,10 @@ pub fn regex_replace(
             out.push(token.clone());
             continue;
         }
-        if let Some(main) = token.strip_prefix('-').filter(|rest| !rest.starts_with('-')) {
+        if let Some(main) = token
+            .strip_prefix('-')
+            .filter(|rest| !rest.starts_with('-'))
+        {
             last_main_parameter = Some(main.to_string());
             if token.contains('*') || token.starts_with("r\"") {
                 out.extend(match_main_parameters(token, completion_runtime));
@@ -220,10 +280,18 @@ pub fn regex_replace(
             }
             continue;
         }
-        if let Some((parameter, value_probe)) = token.strip_prefix("--").and_then(|tail| tail.split_once('=')) {
+        if let Some((parameter, value_probe)) = token
+            .strip_prefix("--")
+            .and_then(|tail| tail.split_once('='))
+        {
             if token.contains('*') || token.contains("r\"") {
                 if let Some(main) = &last_main_parameter {
-                    out.extend(match_parameter_values(main, parameter, value_probe, domains));
+                    out.extend(match_parameter_values(
+                        main,
+                        parameter,
+                        value_probe,
+                        domains,
+                    ));
                 }
             } else {
                 out.push(token.clone());
@@ -244,7 +312,11 @@ pub fn regex_replace(
             out.push(token.clone());
         }
     }
-    if out.is_empty() { text_state.liste.clone() } else { out }
+    if out.is_empty() {
+        text_state.liste.clone()
+    } else {
+        out
+    }
 }
 
 fn match_prompt_commands(probe: &str, completion_runtime: &CompletionRuntimeBundle) -> Vec<String> {
@@ -312,7 +384,10 @@ pub fn simple_pattern_match(pattern: &str, candidate: &str) -> bool {
     if stripped.is_empty() {
         return true;
     }
-    let wildcard_parts = stripped.split('*').filter(|part| !part.is_empty()).collect::<Vec<_>>();
+    let wildcard_parts = stripped
+        .split('*')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
     if wildcard_parts.is_empty() {
         return true;
     }
@@ -363,7 +438,11 @@ pub fn prepare_large_output(
         && !txt.liste.iter().any(|token| token == "-zeilen")
     {
         txt.liste.push("-zeilen".to_string());
-        txt.liste.push(vorher_von_ausschnitt_or_zaehlung(&txt, &numeric_tokens.join(",")));
+        txt.liste.push(vorher_von_ausschnitt_or_zaehlung(
+            &txt,
+            &numeric_tokens.join(","),
+        ));
+        txt.set_liste(txt.liste.clone());
     }
 
     if !txt.liste.first().is_some_and(|token| token == "reta") {
@@ -400,7 +479,12 @@ mod tests {
 
     #[test]
     fn rotates_reta_command_like_python_helper() {
-        let result = rotate_where_reta_command("abc", "reta -zeilen", &["x".to_string()], PromptModus::Normal);
+        let result = rotate_where_reta_command(
+            "abc",
+            "reta -zeilen",
+            &["x".to_string()],
+            PromptModus::Normal,
+        );
         assert_eq!(result.0, "reta -zeilen");
         assert_eq!(result.1, "abc");
     }
@@ -424,6 +508,9 @@ mod tests {
             "1-3",
             &[],
         );
-        assert!(prepared.tokens.iter().any(|item| item.starts_with("--vorhervonausschnitt=")));
+        assert!(prepared
+            .tokens
+            .iter()
+            .any(|item| item.starts_with("--vorhervonausschnitt=")));
     }
 }
