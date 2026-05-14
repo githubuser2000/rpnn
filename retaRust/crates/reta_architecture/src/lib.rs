@@ -342,10 +342,12 @@ pub use semantics_builder::{
 };
 pub use shadow_pipeline::{
     bootstrap_shadow_pipeline, diff_shadow_lines, evaluate_shadow_prompt_commit,
-    evaluate_shadow_table_commit, prepare_shadow_table, ShadowCliPlan, ShadowCommitDecision,
-    ShadowCommitPolicy, ShadowDiffSummary, ShadowPipelineBundle, ShadowPipelineSnapshot,
-    ShadowPromptCommitDecision, ShadowPromptCommitPolicy, ShadowPromptInput,
-    ShadowPromptLegacyCommand, ShadowPromptReport, ShadowTableInput, ShadowTableReport,
+    evaluate_shadow_table_commit, evaluate_shadow_table_view_output_commit, prepare_shadow_table,
+    ShadowCliPlan, ShadowCommitDecision, ShadowCommitPolicy, ShadowDiffSummary,
+    ShadowPipelineBundle, ShadowPipelineSnapshot, ShadowPromptCommitDecision,
+    ShadowPromptCommitPolicy, ShadowPromptInput, ShadowPromptLegacyCommand, ShadowPromptReport,
+    ShadowTableInput, ShadowTableReport, ShadowTableViewOutputCommitDecision,
+    ShadowTableViewOutputCommitPolicy, ShadowTableViewOutputReport,
 };
 pub use sheaf::{
     bootstrap_sheaves, ColumnParameterMeta, GeneratedColumnsSheaf, GeneratedColumnsSheafSnapshot,

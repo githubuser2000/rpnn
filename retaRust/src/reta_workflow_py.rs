@@ -43,6 +43,8 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
     if let Some(shadow_runtime) = crate::reta_arch_shadow::shadow_table_runtime_report_for_program(&program, &argv) {
         let shadow_report = shadow_runtime.report;
         let commit = shadow_runtime.commit;
+        let view_output_report = shadow_runtime.view_output_report;
+        let view_output_commit = shadow_runtime.view_output_commit;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -74,7 +76,51 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 commit.rollback_anchor,
             ),
         });
-        if commit.use_shadow_output {
+        if let Some(report) = view_output_report.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
+                code: "ARCH_TABLE_VIEW_OUTPUT".to_string(),
+                message: format!(
+                    "Rust-Architektur-Materialized-View-Output: mode={} gate={} output_mode={} legacy_rows={} rendered_rows={} equal={} first_diff={:?}",
+                    report.switch_mode,
+                    report.gate.reason,
+                    report.output_mode,
+                    report.legacy_rows,
+                    report.rendered_rows,
+                    report.diff.equal,
+                    report.diff.first_mismatch_index,
+                ),
+            });
+        }
+        if let Some(commit) = view_output_commit.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if commit.use_view_output || !commit.gate_allowed_to_commit {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_OUTPUT_COMMIT".to_string(),
+                message: format!(
+                    "Rust-Architektur-Materialized-View-Commit-Gate: mode={} use_view_output={} reason={} gate={} diff_equal={} lines={} rollback={:?}",
+                    commit.switch_mode,
+                    commit.use_view_output,
+                    commit.reason,
+                    commit.gate_reason,
+                    commit.diff_equal,
+                    commit.rendered_line_count,
+                    commit.rollback_anchor,
+                ),
+            });
+        }
+        if view_output_commit
+            .as_ref()
+            .map(|commit| commit.use_view_output)
+            .unwrap_or(false)
+        {
+            if let Some(report) = view_output_report {
+                committed_shadow_lines = Some(report.output_report.rendered_lines.clone());
+            }
+        } else if commit.use_shadow_output {
             committed_shadow_lines = Some(shadow_report.rendered_lines.clone());
         }
     }

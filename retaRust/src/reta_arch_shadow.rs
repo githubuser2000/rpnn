@@ -1,9 +1,9 @@
 //! Root-crate bridge from the legacy-compatible `Program` run to the typed
 //! `reta_architecture` shadow pipeline.
 //!
-//! This module keeps legacy output as the default.  It builds a typed table-shadow
-//! report after the legacy path has produced its table and visible lines, and it
-//! returns a commit decision for explicit architecture modes.  A visible switch is
+//! This module keeps legacy output as the default.  It builds typed table-shadow
+//! reports after the legacy path has produced its table and visible lines, and it
+//! returns commit decisions for explicit architecture modes.  A visible switch is
 //! only possible when the runtime gate and parity policy both allow it.
 
 use crate::shared::reta_program_types::Program;
@@ -12,6 +12,8 @@ use crate::shared::reta_program_types::Program;
 pub struct ShadowTableRuntimeReport {
     pub report: reta_architecture::ShadowTableReport,
     pub commit: reta_architecture::ShadowCommitDecision,
+    pub view_output_report: Option<reta_architecture::ShadowTableViewOutputReport>,
+    pub view_output_commit: Option<reta_architecture::ShadowTableViewOutputCommitDecision>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -33,7 +35,20 @@ pub fn shadow_table_runtime_report_for_program(
     let pipeline = reta_architecture::bootstrap_shadow_pipeline();
     let report = pipeline.shadow_table(&input, &switch_config);
     let commit = pipeline.table_commit_decision(&report, &switch_config);
-    Some(ShadowTableRuntimeReport { report, commit })
+    let view_output_report = Some(pipeline.shadow_table_view_output(
+        argv,
+        &program.finallyDisplayLines,
+        &switch_config,
+    ));
+    let view_output_commit = view_output_report
+        .as_ref()
+        .map(|report| pipeline.table_view_output_commit_decision(report, &switch_config));
+    Some(ShadowTableRuntimeReport {
+        report,
+        commit,
+        view_output_report,
+        view_output_commit,
+    })
 }
 
 pub fn shadow_table_input_from_program(program: &Program) -> reta_architecture::ShadowTableInput {

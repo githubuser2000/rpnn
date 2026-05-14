@@ -309,6 +309,13 @@ pub extern "C" fn reta_architecture_prompt_commit_policy_json() -> *mut c_char {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn reta_architecture_table_view_output_commit_policy_json() -> *mut c_char {
+    ffi_json_result(|| {
+        serde_json::to_string(&reta_architecture::ShadowTableViewOutputCommitPolicy::default())
+    })
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {
     ffi_json_result(|| {
         let runtime = crate::shared_architecture();
