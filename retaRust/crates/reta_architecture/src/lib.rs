@@ -70,6 +70,7 @@ pub mod table_generation;
 pub mod table_materialization;
 pub mod table_view;
 pub mod table_view_output;
+pub mod table_view_output_parity;
 pub mod table_output;
 pub mod table_preparation;
 pub mod table_runtime;
@@ -389,6 +390,14 @@ pub use table_view_output::{
     render_table_view_for_cli_args, render_table_view_rows_as_mode, row_values,
     TableViewOutputBundle, TableViewOutputConfig, TableViewOutputReport,
     TableViewOutputSnapshot,
+};
+pub use table_view_output_parity::{
+    bootstrap_table_view_output_parity, canonicalize_cell,
+    compare_output_lines as compare_table_view_output_lines,
+    compare_table_view_output_to_legacy, normalize_output_lines, parse_line_as_cells,
+    semantic_rows_from_lines, strip_ansi_escape_sequences, NormalizedOutputLine,
+    NormalizedOutputReport, TableViewOutputParityBundle, TableViewOutputParityConfig,
+    TableViewOutputParityReport, TableViewOutputParitySnapshot,
 };
 pub use table_output::{
     bootstrap_table_output, colorize, determine_row_width, max_cell_text_len, only_that_columns_fn,

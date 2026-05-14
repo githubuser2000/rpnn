@@ -1,0 +1,36 @@
+{
+  "stage": 25,
+  "title": "mode-aware table_view_output semantic parity",
+  "new_modules": [
+    "crates/reta_architecture/src/table_view_output_parity.rs"
+  ],
+  "new_tools": [
+    "tools/architecture_table_view_output_parity_probe.py"
+  ],
+  "new_binaries": [
+    "rreta_arch_view_output_parity"
+  ],
+  "new_ffi_exports": [
+    "reta_architecture_table_view_output_parity_json"
+  ],
+  "new_runtime_gates": [
+    "table_view_output.parity_normalize",
+    "table_view_output.semantic_diff",
+    "shadow_pipeline.table_view_output_semantic_diff"
+  ],
+  "new_migration_steps": [
+    "step-table-view-output-parity"
+  ],
+  "commit_policy": {
+    "raw_equality_still_required_for_normal_commit": true,
+    "semantic_equality_is_diagnostic_only": true,
+    "force_may_override_mismatch": true
+  },
+  "checks": {
+    "python_probes": "passed",
+    "coverage": "1096/1096 functions, 239/239 classes",
+    "semantic_surface": "0 marker-only, 0 missing",
+    "cargo_check": "not run; cargo/rustc unavailable in container"
+  },
+  "status": "stage25_complete"
+}

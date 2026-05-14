@@ -189,10 +189,13 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("parallel_execution")
                     || morphism.starts_with("table_materialization")
                     || morphism.starts_with("table_view")
+                    || morphism.starts_with("table_view_output.parity")
+                    || morphism.starts_with("table_view_output.semantic_diff")
                     || morphism.starts_with("shadow_pipeline.table_adapter")
                     || morphism.starts_with("shadow_pipeline.table_commit")
                     || morphism.starts_with("shadow_pipeline.table_view_output_adapter")
                     || morphism.starts_with("shadow_pipeline.table_view_output_commit")
+                    || morphism.starts_with("shadow_pipeline.table_view_output_semantic_diff")
                     || morphism.starts_with("shadow_pipeline.prompt_adapter")
                     || morphism.starts_with("shadow_pipeline.prompt_commit");
                 if may_commit {
@@ -329,6 +332,8 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view.render_lines".to_string(),
             "table_view_output.render".to_string(),
             "table_view_output.mode_projection".to_string(),
+            "table_view_output.parity_normalize".to_string(),
+            "table_view_output.semantic_diff".to_string(),
             "table_view_output.commit".to_string(),
             "shadow_pipeline.table_adapter".to_string(),
             "shadow_pipeline.table_commit".to_string(),

@@ -216,6 +216,37 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     }
 }
 
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
+    argc: usize,
+    argv: *const *const c_char,
+    legacy_text: *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let legacy_text = unsafe { read_optional_string(legacy_text) }.unwrap_or_default().unwrap_or_default();
+        let legacy_lines = legacy_text.lines().map(ToString::to_string).collect::<Vec<_>>();
+        let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
+        let mode = parsed.selected_output_mode.unwrap_or(reta_architecture::OutputMode::Shell);
+        let output_report = reta_architecture::render_table_view_for_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableViewOutputConfig::default().with_mode(mode),
+        );
+        let parity = reta_architecture::compare_table_view_output_to_legacy(
+            &output_report,
+            &legacy_lines,
+            &reta_architecture::TableViewOutputParityConfig::default().with_mode(mode),
+        );
+        serde_json::to_string(&parity)
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_output_parity_json"),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_snapshot_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&crate::shared_architecture().snapshot_ref()))

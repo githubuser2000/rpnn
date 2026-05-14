@@ -81,14 +81,16 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 level: if report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
                 code: "ARCH_TABLE_VIEW_OUTPUT".to_string(),
                 message: format!(
-                    "Rust-Architektur-Materialized-View-Output: mode={} gate={} output_mode={} legacy_rows={} rendered_rows={} equal={} first_diff={:?}",
+                    "Rust-Architektur-Materialized-View-Output: mode={} gate={} output_mode={} legacy_rows={} rendered_rows={} raw_equal={} semantic_equal={} first_diff={:?} semantic_first_diff={:?}",
                     report.switch_mode,
                     report.gate.reason,
                     report.output_mode,
                     report.legacy_rows,
                     report.rendered_rows,
                     report.diff.equal,
+                    report.semantic_diff.semantic_equal,
                     report.diff.first_mismatch_index,
+                    report.semantic_diff.first_semantic_mismatch_index,
                 ),
             });
         }
@@ -101,12 +103,13 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 },
                 code: "ARCH_TABLE_VIEW_OUTPUT_COMMIT".to_string(),
                 message: format!(
-                    "Rust-Architektur-Materialized-View-Commit-Gate: mode={} use_view_output={} reason={} gate={} diff_equal={} lines={} rollback={:?}",
+                    "Rust-Architektur-Materialized-View-Commit-Gate: mode={} use_view_output={} reason={} gate={} diff_equal={} semantic_equal={} lines={} rollback={:?}",
                     commit.switch_mode,
                     commit.use_view_output,
                     commit.reason,
                     commit.gate_reason,
                     commit.diff_equal,
+                    commit.semantic_equal,
                     commit.rendered_line_count,
                     commit.rollback_anchor,
                 ),

@@ -29,6 +29,9 @@ use crate::table_view::{
 use crate::table_view_output::{
     bootstrap_table_view_output, TableViewOutputConfig, TableViewOutputReport,
 };
+use crate::table_view_output_parity::{
+    bootstrap_table_view_output_parity, TableViewOutputParityConfig, TableViewOutputParityReport,
+};
 use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
 use crate::table_preparation::{prepare_row_cells, PreparedTable};
 use crate::table_wrapping::TableWidthContext;
@@ -182,6 +185,7 @@ pub struct ShadowTableViewOutputReport {
     pub rendered_rows: usize,
     pub output_mode: String,
     pub diff: ShadowDiffSummary,
+    pub semantic_diff: TableViewOutputParityReport,
     pub output_report: TableViewOutputReport,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
@@ -216,6 +220,7 @@ pub struct ShadowTableViewOutputCommitDecision {
     pub gate_reason: String,
     pub gate_allowed_to_commit: bool,
     pub diff_equal: bool,
+    pub semantic_equal: bool,
     pub force_override: bool,
     pub rendered_line_count: usize,
     pub rollback_anchor: Option<String>,
@@ -368,6 +373,9 @@ impl ShadowPipelineBundle {
                 "shadow_pipeline.table_commit".to_string(),
                 "shadow_pipeline.table_view_output_adapter".to_string(),
                 "shadow_pipeline.table_view_output_commit".to_string(),
+                "shadow_pipeline.table_view_output_semantic_diff".to_string(),
+                "table_view_output_parity.normalize_output_lines".to_string(),
+                "table_view_output_parity.compare_output_lines".to_string(),
                 "shadow_pipeline.prompt_adapter".to_string(),
                 "shadow_pipeline.prompt_commit".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
@@ -497,6 +505,11 @@ impl ShadowPipelineBundle {
             legacy_display_lines,
             &output_report.rendered_lines,
         );
+        let semantic_diff = bootstrap_table_view_output_parity().compare_table_view_output_to_legacy(
+            &output_report,
+            legacy_display_lines,
+            &TableViewOutputParityConfig::default().with_mode(output_mode),
+        );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -508,6 +521,7 @@ impl ShadowPipelineBundle {
             rendered_rows: output_report.rendered_line_count,
             output_mode: output_report.mode.clone(),
             diff,
+            semantic_diff,
             rendered_preview: output_report.rendered_lines.iter().take(8).cloned().collect(),
             output_report,
             commit_candidate,
@@ -691,6 +705,7 @@ pub fn evaluate_shadow_table_view_output_commit(
         gate_reason: commit_gate.reason,
         gate_allowed_to_commit: commit_gate.allowed_to_commit,
         diff_equal: report.diff.equal,
+        semantic_equal: report.semantic_diff.semantic_equal,
         force_override,
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),
@@ -876,6 +891,11 @@ mod tests {
                 "rust_table_view_output",
                 &["legacy".to_string()],
                 &["view".to_string()],
+            ),
+            semantic_diff: crate::table_view_output_parity::compare_output_lines(
+                &["legacy".to_string()],
+                &["view".to_string()],
+                &crate::table_view_output_parity::TableViewOutputParityConfig::default(),
             ),
             output_report: TableViewOutputReport {
                 class: "TableViewOutputReport".to_string(),

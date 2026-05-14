@@ -290,6 +290,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "commit_only_when_materialized_view_output_matches_legacy_lines",
         ),
         step(
+            "step-table-view-output-parity",
+            "wave-02-table-adapters",
+            "Legacy lines + TableViewOutputReport",
+            "table_view_output.semantic_diff",
+            "table_view_output.semantic_diff",
+            "table-view-output-semantic-parity",
+            "raw_line_diff_and_normalized_cell_diff_are_reported_separately",
+        ),
+        step(
             "step-shadow-table-view-output",
             "wave-02-table-adapters",
             "Program.finallyDisplayLines + MaterializedTableView",

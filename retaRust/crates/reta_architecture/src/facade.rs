@@ -157,6 +157,10 @@ use crate::table_view_output::{
     bootstrap_table_view_output as bootstrap_table_view_output_impl, TableViewOutputBundle,
     TableViewOutputConfig,
 };
+use crate::table_view_output_parity::{
+    bootstrap_table_view_output_parity as bootstrap_table_view_output_parity_impl,
+    TableViewOutputParityBundle, TableViewOutputParityConfig,
+};
 use crate::table_output::{
     bootstrap_table_output as bootstrap_table_output_impl, TableOutputBundle,
 };
@@ -241,6 +245,7 @@ pub struct ArchitectureRuntime {
     pub table_materialization: TableMaterializationBundle,
     pub table_view: TableViewBundle,
     pub table_view_output: TableViewOutputBundle,
+    pub table_view_output_parity: TableViewOutputParityBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -396,6 +401,7 @@ impl ArchitectureRuntime {
             table_materialization: bootstrap_table_materialization_impl(),
             table_view: bootstrap_table_view_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
+            table_view_output_parity: bootstrap_table_view_output_parity_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -461,6 +467,7 @@ impl ArchitectureRuntime {
             "table_materialization",
             "table_view",
             "table_view_output",
+            "table_view_output_parity",
             "table_preparation",
             "table_output",
             "table_wrapping",
@@ -602,6 +609,17 @@ impl ArchitectureRuntime {
                 .materialized_cell_count,
             rust_table_view_morphism_count: self.table_view.snapshot().morphisms.len(),
             rust_table_view_output_morphism_count: self.table_view_output.snapshot().morphisms.len(),
+            rust_table_view_output_parity_morphism_count: self.table_view_output_parity.snapshot().morphisms.len(),
+            rust_table_view_output_parity_smoke_row_count: self
+                .table_view_output_parity
+                .compare_lines(
+                    &["| A |".to_string(), "| x |".to_string()],
+                    &["| A |".to_string(), "| --- |".to_string(), "| x |".to_string()],
+                    &TableViewOutputParityConfig::default()
+                        .with_mode(crate::output_syntax::OutputMode::Markdown),
+                )
+                .left
+                .semantic_row_count,
             rust_table_view_output_smoke_line_count: self
                 .table_view_output
                 .render_cli_args(
@@ -734,6 +752,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_materialization_smoke_cell_count: usize,
     pub rust_table_view_morphism_count: usize,
     pub rust_table_view_output_morphism_count: usize,
+    pub rust_table_view_output_parity_morphism_count: usize,
+    pub rust_table_view_output_parity_smoke_row_count: usize,
     pub rust_table_view_output_smoke_line_count: usize,
     pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
@@ -778,6 +798,7 @@ pub struct RetaRunArchitecture {
     pub materialized_table_view_virtual_cell_count: usize,
     pub materialized_table_output_mode: String,
     pub materialized_table_output_line_count: usize,
+    pub materialized_table_output_semantic_row_count: usize,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -821,6 +842,12 @@ impl RetaRunArchitecture {
                 &materialized_table_view,
                 &TableViewOutputConfig::default().with_mode(table_output_mode),
             );
+        let materialized_table_output_semantic =
+            crate::table_view_output_parity::bootstrap_table_view_output_parity()
+                .normalize_lines(
+                    &materialized_table_output.rendered_lines,
+                    &TableViewOutputParityConfig::default().with_mode(table_output_mode),
+                );
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
         let activation_units =
@@ -857,6 +884,7 @@ impl RetaRunArchitecture {
             materialized_table_view_virtual_cell_count: materialized_table_view.rendered_virtual_cell_count,
             materialized_table_output_mode: materialized_table_output.mode.clone(),
             materialized_table_output_line_count: materialized_table_output.rendered_line_count,
+            materialized_table_output_semantic_row_count: materialized_table_output_semantic.semantic_row_count,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -873,7 +901,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -894,6 +922,7 @@ impl RetaRunArchitecture {
             self.materialized_table_view_virtual_cell_count,
             self.materialized_table_output_mode,
             self.materialized_table_output_line_count,
+            self.materialized_table_output_semantic_row_count,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,
