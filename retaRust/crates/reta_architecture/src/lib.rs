@@ -73,6 +73,7 @@ pub mod table_preparation;
 pub mod table_runtime;
 pub mod table_state;
 pub mod table_view;
+pub mod table_view_numbering;
 pub mod table_view_output;
 pub mod table_view_output_parity;
 pub mod table_wrapping;
@@ -388,6 +389,13 @@ pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
     MaterializedTableViewConfig, MaterializedTableViewRow, TableViewBundle, TableViewSnapshot,
     VirtualColumnDisplayPolicy,
+};
+pub use table_view_numbering::{
+    bootstrap_table_view_numbering, legacy_zaehlung_for_row, legacy_zaehlung_map,
+    numbering_projection_for_source_row, numbering_report_for_rows, numbering_smoke_report,
+    numbering_values_for_source_row, TableViewNumberingBundle, TableViewNumberingCell,
+    TableViewNumberingConfig, TableViewNumberingMode, TableViewNumberingProjection,
+    TableViewNumberingReport, TableViewNumberingSnapshot,
 };
 pub use table_view_output::{
     bbcode_escape_cell, bootstrap_table_view_output, continuum_m_table_view_output_smoke,

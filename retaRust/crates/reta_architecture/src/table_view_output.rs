@@ -5,6 +5,8 @@
 //! the same typed path: output flags such as `--keineueberschriften`,
 //! `--keineleereninhalte`, `--breite=…`, `--breiten=…`, `--dontwrap`,
 //! `--nocolor`, `--justtext`, `--onetable`, `--endlessscreen` and `--endless`.
+//! Stage 29 adds the legacy numbering/counting prefix as an explicit projection
+//! instead of leaving it hidden inside the renderer.
 //! The legacy renderer is still the behaviour oracle; this module makes those
 //! options inspectable and shadow-comparable before any guarded commit.
 
@@ -16,6 +18,9 @@ use crate::table_materialization::{bootstrap_table_materialization, TableMateria
 use crate::table_view::{
     bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
     MaterializedTableViewRow, VirtualColumnDisplayPolicy,
+};
+use crate::table_view_numbering::{
+    numbering_values_for_source_row, TableViewNumberingConfig, TableViewNumberingMode,
 };
 use crate::table_wrapping::alxwrap;
 
@@ -83,6 +88,7 @@ impl TableViewOutputCliOptions {
         }
         if self.keinenummerierung {
             config.include_row_numbers = false;
+            config.numbering = config.numbering.clone().disabled_by_keinenummerierung();
         }
         if !self.widths.is_empty() {
             config.per_column_widths = self.widths.clone();
@@ -116,6 +122,7 @@ pub struct TableViewOutputConfig {
     /// policy instead of implicit renderer side effects.
     pub include_row_numbers: bool,
     pub row_number_header: String,
+    pub numbering: TableViewNumberingConfig,
     pub wrap_cell_width: Option<usize>,
     pub per_column_widths: Vec<usize>,
     pub dontwrap: bool,
@@ -139,6 +146,7 @@ impl Default for TableViewOutputConfig {
             suppress_headers: false,
             include_row_numbers: false,
             row_number_header: "#".to_string(),
+            numbering: TableViewNumberingConfig::disabled(),
             wrap_cell_width: None,
             per_column_widths: Vec::new(),
             dontwrap: false,
@@ -173,6 +181,18 @@ impl TableViewOutputConfig {
         self
     }
 
+    pub fn with_legacy_numbering(mut self) -> Self {
+        self.include_row_numbers = true;
+        self.numbering = TableViewNumberingConfig::legacy_pair();
+        self
+    }
+
+    pub fn with_numbering(mut self, numbering: TableViewNumberingConfig) -> Self {
+        self.include_row_numbers = numbering.is_enabled();
+        self.numbering = numbering;
+        self
+    }
+
     pub fn width_for_cell(&self, cell_index: usize) -> Option<usize> {
         if self.dontwrap || self.mode.force_zero_width() {
             return None;
@@ -192,6 +212,7 @@ pub struct TableViewOutputSnapshot {
     pub output_modes: Vec<String>,
     pub default_virtual_policy: String,
     pub stage28_cli_options: Vec<String>,
+    pub stage29_numbering_modes: Vec<String>,
     pub universal_property: String,
 }
 
@@ -210,6 +231,8 @@ pub struct TableViewOutputReport {
     pub suppress_headers: bool,
     pub include_empty_rows: bool,
     pub include_row_numbers: bool,
+    pub numbering_mode: String,
+    pub numbering_column_count: usize,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -246,6 +269,7 @@ impl TableViewOutputBundle {
                 "render_table_view_for_cli_args".to_string(),
                 "rendered_row_value_lines".to_string(),
                 "wrap_output_cell".to_string(),
+                "numbering_values_for_source_row".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -273,8 +297,14 @@ impl TableViewOutputBundle {
                 "keinenummerierung".to_string(),
                 "keineueberschriften".to_string(),
             ],
+            stage29_numbering_modes: vec![
+                TableViewNumberingMode::Disabled.canonical().to_string(),
+                TableViewNumberingMode::LegacyPair.canonical().to_string(),
+                TableViewNumberingMode::NumberOnly.canonical().to_string(),
+                TableViewNumberingMode::CountingOnly.canonical().to_string(),
+            ],
             universal_property:
-                "one materialized table view has deterministic images in every output syntax and output-option context"
+                "one materialized table view has deterministic images in every output syntax, output-option and numbering context"
                     .to_string(),
         }
     }
@@ -456,6 +486,8 @@ pub fn render_materialized_table_view(
         suppress_headers: config.suppress_headers,
         include_empty_rows: config.include_empty_rows,
         include_row_numbers: config.include_row_numbers,
+        numbering_mode: config.numbering.mode.canonical().to_string(),
+        numbering_column_count: config.numbering.column_count(),
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -469,7 +501,7 @@ pub fn render_materialized_table_view(
         continuum_m_virtual_744_kept_as_witness: view.continuum_m_virtual_744_kept_as_witness,
         visible_output_is_empty,
         universal_property:
-            "output flags change only the selected output projection; materialized local sections stay unchanged"
+            "output flags and numbering change only the selected output projection; materialized local sections stay unchanged"
                 .to_string(),
     }
 }
@@ -541,6 +573,15 @@ pub fn row_values_with_options(
     display_index: usize,
 ) -> Vec<String> {
     let mut values = row_values(row);
+    if config.numbering.is_enabled() {
+        let mut prefix = numbering_values_for_source_row(
+            row.source_row_zero_based,
+            display_index,
+            &config.numbering,
+        );
+        prefix.extend(values);
+        return prefix;
+    }
     if config.include_row_numbers {
         let value = if row.source_row_zero_based == 0 {
             config.row_number_header.clone()
@@ -902,6 +943,26 @@ mod tests {
             ..TableViewOutputConfig::default()
         };
         assert!(render_shell_rows(&[row], &config).is_empty());
+    }
+
+    #[test]
+    fn legacy_numbering_projection_adds_zaehlung_and_nummerierung_columns() {
+        let args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+        ];
+        let report = render_table_view_for_cli_args(
+            &args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default().with_legacy_numbering(),
+        );
+        assert_eq!(report.numbering_mode, "legacy-pair");
+        assert_eq!(report.numbering_column_count, 2);
+        assert!(report.rendered_lines[0].contains("Zählung"));
+        assert!(report.rendered_lines[0].contains("Nummerierung"));
     }
 
     #[test]

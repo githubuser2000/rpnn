@@ -916,6 +916,8 @@ mod tests {
                 suppress_headers: false,
                 include_empty_rows: true,
                 include_row_numbers: false,
+                numbering_mode: "disabled".to_string(),
+                numbering_column_count: 0,
                 wrap_cell_width: None,
                 per_column_width_count: 0,
                 dontwrap: false,

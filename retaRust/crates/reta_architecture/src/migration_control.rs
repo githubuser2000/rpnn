@@ -290,6 +290,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "materialized_sections_glue_to_same_ordered_renderable_rows",
         ),
         step(
+            "step-table-view-numbering",
+            "wave-02-table-adapters",
+            "MaterializedTableViewRow.source_row_zero_based",
+            "table_view_numbering.legacy_prefix",
+            "table_view_numbering.legacy_prefix",
+            "table-view-numbering-shadow-diff",
+            "legacy_zaehlung_and_nummerierung_prefixes_are_policy_controlled",
+        ),
+        step(
             "step-table-view-output",
             "wave-02-table-adapters",
             "MaterializedTableView",

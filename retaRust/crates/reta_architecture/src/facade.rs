@@ -162,6 +162,9 @@ use crate::table_state::{bootstrap_table_state as bootstrap_table_state_impl, Ta
 use crate::table_view::{
     bootstrap_table_view as bootstrap_table_view_impl, MaterializedTableViewConfig, TableViewBundle,
 };
+use crate::table_view_numbering::{
+    bootstrap_table_view_numbering as bootstrap_table_view_numbering_impl, TableViewNumberingBundle,
+};
 use crate::table_view_output::{
     bootstrap_table_view_output as bootstrap_table_view_output_impl, TableViewOutputBundle,
     TableViewOutputConfig,
@@ -243,6 +246,7 @@ pub struct ArchitectureRuntime {
     pub table_generation: TableGenerationBundle,
     pub table_materialization: TableMaterializationBundle,
     pub table_view: TableViewBundle,
+    pub table_view_numbering: TableViewNumberingBundle,
     pub table_view_output: TableViewOutputBundle,
     pub table_view_output_parity: TableViewOutputParityBundle,
     pub table_output: TableOutputBundle,
@@ -399,6 +403,7 @@ impl ArchitectureRuntime {
             table_generation: bootstrap_table_generation_impl(),
             table_materialization: bootstrap_table_materialization_impl(),
             table_view: bootstrap_table_view_impl(),
+            table_view_numbering: bootstrap_table_view_numbering_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
             table_view_output_parity: bootstrap_table_view_output_parity_impl(),
             table_output: bootstrap_table_output_impl(),
@@ -465,6 +470,7 @@ impl ArchitectureRuntime {
             "table_generation",
             "table_materialization",
             "table_view",
+            "table_view_numbering",
             "table_view_output",
             "table_view_output_parity",
             "table_preparation",
@@ -607,6 +613,8 @@ impl ArchitectureRuntime {
                 )
                 .materialized_cell_count,
             rust_table_view_morphism_count: self.table_view.snapshot().morphisms.len(),
+            rust_table_view_numbering_morphism_count: self.table_view_numbering.snapshot().morphisms.len(),
+            rust_table_view_numbering_smoke_column_count: crate::table_view_numbering::numbering_smoke_report().numbering_column_count,
             rust_table_view_output_morphism_count: self
                 .table_view_output
                 .snapshot()
@@ -762,6 +770,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_materialization_morphism_count: usize,
     pub rust_table_materialization_smoke_cell_count: usize,
     pub rust_table_view_morphism_count: usize,
+    pub rust_table_view_numbering_morphism_count: usize,
+    pub rust_table_view_numbering_smoke_column_count: usize,
     pub rust_table_view_output_morphism_count: usize,
     pub rust_table_view_output_parity_morphism_count: usize,
     pub rust_table_view_output_parity_smoke_row_count: usize,
@@ -814,6 +824,8 @@ pub struct RetaRunArchitecture {
     pub materialized_table_output_mode: String,
     pub materialized_table_output_line_count: usize,
     pub materialized_table_output_semantic_row_count: usize,
+    pub materialized_table_output_numbering_mode: String,
+    pub materialized_table_output_numbering_column_count: usize,
     pub parallel_mode: String,
     pub parallel_workers: usize,
     pub architecture_mode: String,
@@ -920,6 +932,8 @@ impl RetaRunArchitecture {
             materialized_table_output_line_count: materialized_table_output.rendered_line_count,
             materialized_table_output_semantic_row_count: materialized_table_output_semantic
                 .semantic_row_count,
+            materialized_table_output_numbering_mode: materialized_table_output.numbering_mode.clone(),
+            materialized_table_output_numbering_column_count: materialized_table_output.numbering_column_count,
             parallel_mode: parallel_config.mode.clone(),
             parallel_workers: parallel_config.resolved_workers(),
             architecture_mode: arch_switch_config.mode.canonical().to_string(),
@@ -936,7 +950,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} row_order_override={} row_order={:?} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} row_order_override={} row_order={:?} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} numbering={} numbering_cols={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -962,6 +976,8 @@ impl RetaRunArchitecture {
             self.materialized_table_output_mode,
             self.materialized_table_output_line_count,
             self.materialized_table_output_semantic_row_count,
+            self.materialized_table_output_numbering_mode,
+            self.materialized_table_output_numbering_column_count,
             self.parallel_mode,
             self.parallel_workers,
             self.architecture_mode,
