@@ -7,6 +7,8 @@
 //! `--nocolor`, `--justtext`, `--onetable`, `--endlessscreen` and `--endless`.
 //! Stage 29 adds the legacy numbering/counting prefix as an explicit projection
 //! instead of leaving it hidden inside the renderer.
+//! Stage 31 connects `htmlclassesPy.jsonl` witnesses to the HTML projection via
+//! a disabled-by-default class/style policy.
 //! The legacy renderer is still the behaviour oracle; this module makes those
 //! options inspectable and shadow-comparable before any guarded commit.
 
@@ -18,6 +20,10 @@ use crate::table_materialization::{bootstrap_table_materialization, TableMateria
 use crate::table_view::{
     bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
     MaterializedTableViewRow, VirtualColumnDisplayPolicy,
+};
+use crate::table_view_html_attributes::{
+    html_attribute_report_for_rows, render_html_table_with_attributes, TableViewHtmlAttributeConfig,
+    TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport,
 };
 use crate::table_view_layout::{layout_value_rows, TableViewLayoutConfig, TableViewLayoutReport};
 use crate::table_view_numbering::{
@@ -36,6 +42,9 @@ pub struct TableViewOutputCliOptions {
     pub keineleereninhalte: bool,
     pub keinenummerierung: bool,
     pub keineueberschriften: bool,
+    pub htmlclasses: bool,
+    pub htmlrawclasses: bool,
+    pub htmlclasswitness: bool,
     pub width: Option<usize>,
     pub widths: Vec<usize>,
     pub recognized_option_count: usize,
@@ -54,6 +63,9 @@ impl Default for TableViewOutputCliOptions {
             keineleereninhalte: false,
             keinenummerierung: false,
             keineueberschriften: false,
+            htmlclasses: false,
+            htmlrawclasses: false,
+            htmlclasswitness: false,
             width: None,
             widths: Vec::new(),
             recognized_option_count: 0,
@@ -76,6 +88,9 @@ impl TableViewOutputCliOptions {
             || self.onetable
             || self.endlessscreen
             || self.endless
+            || self.htmlclasses
+            || self.htmlrawclasses
+            || self.htmlclasswitness
     }
 
     pub fn apply_to_config(&self, base: &TableViewOutputConfig) -> TableViewOutputConfig {
@@ -96,6 +111,20 @@ impl TableViewOutputCliOptions {
         }
         if !self.widths.is_empty() {
             config.per_column_widths = self.widths.clone();
+        }
+        if self.htmlclasses || self.htmlrawclasses || self.htmlclasswitness {
+            config.html_attributes.enabled = true;
+            config.html_attributes.policy = if self.htmlclasswitness {
+                config.virtual_column_policy = VirtualColumnDisplayPolicy::TagSummary;
+                TableViewHtmlAttributePolicy::RawHtmlWitness
+            } else if self.htmlrawclasses {
+                TableViewHtmlAttributePolicy::RawOpenTag
+            } else {
+                TableViewHtmlAttributePolicy::ClassOnly
+            };
+        }
+        if config.nocolor {
+            config.html_attributes.include_inline_style = false;
         }
         if self.width.is_some() || self.dontwrap {
             config.wrap_cell_width = self.width;
@@ -137,6 +166,7 @@ pub struct TableViewOutputConfig {
     pub row_number_header: String,
     pub numbering: TableViewNumberingConfig,
     pub layout: TableViewLayoutConfig,
+    pub html_attributes: TableViewHtmlAttributeConfig,
     pub wrap_cell_width: Option<usize>,
     pub per_column_widths: Vec<usize>,
     pub dontwrap: bool,
@@ -162,6 +192,7 @@ impl Default for TableViewOutputConfig {
             row_number_header: "#".to_string(),
             numbering: TableViewNumberingConfig::disabled(),
             layout: TableViewLayoutConfig::default(),
+            html_attributes: TableViewHtmlAttributeConfig::default(),
             wrap_cell_width: None,
             per_column_widths: Vec::new(),
             dontwrap: false,
@@ -199,6 +230,11 @@ impl TableViewOutputConfig {
     pub fn with_legacy_numbering(mut self) -> Self {
         self.include_row_numbers = true;
         self.numbering = TableViewNumberingConfig::legacy_pair();
+        self
+    }
+
+    pub fn with_html_attributes(mut self, html_attributes: TableViewHtmlAttributeConfig) -> Self {
+        self.html_attributes = html_attributes;
         self
     }
 
@@ -252,6 +288,11 @@ pub struct TableViewOutputReport {
     pub layout_page_count: usize,
     pub layout_column_count: usize,
     pub layout_column_widths: Vec<usize>,
+    pub html_attribute_enabled: bool,
+    pub html_attribute_policy: String,
+    pub html_attribute_cell_count: usize,
+    pub html_attribute_class_cell_count: usize,
+    pub html_attribute_report: Option<TableViewHtmlAttributeReport>,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -291,6 +332,8 @@ impl TableViewOutputBundle {
                 "numbering_values_for_source_row".to_string(),
                 "layout_value_rows".to_string(),
                 "column_pages_for_widths".to_string(),
+                "html_attribute_report_for_rows".to_string(),
+                "render_html_table_with_attributes".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -317,6 +360,9 @@ impl TableViewOutputBundle {
                 "keineleereninhalte".to_string(),
                 "keinenummerierung".to_string(),
                 "keineueberschriften".to_string(),
+                "htmlclasses".to_string(),
+                "htmlrawclasses".to_string(),
+                "htmlclasswitness".to_string(),
             ],
             stage29_numbering_modes: vec![
                 TableViewNumberingMode::Disabled.canonical().to_string(),
@@ -408,6 +454,18 @@ pub fn parse_table_view_output_cli_options<S: AsRef<str>>(args: &[S]) -> TableVi
                 options.keineueberschriften = true;
                 true
             }
+            "htmlclasses" => {
+                options.htmlclasses = true;
+                true
+            }
+            "htmlrawclasses" => {
+                options.htmlrawclasses = true;
+                true
+            }
+            "htmlclasswitness" => {
+                options.htmlclasswitness = true;
+                true
+            }
             "breite" => {
                 if let Some(value) = value.as_deref() {
                     options.width = parse_positive_width(value);
@@ -489,6 +547,16 @@ pub fn render_materialized_table_view(
     config: &TableViewOutputConfig,
 ) -> TableViewOutputReport {
     let layout_report = shell_layout_report_for_rows(&view.rows, config);
+    let html_attribute_report = if config.mode == OutputMode::Html && config.html_attributes.enabled {
+        Some(html_attribute_report_for_rows(
+            &view.rows,
+            &config.html_attributes,
+            config.suppress_headers,
+            config.include_empty_rows,
+        ))
+    } else {
+        None
+    };
     let rendered_lines = render_table_view_rows_as_mode(&view.rows, config);
     let rendered_text = rendered_lines.join("\n");
     let visible_output_is_empty = rendered_text.is_empty();
@@ -514,6 +582,17 @@ pub fn render_materialized_table_view(
         layout_page_count: layout_report.page_count,
         layout_column_count: layout_report.column_count,
         layout_column_widths: layout_report.column_widths,
+        html_attribute_enabled: config.html_attributes.enabled,
+        html_attribute_policy: config.html_attributes.policy.canonical().to_string(),
+        html_attribute_cell_count: html_attribute_report
+            .as_ref()
+            .map(|report| report.attributed_cell_count)
+            .unwrap_or_default(),
+        html_attribute_class_cell_count: html_attribute_report
+            .as_ref()
+            .map(|report| report.class_string_cell_count)
+            .unwrap_or_default(),
+        html_attribute_report,
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -779,6 +858,18 @@ pub fn render_html_rows_with_config(
     rows: &[MaterializedTableViewRow],
     config: &TableViewOutputConfig,
 ) -> Vec<String> {
+    if config.html_attributes.enabled
+        && config.wrap_cell_width.is_none()
+        && !config.include_row_numbers
+        && !config.numbering.is_enabled()
+    {
+        return render_html_table_with_attributes(
+            rows,
+            &config.html_attributes,
+            config.suppress_headers,
+            config.include_empty_rows,
+        );
+    }
     let row_lines = rendered_row_value_lines(rows, config);
     if row_lines.is_empty() {
         return Vec::new();
@@ -1036,6 +1127,56 @@ mod tests {
         assert!(report.layout_column_count >= 1);
         assert!(report.layout_page_count >= 1);
         assert!(!report.layout_column_widths.is_empty());
+    }
+
+
+    #[test]
+    fn htmlclasses_option_uses_catalog_but_default_html_stays_plain() {
+        let plain = continuum_m_table_view_output_smoke(OutputMode::Html);
+        assert!(!plain.html_attribute_enabled);
+        assert_eq!(plain.html_attribute_cell_count, 0);
+
+        let args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--htmlclasses".to_string(),
+        ];
+        let report = render_table_view_for_cli_args(
+            &args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(report.html_attribute_enabled);
+        assert_eq!(report.html_attribute_policy, "class-only");
+        assert!(report.html_attribute_cell_count > 0);
+        assert!(report.rendered_lines.iter().any(|line| line.contains("class=\"")));
+    }
+
+    #[test]
+    fn nocolor_strips_inline_style_from_raw_html_class_output() {
+        let args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--htmlrawclasses".to_string(),
+            "--nocolor".to_string(),
+        ];
+        let report = render_table_view_for_cli_args(
+            &args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(report.html_attribute_enabled);
+        assert!(!report.rendered_lines.iter().any(|line| line.contains("style=\"")));
     }
 
     #[test]

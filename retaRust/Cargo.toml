@@ -68,6 +68,10 @@ name = "rreta_arch_layout"
 path = "src/bin/reta_arch_layout.rs"
 
 [[bin]]
+name = "rreta_arch_html_output"
+path = "src/bin/reta_arch_html_output.rs"
+
+[[bin]]
 name = "rreta_arch_view_output_shadow"
 path = "src/bin/reta_arch_view_output_shadow.rs"
 

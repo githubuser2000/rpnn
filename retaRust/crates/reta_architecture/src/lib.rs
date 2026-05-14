@@ -73,6 +73,7 @@ pub mod table_preparation;
 pub mod table_runtime;
 pub mod table_state;
 pub mod table_view;
+pub mod table_view_html_attributes;
 pub mod table_view_layout;
 pub mod table_view_numbering;
 pub mod table_view_output;
@@ -390,6 +391,15 @@ pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
     MaterializedTableViewConfig, MaterializedTableViewRow, TableViewBundle, TableViewSnapshot,
     VirtualColumnDisplayPolicy,
+};
+pub use table_view_html_attributes::{
+    bootstrap_table_view_html_attributes, continuum_m_html_attribute_smoke,
+    find_html_record_by_row_text, html_attribute_for_cell, html_attribute_report_for_rows,
+    html_attribute_rows_for_view_rows, html_escape_attribute, render_html_cell_with_attribute,
+    render_html_table_with_attributes,
+    TableViewHtmlAttributeBundle, TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy,
+    TableViewHtmlAttributeReport, TableViewHtmlAttributeRow, TableViewHtmlAttributeSnapshot,
+    TableViewHtmlCellAttribute,
 };
 pub use table_view_layout::{
     bootstrap_table_view_layout, column_pages_for_widths, display_width, effective_column_widths,
