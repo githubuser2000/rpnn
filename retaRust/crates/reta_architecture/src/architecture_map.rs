@@ -227,6 +227,239 @@ fn default_stage_steps() -> Vec<StageArchitectureStep> {
     ]
 }
 
+
+
+pub fn _legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _markdown_audit() -> MarkdownAuditSpec {
+    bootstrap_architecture_map().markdown_audit
+}
+
+pub fn _step(stage: &str, focus: &str, capsule: &str) -> StageArchitectureStep {
+    StageArchitectureStep {
+        stage: stage.to_string(),
+        focus: focus.to_string(),
+        moved_from: Vec::new(),
+        moved_to: Vec::new(),
+        capsule: capsule.to_string(),
+        paradigm_shift: "typed migration step".to_string(),
+    }
+}
+
+pub fn _stage32_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage32_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage32_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage32_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage32_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage33_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage33_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage33_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage33_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage33_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage34_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage34_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage34_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage34_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage34_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage35_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage35_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage35_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage35_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage35_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage36_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage36_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage36_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage36_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage36_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage37_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage37_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage37_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage37_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage37_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage38_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage38_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage38_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage38_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage38_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage39_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage39_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage39_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage39_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage39_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage40_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage40_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage40_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage40_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage40_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage41_capsules() -> Vec<ArchitectureCapsuleSpec> {
+    default_capsules()
+}
+
+pub fn _stage41_containment() -> Vec<CapsuleContainmentSpec> {
+    default_containment()
+}
+
+pub fn _stage41_flows() -> Vec<ArchitectureFlowSpec> {
+    default_flows()
+}
+
+pub fn _stage41_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage41_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
+pub fn _stage42_legacy_mappings() -> Vec<RetaPartMappingSpec> {
+    default_legacy_mappings()
+}
+
+pub fn _stage42_stage_steps() -> Vec<StageArchitectureStep> {
+    default_stage_steps()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

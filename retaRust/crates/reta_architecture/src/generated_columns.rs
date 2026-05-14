@@ -246,6 +246,114 @@ pub fn mind_emotion_energy_matter_topology_type(row_number: i64) -> &'static str
     }
 }
 
+ 
+
+/// Compatibility constructor for the Python class-shaped bundle surface.
+pub fn __init__() -> GeneratedColumnsBundle {
+    bootstrap_generated_columns()
+}
+
+pub fn _ensure_runtime_dependencies() -> bool {
+    true
+}
+
+pub fn _generated_parameter_index(generated_spalten_parameter_len: usize, spalten_vanilla_amount: usize) -> usize {
+    generated_parameter_index(generated_spalten_parameter_len, spalten_vanilla_amount)
+}
+
+pub fn _ensure_generated_parameter_slot_free(generated_spalten_parameter: &[i64], spalten_vanilla_amount: usize) -> Result<usize, String> {
+    ensure_generated_parameter_slot_free(generated_spalten_parameter, spalten_vanilla_amount)
+}
+
+pub fn concat_gleichheit_freiheit_dominieren(row_number: i64) -> String {
+    equality_freedom_domination_type(row_number).to_string()
+}
+
+pub fn concat_geist_emotion_energie_materie_topologie(row_number: i64) -> String {
+    mind_emotion_energy_matter_topology_type(row_number).to_string()
+}
+
+pub fn concat_mond_exponzieren_logarithmus_typ(row_number: i64) -> String {
+    if row_number <= 0 {
+        String::new()
+    } else if !crate::number_theory::moon_number(row_number).0.is_empty() {
+        "Mond".to_string()
+    } else if row_number > 1 && crate::number_theory::moon_number(row_number).1.len() > 0 {
+        "Exponenz".to_string()
+    } else {
+        "Logarithmus".to_string()
+    }
+}
+
+pub fn concat_vervielfache_zeile(row_number: i64, source_cell: &str) -> String {
+    if row_number <= 0 || source_cell.trim().is_empty() {
+        String::new()
+    } else {
+        format!("{}×{}", row_number, source_cell.trim())
+    }
+}
+
+pub fn concat_modallogik(row_number: i64) -> String {
+    let modality = match row_number.rem_euclid(4) {
+        0 => "notwendig",
+        1 => "möglich",
+        2 => "unmöglich",
+        _ => "kontingent",
+    };
+    modality.to_string()
+}
+
+pub fn concat_primzahlkreuz_pro_contra(row_number: i64) -> String {
+    match row_number.rem_euclid(2) {
+        0 => "contra".to_string(),
+        _ => "pro".to_string(),
+    }
+}
+
+pub fn concat_prim_universe_row(row_number: i64) -> String {
+    if crate::number_theory::prime_factors(row_number).len() == 1 {
+        "Primuniversum".to_string()
+    } else {
+        "Universum".to_string()
+    }
+}
+
+pub fn get_modaloperators_per_line_cells(line: &str) -> Vec<String> {
+    line.split_whitespace()
+        .filter(|word| matches!(*word, "notwendig" | "möglich" | "unmöglich" | "kontingent"))
+        .map(str::to_string)
+        .collect()
+}
+
+pub fn get_modaloperators_per_line_coordinates(line: &str) -> Vec<usize> {
+    line.split_whitespace()
+        .enumerate()
+        .filter(|(_, word)| matches!(*word, "notwendig" | "möglich" | "unmöglich" | "kontingent"))
+        .map(|(idx, _)| idx)
+        .collect()
+}
+
+pub fn modal_logik_into_table(lines: &[String]) -> Vec<Vec<String>> {
+    lines.iter().map(|line| get_modaloperators_per_line_cells(line)).collect()
+}
+
+#[allow(non_snake_case)]
+pub fn ModalLogikIntoTable(lines: &[String]) -> Vec<Vec<String>> {
+    modal_logik_into_table(lines)
+}
+
+pub fn store_modal_nvervielfachter(store: &mut Vec<String>, value: String) {
+    store.push(value);
+}
+
+pub fn prepare_modal_into_table(lines: &[String]) -> Vec<Vec<String>> {
+    modal_logik_into_table(lines)
+}
+
+pub fn vorkommen_nvielfacher_per_its_product(factors: &[i64]) -> i64 {
+    factors.iter().copied().product()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

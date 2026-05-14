@@ -91,6 +91,43 @@ pub struct NaturalTransformationSpec {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ParadigmTermSpec {
+    pub term: String,
+    pub meaning: String,
+    pub implemented_by: Vec<String>,
+    pub stage_status: String,
+}
+
+impl ParadigmTermSpec {
+    pub fn new(term: &str, meaning: &str, implemented_by: &[&str], stage_status: &str) -> Self {
+        Self {
+            term: term.to_string(),
+            meaning: meaning.to_string(),
+            implemented_by: implemented_by.iter().map(|item| (*item).to_string()).collect(),
+            stage_status: stage_status.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Stage27ArchitecturePlan {
+    pub planned_before_stage_27: Vec<String>,
+    pub implemented_in_stage_27: Vec<String>,
+    pub already_implemented_before_stage_27: Vec<String>,
+    pub behaviour_change: String,
+}
+
+impl Stage27ArchitecturePlan {
+    pub fn snapshot(&self) -> BTreeMap<&'static str, Vec<String>> {
+        BTreeMap::from([
+            ("planned_before_stage_27", self.planned_before_stage_27.clone()),
+            ("implemented_in_stage_27", self.implemented_in_stage_27.clone()),
+            ("already_implemented_before_stage_27", self.already_implemented_before_stage_27.clone()),
+        ])
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CategoryTheoryBundle {
     pub categories: Vec<CategorySpec>,
     pub functors: Vec<FunctorSpec>,
@@ -129,6 +166,29 @@ impl CategoryTheoryBundle {
     pub fn python_snapshot(&self) -> &'static str {
         PYTHON_CATEGORY_THEORY_SNAPSHOT
     }
+
+    pub fn snapshot(&self) -> CategoryTheorySnapshot {
+        CategoryTheorySnapshot {
+            class: "CategoryTheoryBundle".to_string(),
+            paradigm: _paradigm_terms().into_iter().map(|term| term.term).collect(),
+            categories: self.categories.len(),
+            functors: self.functors.len(),
+            natural_transformations: self.natural_transformations.len(),
+            paradigm_terms: self.paradigm_terms.len(),
+            plan: _plan(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CategoryTheorySnapshot {
+    pub class: String,
+    pub paradigm: Vec<String>,
+    pub categories: usize,
+    pub functors: usize,
+    pub natural_transformations: usize,
+    pub paradigm_terms: usize,
+    pub plan: Stage27ArchitecturePlan,
 }
 
 fn obj(name: &str, code_owner: &str, role: &str) -> CategoryObjectSpec {
@@ -341,6 +401,180 @@ pub fn bootstrap_category_theory() -> CategoryTheoryBundle {
             PYTHON_CATEGORY_THEORY_SNAPSHOT.as_bytes().len()
         ),
     }
+}
+
+
+/// Shared lookup helper matching Python `_find_by_name`.
+pub fn _find_by_name<'a>(bundle: &'a CategoryTheoryBundle, name: &str, kind: &str) -> Option<&'a str> {
+    match kind {
+        "category" => bundle.category_named(name).map(|item| item.name.as_str()),
+        "functor" => bundle.functor_named(name).map(|item| item.name.as_str()),
+        "natural transformation" | "natural_transformation" => bundle.natural_transformation_named(name).map(|item| item.name.as_str()),
+        _ => None,
+    }
+}
+
+pub fn _paradigm_terms() -> Vec<ParadigmTermSpec> {
+    vec![
+        ParadigmTermSpec::new("topology", "open Reta contexts and refinements", &["topology.rs"], "ported"),
+        ParadigmTermSpec::new("morphism", "typed semantic transitions", &["morphism.rs"], "ported"),
+        ParadigmTermSpec::new("universal_property", "gluing invariants for local-to-global data", &["universal.rs", "dataflow.rs"], "ported"),
+        ParadigmTermSpec::new("presheaf", "local context-indexed sections", &["presheaf.rs"], "ported"),
+        ParadigmTermSpec::new("sheaf", "compatible glued semantic sections", &["sheaf.rs"], "ported"),
+        ParadigmTermSpec::new("category", "metadata category layer", &["category.rs"], "ported"),
+        ParadigmTermSpec::new("functor", "structure-preserving architecture maps", &["category.rs"], "ported"),
+        ParadigmTermSpec::new("natural_transformation", "commuting parity/output diagrams", &["category.rs"], "ported"),
+    ]
+}
+
+pub fn _natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _plan() -> Stage27ArchitecturePlan {
+    Stage27ArchitecturePlan {
+        planned_before_stage_27: vec!["make category/functor/natural-transformation layer explicit".to_string()],
+        implemented_in_stage_27: vec!["category metadata".to_string(), "functor metadata".to_string(), "naturality metadata".to_string()],
+        already_implemented_before_stage_27: vec!["topology".to_string(), "presheaf".to_string(), "sheaf".to_string(), "morphism".to_string()],
+        behaviour_change: "none; metadata and validation only".to_string(),
+    }
+}
+
+pub fn _stage32_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage32_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage32_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage33_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage33_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage33_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage34_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage34_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage34_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage35_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage35_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage35_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage36_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage36_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage36_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage37_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage37_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage37_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage38_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage38_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage38_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage39_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage39_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage39_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage40_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage40_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage40_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage41_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage41_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage41_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+pub fn _stage43_categories() -> Vec<CategorySpec> {
+    bootstrap_category_theory().categories
+}
+
+pub fn _stage43_functors() -> Vec<FunctorSpec> {
+    bootstrap_category_theory().functors
+}
+
+pub fn _stage43_natural_transformations() -> Vec<NaturalTransformationSpec> {
+    bootstrap_category_theory().natural_transformations
+}
+
+/// Python-level snapshot façade used by audit tooling.
+pub fn snapshot() -> CategoryTheorySnapshot {
+    bootstrap_category_theory().snapshot()
 }
 
 #[cfg(test)]

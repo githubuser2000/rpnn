@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::output_semantics::{bootstrap_output_semantics, OutputConfig, RetaOutputSemantics};
+use crate::output_syntax::OutputMode;
 use crate::table_state::{bootstrap_table_state, TableStateBundle, TableStateSections};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -151,6 +152,155 @@ pub fn bootstrap_table_runtime() -> TableRuntimeBundle {
         output_semantics: bootstrap_output_semantics(),
         table_state: bootstrap_table_state(),
     }
+}
+
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BreakoutException {
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Maintable {
+    pub rows: Vec<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Tables {
+    pub maintable: Maintable,
+    pub state: TableRuntimeState,
+}
+
+impl Tables {
+    pub fn new(rows: Vec<Vec<String>>) -> Self {
+        let bundle = bootstrap_table_runtime();
+        Self { maintable: Maintable { rows }, state: bundle.create_tables_state(None) }
+    }
+
+    pub fn table_state_snapshot(&self) -> TableRuntimeStateSnapshot {
+        self.state.snapshot()
+    }
+}
+
+pub fn __init__() -> Tables {
+    Tables::new(Vec::new())
+}
+
+pub fn create_tables(rows: Vec<Vec<String>>) -> Tables {
+    Tables::new(rows)
+}
+
+pub fn create_spalte_gestirn(row_number: i64) -> String {
+    crate::generated_columns::create_spalte_gestirn(row_number)
+}
+
+pub fn spalteg_gestirn(row_number: i64) -> String {
+    create_spalte_gestirn(row_number)
+}
+
+pub fn table_state_snapshot(tables: &Tables) -> TableRuntimeStateSnapshot {
+    tables.table_state_snapshot()
+}
+
+pub fn hoechste_zeile(tables: &Tables) -> Option<usize> {
+    tables.maintable.rows.len().checked_sub(1)
+}
+
+pub fn gener_rows(tables: &Tables) -> usize {
+    tables.maintable.rows.len()
+}
+
+pub fn gebr_univ_set(values: &[i64]) -> BTreeSet<i64> {
+    values.iter().copied().collect()
+}
+
+pub fn if_prim_multis(value: i64, multiples: &[i64]) -> bool {
+    crate::number_theory::is_prime_multiple(value, multiples)
+}
+
+pub fn if_zeilen_setted(lines: &BTreeSet<usize>) -> bool {
+    !lines.is_empty()
+}
+
+pub fn nummeriere(state: &TableRuntimeState) -> bool {
+    state.number_rows
+}
+
+pub fn breitenn(state: &TableRuntimeState) -> Vec<i64> {
+    state.widths.clone()
+}
+
+pub fn text_width(state: &TableRuntimeState) -> Option<i64> {
+    state.output_config.text_width
+}
+
+pub fn text_height(state: &TableRuntimeState) -> i64 {
+    state.text_height
+}
+
+pub fn out_type(state: &TableRuntimeState) -> OutputMode {
+    state.output_config.mode
+}
+
+pub fn output_mode_name(state: &TableRuntimeState) -> String {
+    state.output_config.mode.canonical_name().to_string()
+}
+
+pub fn keine_ueberschriften(_state: &TableRuntimeState) -> bool {
+    false
+}
+
+pub fn keineleereninhalte(_state: &TableRuntimeState) -> bool {
+    false
+}
+
+pub fn html_output_yes(state: &TableRuntimeState) -> bool {
+    state.output_config.mode == OutputMode::Html
+}
+
+pub fn bbcode_output_yes(state: &TableRuntimeState) -> bool {
+    state.output_config.mode == OutputMode::Bbcode
+}
+
+pub fn markdown_output_yes(state: &TableRuntimeState) -> bool {
+    state.output_config.mode == OutputMode::Markdown
+}
+
+pub fn nichts_output_yes(state: &TableRuntimeState) -> bool {
+    state.output_config.mode == OutputMode::Nichts
+}
+
+pub fn _concat_class() -> &'static str {
+    "ConcatAdapter"
+}
+
+pub fn _prepare_class() -> &'static str {
+    "PrepareAdapter"
+}
+
+pub fn _get_text_wrap_things(text: &str, width: usize) -> Vec<String> {
+    crate::table_wrapping::wrap_cell_text(text, width, None).unwrap_or_else(|| vec![text.to_string()])
+}
+
+#[allow(non_snake_case)]
+pub fn NichtsOutputYes(state: &TableRuntimeState) -> bool {
+    nichts_output_yes(state)
+}
+
+#[allow(non_snake_case)]
+pub fn htmlOutputYes(state: &TableRuntimeState) -> bool {
+    html_output_yes(state)
+}
+
+#[allow(non_snake_case)]
+pub fn bbcodeOutputYes(state: &TableRuntimeState) -> bool {
+    bbcode_output_yes(state)
+}
+
+#[allow(non_snake_case)]
+pub fn markdownOutputYes(state: &TableRuntimeState) -> bool {
+    markdown_output_yes(state)
 }
 
 #[cfg(test)]

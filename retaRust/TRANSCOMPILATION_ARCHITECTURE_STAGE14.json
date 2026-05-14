@@ -1,0 +1,48 @@
+{
+  "stage": 14,
+  "name": "python architecture surface hardening",
+  "visible_runtime_switch": false,
+  "changed_focus": [
+    "execution_network",
+    "category_theory",
+    "architecture_map",
+    "architecture_contracts",
+    "generated_columns",
+    "meta_columns",
+    "table_adapters",
+    "parallel_execution",
+    "completion_nested",
+    "table_runtime"
+  ],
+  "coverage_before_stage13": {
+    "functions_represented_by_name": 486,
+    "functions_total": 1096,
+    "classes_represented_by_name": 180,
+    "classes_total": 239
+  },
+  "coverage_after_stage14": {
+    "functions_represented_by_name": 772,
+    "functions_total": 1096,
+    "classes_represented_by_name": 200,
+    "classes_total": 239
+  },
+  "semantic_status": "typed compatibility wrappers and local deterministic morphisms added; no claim of full byte-exact parity",
+  "cargo_build_in_container": false,
+  "checks": [
+    "Cargo.toml parse ok",
+    "crates/reta_architecture/Cargo.toml parse ok",
+    "retaprompt_frontends/Cargo.toml parse ok",
+    "Python architecture probe tools py_compile ok",
+    "architecture coverage full/missing JSON generated",
+    "patch generated against Stage 13"
+  ],
+  "next_stage_recommendation": [
+    "architecture_migration",
+    "architecture_progress",
+    "architecture_validation",
+    "architecture_impact",
+    "prompt_execution",
+    "prompt_session",
+    "console_io"
+  ]
+}

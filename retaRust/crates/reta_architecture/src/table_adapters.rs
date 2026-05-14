@@ -254,6 +254,233 @@ pub fn bootstrap_table_adapters() -> TableAdaptersBundle {
     }
 }
 
+
+
+pub fn legacy_table_adapter_surface_names() -> Vec<&'static str> {
+    vec![
+        "FilterOriginalLines",
+        "prepare4out_beforeForLoop_SpaltenZeilenBestimmen",
+        "prepare4out_LoopBody",
+        "prepare4out_Tagging",
+        "cellWork",
+        "concatVervielfacheZeile",
+        "concatModallogik",
+        "concat1PrimzahlkreuzProContra",
+        "concat1RowPrimUniverse2",
+        "convertSetOfPaarenToDictOfNumToPaareDiv",
+        "convertSetOfPaarenToDictOfNumToPaareMul",
+        "convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction",
+        "combineDicts",
+        "readConcatCsv_tabelleDazuColchange",
+        "readConcatCsv_ChangeTableToAddToTable",
+        "readConcatCsv_LoopBody",
+        "readConcatCSV_choseCsvFile",
+        "readConcatCsv_SetHtmlParamaters",
+        "spalteMetaKontretTheorieAbstrakt_etc_1",
+        "spalteMetaKonkretAbstrakt_isGanzZahlig",
+        "spalteMetaKonkretTheorieAbstrakt_SetHtmlParameters",
+        "spalteMetaKonkretTheorieAbstrakt_mainPart",
+        "spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta",
+        "spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText",
+        "spalteMetaKonkretTheorieAbstrakt_getGebrRatUnivStrukturalie",
+        "spalteMetaKonkretAbstrakt_UeberschriftenUndTags",
+        "spalteFuerGegenInnenAussenSeitlichPrim",
+        "readOneCSVAndReturn",
+        "getAllBrueche",
+        "findAllBruecheAndTheirCombinations",
+        "breitenn",
+        "nummeriere",
+        "textWidth",
+        "zeileWhichZaehlung",
+        "moonsun",
+    ]
+}
+
+pub fn __init__() -> TableAdaptersBundle {
+    bootstrap_table_adapters()
+}
+
+pub fn set_zaehlungen(adapter: &mut PrepareAdapter, values: Vec<BTreeMap<String, i64>>) {
+    adapter.zaehlungen = values;
+}
+
+pub fn breitenn(adapter: &PrepareAdapter) -> Vec<usize> {
+    adapter.breiten.clone()
+}
+
+pub fn nummeriere(adapter: &PrepareAdapter) -> bool {
+    adapter.nummerierung
+}
+
+pub fn text_width(adapter: &PrepareAdapter) -> usize {
+    adapter.textwidth
+}
+
+pub fn delete_doubles_in_sets(values: &[i64]) -> BTreeSet<i64> {
+    values.iter().copied().collect()
+}
+
+pub fn from_until(from: i64, until: i64) -> BTreeSet<i64> {
+    if from <= until {
+        (from..=until).collect()
+    } else {
+        (until..=from).collect()
+    }
+}
+
+pub fn zeile_which_zaehlung(row_number: i64) -> usize {
+    row_number.rem_euclid(5) as usize
+}
+
+pub fn moonsun(row_number: i64) -> (Vec<i64>, Vec<i64>) {
+    crate::number_theory::moon_number(row_number)
+}
+
+pub fn filter_original_lines(rows: &[i64], allowed: &BTreeSet<i64>) -> Vec<i64> {
+    rows.iter().copied().filter(|row| allowed.contains(row)).collect()
+}
+
+pub fn prepare4out_before_for_loop_spalten_zeilen_bestimmen(rows: &[i64]) -> BTreeSet<i64> {
+    rows.iter().copied().collect()
+}
+
+pub fn prepare4out_loop_body(row: &[String]) -> Vec<String> {
+    row.to_vec()
+}
+
+pub fn prepare4out_tagging(column_number: i64) -> Vec<String> {
+    crate::tag_schema::ordinary_tags_for_column(column_number).unwrap_or_default().into_iter().map(|tag| format!("{:?}", tag)).collect()
+}
+
+pub fn cell_work(cell: &str, width: usize) -> Vec<String> {
+    crate::table_wrapping::wrap_cell_text(cell, width, None).unwrap_or_else(|| vec![cell.to_string()])
+}
+
+pub fn concat_vervielfache_zeile(row_number: i64, source_cell: &str) -> String {
+    crate::generated_columns::concat_vervielfache_zeile(row_number, source_cell)
+}
+
+pub fn concat_modallogik(row_number: i64) -> String {
+    crate::generated_columns::concat_modallogik(row_number)
+}
+
+pub fn concat_gleichheit_freiheit_dominieren(row_number: i64) -> String {
+    crate::generated_columns::concat_gleichheit_freiheit_dominieren(row_number)
+}
+
+pub fn concat_geist_emotion_energie_materie_topologie(row_number: i64) -> String {
+    crate::generated_columns::concat_geist_emotion_energie_materie_topologie(row_number)
+}
+
+pub fn concat_mond_exponzieren_logarithmus_typ(row_number: i64) -> String {
+    crate::generated_columns::concat_mond_exponzieren_logarithmus_typ(row_number)
+}
+
+pub fn concat1_primzahlkreuz_pro_contra(row_number: i64) -> String {
+    crate::generated_columns::concat_primzahlkreuz_pro_contra(row_number)
+}
+
+pub fn concat1_row_prim_universe2(row_number: i64) -> String {
+    crate::generated_columns::concat_prim_universe_row(row_number)
+}
+
+pub fn convert_set_of_paaren_to_dict_of_num_to_paare_div(pairs: &[(i64, i64)]) -> crate::concat_csv::FractionPairMap {
+    let pairs = pairs
+        .iter()
+        .map(|(left, right)| crate::concat_csv::FractionPair::new(crate::meta_columns::Rational::new(*left, 1), crate::meta_columns::Rational::new(*right, 1)))
+        .collect::<BTreeSet<_>>();
+    crate::concat_csv::convert_set_of_pairs_to_dict_of_num_to_pairs_div(&pairs, false)
+}
+
+pub fn convert_set_of_paaren_to_dict_of_num_to_paare_mul(pairs: &[(i64, i64)]) -> crate::concat_csv::FractionPairMap {
+    let pairs = pairs
+        .iter()
+        .map(|(left, right)| crate::concat_csv::FractionPair::new(crate::meta_columns::Rational::new(*left, 1), crate::meta_columns::Rational::new(*right, 1)))
+        .collect::<BTreeSet<_>>();
+    crate::concat_csv::convert_set_of_pairs_to_dict_of_num_to_pairs_mul(&pairs, false)
+}
+
+pub fn convert_fractions_to_dict_of_num_to_paare_of_mul_of_int_and_fraction(fractions: &[crate::meta_columns::Rational], max_row: i64) -> crate::concat_csv::FractionPairMap {
+    let fracs = fractions.iter().copied().collect::<BTreeSet<_>>();
+    crate::concat_csv::convert_fractions_to_dict_of_num_to_pairs_of_mul_of_int_and_fraction(&fracs, &fracs, max_row, false)
+}
+
+pub fn combine_dicts(left: &crate::concat_csv::FractionPairMap, right: &crate::concat_csv::FractionPairMap) -> crate::concat_csv::FractionPairMap {
+    crate::concat_csv::combine_dicts(left, right)
+}
+
+pub fn spalte_meta_konkret_abstrakt_is_ganz_zahlig(value: crate::meta_columns::Rational, inverse: bool) -> bool {
+    crate::meta_columns::spalte_meta_konkret_abstrakt_is_ganz_zahlig(value, inverse)
+}
+
+pub fn spalte_meta_kontret_theorie_abstrakt_etc_1(value: i64) -> String {
+    crate::meta_columns::spalte_meta_kontret_theorie_abstrakt_etc_1(value)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_set_html_parameters(enabled: bool) -> Vec<(String, String)> {
+    crate::meta_columns::spalte_meta_konkret_theorie_abstrakt_set_html_parameters(enabled)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_main_part(value: i64) -> String {
+    crate::meta_columns::spalte_meta_konkret_theorie_abstrakt_main_part(value)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_vorwort_behandlung_wie_vorwort_meta(prefix: &str, repetitions: usize) -> String {
+    crate::meta_columns::spalte_meta_konkret_theorie_abstrakt_vorwort_behandlung_wie_vorwort_meta(prefix, repetitions)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_main_part_inserting_text(value: i64, text: &str) -> String {
+    crate::meta_columns::spalte_meta_konkret_theorie_abstrakt_main_part_inserting_text(value, text)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_get_gebr_rat_univ_strukturalie(value: i64) -> String {
+    crate::meta_columns::spalte_meta_konkret_theorie_abstrakt_get_gebr_rat_univ_strukturalie(value)
+}
+
+pub fn spalte_meta_konkret_abstrakt_ueberschriften_und_tags() -> Vec<String> {
+    crate::meta_columns::spalte_meta_konkret_abstrakt_ueberschriften_und_tags()
+}
+
+pub fn spalte_fuer_gegen_innen_aussen_seitlich_prim(value: i64) -> crate::meta_columns::PrimeCrossColumnClass {
+    crate::meta_columns::spalte_fuer_gegen_innen_aussen_seitlich_prim(value)
+}
+
+pub fn get_all_brueche(max_denominator: i64) -> Vec<crate::meta_columns::Rational> {
+    crate::meta_columns::get_all_brueche(max_denominator)
+}
+
+pub fn read_one_csv_and_return(text: &str) -> Vec<Vec<String>> {
+    crate::meta_columns::read_one_csv_and_return(text)
+}
+
+pub fn find_all_brueche_and_their_combinations(max_denominator: i64) -> Vec<crate::meta_columns::Rational> {
+    crate::meta_columns::find_all_brueche_and_their_combinations(max_denominator)
+}
+
+pub fn read_concat_csv_tabelle_dazu_colchange(cells: &[String], row_number: i64) -> Vec<String> {
+    crate::concat_csv::read_concat_csv_tabelle_dazu_colchange(row_number, cells, false)
+}
+
+pub fn read_concat_csv_chose_csv_file(name: &str) -> String {
+    name.to_string()
+}
+
+pub fn read_concat_csv_change_table_to_add_to_table(table: &[Vec<String>]) -> Vec<Vec<String>> {
+    table.to_vec()
+}
+
+pub fn read_concat_csv_loop_body(row: &[String]) -> Vec<String> {
+    row.to_vec()
+}
+
+pub fn read_concat_csv_set_html_paramaters(enabled: bool) -> Vec<(String, String)> {
+    vec![("html".to_string(), enabled.to_string())]
+}
+
+pub fn read_one_csv_and_return_adapter(text: &str) -> Vec<Vec<String>> {
+    read_one_csv_and_return(text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

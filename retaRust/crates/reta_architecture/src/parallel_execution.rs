@@ -641,6 +641,162 @@ pub fn normalize_column_buckets_in_processes(
     })
 }
 
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WorkerPrepare {
+    pub text_width: usize,
+    pub shell_rows_amount: Option<String>,
+    pub breiten: Vec<usize>,
+}
+
+impl Default for WorkerPrepare {
+    fn default() -> Self {
+        Self { text_width: 21, shell_rows_amount: None, breiten: Vec::new() }
+    }
+}
+
+impl WorkerPrepare {
+    pub fn snapshot(&self) -> BTreeMap<String, String> {
+        BTreeMap::from([
+            ("class".to_string(), "WorkerPrepare".to_string()),
+            ("text_width".to_string(), self.text_width.to_string()),
+            ("breiten".to_string(), self.breiten.len().to_string()),
+        ])
+    }
+
+    pub fn set_width(&self, row_to_display: usize, row_count: usize) -> usize {
+        self.breiten
+            .get(row_to_display)
+            .copied()
+            .unwrap_or(self.text_width.max(row_count))
+    }
+
+    pub fn wrapping(&self, text: &str, width: usize) -> Vec<String> {
+        crate::table_wrapping::wrap_cell_text(text, width, None).unwrap_or_else(|| vec![text.to_string()])
+    }
+}
+
+pub fn __init__() -> WorkerPrepare {
+    WorkerPrepare::default()
+}
+
+pub fn __post_init__(config: ParallelExecutionConfig) -> ParallelExecutionConfig {
+    ParallelExecutionConfig::new(config.mode, config.workers, config.chunk_size, config.threshold, config.start_method, config.source)
+}
+
+pub fn _available_virtual_cpu_count() -> usize {
+    detect_processor_core_counts().available
+}
+
+pub fn _linux_physical_cpu_count() -> usize {
+    detect_processor_core_counts().physical
+}
+
+pub fn _normalise_mode(value: Option<&str>) -> String {
+    normalise_parallel_mode(value)
+}
+
+pub fn _positive_int(value: Option<&str>, default: Option<usize>) -> Option<usize> {
+    positive_int(value, default)
+}
+
+pub fn is_pypy_runtime() -> bool {
+    false
+}
+
+pub fn _default_start_method() -> Option<String> {
+    None
+}
+
+pub fn _consume_value(argv: &[String], index: usize) -> (Option<String>, usize) {
+    consume_value(argv, index)
+}
+
+pub fn _chunks<T: Clone>(items: &[T], chunk_size: usize) -> Vec<Vec<T>> {
+    chunk_items(items, chunk_size)
+}
+
+pub fn _parallel_context_from_prepare(prepare: &WorkerPrepare) -> ParallelExecutionConfig {
+    ParallelExecutionConfig::default().with_overrides(None, None, Some(prepare.text_width.max(1)), None, None, Some("worker-prepare".to_string()))
+}
+
+pub fn _pool_map_ordered<T, U, F>(items: &[T], handler: F, config: Option<ParallelExecutionConfig>) -> Vec<U>
+where
+    T: Clone,
+    U: Clone,
+    F: Fn(&T) -> U,
+{
+    let _config = config.unwrap_or_default();
+    items.iter().map(handler).collect()
+}
+
+pub fn apply_parallel_environment(config: &ParallelExecutionConfig) -> Vec<(String, String)> {
+    apply_parallel_environment_pairs(config)
+}
+
+pub fn _decode_religion_cell_static(cell: &str) -> Vec<i64> {
+    cell.split(|ch: char| !ch.is_ascii_digit() && ch != '-')
+        .filter_map(|part| part.parse::<i64>().ok())
+        .collect()
+}
+
+pub fn _decode_religion_rows_worker(rows: &[String]) -> Vec<Vec<i64>> {
+    rows.iter().map(|row| _decode_religion_cell_static(row)).collect()
+}
+
+pub fn _parse_kombi_number_static(cell: &str) -> Option<i64> {
+    cell.trim().parse::<i64>().ok()
+}
+
+pub fn _decode_kombi_rows_worker(rows: &[String]) -> Vec<Option<i64>> {
+    rows.iter().map(|row| _parse_kombi_number_static(row)).collect()
+}
+
+pub fn _select_columns_worker(row: &[String], columns: &[usize]) -> Vec<String> {
+    columns.iter().filter_map(|idx| row.get(*idx).cloned()).collect()
+}
+
+pub fn _max_cell_text_len_worker(row: &[String]) -> usize {
+    row.iter().map(|cell| cell.chars().count()).max().unwrap_or(0)
+}
+
+pub fn _prepare_kombi_join_tables_worker(table: &[Vec<String>]) -> Vec<Vec<String>> {
+    table.to_vec()
+}
+
+pub fn _moon_numbers_worker(number: i64) -> (Vec<i64>, Vec<i64>) {
+    moon_number(number)
+}
+
+pub fn _prime_factors_worker(number: i64) -> Vec<i64> {
+    prime_factors(number)
+}
+
+pub fn _number_filter_worker(number: i64, mode: &str, criteria: &[i64]) -> bool {
+    match mode {
+        "prime_multiples" => is_prime_multiple(number, criteria),
+        "ordinary_multiples" => criteria.iter().any(|divisor| *divisor != 0 && number % divisor == 0),
+        _ => true,
+    }
+}
+
+pub fn _factor_pairs_worker(number: i64, include_one: bool) -> Vec<(i64, i64)> {
+    factor_pairs(number, include_one)
+}
+
+pub fn _normalize_column_bucket_worker(positive: &BTreeSet<i64>, negative: &BTreeSet<i64>) -> BTreeSet<i64> {
+    positive.difference(negative).copied().collect()
+}
+
+pub fn set_width(prepare: &WorkerPrepare, row_to_display: usize, row_count: usize) -> usize {
+    prepare.set_width(row_to_display, row_count)
+}
+
+pub fn wrapping(prepare: &WorkerPrepare, text: &str, width: usize) -> Vec<String> {
+    prepare.wrapping(text, width)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

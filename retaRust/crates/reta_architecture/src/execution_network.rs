@@ -6,7 +6,133 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::dataflow::{order_tasks, DataflowDiscipline, ExecutionNetworkConfig, ExecutionTask};
+pub use crate::dataflow::{
+    bootstrap_execution_network, deterministic_reduce, execute_tasks_deterministically,
+    ExecutionNetworkBundle, ExecutionNetworkConfig, ExecutionResult, ExecutionRunResult,
+    ExecutionTask, FifoTaskQueue, FullDuplexChannel, HalfDuplexChannel,
+    LifoTaskStack, PriorityTaskQueue, ResourceSemaphore,
+};
+use crate::dataflow::{order_tasks, DataflowDiscipline};
+
+
+/// Python-architecture compatibility: available worker count used by
+/// `execution_network.py`.  This mirrors Python's guarded CPU discovery with
+/// Rust's portable available_parallelism fallback.
+pub fn _available_worker_count() -> usize {
+    std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1)
+        .max(1)
+}
+
+/// Normalize config after construction, matching Python `__post_init__`.
+pub fn __post_init__(mut config: ExecutionNetworkConfig) -> ExecutionNetworkConfig {
+    config.max_workers = config.max_workers.max(1);
+    config
+}
+
+/// Default constructor mirror for Python dataclass `__init__`.
+pub fn __init__() -> ExecutionNetworkConfig {
+    ExecutionNetworkConfig::default()
+}
+
+/// Pick the configured queue discipline and return the scheduled task order.
+pub fn _queue_for<T: Clone>(
+    config: &ExecutionNetworkConfig,
+    tasks: &[ExecutionTask<T>],
+) -> Vec<ExecutionTask<T>> {
+    order_tasks(tasks, config)
+}
+
+/// Rust-local identity operation used when no importable Python callable exists.
+pub fn _builtin_operation<T: Clone>(payload: &T) -> T {
+    payload.clone()
+}
+
+/// In Rust the callable is already typed; resolving it is the identity over the
+/// handler reference.  The name is kept to preserve the Python architecture map.
+pub fn _resolve_callable<T, U, F>(handler: &F) -> &F
+where
+    F: Fn(&T) -> U,
+{
+    handler
+}
+
+/// Execute one task with the identity operation.
+pub fn _task_worker<T: Clone>(task: &ExecutionTask<T>) -> ExecutionResult<T> {
+    ExecutionResult {
+        task_index: task.index,
+        value: task.payload.clone(),
+        operation: task.operation.clone(),
+        metadata: task.metadata.clone(),
+    }
+}
+
+/// Serial worker path used by the deterministic execution-network morphism.
+pub fn _run_serial<T, U, F>(tasks: &[ExecutionTask<T>], handler: &F) -> Vec<ExecutionResult<U>>
+where
+    T: Clone,
+    U: Clone,
+    F: Fn(&T) -> U,
+{
+    order_tasks(tasks, &ExecutionNetworkConfig::default())
+        .iter()
+        .map(|task| ExecutionResult {
+            task_index: task.index,
+            value: handler(&task.payload),
+            operation: task.operation.clone(),
+            metadata: task.metadata.clone(),
+        })
+        .collect()
+}
+
+pub fn push<T>(queue: &mut FifoTaskQueue<T>, task: ExecutionTask<T>) {
+    queue.push(task);
+}
+
+pub fn pop<T>(queue: &mut FifoTaskQueue<T>) -> Option<ExecutionTask<T>> {
+    queue.pop()
+}
+
+pub fn acquire(semaphore: &ResourceSemaphore) {
+    semaphore.acquire();
+}
+
+pub fn release(semaphore: &ResourceSemaphore) {
+    semaphore.release();
+}
+
+pub fn send_request<T>(channel: &HalfDuplexChannel<T>, message: T) {
+    channel.send_request(message);
+}
+
+pub fn receive_request<T>(channel: &HalfDuplexChannel<T>) -> T {
+    channel.receive_request()
+}
+
+pub fn send_response<T>(channel: &HalfDuplexChannel<T>, message: T) {
+    channel.send_response(message);
+}
+
+pub fn receive_response<T>(channel: &HalfDuplexChannel<T>) -> T {
+    channel.receive_response()
+}
+
+pub fn send_a_to_b<T>(channel: &FullDuplexChannel<T>, message: T) {
+    channel.send_a_to_b(message);
+}
+
+pub fn receive_a_to_b<T>(channel: &FullDuplexChannel<T>) -> T {
+    channel.receive_a_to_b()
+}
+
+pub fn send_b_to_a<T>(channel: &FullDuplexChannel<T>, message: T) {
+    channel.send_b_to_a(message);
+}
+
+pub fn receive_b_to_a<T>(channel: &FullDuplexChannel<T>) -> T {
+    channel.receive_b_to_a()
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExecutionNetworkPlan {

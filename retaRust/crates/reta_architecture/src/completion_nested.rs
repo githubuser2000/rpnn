@@ -458,6 +458,177 @@ pub fn word_options_for_nested(fuzzy: bool) -> WordCompletionOptions {
     }
 }
 
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompleteEvent {
+    pub completion_requested: bool,
+}
+
+impl Default for CompleteEvent {
+    fn default() -> Self {
+        Self { completion_requested: true }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Completion {
+    pub text: String,
+    pub start_position: isize,
+    pub display_meta: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Document {
+    pub text: String,
+    pub cursor_position: usize,
+}
+
+impl Document {
+    pub fn new(text: impl Into<String>) -> Self {
+        let text = text.into();
+        let cursor_position = text.chars().count();
+        Self { text, cursor_position }
+    }
+
+    pub fn text_before_cursor(&self) -> String {
+        self.text.chars().take(self.cursor_position).collect()
+    }
+}
+
+pub trait Completer {
+    fn get_completions(&self, document: &Document, event: &CompleteEvent) -> Vec<Completion>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FuzzyWordCompleter {
+    pub words: Vec<String>,
+    pub fuzzy: bool,
+}
+
+impl FuzzyWordCompleter {
+    pub fn new(words: Vec<String>, fuzzy: bool) -> Self {
+        Self { words, fuzzy }
+    }
+}
+
+impl Completer for FuzzyWordCompleter {
+    fn get_completions(&self, document: &Document, _event: &CompleteEvent) -> Vec<Completion> {
+        let prefix = document.text_before_cursor().split_whitespace().last().unwrap_or_default().to_string();
+        self.words
+            .iter()
+            .filter(|word| match_text_alx(word, &prefix, self.fuzzy))
+            .map(|word| Completion { text: word.clone(), start_position: -(prefix.chars().count() as isize), display_meta: "FuzzyWordCompleter".to_string() })
+            .collect()
+    }
+}
+
+pub fn __init__() -> NestedCompletionMorphismBundle {
+    bootstrap_nested_completion_morphisms()
+}
+
+pub fn __post_init__() -> NestedCompletionMorphismBundle {
+    bootstrap_nested_completion_morphisms()
+}
+
+pub fn __repr__(context: &NestedCompletionContext) -> String {
+    format!("NestedCompletionContext({:?}, prefix={})", context.situation, context.prefix)
+}
+
+pub fn __eq__(left: &NestedCompletionContext, right: &NestedCompletionContext) -> bool {
+    left == right
+}
+
+pub fn __hash__(context: &NestedCompletionContext) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    context.text.hash(&mut hasher);
+    context.cursor_position.hash(&mut hasher);
+    context.situation.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub fn _default_i18n() -> Vec<String> {
+    vec!["de".to_string(), "en".to_string(), "meta".to_string()]
+}
+
+pub fn _default_row_range_morphisms() -> Vec<String> {
+    vec!["is_row_range".to_string(), "range_to_numbers".to_string(), "str_as_generator_to_set".to_string()]
+}
+
+pub fn _default_prompt_language_refs() -> Vec<String> {
+    vec!["prompt_language".to_string(), "custom_split".to_string(), "is_reta_parameter".to_string()]
+}
+
+pub fn _default_completion_runtime() -> CompletionRuntimeBundle {
+    bootstrap_completion_runtime()
+}
+
+pub fn _child(name: &str, situation: ComplSitua) -> (String, ComplSitua) {
+    (name.to_string(), situation)
+}
+
+pub fn options_sync(runtime: &NestedCompletionRuntimeView) -> BTreeMap<String, Option<ComplSitua>> {
+    let mut out = BTreeMap::new();
+    for item in &runtime.main_parameters {
+        out.insert(format!("-{item}"), Some(ComplSitua::HauptPara));
+    }
+    out
+}
+
+pub fn __set_options(options: &mut NestedCompletionOptions, values: BTreeMap<String, Option<ComplSitua>>) {
+    options.options = values;
+}
+
+pub fn gleich_komma_kombi(prefix: &str, runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.kombi_value_options.values().flatten().filter(|value| match_text_alx(value, prefix, true)).cloned().collect()
+}
+
+pub fn gleich_komma_zeilen(prefix: &str, runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.zeilen_typen.iter().chain(runtime.zeilen_zeit.iter()).filter(|value| match_text_alx(value, prefix, true)).cloned().collect()
+}
+
+pub fn gleich_komma_ausg(prefix: &str, runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.ausgabe_art.iter().filter(|value| match_text_alx(value, prefix, true)).cloned().collect()
+}
+
+pub fn gleich_komma_spalten(prefix: &str, runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.spalten.iter().filter(|value| match_text_alx(value, prefix, true)).cloned().collect()
+}
+
+pub fn para_kombination(runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.kombi_main_paras.iter().map(|item| format!("--{item}")).collect()
+}
+
+pub fn para_ausgabe(runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.ausgabe_paras.iter().map(|item| format!("--{item}")).collect()
+}
+
+pub fn para_spalten(runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.spalten.iter().map(|item| format!("--{item}")).collect()
+}
+
+pub fn para_zeilen(runtime: &NestedCompletionRuntimeView) -> Vec<String> {
+    runtime.zeilen_paras.iter().map(|item| format!("--{item}")).collect()
+}
+
+pub fn create_completer(words: Vec<String>, fuzzy: bool) -> FuzzyWordCompleter {
+    FuzzyWordCompleter::new(words, fuzzy)
+}
+
+pub fn get_completions<C: Completer>(completer: &C, document: &Document, event: &CompleteEvent) -> Vec<Completion> {
+    completer.get_completions(document, event)
+}
+
+pub fn text_before_cursor(document: &Document) -> String {
+    document.text_before_cursor()
+}
+
+pub fn sample_options() -> Vec<String> {
+    let bundle = bootstrap_nested_completion_morphisms();
+    bundle.complete("reta -").into_iter().take(8).map(|candidate| candidate.text).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

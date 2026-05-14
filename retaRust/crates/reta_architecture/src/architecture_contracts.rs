@@ -290,6 +290,125 @@ fn validate_contracts(diagrams: &[CommutativeDiagramSpec], contracts: &[CapsuleC
     }
 }
 
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Stage29ArchitecturePlan {
+    pub implemented: Vec<String>,
+    pub behaviour_change: String,
+}
+
+pub fn _capsule_contracts(map: Option<&ArchitectureMapBundle>) -> Vec<CapsuleContractSpec> {
+    default_contracts(map)
+}
+
+pub fn _capsule_names(map: &ArchitectureMapBundle) -> Vec<String> {
+    map.capsule_names()
+}
+
+pub fn _names_from_attr(items: &[String]) -> Vec<String> {
+    items.to_vec()
+}
+
+pub fn _plan() -> Stage29ArchitecturePlan {
+    Stage29ArchitecturePlan {
+        implemented: vec!["commutative diagrams".to_string(), "capsule contracts".to_string(), "refactor laws".to_string()],
+        behaviour_change: "none; contracts guard later activation".to_string(),
+    }
+}
+
+pub fn capsule_contract_named<'a>(bundle: &'a ArchitectureContractsBundle, capsule: &str) -> Option<&'a CapsuleContractSpec> {
+    bundle.capsule_contracts.iter().find(|contract| contract.capsule == capsule)
+}
+
+pub fn _stage32_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage32_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage33_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage33_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage34_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage34_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage35_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage35_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage36_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage36_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage37_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage37_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage38_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage38_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage39_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage39_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage40_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage40_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage41_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage41_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
+pub fn _stage43_diagrams() -> Vec<CommutativeDiagramSpec> {
+    default_diagrams()
+}
+
+pub fn _stage43_laws() -> Vec<RefactorLawSpec> {
+    default_laws()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

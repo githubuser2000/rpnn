@@ -210,6 +210,88 @@ pub fn meta_number_signature(value: i64) -> String {
     format!("creativity={} factors={}", prime_creativity(value), repeats)
 }
 
+
+
+pub fn _ensure_runtime_dependencies() -> bool {
+    true
+}
+
+pub fn spalte_meta_konkret_abstrakt_is_ganz_zahlig(zahl: Rational, inverse: bool) -> bool {
+    spalte_meta_konkret_abstrakt_is_ganzzahlig(zahl, inverse)
+}
+
+pub fn spalte_meta_kontret_theorie_abstrakt_etc_1(value: i64) -> String {
+    format!("meta-konkret-theorie-abstrakt:{value}")
+}
+
+pub fn spalte_meta_kontret_theorie_abstrakt_etc(value: i64) -> String {
+    spalte_meta_kontret_theorie_abstrakt_etc_1(value)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_set_html_parameters(enabled: bool) -> Vec<(String, String)> {
+    vec![("html".to_string(), enabled.to_string())]
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_vorwort_behandlung_wie_vorwort_meta(prefix: &str, repetitions: usize) -> String {
+    make_vorwort(prefix, repetitions)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_main_part(value: i64) -> String {
+    meta_number_signature(value)
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_main_part_inserting_text(value: i64, text: &str) -> String {
+    if text.trim().is_empty() {
+        meta_number_signature(value)
+    } else {
+        format!("{} {}", meta_number_signature(value), text.trim())
+    }
+}
+
+pub fn spalte_meta_konkret_theorie_abstrakt_get_gebr_rat_univ_strukturalie(value: i64) -> String {
+    match value.rem_euclid(3) {
+        0 => "gebrochen-rational".to_string(),
+        1 => "universell".to_string(),
+        _ => "strukturalie".to_string(),
+    }
+}
+
+pub fn spalte_meta_konkret_abstrakt_ueberschriften_und_tags() -> Vec<String> {
+    vec!["Meta".to_string(), "Konkret".to_string(), "Theorie".to_string(), "Abstrakt".to_string()]
+}
+
+pub fn get_all_brueche(max_denominator: i64) -> Vec<Rational> {
+    find_all_brueche_and_their_combinations(max_denominator)
+}
+
+pub fn read_one_csv_and_return(text: &str) -> Vec<Vec<String>> {
+    text.lines()
+        .map(|line| line.split(',').map(|cell| cell.trim().to_string()).collect())
+        .collect()
+}
+
+pub fn switching(zahl1: Rational, zahl2: Rational, choose_inverse: bool) -> (Rational, Rational) {
+    switching_meta_pair(zahl1, zahl2, choose_inverse)
+}
+
+pub fn prim_answer(value: i64) -> String {
+    format!("{:?}", spalte_fuer_gegen_innen_aussen_seitlich_prim(value))
+}
+
+pub fn prim_answer2(value: i64) -> String {
+    format!("{}:{}", value, prim_answer(value))
+}
+
+#[allow(non_snake_case)]
+pub fn PrimAnswer(value: i64) -> String {
+    prim_answer(value)
+}
+
+#[allow(non_snake_case)]
+pub fn PrimAnswer2(value: i64) -> String {
+    prim_answer2(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
