@@ -169,6 +169,66 @@ mod tests {
     }
 }
 
+// Stage 16: concrete compatibility wrappers for runtime_compat.py names.
+#[allow(non_camel_case_types)]
+pub type nPmEnum = NPmEnum;
+
+pub fn primfaktoren(value: i64) -> Vec<i64> {
+    crate::number_theory::prime_factors(value)
+}
+
+#[allow(non_snake_case)]
+pub fn primRepeat(value: i64) -> Vec<i64> {
+    { let mut values = crate::number_theory::prime_factors(value); crate::arithmetic::prime_repeat_legacy(&mut values).into_iter().filter_map(|item| item.split('^').next().and_then(|v| v.parse::<i64>().ok())).collect() }
+}
+
+#[allow(non_snake_case)]
+pub fn primRepeat2(value: i64) -> Vec<(i64, usize)> {
+    { let mut values = crate::number_theory::prime_factors(value); crate::arithmetic::prime_repeat_pairs(&mut values) }
+}
+
+#[allow(non_snake_case)]
+pub fn moduloA(value: i64, modulus: i64) -> i64 {
+    if modulus == 0 { value } else { value.rem_euclid(modulus) }
+}
+
+#[allow(non_snake_case)]
+pub fn getTextWrapThings(max_len: Option<usize>) -> crate::console_io::TextWrapRuntimeSnapshot {
+    crate::console_io::get_text_wrap_things(max_len)
+}
+
+#[allow(non_snake_case)]
+pub fn invert_dict_B(map: &std::collections::BTreeMap<String, Vec<String>>) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut out: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for (key, values) in map {
+        for value in values {
+            out.entry(value.clone()).or_default().push(key.clone());
+        }
+    }
+    out
+}
+
+pub fn unique_everseen(values: &[String]) -> Vec<String> {
+    crate::console_io::unique_strings_everseen(values.iter().cloned())
+}
+
+pub fn alxp(text: impl AsRef<str>) -> String {
+    text.as_ref().to_string()
+}
+
+pub fn x(text: impl ToString) -> String {
+    text.to_string()
+}
+
+#[allow(non_snake_case)]
+pub fn retaHilfe(markdown_text: &str) -> String {
+    crate::console_io::reta_help_text(markdown_text)
+}
+
+#[allow(non_snake_case)]
+pub fn retaPromptHilfe(markdown_text: &str) -> String {
+    crate::console_io::reta_prompt_help_text(markdown_text)
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

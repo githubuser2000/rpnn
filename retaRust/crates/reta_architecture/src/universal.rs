@@ -101,3 +101,20 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn snapshot() -> UniversalBundle {
+    UniversalBundle::new()
+}
+
+pub fn sync_tables<T: Clone>(tables: &[T]) -> Vec<T> {
+    tables.to_vec()
+}
+
+pub fn sync_generated_columns_from_tables<T: Clone>(tables: &[T]) -> Vec<T> {
+    tables.to_vec()
+}
+
+pub fn sync_output_section_from_tables<T: Clone>(tables: &[T]) -> Vec<T> {
+    tables.to_vec()
+}

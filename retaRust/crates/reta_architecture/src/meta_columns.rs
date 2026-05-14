@@ -309,6 +309,17 @@ mod tests {
     }
 }
 
+// Stage 16 continued: Python camel-case meta column wrappers.
+#[allow(non_snake_case)]
+pub fn readOneCSVAndReturn(text: &str) -> Vec<Vec<String>> { read_one_csv_and_return(text) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretAbstrakt_UeberschriftenUndTags() -> Vec<String> { spalte_meta_konkret_abstrakt_ueberschriften_und_tags() }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_SetHtmlParameters(enabled: bool) -> Vec<(String, String)> { spalte_meta_konkret_theorie_abstrakt_set_html_parameters(enabled) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta(prefix: &str, repetitions: usize) -> String { spalte_meta_konkret_theorie_abstrakt_vorwort_behandlung_wie_vorwort_meta(prefix, repetitions) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(value: i64, text: &str) -> String { spalte_meta_konkret_theorie_abstrakt_main_part_inserting_text(value, text) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

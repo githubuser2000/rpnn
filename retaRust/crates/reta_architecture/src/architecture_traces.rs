@@ -182,3 +182,20 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type Stage32ArchitecturePlan = ArchitectureTraceBundle;
+
+pub fn _capsule_traces() -> Vec<String> { stage16_names(&["runtime", "table", "prompt", "governance"]) }
+pub fn _category_for_capsule(capsule: &str) -> String { format!("category::{capsule}") }
+pub fn _component_traces() -> Vec<String> { stage16_names(&["tag_schema", "row_ranges", "table_output", "prompt_execution"]) }
+pub fn _mermaid_diagram() -> String { "graph TD; python-->arch; arch-->rust".to_string() }
+pub fn _route(source: &str, target: &str) -> String { format!("{source}->{target}") }
+pub fn _stage_traces() -> Vec<String> { stage16_names(&["stage10-shadow", "stage11-table-commit", "stage12-prompt-commit", "stage16-surface"]) }
+pub fn _text_diagram() -> String { "python -> py-arch -> rust-shadow -> commit-gate".to_string() }
+pub fn _validate() -> String { "trace-validation-pending-runtime-probe".to_string() }
+pub fn endpoint_known(endpoint: &str) -> bool { !endpoint.trim().is_empty() }

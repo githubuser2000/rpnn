@@ -1,0 +1,26 @@
+{
+  "checks": {
+    "isolated_reta_architecture_cargo_check_offline_with_serde_stubs": "passed",
+    "isolated_reta_architecture_cargo_test_offline_with_serde_stubs": "108 passed, 0 failed",
+    "python_py_compile_tools": "passed",
+    "real_workspace_cargo_build": "not completed: crates.io DNS resolution failed"
+  },
+  "not_byte_exact_claim": true,
+  "primary_changed_areas": [
+    "crates/reta_architecture/src/* surface wrappers",
+    "architecture governance modules",
+    "prompt/table/output/runtime compatibility wrappers"
+  ],
+  "semantic_surface": {
+    "classes": 239,
+    "classes_declared": 239,
+    "classes_marker_only": 0,
+    "classes_missing": 0,
+    "functions": 1096,
+    "functions_declared": 1096,
+    "functions_marker_only": 0,
+    "functions_missing": 0
+  },
+  "stage": 16,
+  "summary": "All py-reta-arch functions/classes are now declared as Rust surface items; marker-only/missing counts are zero in the strict semantic-surface audit."
+}

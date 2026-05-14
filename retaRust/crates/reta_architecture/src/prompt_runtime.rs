@@ -232,6 +232,12 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete prompt_runtime.py compatibility wrappers.
+pub fn __init__() -> PromptRuntimeBundle { bootstrap_prompt_runtime() }
+pub fn _prime_command_predicate(num: i64) -> i64 { prime_command_predicate(num) }
+pub fn build_program_view() -> PromptProgramView { PromptProgramView::from_parameter_runtime(&crate::parameter_runtime::bootstrap_parameter_runtime()) }
+pub fn build_semantics() -> PromptRuntimeBundle { bootstrap_prompt_runtime() }
+pub fn validate_wahl15(values: &BTreeMap<String, String>) -> bool { values.keys().all(|key| !key.trim().is_empty()) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

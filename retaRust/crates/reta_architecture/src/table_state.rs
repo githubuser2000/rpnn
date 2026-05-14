@@ -187,3 +187,12 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn _highest_rows(highest_row: Option<i64>) -> BTreeMap<i64, i64> {
+    highest_rows(highest_row)
+}
+
+pub fn new_generated_rows() -> BTreeSet<i64> {
+    BTreeSet::new()
+}

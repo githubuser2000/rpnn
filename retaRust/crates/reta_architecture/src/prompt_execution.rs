@@ -357,6 +357,70 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete prompt_execution.py compatibility wrappers.
+pub fn configure_prompt_execution() -> PromptExecutionBundle { bootstrap_prompt_execution() }
+
+#[allow(non_snake_case)]
+pub fn dictToList<K: Clone + Ord, V: Clone>(dict: &BTreeMap<K, V>) -> Vec<(K, V)> {
+    dict.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+}
+
+#[allow(non_snake_case)]
+pub fn getDictLimtedByKeyList<K: Ord + Clone, V: Clone>(dict: &BTreeMap<K, V>, keys: &BTreeSet<K>) -> BTreeMap<K, V> {
+    get_dict_limited_by_key_list(dict, keys)
+}
+
+#[allow(non_snake_case)]
+pub fn grKl(a: &BTreeSet<i64>, b: &BTreeSet<i64>) -> (BTreeSet<i64>, BTreeSet<i64>) {
+    greater_and_less_than_anchor(a, b)
+}
+
+#[allow(non_snake_case)]
+pub fn addMoreVals(values: &mut Vec<String>, more: &[String]) { values.extend(more.iter().cloned()); }
+#[allow(non_snake_case)]
+pub fn addMoreVals2(values: &mut BTreeSet<String>, more: &[String]) { values.extend(more.iter().cloned()); }
+
+#[allow(non_snake_case)]
+pub fn createRangesForBruchLists(text: &str) -> (Vec<i64>, String) { create_ranges_for_bruch_parts(&bruch_spalt(text)) }
+
+#[allow(non_snake_case)]
+pub fn bruchBereichsManagementAndWbefehl(zahlen_bereich_c: &str, tokens: &[String]) -> FractionRangeManagementResult {
+    fraction_range_management(&bootstrap_row_range_morphisms(None), zahlen_bereich_c, tokens, &[])
+}
+
+#[allow(non_snake_case)]
+pub fn findEqualNennerZaehler(pairs: &[(i64, i64)]) -> Vec<(i64, i64)> {
+    pairs.iter().copied().filter(|(a, b)| a == b).collect()
+}
+
+#[allow(non_snake_case)]
+pub fn findNennerZaehlerMakesWholeNum(pairs: &[(i64, i64)]) -> Vec<(i64, i64)> {
+    pairs.iter().copied().filter(|(_, denominator)| *denominator != 0).filter(|(numerator, denominator)| numerator % denominator == 0).collect()
+}
+
+#[allow(non_snake_case)]
+pub fn maxMenge(values: &BTreeSet<i64>) -> Option<i64> { values.iter().next_back().copied() }
+
+pub fn zeiln1234create() -> Vec<String> { ["1", "2", "3", "4"].into_iter().map(str::to_string).collect() }
+
+pub fn retaCmdAbstraction_n_and_1pron(tokens: &[String]) -> Vec<String> { split_reta_argv_like_python(tokens) }
+
+#[allow(non_snake_case)]
+pub fn retaExecuteNprint(plan: &PromptExecutionPlan) -> Vec<String> {
+    if !plan.reta_argv.is_empty() { plan.reta_argv.clone() } else { plan.helper_outputs.clone() }
+}
+
+#[allow(non_snake_case)]
+pub fn PromptVonGrosserAusgabeSonderBefehlAusgaben(plan: &PromptExecutionPlan) -> Vec<String> { plan.helper_outputs.clone() }
+
+#[allow(non_snake_case)]
+pub fn PromptGrosseAusgabe(prepared: &PreparedPromptOutput, text_state: &PromptTextState) -> PromptExecutionPlan {
+    bootstrap_prompt_execution().plan_prompt_execution(prepared, text_state)
+}
+
+pub fn run_grosse_ausgabe(prepared: &PreparedPromptOutput, text_state: &PromptTextState) -> PromptExecutionPlan {
+    PromptGrosseAusgabe(prepared, text_state)
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

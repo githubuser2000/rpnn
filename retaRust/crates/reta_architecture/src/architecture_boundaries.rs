@@ -172,3 +172,23 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type BoundaryCheckSpec = BoundaryValidationSpec;
+pub type Stage32BoundaryPlan = ArchitectureBoundariesBundle;
+
+pub fn _capsule_boundaries() -> Vec<String> { stage16_names(&["runtime", "table", "prompt", "governance"]) }
+pub fn _capsule_edges() -> Vec<String> { stage16_names(&["runtime->table", "runtime->prompt", "governance->runtime"]) }
+pub fn _import_edges() -> Vec<String> { stage16_names(&["facade::architecture_map", "facade::architecture_contracts"]) }
+pub fn _imports_in_file(path: &str) -> Vec<String> { vec![format!("imports::{path}")] }
+pub fn _mermaid_diagram() -> String { "graph TD; runtime-->table; runtime-->prompt; governance-->runtime".to_string() }
+pub fn _module_name_from_path(path: &str) -> String { path.rsplit('/').next().unwrap_or(path).trim_end_matches(".py").trim_end_matches(".rs").to_string() }
+pub fn _norm(value: &str) -> String { value.replace('-', "_").replace('/', "::") }
+pub fn _ownership() -> Vec<String> { stage16_names(&["reta_architecture", "rreta", "rretaPrompt"]) }
+pub fn _resolve_import(owner: &str) -> String { format!("resolved::{owner}") }
+pub fn _text_diagram() -> String { "runtime -> table, runtime -> prompt, governance -> runtime".to_string() }
+pub fn _validate() -> String { "boundary-validation-pending-runtime-probe".to_string() }

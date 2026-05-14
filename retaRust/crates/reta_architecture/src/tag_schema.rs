@@ -337,3 +337,12 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+#[allow(non_camel_case_types)]
+pub type ST = TableTag;
+
+#[allow(non_snake_case)]
+pub fn dictViceversa(selector: TagTableSelector) -> BTreeMap<i64, BTreeSet<TableTag>> {
+    reverse_map_for_selector(selector)
+}

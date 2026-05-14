@@ -498,6 +498,45 @@ mod tests {
     }
 }
 
+// Stage 16: concrete Python TableOutput compatibility surface.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BreakoutException {
+    pub reason: BreakoutReason,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TableOutput {
+    pub config: TableOutputConfig,
+    pub bundle: TableOutputBundle,
+}
+
+pub fn __init__(config: Option<TableOutputConfig>) -> TableOutput {
+    TableOutput { config: config.unwrap_or_default(), bundle: bootstrap_table_output() }
+}
+
+pub fn create(config: Option<TableOutputConfig>) -> TableOutput { __init__(config) }
+#[allow(non_snake_case)]
+pub fn outType(output: &TableOutput) -> OutputMode { output.config.mode }
+#[allow(non_snake_case)]
+pub fn textWidth(output: &TableOutput) -> usize { output.config.textwidth }
+#[allow(non_snake_case)]
+pub fn textHeight(output: &TableOutput) -> usize { output.config.textheight }
+pub fn breitenn(output: &TableOutput) -> Vec<usize> { output.config.breiten.clone() }
+pub fn nummeriere(output: &TableOutput) -> bool { output.config.numbering }
+#[allow(non_snake_case)]
+pub fn oneTable(output: &TableOutput) -> bool { output.config.one_table }
+pub fn color(text: &str, num: i64, rest: bool) -> String { colorize(text, num, rest) }
+#[allow(non_snake_case)]
+pub fn findMaxCellTextLen(table: &PreparedTable, rows_range: &[usize]) -> BTreeMap<usize, usize> {
+    max_cell_text_len(table, rows_range)
+}
+#[allow(non_snake_case)]
+pub fn cliOut(output: &TableOutput, finally_display_lines_set: &BTreeSet<usize>, new_table: &PreparedTable, numlen: usize, rows_range: &[usize]) -> TableRenderResult {
+    render_prepared_table(finally_display_lines_set, new_table, numlen, rows_range, &output.config)
+}
+pub fn cliout2(output: &TableOutput, finally_display_lines_set: &BTreeSet<usize>, new_table: &PreparedTable, numlen: usize, rows_range: &[usize]) -> Vec<String> {
+    cliOut(output, finally_display_lines_set, new_table, numlen, rows_range).resulting_table
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

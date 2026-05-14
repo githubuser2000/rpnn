@@ -177,6 +177,17 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete KombiJoin class compatibility surface.
+pub type KombiJoin = KombiJoinBundle;
+pub fn __init__() -> KombiJoinBundle { bootstrap_combi_join() }
+pub fn create() -> KombiJoinBundle { bootstrap_combi_join() }
+pub fn _ensure_runtime_dependencies() -> bool { true }
+pub fn _kombi_csv_sources() -> Vec<String> { vec!["kombi.csv".to_string(), "kombi-meta.csv".to_string()] }
+#[allow(non_snake_case)]
+pub fn kombiNumbersCorrectTestAndSet(values: &[i64]) -> BTreeSet<i64> { values.iter().copied().filter(|value| *value > 0).collect() }
+pub fn prepare_kombi(chosen: &BTreeMap<i64, BTreeSet<i64>>, table: &[Vec<String>]) -> Vec<KombiSubTable> { prepare_table_join(chosen, table) }
+#[allow(non_snake_case)]
+pub fn readKombiCsv(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

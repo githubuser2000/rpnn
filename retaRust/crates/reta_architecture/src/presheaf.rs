@@ -369,3 +369,27 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn __init__() -> PresheafBundle {
+    bootstrap_presheaves(None)
+}
+
+pub fn as_dict(presheaf: &Presheaf) -> BTreeMap<String, Vec<String>> {
+    presheaf
+        .sections
+        .iter()
+        .map(|section| {
+            let values = section
+                .payload
+                .iter()
+                .map(|(key, value)| format!("{key}={value}"))
+                .collect::<Vec<_>>();
+            (section.source.clone(), values)
+        })
+        .collect()
+}
+
+pub fn sections(presheaf: &Presheaf) -> &[LocalSection] {
+    &presheaf.sections
+}

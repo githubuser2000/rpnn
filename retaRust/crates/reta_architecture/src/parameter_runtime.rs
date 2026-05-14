@@ -449,6 +449,53 @@ mod tests {
     }
 }
 
+// Stage 16: concrete Python-name runtime wrappers.
+pub fn _ensure_runtime_imports() -> ParameterRuntimeBundle {
+    bootstrap_parameter_runtime()
+}
+
+pub fn apply_upper_limit_argument(args: &[String]) -> Option<i64> {
+    bootstrap_parameter_runtime().upper_limit_from_arguments(args, None)
+}
+
+pub fn apply_width_parameter(args: &[String]) -> Option<usize> {
+    args.iter().find_map(|arg| {
+        arg.strip_prefix("--breite=")
+            .or_else(|| arg.strip_prefix("--breiten="))
+            .and_then(|value| value.parse::<usize>().ok())
+    })
+}
+
+pub fn resultingSpaltenFromTuple(columns: &[i64]) -> Vec<i64> {
+    let mut out = columns.to_vec();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+#[allow(non_snake_case)]
+pub fn spalten_removeDoublesNthenRemoveOneFromAnother(positive: &[i64], negative: &[i64]) -> Vec<i64> {
+    let mut out = resultingSpaltenFromTuple(positive);
+    let remove = negative.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    out.retain(|value| !remove.contains(value));
+    out
+}
+
+pub fn produce_all_spalten_numbers(args: &[String]) -> Vec<i64> {
+    let bundle = bootstrap_parameter_runtime();
+    let parsed = bundle.parse_cli_args(args);
+    let mut out = Vec::new();
+    for token in parsed.subparameters_for(MainParameter::Spalten) {
+        if let Some(value) = &token.value {
+            for part in value.split(',') {
+                if let Ok(number) = part.trim().parse::<i64>() {
+                    out.push(number);
+                }
+            }
+        }
+    }
+    resultingSpaltenFromTuple(&out)
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

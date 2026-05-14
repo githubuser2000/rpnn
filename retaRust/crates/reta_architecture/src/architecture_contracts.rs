@@ -438,3 +438,8 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+pub fn _diagrams() -> Vec<CommutativeDiagramSpec> { default_diagrams() }
+pub fn _laws() -> Vec<RefactorLawSpec> { default_laws() }
+pub fn _validation() -> ContractValidationSpec { validate_contracts(&default_diagrams(), &default_contracts(None), &default_laws(), None) }

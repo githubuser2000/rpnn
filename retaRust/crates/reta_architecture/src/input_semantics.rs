@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle, RowRangeSyntax};
+use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::schema::RetaContextSchema;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -331,4 +331,11 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 #[allow(dead_code)]
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
+}
+
+// Stage 16 small-surface concrete wrappers.
+pub type RowRangeSyntax = crate::row_ranges::RowRangeSyntax;
+
+pub fn __init__() -> InputBundle {
+    bootstrap_input_semantics(None)
 }

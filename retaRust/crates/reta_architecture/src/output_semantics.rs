@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::output_syntax::{bootstrap_output_syntax, OutputMode, OutputModeSpec};
+use crate::output_syntax::{bootstrap_output_syntax, OutputMode, OutputModeSpec as OutputSyntaxModeSpec};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OutputModeApplication {
@@ -37,7 +37,7 @@ impl Default for OutputConfig {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RetaOutputSemantics {
-    pub mode_specs: BTreeMap<String, OutputModeSpec>,
+    pub mode_specs: BTreeMap<String, OutputSyntaxModeSpec>,
     pub alias_to_mode: BTreeMap<String, String>,
 }
 
@@ -132,7 +132,7 @@ impl Default for RetaOutputSemantics {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OutputSemanticsSnapshot {
     pub available_modes: Vec<String>,
-    pub mode_specs: BTreeMap<String, OutputModeSpec>,
+    pub mode_specs: BTreeMap<String, OutputSyntaxModeSpec>,
 }
 
 pub fn bootstrap_output_semantics() -> RetaOutputSemantics {
@@ -181,4 +181,31 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 #[allow(dead_code)]
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
+}
+
+// Stage 16 small-surface concrete wrappers.
+pub type OutputModeSpec = OutputSyntaxModeSpec;
+
+pub fn __init__() -> RetaOutputSemantics {
+    RetaOutputSemantics::new()
+}
+
+pub fn _bootstrap_output_semantics() -> RetaOutputSemantics {
+    bootstrap_output_semantics()
+}
+
+pub fn create_syntax() -> crate::output_syntax::OutputSyntaxBundle {
+    bootstrap_output_syntax()
+}
+
+pub fn mode_for_tables(config: &OutputConfig) -> OutputMode {
+    config.mode
+}
+
+pub fn mode_for_output_syntax(mode: &str) -> Option<OutputMode> {
+    OutputMode::from_name(mode)
+}
+
+pub fn apply_mode_to_tables(config: &mut OutputConfig, mode: &str) -> Option<OutputModeApplication> {
+    RetaOutputSemantics::new().apply_mode_to_config(config, mode)
 }

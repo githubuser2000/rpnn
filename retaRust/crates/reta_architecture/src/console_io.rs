@@ -5,7 +5,7 @@
 //! represented as rendered text decisions; callers may perform the actual side
 //! effect at the facade boundary.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -315,6 +315,133 @@ mod tests {
     }
 }
 
+// Stage 16: concrete compatibility wrappers for console_io.py surfaces.
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct _FallbackHyphenator;
+
+impl _FallbackHyphenator {
+    pub fn wrap(&self, text: &str, width: usize) -> Vec<String> {
+        wrap(text, width)
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct _RichConsole;
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct _RichMarkdown {
+    pub text: String,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct _RichSyntax {
+    pub text: String,
+    pub lexer: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DefaultOrderedDict {
+    pub default_factory: Option<String>,
+    pub items: BTreeMap<String, Vec<String>>,
+}
+
+pub fn default_ordered_dict_type(default_factory: Option<String>) -> DefaultOrderedDict {
+    DefaultOrderedDict { default_factory, items: BTreeMap::new() }
+}
+
+pub fn __init__(default_factory: Option<String>) -> DefaultOrderedDict {
+    default_ordered_dict_type(default_factory)
+}
+
+pub fn __copy__(dict: &DefaultOrderedDict) -> DefaultOrderedDict {
+    dict.clone()
+}
+
+pub fn __deepcopy__(dict: &DefaultOrderedDict) -> DefaultOrderedDict {
+    dict.clone()
+}
+
+pub fn copy(dict: &DefaultOrderedDict) -> DefaultOrderedDict {
+    dict.clone()
+}
+
+pub fn __repr__(dict: &DefaultOrderedDict) -> String {
+    format!("DefaultOrderedDict(default_factory={:?}, keys={:?})", dict.default_factory, dict.items.keys().collect::<Vec<_>>())
+}
+
+pub fn __reduce__(dict: &DefaultOrderedDict) -> (Option<String>, Vec<(String, Vec<String>)>) {
+    (dict.default_factory.clone(), dict.items.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+}
+
+pub fn __missing__(dict: &mut DefaultOrderedDict, key: &str) -> Vec<String> {
+    let value = dict.items.entry(key.to_string()).or_default();
+    value.clone()
+}
+
+pub fn __getitem__(dict: &mut DefaultOrderedDict, key: &str) -> Vec<String> {
+    if dict.items.contains_key(key) {
+        dict.items.get(key).cloned().unwrap_or_default()
+    } else {
+        __missing__(dict, key)
+    }
+}
+
+pub fn _doc_path(repo_root: impl AsRef<Path>, readme_filename: impl AsRef<str>) -> PathBuf {
+    doc_path(repo_root, readme_filename)
+}
+
+pub fn cli_output(text: impl AsRef<str>, color: bool, stype: impl AsRef<str>) -> Option<String> {
+    cli_output_text(text, color, stype, true)
+}
+
+pub fn print(text: impl AsRef<str>) -> String {
+    text.as_ref().to_string()
+}
+
+pub fn fill(text: &str, width: usize) -> String {
+    wrap(text, width).join("\n")
+}
+
+pub fn wrap(text: &str, width: usize) -> Vec<String> {
+    let width = width.max(1);
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        let extra = usize::from(!current.is_empty());
+        if current.chars().count() + extra + word.chars().count() > width && !current.is_empty() {
+            out.push(current);
+            current = String::new();
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+    if !current.is_empty() || text.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+pub fn reta_prompt_help_text(markdown_text: &str) -> String {
+    reta_prompt_help_text_from_markdown(markdown_text)
+}
+
+pub fn reta_help_text(markdown_text: &str) -> String {
+    strip_markdown_anchors(markdown_text)
+}
+
+pub fn print_reta_prompt_help(markdown_text: &str) -> String {
+    reta_prompt_help_text(markdown_text)
+}
+
+pub fn print_reta_help(markdown_text: &str) -> String {
+    reta_help_text(markdown_text)
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

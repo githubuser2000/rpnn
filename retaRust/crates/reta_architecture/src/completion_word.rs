@@ -282,6 +282,70 @@ mod tests {
     }
 }
 
+// Stage 16: prompt-toolkit-name compatibility surface for word completion.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Document {
+    pub text: String,
+    pub cursor_position: usize,
+}
+
+impl From<Document> for PromptDocument {
+    fn from(value: Document) -> Self {
+        PromptDocument::with_cursor(value.text, value.cursor_position)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Completion {
+    pub text: String,
+    pub start_position: isize,
+    pub display: String,
+    pub display_meta: String,
+}
+
+impl From<CompletionCandidate> for Completion {
+    fn from(value: CompletionCandidate) -> Self {
+        Self { text: value.text, start_position: value.start_position, display: value.display, display_meta: value.display_meta }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompleteEvent {
+    pub completion_requested: bool,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Completer;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ArchitectureWordCompleter {
+    pub words: Vec<String>,
+    pub options: WordCompletionOptions,
+}
+
+pub fn __init__(words: Vec<String>, options: Option<WordCompletionOptions>) -> ArchitectureWordCompleter {
+    ArchitectureWordCompleter { words, options: options.unwrap_or_default() }
+}
+
+pub fn __repr__(completer: &ArchitectureWordCompleter) -> String {
+    format!("ArchitectureWordCompleter(words={})", completer.words.len())
+}
+
+pub fn __eq__(left: &ArchitectureWordCompleter, right: &ArchitectureWordCompleter) -> bool {
+    left == right
+}
+
+pub fn create_completer(words: Vec<String>) -> ArchitectureWordCompleter {
+    __init__(words, None)
+}
+
+pub fn get_completions(completer: &ArchitectureWordCompleter, document: &Document, _event: Option<&CompleteEvent>) -> Vec<Completion> {
+    let prompt_document: PromptDocument = document.clone().into();
+    iter_word_completions(&completer.words, &prompt_document, &completer.options)
+        .into_iter()
+        .map(Completion::from)
+        .collect()
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

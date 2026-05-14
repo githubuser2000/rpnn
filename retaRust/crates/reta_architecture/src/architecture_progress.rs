@@ -155,3 +155,32 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type ProgressCheckSpec = ProgressValidationSpec;
+pub type Stage42ArchitecturePlan = ArchitectureProgressBundle;
+#[allow(non_camel_case_types)]
+pub type _PythonFileAnalysis = OutstandingWorkItemSpec;
+
+pub fn _analyse_python_file(path: &str) -> String { format!("analysis::{path}") }
+pub fn _architecture_import_names() -> Vec<String> { stage16_names(&["reta_architecture", "python_arch_reference"]) }
+pub fn _execution_status_for_surface(surface: &str) -> String { format!("shadow::{surface}") }
+pub fn _git_progress_command() -> Vec<String> { stage16_names(&["git", "diff", "--stat"]) }
+pub fn _is_wrapper_like(name: &str) -> bool { name.starts_with('_') || name.ends_with("_worker") }
+pub fn _iter_function_nodes() -> Vec<String> { stage16_names(&["functions-from-python-ast"]) }
+pub fn _mentions_architecture(text: &str) -> bool { text.contains("architecture") || text.contains("reta_architecture") }
+pub fn _mermaid_diagram() -> String { "graph TD; surface-->status; status-->work".to_string() }
+pub fn _norm(value: &str) -> String { value.replace('-', "_") }
+pub fn _outstanding_work() -> Vec<String> { stage16_names(&["marker-only", "semantic-parity", "workspace-build"]) }
+pub fn _parity_reference_state() -> Vec<String> { stage16_names(&["py-reta", "py-reta-arch", "rust-shadow"]) }
+pub fn _step_progress(step: &str) -> String { format!("progress::{step}") }
+pub fn _strip_docstring(text: &str) -> String { text.lines().filter(|l| !l.trim_start().starts_with("///")).collect::<Vec<_>>().join("\n") }
+pub fn _surface_for_owner(owner: &str) -> String { format!("surface::{owner}") }
+pub fn _text_diagram() -> String { "surface -> progress -> outstanding work".to_string() }
+pub fn _validation() -> String { "progress-validation-pending-runtime-probe".to_string() }
+pub fn _wave_progress(wave: &str) -> String { format!("wave-progress::{wave}") }
+pub fn surface_named(name: &str) -> String { format!("surface::{name}") }

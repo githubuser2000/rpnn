@@ -6,13 +6,19 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::dataflow::{
-    bootstrap_execution_network, deterministic_reduce, execute_tasks_deterministically,
-    ExecutionNetworkBundle, ExecutionNetworkConfig, ExecutionResult, ExecutionRunResult,
-    ExecutionTask, FifoTaskQueue, FullDuplexChannel, HalfDuplexChannel,
-    LifoTaskStack, PriorityTaskQueue, ResourceSemaphore,
-};
-use crate::dataflow::{order_tasks, DataflowDiscipline};
+pub type ExecutionNetworkBundle = crate::dataflow::ExecutionNetworkBundle;
+pub type ExecutionNetworkConfig = crate::dataflow::ExecutionNetworkConfig;
+pub type ExecutionResult<T = String> = crate::dataflow::ExecutionResult<T>;
+pub type ExecutionRunResult<T = String> = crate::dataflow::ExecutionRunResult<T>;
+pub type ExecutionTask<T = String> = crate::dataflow::ExecutionTask<T>;
+pub type FifoTaskQueue<T> = crate::dataflow::FifoTaskQueue<T>;
+pub type FullDuplexChannel<T> = crate::dataflow::FullDuplexChannel<T>;
+pub type HalfDuplexChannel<T> = crate::dataflow::HalfDuplexChannel<T>;
+pub type LifoTaskStack<T> = crate::dataflow::LifoTaskStack<T>;
+pub type PriorityTaskQueue<T> = crate::dataflow::PriorityTaskQueue<T>;
+pub type ResourceSemaphore = crate::dataflow::ResourceSemaphore;
+
+use crate::dataflow::DataflowDiscipline;
 
 
 /// Python-architecture compatibility: available worker count used by
@@ -34,6 +40,37 @@ pub fn __post_init__(mut config: ExecutionNetworkConfig) -> ExecutionNetworkConf
 /// Default constructor mirror for Python dataclass `__init__`.
 pub fn __init__() -> ExecutionNetworkConfig {
     ExecutionNetworkConfig::default()
+}
+
+
+// Stage 16: declared wrappers for re-exported execution_network.py functions.
+pub fn bootstrap_execution_network(config: Option<ExecutionNetworkConfig>) -> ExecutionNetworkBundle {
+    crate::dataflow::bootstrap_execution_network(config)
+}
+
+pub fn order_tasks<T: Clone>(tasks: &[ExecutionTask<T>], config: &ExecutionNetworkConfig) -> Vec<ExecutionTask<T>> {
+    crate::dataflow::order_tasks(tasks, config)
+}
+
+pub fn deterministic_reduce<T: Clone>(results: &[ExecutionResult<T>], preserve_input_order: bool) -> Vec<T> {
+    crate::dataflow::deterministic_reduce(results, preserve_input_order)
+}
+
+pub fn execute_tasks_deterministically<T, U, F>(tasks: &[ExecutionTask<T>], handler: F, config: Option<ExecutionNetworkConfig>) -> ExecutionRunResult<U>
+where
+    T: Clone,
+    U: Clone,
+    F: Fn(&T) -> U,
+{
+    crate::dataflow::execute_tasks_deterministically(tasks, handler, config)
+}
+
+pub fn workers_for(config: &ExecutionNetworkConfig, task_count: usize) -> usize {
+    config.workers_for(task_count)
+}
+
+pub fn __len__<T>(queue: &FifoTaskQueue<T>) -> usize {
+    queue.len()
 }
 
 /// Pick the configured queue discipline and return the scheduled task order.

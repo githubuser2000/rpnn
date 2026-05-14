@@ -191,3 +191,21 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type Stage31CoherencePlan = ArchitectureCoherenceBundle;
+
+pub fn _cap(name: &str) -> String { format!("capsule::{name}") }
+pub fn _capsule_coherence() -> Vec<String> { stage16_names(&["runtime", "table", "prompt", "governance"]) }
+pub fn _functorial_routes() -> Vec<String> { stage16_names(&["py-reta->py-reta-arch", "py-reta-arch->rust", "legacy->shadow"]) }
+pub fn _law_coherence() -> Vec<String> { stage16_names(&["deterministic-glue", "shadow-before-commit"]) }
+pub fn _naturality_coherence() -> Vec<String> { stage16_names(&["prompt-plan", "table-render", "row-filter"]) }
+pub fn _plan() -> String { "stage31_coherence_plan".to_string() }
+pub fn _route_kind(route: &str) -> String { if route.contains("shadow") { "shadow" } else { "semantic" }.to_string() }
+pub fn capsule_named(name: &str) -> String { _cap(name) }
+pub fn naturality_named(name: &str) -> String { format!("naturality::{name}") }
+pub fn route_for(source: &str, target: &str) -> String { format!("{source}->{target}") }

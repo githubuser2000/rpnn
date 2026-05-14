@@ -331,6 +331,12 @@ impl RetaContextTopology {
     }
 }
 
+// Stage 16 continued: concrete topology.py compatibility wrappers.
+pub fn __init__() -> RetaContextTopology { RetaContextTopology::standard() }
+pub fn from_schema(_schema: &crate::schema::RetaContextSchema) -> RetaContextTopology { RetaContextTopology::standard() }
+pub fn restrict(selection: ContextSelection, dimension: &str, values: &[String]) -> ContextSelection { selection.restrict_dimension(dimension, values.iter().cloned()) }
+pub fn _meet(left: &ContextSelection, right: &ContextSelection) -> ContextSelection { left.refine(right) }
+pub fn snapshot(topology: &RetaContextTopology) -> BTreeMap<String, BTreeMap<&'static str, Vec<String>>> { topology.snapshot_dimensions() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

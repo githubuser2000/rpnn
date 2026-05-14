@@ -241,6 +241,13 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete schema.py compatibility wrappers.
+pub fn _module_name(name: &str) -> String { name.rsplit('.').next().unwrap_or(name).to_string() }
+pub fn _stringified_mapping(map: &BTreeMap<String, String>) -> BTreeMap<String, String> { map.clone() }
+pub fn _tag_names(tags: &[&str]) -> Vec<String> { tags.iter().map(|tag| tag.to_string()).collect() }
+pub fn _parameter_groups(schema: &RetaContextSchema) -> Vec<AliasGroup> { schema.main_alias_groups() }
+pub fn from_words_parts() -> RetaContextSchema { bootstrap_schema() }
+pub fn from_words_module() -> RetaContextSchema { bootstrap_schema() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

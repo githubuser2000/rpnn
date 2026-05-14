@@ -515,6 +515,54 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete prompt_preparation.py compatibility wrappers.
+pub fn configure_prompt_preparation() -> PromptPreparationBundle { bootstrap_prompt_preparation() }
+
+#[allow(non_snake_case)]
+pub fn verdreheWoReTaBefehl(text1: &str, text2: &str, text3: &[String], prompt_mode: PromptModus) -> (String, String, Vec<String>) {
+    rotate_where_reta_command(text1, text2, text3, prompt_mode)
+}
+
+#[allow(non_snake_case)]
+pub fn regExReplace(text_state: &PromptTextState) -> Vec<String> {
+    let bundle = bootstrap_prompt_preparation();
+    bundle.regex_replace(text_state)
+}
+
+#[allow(non_snake_case)]
+pub fn promptVorbereitungGrosseAusgabe(placeholder: &str, text: &str) -> PreparedPromptOutput {
+    bootstrap_prompt_preparation().prepare_large_output(placeholder, PromptModus::Normal, PromptModus::Normal, PromptModus::Normal, text, &[])
+}
+
+pub fn prepare_grosse_ausgabe(placeholder: &str, text: &str) -> PreparedPromptOutput { promptVorbereitungGrosseAusgabe(placeholder, text) }
+
+#[allow(non_snake_case)]
+pub fn allEqSignAbarbeitung(token: &str) -> Option<(String, String)> {
+    token.split_once('=').map(|(left, right)| (left.to_string(), right.to_string()))
+}
+
+pub fn aufloesen(pattern: &str, candidates: &[String]) -> Vec<String> {
+    candidates.iter().filter(|candidate| simple_pattern_match(pattern, candidate)).cloned().collect()
+}
+
+#[allow(non_snake_case)]
+pub fn findregEx(pattern: &str, candidate: &str) -> bool { simple_pattern_match(pattern, candidate) }
+
+#[allow(non_snake_case)]
+pub fn lastRetaHauptPara(tokens: &[String]) -> Option<String> {
+    tokens.iter().rev().find(|token| token.starts_with('-') && !token.starts_with("--")).cloned()
+}
+
+#[allow(non_snake_case)]
+pub fn immerHauptParaAbarbeitung(tokens: &[String], default_main: &str) -> Vec<String> {
+    if tokens.iter().any(|token| token.starts_with('-') && !token.starts_with("--")) {
+        tokens.to_vec()
+    } else {
+        let mut out = vec![default_main.to_string()];
+        out.extend(tokens.iter().cloned());
+        out
+    }
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

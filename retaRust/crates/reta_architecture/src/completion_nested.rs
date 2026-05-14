@@ -672,3 +672,14 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub type ArchitectureNestedCompleter = NestedCompletionMorphismBundle;
+
+pub fn runtime_view(bundle: &NestedCompletionMorphismBundle) -> &NestedCompletionRuntimeView {
+    &bundle.runtime_view
+}
+
+pub fn text(document: &Document) -> &str {
+    &document.text
+}

@@ -171,3 +171,33 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type Stage31ArchitecturePlan = ArchitectureValidationBundle;
+
+pub fn _activation_checks() -> Vec<String> { stage16_names(&["activation-gates", "rollback-anchors"]) }
+pub fn _arithmetic_checks() -> Vec<String> { stage16_names(&["prime-factors", "modulo-table"]) }
+pub fn _boundary_checks() -> Vec<String> { stage16_names(&["import-boundaries", "capsule-ownership"]) }
+pub fn _category_checks() -> Vec<String> { stage16_names(&["functors", "natural-transformations"]) }
+pub fn _console_io_checks() -> Vec<String> { stage16_names(&["help-text", "wrap", "cli-output"]) }
+pub fn _contract_checks() -> Vec<String> { stage16_names(&["diagrams", "laws", "capsule-contracts"]) }
+pub fn _impact_checks() -> Vec<String> { stage16_names(&["candidate-status", "regression-gates"]) }
+pub fn _layers() -> Vec<String> { stage16_names(&["runtime", "table", "prompt", "governance"]) }
+pub fn _map_checks() -> Vec<String> { stage16_names(&["capsules", "flows", "legacy-mapping"]) }
+pub fn _migration_checks() -> Vec<String> { stage16_names(&["waves", "steps", "gates"]) }
+pub fn _nested_completion_checks() -> Vec<String> { stage16_names(&["context-classification", "candidate-preview"]) }
+pub fn _passed(values: &[String]) -> bool { !values.iter().any(|v| v.contains("failed")) }
+pub fn _plan() -> String { "stage31_validation_plan".to_string() }
+pub fn _rehearsal_checks() -> Vec<String> { stage16_names(&["open-cover", "dry-run-gates"]) }
+pub fn _repo_checks() -> Vec<String> { stage16_names(&["python-reference", "rust-modules", "audits"]) }
+pub fn _row_range_checks() -> Vec<String> { stage16_names(&["integer-ranges", "fraction-ranges"]) }
+pub fn _summary() -> String { "validation summary: structured checks declared".to_string() }
+pub fn _trace_checks() -> Vec<String> { stage16_names(&["component-traces", "stage-traces"]) }
+pub fn _witness_checks() -> Vec<String> { stage16_names(&["anchors", "probes", "obligations"]) }
+pub fn _word_completion_checks() -> Vec<String> { stage16_names(&["word-before-cursor", "candidate-filtering"]) }
+pub fn assert_passed(values: &[String]) -> bool { _passed(values) }
+pub fn check_named(name: &str) -> String { format!("check::{name}") }

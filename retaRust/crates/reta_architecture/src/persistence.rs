@@ -491,6 +491,46 @@ mod tests {
     }
 }
 
+// Stage 16: concrete persistence.py compatibility wrappers.
+pub fn stable_digest(value: &str) -> String { stable_digest_text(value) }
+
+pub fn _json_dumps(items: &BTreeMap<String, String>) -> String { jsonish_pair_map(items) }
+
+pub fn connect(db_path: Option<String>) -> PersistenceBundle {
+    bootstrap_persistence(None, db_path)
+}
+
+pub fn initialise_persistence_schema(bundle: &PersistenceBundle) -> PersistenceSnapshot {
+    bundle.snapshot()
+}
+
+pub fn _prepare_section_entries_worker(items: &[(String, String, String)]) -> Vec<(String, String, String, String)> {
+    items.iter().map(|(kind, name, payload)| (kind.clone(), name.clone(), payload.clone(), stable_digest_text(payload))).collect()
+}
+
+pub fn _prepare_sheaf_snapshot_entries_worker(items: &[(String, String)]) -> Vec<(String, String, String)> {
+    items.iter().map(|(name, payload)| (name.clone(), payload.clone(), stable_digest_text(payload))).collect()
+}
+
+pub fn _prepare_cache_entries_worker(items: &[(String, String)]) -> Vec<(String, String, String)> {
+    items.iter().map(|(key, value)| (key.clone(), value.clone(), stable_digest_text(value))).collect()
+}
+
+pub fn _prepare_persistence_entries_in_processes(items: &[(String, String)]) -> Vec<(String, String, String)> {
+    _prepare_cache_entries_worker(items)
+}
+
+pub fn persist_sections_batch(store: &mut PersistenceStore, sections: &[(String, String, String)]) -> Vec<PersistedRecord> {
+    sections.iter().map(|(kind, name, payload)| store.persist_section(kind.clone(), name.clone(), payload.clone(), None)).collect()
+}
+
+pub fn persist_sheaf_snapshots_batch(store: &mut PersistenceStore, snapshots: &[(String, String)]) -> Vec<PersistedRecord> {
+    snapshots.iter().map(|(name, payload)| store.persist_sheaf_snapshot(name.clone(), payload.clone(), None)).collect()
+}
+
+pub fn load_sheaf_snapshot(store: &PersistenceStore, snapshot_hash: &str) -> Option<SheafSnapshotRecord> {
+    store.sheaf_snapshots.get(snapshot_hash).cloned()
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

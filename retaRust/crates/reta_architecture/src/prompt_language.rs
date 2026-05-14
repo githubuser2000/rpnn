@@ -267,6 +267,50 @@ mod tests {
     }
 }
 
+// Stage 16: Python-name prompt language wrappers.
+pub fn __post_init__() -> PromptLanguageBundle {
+    bootstrap_prompt_language()
+}
+
+pub fn _default_prompt_language() -> PromptLanguageBundle {
+    bootstrap_prompt_language()
+}
+
+pub fn _is_zeilenbruch_or_ganzzahl_angabe(text: &str) -> bool {
+    let bundle = bootstrap_prompt_language();
+    bundle.verify_bruch_nganz_zahl_between_commas(text).accepted()
+}
+
+pub fn befehle() -> Vec<String> {
+    vec!["reta".to_string(), "shell".to_string(), "python".to_string(), "math".to_string()]
+}
+
+pub fn befehle2() -> Vec<String> {
+    { let bundle = bootstrap_prompt_language(); bundle.wahl15.keys().chain(bundle.wahl16.keys()).cloned().collect() }
+}
+
+#[allow(non_snake_case)]
+pub fn is15or16command(text: &str) -> bool {
+    is_15_or_16_command(text)
+}
+
+#[allow(non_snake_case)]
+pub fn isReTaParameter(text: &str) -> bool {
+    is_reta_parameter(text)
+}
+
+pub fn is_zeilenangabe_between_kommas(text: &str) -> bool {
+    bootstrap_prompt_language().is_zeilenangabe_between_commas(text)
+}
+
+pub fn is_zeilenbruch_between_kommas(text: &str) -> bool {
+    bootstrap_prompt_language().is_zeilenbruch_between_commas(text)
+}
+
+#[allow(non_snake_case)]
+pub fn stextFromKleinKleinKleinBefehl(text: &str) -> String {
+    custom_split(text).join(" ")
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

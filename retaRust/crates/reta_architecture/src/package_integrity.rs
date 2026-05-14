@@ -273,6 +273,12 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete package_integrity.py compatibility wrappers.
+pub fn _normalise_path(path: impl AsRef<Path>) -> String { normalise_path(path) }
+pub fn _iter_all_regular_files(root: impl AsRef<Path>) -> Vec<PathBuf> { iter_manifest_files(root) }
+pub fn _manifest_file_entry(root: impl AsRef<Path>, path: impl AsRef<Path>) -> String { normalise_path(path.as_ref().strip_prefix(root.as_ref()).unwrap_or(path.as_ref())) }
+pub fn _manifest_file_worker(path: impl AsRef<Path>) -> String { normalise_path(path) }
+pub fn _manifest_entries_parallel(root: impl AsRef<Path>) -> Vec<String> { iter_manifest_files(root).into_iter().map(normalise_path).collect() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

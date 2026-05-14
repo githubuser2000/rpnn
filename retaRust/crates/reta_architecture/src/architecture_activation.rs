@@ -191,3 +191,23 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type ActivationCheckSpec = ActivationValidationSpec;
+pub type ActivationTransactionSpec = ArchitectureActivationTransactionSpec;
+pub type ActivationUnitSpec = ArchitectureActivationUnitSpec;
+pub type Stage36ArchitecturePlan = ArchitectureActivationBundle;
+
+pub fn _activation_gates() -> Vec<String> { stage16_names(&["shadow_pipeline.table_adapter", "shadow_pipeline.table_commit", "shadow_pipeline.prompt_commit"]) }
+pub fn _dedupe(values: &[String]) -> Vec<String> { let mut out = values.to_vec(); out.sort(); out.dedup(); out }
+pub fn _gate_by_step(step: &str) -> String { format!("gate::{step}") }
+pub fn _plan() -> String { "stage36_activation_plan".to_string() }
+pub fn _rollbacks() -> Vec<String> { stage16_names(&["legacy-visible-output", "prompt-legacy-plan"]) }
+pub fn _transactions() -> Vec<String> { stage16_names(&["shadow-table", "shadow-prompt"]) }
+pub fn _unit_from_move(value: &str) -> String { format!("activation-unit::{value}") }
+pub fn _units() -> Vec<String> { stage16_names(&["table-adapter", "prompt-adapter", "execution-network"]) }
+pub fn _windows() -> Vec<String> { stage16_names(&["observe", "dry-run", "adapter", "commit"]) }

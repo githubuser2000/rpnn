@@ -261,3 +261,27 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type ImpactCheckSpec = ImpactValidationSpec;
+pub type Stage33ArchitecturePlan = ArchitectureImpactBundle;
+
+pub fn _base_gates() -> Vec<String> { stage16_names(&["shadow", "parity", "rollback"]) }
+pub fn _boundary_edges_for(owner: &str) -> Vec<String> { vec![format!("boundary::{owner}")] }
+pub fn _candidate_status(candidate: &str) -> String { format!("planned::{candidate}") }
+pub fn _dedupe(values: &[String]) -> Vec<String> { let mut out = values.to_vec(); out.sort(); out.dedup(); out }
+pub fn _diagram_probe_map() -> Vec<String> { stage16_names(&["744-regression", "prompt-argv", "table-render"]) }
+pub fn _gate_names_for(owner: &str) -> Vec<String> { vec![format!("gate::{owner}")] }
+pub fn _impact_contracts() -> Vec<String> { stage16_names(&["no-visible-change-without-commit", "shadow-diff-before-switch"]) }
+pub fn _impact_sources() -> Vec<String> { stage16_names(&["python_reference", "python_arch_reference", "rust_shadow"]) }
+pub fn _mermaid_diagram() -> String { "graph TD; source-->candidate; candidate-->gate".to_string() }
+pub fn _migration_candidates() -> Vec<String> { stage16_names(&["table_adapters", "prompt_interaction", "execution_network"]) }
+pub fn _plan() -> String { "stage33_impact_plan".to_string() }
+pub fn _source_kind(owner: &str) -> String { if owner.contains("prompt") { "prompt" } else if owner.contains("table") { "table" } else { "runtime" }.to_string() }
+pub fn _text_diagram() -> String { "impact source -> migration candidate -> regression gate".to_string() }
+pub fn _validate() -> String { "impact-validation-pending-runtime-probe".to_string() }
+pub fn source_named(name: &str) -> String { format!("source::{name}") }

@@ -492,6 +492,37 @@ mod tests {
     }
 }
 
+// Stage 16 continued: Python camel-case adapter wrappers.
+pub type Prepare = PrepareAdapter;
+pub type Concat = ConcatAdapter;
+#[allow(non_snake_case)]
+pub fn prepare4out_LoopBody(row: &[String]) -> Vec<String> { prepare4out_loop_body(row) }
+#[allow(non_snake_case)]
+pub fn prepare4out_Tagging(column_number: i64) -> Vec<String> { prepare4out_tagging(column_number) }
+#[allow(non_snake_case)]
+pub fn prepare4out_beforeForLoop_SpaltenZeilenBestimmen(rows: &[i64]) -> BTreeSet<i64> { prepare4out_before_for_loop_spalten_zeilen_bestimmen(rows) }
+#[allow(non_snake_case)]
+pub fn readConcatCSV_choseCsvFile(name: &str) -> String { read_concat_csv_chose_csv_file(name) }
+#[allow(non_snake_case)]
+pub fn readConcatCsv(cells: &[String], row_number: i64) -> Vec<String> { read_concat_csv_tabelle_dazu_colchange(cells, row_number) }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_ChangeTableToAddToTable(table: &[Vec<String>]) -> Vec<Vec<String>> { read_concat_csv_change_table_to_add_to_table(table) }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_LoopBody(row: &[String]) -> Vec<String> { read_concat_csv_loop_body(row) }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_SetHtmlParamaters(enabled: bool) -> Vec<(String, String)> { read_concat_csv_set_html_paramaters(enabled) }
+#[allow(non_snake_case)]
+pub fn readOneCSVAndReturn(text: &str) -> Vec<Vec<String>> { read_one_csv_and_return(text) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretAbstrakt_UeberschriftenUndTags() -> Vec<String> { spalte_meta_konkret_abstrakt_ueberschriften_und_tags() }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_SetHtmlParameters(enabled: bool) -> Vec<(String, String)> { spalte_meta_konkret_theorie_abstrakt_set_html_parameters(enabled) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_VorwortBehandlungWieVorwortMeta(prefix: &str, repetitions: usize) -> String { spalte_meta_konkret_theorie_abstrakt_vorwort_behandlung_wie_vorwort_meta(prefix, repetitions) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKonkretTheorieAbstrakt_mainPart_InsertingText(value: i64, text: &str) -> String { spalte_meta_konkret_theorie_abstrakt_main_part_inserting_text(value, text) }
+#[allow(non_snake_case)]
+pub fn spalteMetaKontretTheorieAbstrakt_etc(value: i64) -> String { spalte_meta_kontret_theorie_abstrakt_etc_1(value) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

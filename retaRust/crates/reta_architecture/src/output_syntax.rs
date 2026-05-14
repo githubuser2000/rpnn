@@ -337,6 +337,39 @@ mod tests {
     }
 }
 
+// Stage 16: concrete Python syntax class surface.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OutputSyntax {
+    pub mode: OutputMode,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NichtsSyntax;
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct csvSyntax;
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct bbCodeSyntax;
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct htmlSyntax;
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct emacsSyntax;
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct markdownSyntax;
+
+pub fn __init__(mode: Option<OutputMode>) -> OutputSyntax {
+    OutputSyntax { mode: mode.unwrap_or(OutputMode::Shell) }
+}
+
+#[allow(non_snake_case)]
+pub fn generateCell(mode: OutputMode, spalte: i64, content: Option<i64>, zeile: Option<i64>, header_tags: &[String]) -> String {
+    generate_cell_begin(mode, spalte, content, zeile, header_tags)
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

@@ -539,3 +539,22 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn _tag_modules() -> Vec<&'static str> {
+    vec!["ordinary", "kombi", "kombi2"]
+}
+
+pub fn capture_last_line_number(table: &[Vec<String>]) -> Option<usize> {
+    table.len().checked_sub(1)
+}
+
+pub fn prepare_kombi_output(table: &[Vec<String>]) -> KombiTablePreparationResult {
+    KombiTablePreparationResult {
+        finally_display_lines: (0..table.len()).collect(),
+        new_table: table.iter().map(|row| row.iter().map(|cell| vec![cell.clone()]).collect()).collect(),
+        line_len: table.len(),
+        animals_professions_table: table.to_vec(),
+        old2new_table_animals_professions: OldNewTableMap::default(),
+    }
+}

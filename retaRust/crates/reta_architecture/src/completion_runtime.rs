@@ -172,3 +172,33 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompletionRuntimeBuilder {
+    pub program_name: String,
+    pub vocabulary_words: Vec<String>,
+}
+
+pub fn __init__() -> CompletionRuntimeBuilder {
+    CompletionRuntimeBuilder::default()
+}
+
+pub fn build(builder: &CompletionRuntimeBuilder) -> CompletionRuntimeBundle {
+    let mut bundle = CompletionRuntimeBundle::default();
+    if !builder.vocabulary_words.is_empty() {
+        bundle.befehle = builder.vocabulary_words.clone();
+        bundle.befehle.sort_by_key(|item| sort_completion_key(item));
+        bundle.befehle2 = bundle.befehle.iter().cloned().collect();
+        bundle.befehle2_list = bundle.befehle.clone();
+    }
+    bundle
+}
+
+pub fn program(builder: &CompletionRuntimeBuilder) -> &str {
+    &builder.program_name
+}
+
+pub fn vocabulary(builder: &CompletionRuntimeBuilder) -> &[String] {
+    &builder.vocabulary_words
+}

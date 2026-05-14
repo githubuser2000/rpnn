@@ -1,54 +1,54 @@
 use serde::{Deserialize, Serialize};
 
-use crate::architecture_activation::{bootstrap_architecture_activation, ArchitectureActivationBundle};
-use crate::architecture_boundaries::{bootstrap_architecture_boundaries, ArchitectureBoundariesBundle};
-use crate::architecture_coherence::{bootstrap_architecture_coherence, ArchitectureCoherenceBundle};
-use crate::architecture_contracts::{bootstrap_architecture_contracts, ArchitectureContractsBundle};
-use crate::architecture_impact::{bootstrap_architecture_impact, ArchitectureImpactBundle};
-use crate::architecture_map::{bootstrap_architecture_map, ArchitectureMapBundle};
-use crate::architecture_migration::{bootstrap_architecture_migration, ArchitectureMigrationBundle};
-use crate::architecture_progress::{bootstrap_architecture_progress, ArchitectureProgressBundle};
-use crate::architecture_rehearsal::{bootstrap_architecture_rehearsal, ArchitectureRehearsalBundle};
-use crate::architecture_traces::{bootstrap_architecture_traces, ArchitectureTraceBundle};
-use crate::architecture_validation::{bootstrap_architecture_validation, ArchitectureValidationBundle};
-use crate::architecture_witnesses::{bootstrap_architecture_witnesses, ArchitectureWitnessBundle};
+use crate::architecture_activation::{bootstrap_architecture_activation as bootstrap_architecture_activation_impl, ArchitectureActivationBundle};
+use crate::architecture_boundaries::{bootstrap_architecture_boundaries as bootstrap_architecture_boundaries_impl, ArchitectureBoundariesBundle};
+use crate::architecture_coherence::{bootstrap_architecture_coherence as bootstrap_architecture_coherence_impl, ArchitectureCoherenceBundle};
+use crate::architecture_contracts::{bootstrap_architecture_contracts as bootstrap_architecture_contracts_impl, ArchitectureContractsBundle};
+use crate::architecture_impact::{bootstrap_architecture_impact as bootstrap_architecture_impact_impl, ArchitectureImpactBundle};
+use crate::architecture_map::{bootstrap_architecture_map as bootstrap_architecture_map_impl, ArchitectureMapBundle};
+use crate::architecture_migration::{bootstrap_architecture_migration as bootstrap_architecture_migration_impl, ArchitectureMigrationBundle};
+use crate::architecture_progress::{bootstrap_architecture_progress as bootstrap_architecture_progress_impl, ArchitectureProgressBundle};
+use crate::architecture_rehearsal::{bootstrap_architecture_rehearsal as bootstrap_architecture_rehearsal_impl, ArchitectureRehearsalBundle};
+use crate::architecture_traces::{bootstrap_architecture_traces as bootstrap_architecture_traces_impl, ArchitectureTraceBundle};
+use crate::architecture_validation::{bootstrap_architecture_validation as bootstrap_architecture_validation_impl, ArchitectureValidationBundle};
+use crate::architecture_witnesses::{bootstrap_architecture_witnesses as bootstrap_architecture_witnesses_impl, ArchitectureWitnessBundle};
 use crate::arithmetic::{bootstrap_arithmetic_morphisms, ArithmeticMorphismBundle};
-use crate::category::{bootstrap_category_theory, CategoryTheoryBundle};
-use crate::column_selection::{bootstrap_column_selection, ColumnSelectionBundle};
-use crate::combi_join::{bootstrap_combi_join, KombiJoinBundle};
+use crate::category::{bootstrap_category_theory as bootstrap_category_theory_impl, CategoryTheoryBundle};
+use crate::column_selection::{bootstrap_column_selection as bootstrap_column_selection_impl, ColumnSelectionBundle};
+use crate::combi_join::{bootstrap_combi_join as bootstrap_combi_join_impl, KombiJoinBundle};
 use crate::completion_nested::{
     bootstrap_nested_completion_morphisms, NestedCompletionMorphismBundle,
 };
-use crate::completion_runtime::{bootstrap_completion_runtime, CompletionRuntimeBundle};
+use crate::completion_runtime::{bootstrap_completion_runtime as bootstrap_completion_runtime_impl, CompletionRuntimeBundle};
 use crate::completion_word::{bootstrap_word_completion_morphisms, WordCompletionMorphismBundle};
-use crate::concat_csv::{bootstrap_concat_csv, ConcatCsvBundle};
+use crate::concat_csv::{bootstrap_concat_csv as bootstrap_concat_csv_impl, ConcatCsvBundle};
 use crate::console_io::{bootstrap_console_io_morphisms, ConsoleIOMorphismBundle};
-use crate::dataflow::{bootstrap_execution_network, ExecutionNetworkBundle, ExecutionTask};
+use crate::dataflow::{bootstrap_execution_network as bootstrap_execution_network_impl, ExecutionNetworkBundle, ExecutionTask};
 use crate::execution_network::{bootstrap_execution_network_bridge, ExecutionNetworkBridgeBundle};
-use crate::generated_columns::{bootstrap_generated_columns, GeneratedColumnsBundle};
+use crate::generated_columns::{bootstrap_generated_columns as bootstrap_generated_columns_impl, GeneratedColumnsBundle};
 use crate::input_semantics::{bootstrap_input_semantics, InputBundle};
-use crate::meta_columns::{bootstrap_meta_columns, MetaColumnsBundle};
+use crate::meta_columns::{bootstrap_meta_columns as bootstrap_meta_columns_impl, MetaColumnsBundle};
 use crate::migration_control::{bootstrap_migration_control, MigrationControlBundle};
 use crate::morphism::{
     bootstrap_semantic_morphisms, MorphismBundle, MorphismEdge, MorphismGraph, MorphismKind,
 };
-use crate::number_theory::{bootstrap_number_theory, NumberTheoryBundle};
+use crate::number_theory::{bootstrap_number_theory as bootstrap_number_theory_impl, NumberTheoryBundle};
 use crate::output_semantics::{bootstrap_output_semantics, RetaOutputSemantics};
-use crate::output_syntax::{bootstrap_output_syntax, OutputSyntaxBundle};
+use crate::output_syntax::{bootstrap_output_syntax as bootstrap_output_syntax_impl, OutputSyntaxBundle};
 use crate::package_integrity::{bootstrap_package_integrity, PackageIntegrityBundle};
-use crate::parallel_execution::{bootstrap_parallel_execution, ParallelExecutionBundle};
+use crate::parallel_execution::{bootstrap_parallel_execution as bootstrap_parallel_execution_impl, ParallelExecutionBundle};
 use crate::parity_harness::{bootstrap_parity_harness, ParityHarnessBundle};
-use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterRuntimeBundle};
-use crate::persistence::{bootstrap_persistence, PersistenceBundle};
+use crate::parameter_runtime::{bootstrap_parameter_runtime as bootstrap_parameter_runtime_impl, ParameterRuntimeBundle};
+use crate::persistence::{bootstrap_persistence as bootstrap_persistence_impl, PersistenceBundle};
 use crate::presheaf::{bootstrap_presheaves, PresheafBundle};
-use crate::program_workflow::{bootstrap_program_workflow, ProgramWorkflowBundle};
-use crate::prompt_execution::{bootstrap_prompt_execution, PromptExecutionBundle};
-use crate::prompt_interaction::{bootstrap_prompt_interaction, PromptInteractionBundle};
-use crate::prompt_language::{bootstrap_prompt_language, PromptLanguageBundle};
-use crate::prompt_preparation::{bootstrap_prompt_preparation, PromptPreparationBundle};
-use crate::prompt_runtime::{bootstrap_prompt_runtime, PromptRuntimeBundle};
-use crate::prompt_session::{bootstrap_prompt_session, PromptSessionBundle};
-use crate::row_filtering::{bootstrap_row_filtering, RowFilteringBundle};
+use crate::program_workflow::{bootstrap_program_workflow as bootstrap_program_workflow_impl, ProgramWorkflowBundle};
+use crate::prompt_execution::{bootstrap_prompt_execution as bootstrap_prompt_execution_impl, PromptExecutionBundle};
+use crate::prompt_interaction::{bootstrap_prompt_interaction as bootstrap_prompt_interaction_impl, PromptInteractionBundle};
+use crate::prompt_language::{bootstrap_prompt_language as bootstrap_prompt_language_impl, PromptLanguageBundle};
+use crate::prompt_preparation::{bootstrap_prompt_preparation as bootstrap_prompt_preparation_impl, PromptPreparationBundle};
+use crate::prompt_runtime::{bootstrap_prompt_runtime as bootstrap_prompt_runtime_impl, PromptRuntimeBundle};
+use crate::prompt_session::{bootstrap_prompt_session as bootstrap_prompt_session_impl, PromptSessionBundle};
+use crate::row_filtering::{bootstrap_row_filtering as bootstrap_row_filtering_impl, RowFilteringBundle};
 use crate::row_ranges::{bootstrap_row_range_morphisms, RowRangeMorphismBundle};
 use crate::runtime_compat::{bootstrap_runtime_compat, RuntimeCompatBundle};
 use crate::runtime_switch::{
@@ -60,12 +60,12 @@ use crate::sheaf::{bootstrap_sheaves, SheafBundle};
 use crate::shadow_pipeline::{bootstrap_shadow_pipeline, ShadowPipelineBundle};
 use crate::split_i18n::{build_split_i18n_proxy, SplitI18nProxy};
 use crate::table_adapters::{bootstrap_table_adapters, TableAdaptersBundle};
-use crate::table_generation::{bootstrap_table_generation, TableGenerationBundle};
-use crate::table_output::{bootstrap_table_output, TableOutputBundle};
-use crate::table_preparation::{bootstrap_table_preparation, TablePreparationBundle};
-use crate::table_runtime::{bootstrap_table_runtime, TableRuntimeBundle};
-use crate::table_state::{bootstrap_table_state, TableStateBundle};
-use crate::table_wrapping::{bootstrap_table_wrapping, TableWrappingBundle};
+use crate::table_generation::{bootstrap_table_generation as bootstrap_table_generation_impl, TableGenerationBundle};
+use crate::table_output::{bootstrap_table_output as bootstrap_table_output_impl, TableOutputBundle};
+use crate::table_preparation::{bootstrap_table_preparation as bootstrap_table_preparation_impl, TablePreparationBundle};
+use crate::table_runtime::{bootstrap_table_runtime as bootstrap_table_runtime_impl, TableRuntimeBundle};
+use crate::table_state::{bootstrap_table_state as bootstrap_table_state_impl, TableStateBundle};
+use crate::table_wrapping::{bootstrap_table_wrapping as bootstrap_table_wrapping_impl, TableWrappingBundle};
 use crate::tag_schema::{bootstrap_tag_schema, TagSchemaBundle};
 use crate::topology::{ContextSelection, RetaContextTopology};
 use crate::universal::UniversalBundle;
@@ -176,37 +176,37 @@ impl ArchitectureRuntime {
         let schema = bootstrap_schema();
         let topology = RetaContextTopology::standard();
         let output_semantics = bootstrap_output_semantics();
-        let output_syntax = bootstrap_output_syntax();
+        let output_syntax = bootstrap_output_syntax_impl();
         let sheaves = bootstrap_sheaves(Some(&schema));
         let semantic_morphisms =
             bootstrap_semantic_morphisms(&topology, &sheaves, Some(output_semantics.clone()));
-        let architecture_map = bootstrap_architecture_map();
-        let architecture_contracts = bootstrap_architecture_contracts(Some(&architecture_map));
-        let architecture_witnesses = bootstrap_architecture_witnesses(&architecture_map, &architecture_contracts);
-        let architecture_coherence = bootstrap_architecture_coherence(&architecture_map, &architecture_contracts);
-        let architecture_boundaries = bootstrap_architecture_boundaries(&architecture_map, &architecture_coherence);
-        let architecture_traces = bootstrap_architecture_traces(
+        let architecture_map = bootstrap_architecture_map_impl();
+        let architecture_contracts = bootstrap_architecture_contracts_impl(Some(&architecture_map));
+        let architecture_witnesses = bootstrap_architecture_witnesses_impl(&architecture_map, &architecture_contracts);
+        let architecture_coherence = bootstrap_architecture_coherence_impl(&architecture_map, &architecture_contracts);
+        let architecture_boundaries = bootstrap_architecture_boundaries_impl(&architecture_map, &architecture_coherence);
+        let architecture_traces = bootstrap_architecture_traces_impl(
             &architecture_map,
             &architecture_contracts,
             &architecture_witnesses,
             &architecture_coherence,
         );
-        let architecture_impact = bootstrap_architecture_impact(
+        let architecture_impact = bootstrap_architecture_impact_impl(
             &architecture_map,
             &architecture_contracts,
             &architecture_witnesses,
             &architecture_boundaries,
             &architecture_traces,
         );
-        let architecture_migration = bootstrap_architecture_migration(&architecture_impact);
-        let architecture_rehearsal = bootstrap_architecture_rehearsal(&architecture_migration, &architecture_contracts);
-        let architecture_activation = bootstrap_architecture_activation(&architecture_rehearsal);
-        let architecture_progress = bootstrap_architecture_progress(
+        let architecture_migration = bootstrap_architecture_migration_impl(&architecture_impact);
+        let architecture_rehearsal = bootstrap_architecture_rehearsal_impl(&architecture_migration, &architecture_contracts);
+        let architecture_activation = bootstrap_architecture_activation_impl(&architecture_rehearsal);
+        let architecture_progress = bootstrap_architecture_progress_impl(
             &architecture_map,
             &architecture_migration,
             &architecture_activation,
         );
-        let architecture_validation = bootstrap_architecture_validation(
+        let architecture_validation = bootstrap_architecture_validation_impl(
             &architecture_map,
             &architecture_contracts,
             &architecture_witnesses,
@@ -234,37 +234,37 @@ impl ArchitectureRuntime {
             architecture_validation,
             architecture_witnesses,
             arithmetic: bootstrap_arithmetic_morphisms(None, None),
-            category_theory: bootstrap_category_theory(),
+            category_theory: bootstrap_category_theory_impl(),
             console_io: bootstrap_console_io_morphisms(None),
-            execution_network: bootstrap_execution_network(None),
+            execution_network: bootstrap_execution_network_impl(None),
             execution_network_bridge: bootstrap_execution_network_bridge(None),
-            column_selection: bootstrap_column_selection(),
-            combi_join: bootstrap_combi_join(),
-            completion_runtime: bootstrap_completion_runtime(),
+            column_selection: bootstrap_column_selection_impl(),
+            combi_join: bootstrap_combi_join_impl(),
+            completion_runtime: bootstrap_completion_runtime_impl(),
             completion_nested: bootstrap_nested_completion_morphisms(),
             completion_word: bootstrap_word_completion_morphisms(),
-            concat_csv: bootstrap_concat_csv(),
-            generated_columns: bootstrap_generated_columns(),
+            concat_csv: bootstrap_concat_csv_impl(),
+            generated_columns: bootstrap_generated_columns_impl(),
             input_semantics: bootstrap_input_semantics(Some(schema.clone())),
-            meta_columns: bootstrap_meta_columns(),
+            meta_columns: bootstrap_meta_columns_impl(),
             migration_control: bootstrap_migration_control(),
-            number_theory: bootstrap_number_theory(),
+            number_theory: bootstrap_number_theory_impl(),
             output_semantics,
             output_syntax,
             package_integrity: bootstrap_package_integrity(),
-            parallel_execution: bootstrap_parallel_execution(None),
+            parallel_execution: bootstrap_parallel_execution_impl(None),
             parity_harness: bootstrap_parity_harness(),
-            persistence: bootstrap_persistence(None, None),
-            parameter_runtime: bootstrap_parameter_runtime(),
-            program_workflow: bootstrap_program_workflow(),
-            prompt_runtime: bootstrap_prompt_runtime(),
-            prompt_session: bootstrap_prompt_session(),
-            prompt_preparation: bootstrap_prompt_preparation(),
-            prompt_execution: bootstrap_prompt_execution(),
-            prompt_interaction: bootstrap_prompt_interaction(),
-            prompt_language: bootstrap_prompt_language(),
+            persistence: bootstrap_persistence_impl(None, None),
+            parameter_runtime: bootstrap_parameter_runtime_impl(),
+            program_workflow: bootstrap_program_workflow_impl(),
+            prompt_runtime: bootstrap_prompt_runtime_impl(),
+            prompt_session: bootstrap_prompt_session_impl(),
+            prompt_preparation: bootstrap_prompt_preparation_impl(),
+            prompt_execution: bootstrap_prompt_execution_impl(),
+            prompt_interaction: bootstrap_prompt_interaction_impl(),
+            prompt_language: bootstrap_prompt_language_impl(),
             presheaves: bootstrap_presheaves(Some(&ContextSelection::cli())),
-            row_filtering: bootstrap_row_filtering(),
+            row_filtering: bootstrap_row_filtering_impl(),
             row_ranges: bootstrap_row_range_morphisms(None),
             runtime_compat: bootstrap_runtime_compat(None, &[]),
             runtime_switch: bootstrap_runtime_switch(None),
@@ -276,12 +276,12 @@ impl ArchitectureRuntime {
             split_i18n: build_split_i18n_proxy(None),
             tag_schema: bootstrap_tag_schema(),
             table_adapters: bootstrap_table_adapters(),
-            table_generation: bootstrap_table_generation(),
-            table_output: bootstrap_table_output(),
-            table_preparation: bootstrap_table_preparation(),
-            table_runtime: bootstrap_table_runtime(),
-            table_state: bootstrap_table_state(),
-            table_wrapping: bootstrap_table_wrapping(),
+            table_generation: bootstrap_table_generation_impl(),
+            table_output: bootstrap_table_output_impl(),
+            table_preparation: bootstrap_table_preparation_impl(),
+            table_runtime: bootstrap_table_runtime_impl(),
+            table_state: bootstrap_table_state_impl(),
+            table_wrapping: bootstrap_table_wrapping_impl(),
             morphisms,
             universal: UniversalBundle::new(),
         }
@@ -561,7 +561,7 @@ impl RetaRunArchitecture {
         let task = ExecutionTask::new(0usize, clean_args.clone()).with_operation("rreta_cli_run");
         let execution_network_bridge = bootstrap_execution_network_bridge(None);
         let execution_network_plan = execution_network_bridge.plan_for_tasks(&[task.clone()]);
-        let parameter_runtime = bootstrap_parameter_runtime();
+        let parameter_runtime = bootstrap_parameter_runtime_impl();
         let parsed = parameter_runtime.parse_cli_args(&clean_args);
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
@@ -639,44 +639,44 @@ pub struct PromptArchitectureContext {
 impl PromptArchitectureContext {
     pub fn from_prompt_input(program_name: &str, input: &str) -> Self {
         let token_count = input.split_whitespace().count();
-        let completion_runtime = bootstrap_completion_runtime();
+        let completion_runtime = bootstrap_completion_runtime_impl();
         let word_completion = bootstrap_word_completion_morphisms();
         let nested_completion = bootstrap_nested_completion_morphisms();
-        let prompt_preparation = bootstrap_prompt_preparation();
-        let prompt_execution = bootstrap_prompt_execution();
+        let prompt_preparation = bootstrap_prompt_preparation_impl();
+        let prompt_execution = bootstrap_prompt_execution_impl();
         let switch_bundle = bootstrap_runtime_switch(None);
         let migration_control = bootstrap_migration_control();
         let activation_units = migration_control.activation_units_for_switch(
             &switch_bundle,
             &switch_bundle.default_config,
         );
-        let prompt_architecture_map = bootstrap_architecture_map();
-        let prompt_architecture_contracts = bootstrap_architecture_contracts(Some(&prompt_architecture_map));
-        let prompt_architecture_witnesses = bootstrap_architecture_witnesses(&prompt_architecture_map, &prompt_architecture_contracts);
-        let prompt_architecture_coherence = bootstrap_architecture_coherence(&prompt_architecture_map, &prompt_architecture_contracts);
-        let prompt_architecture_boundaries = bootstrap_architecture_boundaries(&prompt_architecture_map, &prompt_architecture_coherence);
-        let prompt_architecture_traces = bootstrap_architecture_traces(
+        let prompt_architecture_map = bootstrap_architecture_map_impl();
+        let prompt_architecture_contracts = bootstrap_architecture_contracts_impl(Some(&prompt_architecture_map));
+        let prompt_architecture_witnesses = bootstrap_architecture_witnesses_impl(&prompt_architecture_map, &prompt_architecture_contracts);
+        let prompt_architecture_coherence = bootstrap_architecture_coherence_impl(&prompt_architecture_map, &prompt_architecture_contracts);
+        let prompt_architecture_boundaries = bootstrap_architecture_boundaries_impl(&prompt_architecture_map, &prompt_architecture_coherence);
+        let prompt_architecture_traces = bootstrap_architecture_traces_impl(
             &prompt_architecture_map,
             &prompt_architecture_contracts,
             &prompt_architecture_witnesses,
             &prompt_architecture_coherence,
         );
-        let prompt_architecture_impact = bootstrap_architecture_impact(
+        let prompt_architecture_impact = bootstrap_architecture_impact_impl(
             &prompt_architecture_map,
             &prompt_architecture_contracts,
             &prompt_architecture_witnesses,
             &prompt_architecture_boundaries,
             &prompt_architecture_traces,
         );
-        let prompt_architecture_migration = bootstrap_architecture_migration(&prompt_architecture_impact);
-        let prompt_architecture_rehearsal = bootstrap_architecture_rehearsal(&prompt_architecture_migration, &prompt_architecture_contracts);
-        let prompt_architecture_activation = bootstrap_architecture_activation(&prompt_architecture_rehearsal);
-        let prompt_architecture_progress = bootstrap_architecture_progress(
+        let prompt_architecture_migration = bootstrap_architecture_migration_impl(&prompt_architecture_impact);
+        let prompt_architecture_rehearsal = bootstrap_architecture_rehearsal_impl(&prompt_architecture_migration, &prompt_architecture_contracts);
+        let prompt_architecture_activation = bootstrap_architecture_activation_impl(&prompt_architecture_rehearsal);
+        let prompt_architecture_progress = bootstrap_architecture_progress_impl(
             &prompt_architecture_map,
             &prompt_architecture_migration,
             &prompt_architecture_activation,
         );
-        let prompt_architecture_validation = bootstrap_architecture_validation(
+        let prompt_architecture_validation = bootstrap_architecture_validation_impl(
             &prompt_architecture_map,
             &prompt_architecture_contracts,
             &prompt_architecture_witnesses,
@@ -751,6 +751,64 @@ mod tests {
     }
 }
 
+// Stage 16: concrete facade.py compatibility wrappers.
+pub type RetaArchitecture = ArchitectureRuntime;
+
+pub fn bootstrap() -> ArchitectureRuntime { bootstrap_architecture_runtime() }
+pub fn snapshot(runtime: Option<&ArchitectureRuntime>) -> ArchitectureSnapshotRef {
+    runtime.map(|r| r.snapshot_ref()).unwrap_or_else(|| bootstrap_architecture_runtime().snapshot_ref())
+}
+
+pub fn sync_program_semantics(args: &[String]) -> RetaRunArchitecture { RetaRunArchitecture::from_cli_args(args) }
+pub fn sync_tables() -> TableAdaptersBundle { bootstrap_table_adapters() }
+pub fn update_prompt_state(program_name: &str, input: &str) -> PromptArchitectureContext { PromptArchitectureContext::from_prompt_input(program_name, input) }
+
+pub fn bootstrap_arithmetic() -> ArithmeticMorphismBundle { bootstrap_arithmetic_morphisms(None, None) }
+pub fn bootstrap_console_io() -> ConsoleIOMorphismBundle { bootstrap_console_io_morphisms(None) }
+pub fn bootstrap_nested_completion() -> NestedCompletionMorphismBundle { bootstrap_nested_completion_morphisms() }
+pub fn bootstrap_row_ranges() -> RowRangeMorphismBundle { bootstrap_row_range_morphisms(None) }
+pub fn bootstrap_word_completion() -> WordCompletionMorphismBundle { bootstrap_word_completion_morphisms() }
+
+pub fn bootstrap_architecture_activation() -> ArchitectureActivationBundle { bootstrap_architecture_runtime().architecture_activation }
+pub fn bootstrap_architecture_boundaries() -> ArchitectureBoundariesBundle { bootstrap_architecture_runtime().architecture_boundaries }
+pub fn bootstrap_architecture_coherence() -> ArchitectureCoherenceBundle { bootstrap_architecture_runtime().architecture_coherence }
+pub fn bootstrap_architecture_contracts() -> ArchitectureContractsBundle { bootstrap_architecture_runtime().architecture_contracts }
+pub fn bootstrap_architecture_impact() -> ArchitectureImpactBundle { bootstrap_architecture_runtime().architecture_impact }
+pub fn bootstrap_architecture_map() -> ArchitectureMapBundle { bootstrap_architecture_map_impl() }
+pub fn bootstrap_architecture_migration() -> ArchitectureMigrationBundle { bootstrap_architecture_runtime().architecture_migration }
+pub fn bootstrap_architecture_progress() -> ArchitectureProgressBundle { bootstrap_architecture_runtime().architecture_progress }
+pub fn bootstrap_architecture_rehearsal() -> ArchitectureRehearsalBundle { bootstrap_architecture_runtime().architecture_rehearsal }
+pub fn bootstrap_architecture_traces() -> ArchitectureTraceBundle { bootstrap_architecture_runtime().architecture_traces }
+pub fn bootstrap_architecture_validation() -> ArchitectureValidationBundle { bootstrap_architecture_runtime().architecture_validation }
+pub fn bootstrap_architecture_witnesses() -> ArchitectureWitnessBundle { bootstrap_architecture_runtime().architecture_witnesses }
+
+pub fn bootstrap_category_theory() -> CategoryTheoryBundle { bootstrap_category_theory_impl() }
+pub fn bootstrap_column_selection() -> ColumnSelectionBundle { bootstrap_column_selection_impl() }
+pub fn bootstrap_combi_join() -> KombiJoinBundle { bootstrap_combi_join_impl() }
+pub fn bootstrap_completion_runtime() -> CompletionRuntimeBundle { bootstrap_completion_runtime_impl() }
+pub fn bootstrap_concat_csv() -> ConcatCsvBundle { bootstrap_concat_csv_impl() }
+pub fn bootstrap_execution_network() -> ExecutionNetworkBundle { bootstrap_execution_network_impl(None) }
+pub fn bootstrap_generated_columns() -> GeneratedColumnsBundle { bootstrap_generated_columns_impl() }
+pub fn bootstrap_meta_columns() -> MetaColumnsBundle { bootstrap_meta_columns_impl() }
+pub fn bootstrap_number_theory() -> NumberTheoryBundle { bootstrap_number_theory_impl() }
+pub fn bootstrap_output_syntax() -> OutputSyntaxBundle { bootstrap_output_syntax_impl() }
+pub fn bootstrap_parallel_execution() -> ParallelExecutionBundle { bootstrap_parallel_execution_impl(None) }
+pub fn bootstrap_parameter_runtime() -> ParameterRuntimeBundle { bootstrap_parameter_runtime_impl() }
+pub fn bootstrap_persistence() -> PersistenceBundle { bootstrap_persistence_impl(None, None) }
+pub fn bootstrap_program_workflow() -> ProgramWorkflowBundle { bootstrap_program_workflow_impl() }
+pub fn bootstrap_prompt_execution() -> PromptExecutionBundle { bootstrap_prompt_execution_impl() }
+pub fn bootstrap_prompt_interaction() -> PromptInteractionBundle { bootstrap_prompt_interaction_impl() }
+pub fn bootstrap_prompt_language() -> PromptLanguageBundle { bootstrap_prompt_language_impl() }
+pub fn bootstrap_prompt_preparation() -> PromptPreparationBundle { bootstrap_prompt_preparation_impl() }
+pub fn bootstrap_prompt_runtime() -> PromptRuntimeBundle { bootstrap_prompt_runtime_impl() }
+pub fn bootstrap_prompt_session() -> PromptSessionBundle { bootstrap_prompt_session_impl() }
+pub fn bootstrap_row_filtering() -> RowFilteringBundle { bootstrap_row_filtering_impl() }
+pub fn bootstrap_table_generation() -> TableGenerationBundle { bootstrap_table_generation_impl() }
+pub fn bootstrap_table_output() -> TableOutputBundle { bootstrap_table_output_impl() }
+pub fn bootstrap_table_preparation() -> TablePreparationBundle { bootstrap_table_preparation_impl() }
+pub fn bootstrap_table_runtime() -> TableRuntimeBundle { bootstrap_table_runtime_impl() }
+pub fn bootstrap_table_state() -> TableStateBundle { bootstrap_table_state_impl() }
+pub fn bootstrap_table_wrapping() -> TableWrappingBundle { bootstrap_table_wrapping_impl() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

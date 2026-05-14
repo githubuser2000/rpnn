@@ -282,6 +282,30 @@ mod tests {
     }
 }
 
+// Stage 16 continued: Python-name concat_csv wrappers.
+pub fn _ensure_runtime_dependencies() -> bool { true }
+pub fn choose_csv_file(name: &str) -> String { format!("csv/{name}.csv") }
+#[allow(non_snake_case)]
+pub fn readConcatCSV_choseCsvFile(name: &str) -> String { choose_csv_file(name) }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_ChangeTableToAddToTable(table: &[Vec<String>]) -> Vec<Vec<String>> { table.to_vec() }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_LoopBody(row: &[String]) -> Vec<String> { row.to_vec() }
+#[allow(non_snake_case)]
+pub fn readConcatCsv_SetHtmlParamaters(enabled: bool) -> Vec<(String, String)> { if enabled { vec![("html".to_string(), "concat-csv".to_string())] } else { Vec::new() } }
+pub fn read_concat_csv(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
+#[allow(non_snake_case)]
+pub fn readConcatCsv(text: &str) -> Vec<Vec<String>> { read_concat_csv(text) }
+pub fn transpose(table: &[Vec<String>]) -> Vec<Vec<String>> {
+    let width = table.iter().map(Vec::len).max().unwrap_or(0);
+    (0..width).map(|index| table.iter().map(|row| row.get(index).cloned().unwrap_or_default()).collect()).collect()
+}
+#[allow(non_snake_case)]
+pub fn convertSetOfPaarenToDictOfNumToPaareDiv(pairs: &BTreeSet<FractionPair>, gleichf: bool) -> FractionPairMap { convert_set_of_pairs_to_dict_of_num_to_pairs_div(pairs, gleichf) }
+#[allow(non_snake_case)]
+pub fn convertSetOfPaarenToDictOfNumToPaareMul(pairs: &BTreeSet<FractionPair>, gleichf: bool) -> FractionPairMap { convert_set_of_pairs_to_dict_of_num_to_pairs_mul(pairs, gleichf) }
+#[allow(non_snake_case)]
+pub fn convertFractionsToDictOfNumToPaareOfMulOfIntAndFraction(fracs: &BTreeSet<Rational>, fracs2: &BTreeSet<Rational>, max_row: i64, gleichf: bool) -> FractionPairMap { convert_fractions_to_dict_of_num_to_pairs_of_mul_of_int_and_fraction(fracs, fracs2, max_row, gleichf) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

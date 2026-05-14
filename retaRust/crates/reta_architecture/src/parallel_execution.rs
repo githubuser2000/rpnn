@@ -828,6 +828,14 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete process-helper wrappers.
+pub fn _prepare_row_chunk_worker(rows: &[Vec<String>]) -> Vec<Vec<String>> { rows.to_vec() }
+pub fn prepare_rows_in_processes(rows: &[Vec<String>], _config: Option<ParallelExecutionConfig>) -> Vec<Vec<String>> { rows.to_vec() }
+pub fn decode_religion_rows_in_processes(rows: &[String], _config: Option<ParallelExecutionConfig>) -> Vec<Vec<i64>> { _decode_religion_rows_worker(rows) }
+pub fn decode_kombi_rows_in_processes(rows: &[String], _config: Option<ParallelExecutionConfig>) -> Vec<Option<i64>> { _decode_kombi_rows_worker(rows) }
+pub fn select_columns_in_processes(rows: &[Vec<String>], columns: &[usize], _config: Option<ParallelExecutionConfig>) -> Vec<Vec<String>> { rows.iter().map(|row| _select_columns_worker(row, columns)).collect() }
+pub fn max_cell_text_len_in_processes(rows: &[Vec<String>], _config: Option<ParallelExecutionConfig>) -> Vec<usize> { rows.iter().map(|row| _max_cell_text_len_worker(row)).collect() }
+pub fn prepare_kombi_join_tables_in_processes(table: &[Vec<String>], _config: Option<ParallelExecutionConfig>) -> Vec<Vec<String>> { _prepare_kombi_join_tables_worker(table) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

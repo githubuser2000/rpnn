@@ -167,6 +167,16 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete table_generation.py compatibility wrappers.
+pub fn _set_last_line_number(rows: &[Vec<String>]) -> usize { rows.len().saturating_sub(1) }
+pub fn _concat_csv_inputs(columns: &[i64]) -> Vec<i64> { columns.iter().copied().filter(|value| *value > 0).collect() }
+pub fn _read_kombi_tables(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
+pub fn _apply_generated_column_morphisms(row_number: i64) -> Vec<String> { crate::generated_columns::bootstrap_generated_columns().registry.names().into_iter().map(|name| format!("{name}:{row_number}")).collect() }
+pub fn build_for_program(columns: &[i64]) -> TableGenerationPlan {
+    let mut buckets: BTreeMap<ColumnBucketKey, BTreeSet<i64>> = BTreeMap::new();
+    buckets.insert(ColumnBucketKey::positive(0), columns.iter().copied().collect());
+    TableGenerationPlan::from_column_buckets(&buckets, std::iter::empty::<i64>())
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

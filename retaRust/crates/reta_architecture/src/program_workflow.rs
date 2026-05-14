@@ -152,6 +152,17 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete program_workflow.py compatibility wrappers.
+pub fn _reset_runtime_flags() -> Vec<String> { vec!["runtime_flags_reset".to_string()] }
+pub fn _csv_path(name: &str) -> String { format!("csv/{name}") }
+pub fn _decode_religion_cell(cell: &str) -> Vec<i64> { cell.split(|ch: char| !ch.is_ascii_digit() && ch != '-').filter_map(|part| part.parse().ok()).collect() }
+pub fn _load_religion_table(text: &str) -> Vec<Vec<String>> { text.lines().map(|line| line.split(';').map(str::to_string).collect()).collect() }
+pub fn _read_positive_and_negative_parameters(values: &[i64]) -> (Vec<i64>, Vec<i64>) { values.iter().copied().partition(|value| *value >= 0) }
+pub fn _requested_religion_output_kind(args: &[String]) -> Option<String> { args.iter().find_map(|arg| arg.strip_prefix("--religion=").map(str::to_string)) }
+pub fn _apply_language_specific_motive_column(language: &str, column: i64) -> i64 { if language == "de" || language == "deutsch" { column } else { column + 1000 } }
+pub fn bring_all_important_begin_things(args: &[String]) -> WorkflowTrace { bootstrap_program_workflow().trace_from_args(args) }
+pub fn workflow_everything(args: &[String]) -> WorkflowTrace { bootstrap_program_workflow().trace_from_args(args) }
+pub fn combi_table_workflow(args: &[String]) -> WorkflowTrace { bootstrap_program_workflow().trace_from_args(args) }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

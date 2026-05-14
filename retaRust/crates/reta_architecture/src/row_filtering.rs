@@ -454,3 +454,21 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn cutset(values: &BTreeSet<i64>, to_remove: &BTreeSet<i64>) -> BTreeSet<i64> {
+    values.difference(to_remove).cloned().collect()
+}
+
+pub fn moonsun(value: i64) -> bool {
+    let (divisors, multiples) = moon_number(value);
+    !divisors.is_empty() || !multiples.is_empty() || value > 114
+}
+
+pub fn set_zaehlungen(values: &[i64]) -> BTreeSet<i64> {
+    values.iter().copied().collect()
+}
+
+pub fn zeile_which_zaehlung(row: i64) -> &'static str {
+    if row <= 114 { "sun" } else { "moon" }
+}

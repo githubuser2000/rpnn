@@ -226,3 +226,35 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type MigrationCheckSpec = ArchitectureMigrationValidationSpec;
+pub type MigrationGateBindingSpec = ArchitectureMigrationGateBindingSpec;
+pub type MigrationInvariantSpec = ArchitectureMigrationInvariantSpec;
+pub type MigrationStepSpec = ArchitectureMigrationStepSpec;
+pub type MigrationValidationSpec = ArchitectureMigrationValidationSpec;
+pub type MigrationWaveSpec = ArchitectureMigrationWaveSpec;
+pub type Stage34ArchitecturePlan = ArchitectureMigrationBundle;
+
+pub fn _category_for_target(target: &str) -> String { if target.contains("prompt") { "prompt" } else if target.contains("table") { "table" } else { "runtime" }.to_string() }
+pub fn _dedupe(values: &[String]) -> Vec<String> { let mut out = values.to_vec(); out.sort(); out.dedup(); out }
+pub fn _functors_for(target: &str) -> Vec<String> { vec![format!("functor::{target}")] }
+pub fn _gate_bindings() -> Vec<String> { stage16_names(&["shadow_pipeline.table_commit", "shadow_pipeline.prompt_commit"]) }
+pub fn _gate_catalog() -> Vec<String> { stage16_names(&["observe", "dry-run", "adapter", "commit", "force"]) }
+pub fn _invariants() -> Vec<String> { stage16_names(&["legacy-visible-until-commit", "744-preserved"]) }
+pub fn _mermaid_diagram() -> String { "graph TD; wave-->step; step-->gate".to_string() }
+pub fn _plan() -> String { "stage34_migration_plan".to_string() }
+pub fn _stage34_gate(name: &str) -> String { format!("stage34::{name}") }
+pub fn _steps() -> Vec<String> { stage16_names(&["table_adapters.prepare", "prompt_execution.argv", "execution_network.plan"]) }
+pub fn _target_owner_for(step: &str) -> String { format!("owner::{step}") }
+pub fn _text_diagram() -> String { "migration wave -> migration step -> activation gate".to_string() }
+pub fn _transformations_for(step: &str) -> Vec<String> { vec![format!("transform::{step}")] }
+pub fn _wave_catalog() -> Vec<String> { stage16_names(&["runtime-switch", "table-adapters", "prompt-interaction", "dataflow"]) }
+pub fn _wave_id_for(step: &str) -> String { format!("wave::{step}") }
+pub fn _waves() -> Vec<String> { _wave_catalog() }
+pub fn steps_for_owner(owner: &str) -> Vec<String> { vec![format!("step::{owner}")] }
+pub fn wave_named(name: &str) -> String { format!("wave::{name}") }

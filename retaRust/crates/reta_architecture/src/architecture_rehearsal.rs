@@ -178,3 +178,18 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type RehearsalCheckSpec = RehearsalValidationSpec;
+pub type Stage35ArchitecturePlan = ArchitectureRehearsalBundle;
+
+pub fn _covers() -> Vec<String> { stage16_names(&["table", "prompt", "runtime"]) }
+pub fn _gate_rehearsals() -> Vec<String> { stage16_names(&["dry-run", "adapter", "commit-guard"]) }
+pub fn _moves() -> Vec<String> { stage16_names(&["legacy->shadow", "shadow->commit-candidate"]) }
+pub fn _open_sets() -> Vec<String> { stage16_names(&["cli", "table", "prompt", "dataflow"]) }
+pub fn _plan() -> String { "stage35_rehearsal_plan".to_string() }
+pub fn _with_rehearsal_gate(gate: &str) -> String { format!("rehearsal::{gate}") }

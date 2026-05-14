@@ -259,6 +259,38 @@ mod tests {
     }
 }
 
+// Stage 16 continued: concrete prompt_interaction.py compatibility wrappers.
+pub fn __post_init__() -> PromptInteractionBundle { bootstrap_prompt_interaction() }
+
+pub fn _require_loop_deps() -> PromptInteractionBundle { bootstrap_prompt_interaction() }
+
+pub fn new_session(text: impl Into<String>) -> PromptTextState { PromptTextState::new(text) }
+
+pub fn loop_setup_legacy_tuple(argv: &[String]) -> (bool, PromptModus, PromptModus, Vec<String>) {
+    let mut bundle = bootstrap_prompt_interaction();
+    let setup = bundle.build_loop_setup(argv);
+    (setup.logging_switch, setup.prompt_mode, setup.prompt_mode2, setup.only_one_command)
+}
+
+pub fn prompt_input(input: &str) -> PromptInteractionPlan {
+    let mut bundle = bootstrap_prompt_interaction();
+    bundle.prepare_and_plan_one_input("", input, PromptModus::Normal)
+}
+
+pub fn _execute(input: &str) -> PromptExecutionPlan { prompt_input(input).execution_plan }
+
+pub fn _storage_command(text: &mut PromptTextState, mode: PromptModus, chains: Vec<String>, pending_output: Vec<String>) -> PromptStorageDecision {
+    bootstrap_prompt_interaction().storage_command(text, mode, chains, pending_output)
+}
+
+pub fn prompt_storage_after_input(placeholder: &str, input: &str) -> (Vec<String>, PromptTextState) {
+    bootstrap_prompt_interaction().store_prompt(Vec::new(), placeholder, input)
+}
+
+pub fn run_scope(inputs: &[String]) -> Vec<PromptInteractionPlan> {
+    let mut bundle = bootstrap_prompt_interaction();
+    inputs.iter().map(|input| bundle.prepare_and_plan_one_input("", input, PromptModus::Normal)).collect()
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

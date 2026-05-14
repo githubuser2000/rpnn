@@ -365,6 +365,88 @@ mod tests {
     }
 }
 
+// Stage 16: concrete PromptSession compatibility surface.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FileHistory {
+    pub filename: String,
+    pub strings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Style {
+    pub class_names: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ToggleHistory {
+    pub enabled: bool,
+    pub history: FileHistory,
+}
+
+impl Default for ToggleHistory {
+    fn default() -> Self {
+        Self { enabled: true, history: FileHistory::default() }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PromptSession {
+    pub state: PromptTextState,
+    pub history: ToggleHistory,
+    pub logging_enabled: bool,
+}
+
+pub fn new_session(text: impl Into<String>) -> PromptSession {
+    PromptSession { state: PromptTextState::new(text), history: ToggleHistory::default(), logging_enabled: true }
+}
+
+pub fn __init__(text: impl Into<String>) -> PromptSession {
+    new_session(text)
+}
+
+pub fn from_dict(values: &BTreeMap<String, String>) -> PromptSession {
+    let mut session = new_session(values.get("text").cloned().unwrap_or_default());
+    if let Some(platzhalter) = values.get("platzhalter") {
+        session.state.set_platzhalter(platzhalter.clone());
+    }
+    session
+}
+
+pub fn add_to_history(session: &mut PromptSession, value: impl Into<String>) {
+    session.history.history.strings.push(value.into());
+}
+
+pub fn get_strings(history: &FileHistory) -> Vec<String> {
+    history.strings.clone()
+}
+
+pub fn append_string(history: &mut FileHistory, value: impl Into<String>) {
+    history.strings.push(value.into());
+}
+
+pub fn enable_logging(session: &mut PromptSession) { session.logging_enabled = true; }
+pub fn disable_logging(session: &mut PromptSession) { session.logging_enabled = false; }
+
+#[allow(non_snake_case)]
+pub fn hasWithoutABC(state: &PromptTextState, has_set: &BTreeSet<String>) -> bool {
+    state.has_without_abc(has_set)
+}
+
+pub fn prompt_input(session: &PromptSession) -> String { session.state.text.clone() }
+pub fn prompt(session: &PromptSession) -> String { session.state.text.clone() }
+pub fn text(session: &PromptSession) -> String { session.state.text.clone() }
+pub fn platzhalter(session: &PromptSession) -> String { session.state.platzhalter.clone() }
+pub fn liste(session: &PromptSession) -> Vec<String> { session.state.liste.clone() }
+#[allow(non_snake_case)]
+pub fn listeS(session: &PromptSession) -> Vec<String> { session.state.liste_s.clone() }
+#[allow(non_snake_case)]
+pub fn listeE(session: &PromptSession) -> Vec<String> { session.state.liste_e.clone() }
+pub fn e(session: &PromptSession) -> Vec<String> { session.state.e.clone() }
+pub fn menge(session: &PromptSession) -> BTreeSet<String> { session.state.menge.clone() }
+#[allow(non_snake_case)]
+pub fn mengeE(session: &PromptSession) -> BTreeSet<String> { session.state.menge_e.clone() }
+#[allow(non_snake_case)]
+pub fn befehlDavor(session: &PromptSession) -> String { session.state.befehl_davor.clone() }
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // These markers keep historical Python architecture symbol names visible

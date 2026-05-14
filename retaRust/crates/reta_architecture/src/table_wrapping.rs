@@ -281,3 +281,32 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+#[allow(non_camel_case_types)]
+pub type Wraptype = WrapType;
+
+pub fn textwrap_runtime() -> TextWrapRuntime {
+    TextWrapRuntime::default()
+}
+
+pub fn get_wrapping_type(runtime: &TextWrapRuntime) -> WrapType {
+    runtime.wrapping_type
+}
+
+pub fn set_wrapping_type(runtime: &mut TextWrapRuntime, wrapping_type: WrapType) {
+    runtime.wrapping_type = wrapping_type;
+}
+
+pub fn get_shell_rows_amount(runtime: &TextWrapRuntime) -> Option<i64> {
+    runtime.shell_rows_amount
+}
+
+pub fn set_shell_rows_amount(runtime: &mut TextWrapRuntime, rows: Option<i64>) {
+    runtime.shell_rows_amount = rows;
+}
+
+pub fn refresh_textwrap_runtime(runtime: &mut TextWrapRuntime) -> TextWrapRuntimeSnapshot {
+    runtime.has_fill = true;
+    runtime.snapshot()
+}

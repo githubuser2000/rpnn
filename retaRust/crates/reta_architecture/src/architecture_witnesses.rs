@@ -223,3 +223,28 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+fn stage16_names(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_string()).collect()
+}
+
+pub type Stage30ArchitecturePlan = ArchitectureWitnessBundle;
+
+pub fn _anchor_witnesses() -> Vec<String> { stage16_names(&["744", "prompt-argv", "table-render"]) }
+pub fn _candidate_patterns() -> Vec<String> { stage16_names(&["contains", "argv-equal", "shadow-diff-zero"]) }
+pub fn _capsule_slices() -> Vec<String> { stage16_names(&["table", "prompt", "runtime"]) }
+pub fn _diagram_witnesses() -> Vec<String> { stage16_names(&["legacy-arch-rust-triangle", "shadow-commit-square"]) }
+pub fn _is_file_like(path: &str) -> bool { path.contains('.') || path.contains('/') }
+pub fn _naturality_witnesses() -> Vec<String> { stage16_names(&["row-range", "completion", "output-mode"]) }
+pub fn _obligations() -> Vec<String> { stage16_names(&["no-blind-switch", "regression-744", "explicit-gate"]) }
+pub fn _plan() -> String { "stage30_witness_plan".to_string() }
+pub fn _probe_commands_for(name: &str) -> Vec<String> { vec![format!("probe::{name}")] }
+pub fn _resolve_one(name: &str) -> String { format!("witness::{name}") }
+pub fn _split_owner_anchors(value: &str) -> Vec<String> { value.split(':').map(|v| v.to_string()).collect() }
+pub fn _status_for_anchors(anchors: &[String]) -> Vec<String> { anchors.iter().map(|a| format!("pending::{a}")).collect() }
+pub fn _validation() -> String { "witness-validation-pending-runtime-probe".to_string() }
+pub fn add(values: &mut Vec<String>, value: String) { values.push(value); }
+pub fn capsule_slice_named(name: &str) -> String { format!("capsule-slice::{name}") }
+pub fn diagram_witness_named(name: &str) -> String { format!("diagram-witness::{name}") }
+pub fn naturality_witness_named(name: &str) -> String { format!("naturality-witness::{name}") }

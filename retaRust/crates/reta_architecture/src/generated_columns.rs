@@ -389,3 +389,20 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 small-surface concrete wrappers.
+pub fn specs() -> Vec<GeneratedColumnSpec> {
+    default_generated_column_registry().specs
+}
+
+pub fn concat_love_polygon(structure_size: &str, own_size: &str) -> Option<String> {
+    love_polygon_cell(structure_size, own_size)
+}
+
+pub fn geist_emotion_energie_materie_topologie(row_number: i64) -> &'static str {
+    mind_emotion_energy_matter_topology_type(row_number)
+}
+
+pub fn gleichheit_freiheit_vergleich(row_number: i64) -> &'static str {
+    equality_freedom_domination_type(row_number)
+}

@@ -488,3 +488,10 @@ pub const PY_ARCH_STAGE15_SURFACE: &[&str] = &[
 pub fn stage15_py_surface_names() -> &'static [&'static str] {
     PY_ARCH_STAGE15_SURFACE
 }
+
+// Stage 16 governance concrete wrapper surface.
+pub fn _capsule(name: &str) -> Option<ArchitectureCapsuleSpec> { bootstrap_architecture_map().capsules.into_iter().find(|c| c.name == name) }
+pub fn _capsules() -> Vec<ArchitectureCapsuleSpec> { bootstrap_architecture_map().capsules }
+pub fn _containment() -> Vec<CapsuleContainmentSpec> { bootstrap_architecture_map().containment }
+pub fn _flows() -> Vec<ArchitectureFlowSpec> { bootstrap_architecture_map().flows }
+pub fn _mapping() -> Vec<RetaPartMappingSpec> { bootstrap_architecture_map().legacy_mappings }
