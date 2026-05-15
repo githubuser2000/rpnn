@@ -439,7 +439,7 @@ pub use table_view_output::{
 pub use table_view_output_parity::{
     bootstrap_table_view_output_parity, canonicalize_cell,
     compare_output_lines as compare_table_view_output_lines, compare_table_view_output_to_legacy,
-    normalize_output_lines, parse_line_as_cells, semantic_rows_from_lines,
+    normalize_output_lines, parse_line_as_cells, parse_markup_document_rows, semantic_rows_from_lines,
     strip_ansi_escape_sequences, NormalizedOutputLine, NormalizedOutputReport,
     TableViewOutputParityBundle, TableViewOutputParityConfig, TableViewOutputParityReport,
     TableViewOutputParitySnapshot,

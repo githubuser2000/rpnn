@@ -6,6 +6,9 @@
 //! semantic row/cell comparison.  It tells us whether a mismatch is only syntax
 //! noise (HTML wrappers, Markdown separator rows, shell spacing) or an actual
 //! table-cell mismatch, without changing visible behaviour by itself.
+//! Stage 35 makes that normalization style-aware for HTML/BBCode: styled rows,
+//! styled cells, catalog classes and multi-line cell wrappers are parsed as the
+//! same semantic table cells, while raw line equality remains the commit guard.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +23,14 @@ pub struct TableViewOutputParityConfig {
     pub ignore_empty_lines: bool,
     pub ignore_markdown_separator_rows: bool,
     pub strip_ansi: bool,
+    /// Parse HTML/BBCode as a whole document instead of independent lines so
+    /// legacy multi-line <td>...</td> and [td=...]...[/td] wrappers normalize
+    /// to the same semantic cells as compact Rust renderer lines.
+    pub style_aware_markup: bool,
+    /// Ignore row/cell style wrappers during semantic comparison.  This is a
+    /// diagnostic-only relaxation; raw line equality is still required before
+    /// any visible commit can happen.
+    pub ignore_style_wrappers: bool,
 }
 
 impl Default for TableViewOutputParityConfig {
@@ -31,6 +42,8 @@ impl Default for TableViewOutputParityConfig {
             ignore_empty_lines: true,
             ignore_markdown_separator_rows: true,
             strip_ansi: true,
+            style_aware_markup: true,
+            ignore_style_wrappers: true,
         }
     }
 }
@@ -60,6 +73,8 @@ pub struct NormalizedOutputReport {
     pub semantic_row_count: usize,
     pub cell_count: usize,
     pub ignored_line_count: usize,
+    pub style_wrapper_line_count: usize,
+    pub document_normalized: bool,
     pub canonical_lines: Vec<String>,
     pub semantic_rows: Vec<Vec<String>>,
     pub digest: String,
@@ -115,6 +130,8 @@ impl TableViewOutputParityBundle {
                 "table_view_output_parity.compare_output_lines".to_string(),
                 "table_view_output_parity.compare_table_view_output_to_legacy".to_string(),
                 "table_view_output_parity.strip_ansi_escape_sequences".to_string(),
+                "table_view_output_parity.parse_markup_document_rows".to_string(),
+                "table_view_output_parity.parse_bbcode_cells".to_string(),
             ],
             normalization_modes: vec![
                 OutputMode::Shell.canonical_name().to_string(),
@@ -219,10 +236,14 @@ pub fn normalize_output_lines(
     lines: &[String],
     config: &TableViewOutputParityConfig,
 ) -> NormalizedOutputReport {
+    if config.style_aware_markup && matches!(config.mode, OutputMode::Html | OutputMode::Bbcode) {
+        return normalize_markup_document_lines(lines, config);
+    }
+
     let mut normalized = Vec::new();
     let mut semantic_rows = Vec::new();
     let mut ignored_line_count = 0usize;
-    let mut cell_count = 0usize;
+    let mut style_wrapper_line_count = 0usize;
 
     for raw in lines {
         let line = if config.strip_ansi {
@@ -243,6 +264,9 @@ pub fn normalize_output_lines(
         let structural_markup = matches!(config.mode, OutputMode::Html | OutputMode::Bbcode)
             && cells.is_empty()
             && looks_like_table_markup(raw_trimmed);
+        if config.ignore_style_wrappers && is_style_wrapper_line(raw_trimmed, config.mode) {
+            style_wrapper_line_count += 1;
+        }
         let ignored = (config.ignore_empty_lines && empty) || markdown_separator || structural_markup;
         let reason = if markdown_separator {
             "markdown_separator".to_string()
@@ -257,7 +281,6 @@ pub fn normalize_output_lines(
         if ignored {
             ignored_line_count += 1;
         } else {
-            cell_count += cells.len();
             semantic_rows.push(cells.clone());
         }
         normalized.push(NormalizedOutputLine {
@@ -269,25 +292,108 @@ pub fn normalize_output_lines(
         });
     }
 
+    normalized_output_report(
+        lines.len(),
+        normalized,
+        semantic_rows,
+        ignored_line_count,
+        style_wrapper_line_count,
+        false,
+        config,
+    )
+}
+
+fn normalize_markup_document_lines(
+    lines: &[String],
+    config: &TableViewOutputParityConfig,
+) -> NormalizedOutputReport {
+    let document = if config.strip_ansi {
+        strip_ansi_escape_sequences(&lines.join("\n"))
+    } else {
+        lines.join("\n")
+    };
+    let mut semantic_rows = parse_markup_document_rows(&document, config.mode)
+        .into_iter()
+        .map(|row| {
+            row.into_iter()
+                .map(|cell| canonicalize_cell(&cell, config))
+                .filter(|cell| !cell.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .filter(|row: &Vec<String>| !row.is_empty() || !config.ignore_empty_lines)
+        .collect::<Vec<_>>();
+
+    // Some legacy dumps contain only plain text lines after structural tags.
+    // If no cell wrappers are found, fall back to the line-local parser instead
+    // of fabricating equality.
+    if semantic_rows.is_empty() && !document_looks_like_markup_table(&document, config.mode) {
+        let mut local_config = config.clone();
+        local_config.style_aware_markup = false;
+        return normalize_output_lines(lines, &local_config);
+    }
+
+    if config.ignore_empty_lines {
+        semantic_rows.retain(|row| !row.is_empty());
+    }
+
+    let normalized = semantic_rows
+        .iter()
+        .enumerate()
+        .map(|(index, cells)| NormalizedOutputLine {
+            raw: format!("<semantic-row:{index}>"),
+            cells: cells.clone(),
+            canonical_line: cells.join("\u{1f}"),
+            ignored: false,
+            reason: "document_markup_cells".to_string(),
+        })
+        .collect::<Vec<_>>();
+    let style_wrapper_line_count = lines
+        .iter()
+        .filter(|line| is_style_wrapper_line(line.trim(), config.mode))
+        .count();
+    let ignored_line_count = lines.len().saturating_sub(normalized.len());
+    normalized_output_report(
+        lines.len(),
+        normalized,
+        semantic_rows,
+        ignored_line_count,
+        style_wrapper_line_count,
+        true,
+        config,
+    )
+}
+
+fn normalized_output_report(
+    source_line_count: usize,
+    normalized: Vec<NormalizedOutputLine>,
+    semantic_rows: Vec<Vec<String>>,
+    ignored_line_count: usize,
+    style_wrapper_line_count: usize,
+    document_normalized: bool,
+    config: &TableViewOutputParityConfig,
+) -> NormalizedOutputReport {
     let canonical_lines = normalized
         .iter()
         .filter(|line| !line.ignored)
         .map(|line| line.canonical_line.clone())
         .collect::<Vec<_>>();
+    let cell_count = semantic_rows.iter().map(Vec::len).sum::<usize>();
     let digest = stable_digest_for_rows(&semantic_rows);
     NormalizedOutputReport {
         class: "NormalizedOutputReport".to_string(),
         mode: config.mode.canonical_name().to_string(),
-        source_line_count: lines.len(),
+        source_line_count,
         normalized_line_count: canonical_lines.len(),
         semantic_row_count: semantic_rows.len(),
         cell_count,
         ignored_line_count,
+        style_wrapper_line_count,
+        document_normalized,
         canonical_lines,
         semantic_rows,
         digest,
         universal_property:
-            "syntax_wrappers_are_removed_but_cell_order_and_cell_text_are_preserved".to_string(),
+            "syntax_and_style_wrappers_are_removed_but_cell_order_and_cell_text_are_preserved".to_string(),
     }
 }
 
@@ -423,23 +529,144 @@ fn parse_html_cells(line: &str) -> Vec<String> {
     cells
 }
 
+pub fn parse_markup_document_rows(document: &str, mode: OutputMode) -> Vec<Vec<String>> {
+    match mode {
+        OutputMode::Html => parse_html_document_rows(document),
+        OutputMode::Bbcode => parse_bbcode_document_rows(document),
+        _ => document
+            .lines()
+            .map(|line| parse_line_as_cells(line, mode))
+            .filter(|cells| !cells.is_empty())
+            .collect(),
+    }
+}
+
+fn parse_html_document_rows(document: &str) -> Vec<Vec<String>> {
+    let lower = document.to_ascii_lowercase();
+    let mut rows = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(start_relative) = lower[search_start..].find("<tr") {
+        let row_start = search_start + start_relative;
+        let Some(open_end_relative) = lower[row_start..].find('>') else {
+            break;
+        };
+        let content_start = row_start + open_end_relative + 1;
+        let Some(end_relative) = lower[content_start..].find("</tr>") else {
+            break;
+        };
+        let content_end = content_start + end_relative;
+        let cells = parse_html_cells(&document[content_start..content_end]);
+        if !cells.is_empty() {
+            rows.push(cells);
+        }
+        search_start = content_end + 5;
+        if search_start >= document.len() {
+            break;
+        }
+    }
+    if rows.is_empty() {
+        let cells = parse_html_cells(document);
+        if !cells.is_empty() {
+            rows.push(cells);
+        }
+    }
+    rows
+}
+
+fn parse_bbcode_document_rows(document: &str) -> Vec<Vec<String>> {
+    let lower = document.to_ascii_lowercase();
+    let mut rows = Vec::new();
+    let mut search_start = 0usize;
+    while let Some(row_start_relative) = find_bbcode_open_tag(&lower[search_start..], "tr") {
+        let row_start = search_start + row_start_relative;
+        let Some(open_end_relative) = lower[row_start..].find(']') else {
+            break;
+        };
+        let content_start = row_start + open_end_relative + 1;
+        let Some(end_relative) = lower[content_start..].find("[/tr]") else {
+            break;
+        };
+        let content_end = content_start + end_relative;
+        let cells = parse_bbcode_cells(&document[content_start..content_end]);
+        if !cells.is_empty() {
+            rows.push(cells);
+        }
+        search_start = content_end + 5;
+        if search_start >= document.len() {
+            break;
+        }
+    }
+    if rows.is_empty() {
+        let cells = parse_bbcode_cells(document);
+        if !cells.is_empty() {
+            rows.push(cells);
+        }
+    }
+    rows
+}
+
 fn parse_bbcode_cells(line: &str) -> Vec<String> {
     let lower = line.to_ascii_lowercase();
     let mut cells = Vec::new();
     let mut search_start = 0usize;
-    while let Some(start_relative) = lower[search_start..].find("[td]") {
-        let content_start = search_start + start_relative + 4;
-        let Some(end_relative) = lower[content_start..].find("[/td]") else {
+    while let Some(start_relative) = find_bbcode_open_tag(&lower[search_start..], "td")
+        .or_else(|| find_bbcode_open_tag(&lower[search_start..], "th"))
+    {
+        let tag_start = search_start + start_relative;
+        let Some(open_end_relative) = lower[tag_start..].find(']') else {
+            break;
+        };
+        let content_start = tag_start + open_end_relative + 1;
+        let closing = if lower[tag_start + 1..].starts_with("th") { "[/th]" } else { "[/td]" };
+        let Some(end_relative) = lower[content_start..].find(closing) else {
             break;
         };
         let content_end = content_start + end_relative;
         cells.push(line[content_start..content_end].to_string());
-        search_start = content_end + 5;
+        search_start = content_end + closing.len();
         if search_start >= line.len() {
             break;
         }
     }
     cells
+}
+
+fn find_bbcode_open_tag(haystack_lower: &str, tag: &str) -> Option<usize> {
+    let needle = format!("[{tag}");
+    let mut cursor = 0usize;
+    while let Some(relative) = haystack_lower[cursor..].find(&needle) {
+        let start = cursor + relative;
+        let after = haystack_lower[start + needle.len()..].chars().next();
+        if matches!(after, Some(']') | Some('=') | Some(' ')) {
+            return Some(start);
+        }
+        cursor = start + needle.len();
+    }
+    None
+}
+
+fn document_looks_like_markup_table(document: &str, mode: OutputMode) -> bool {
+    let lower = document.to_ascii_lowercase();
+    match mode {
+        OutputMode::Html => lower.contains("<table") || lower.contains("<tr") || lower.contains("<td") || lower.contains("<th"),
+        OutputMode::Bbcode => lower.contains("[table") || find_bbcode_open_tag(&lower, "tr").is_some() || find_bbcode_open_tag(&lower, "td").is_some() || find_bbcode_open_tag(&lower, "th").is_some(),
+        _ => false,
+    }
+}
+
+fn is_style_wrapper_line(value: &str, mode: OutputMode) -> bool {
+    let lower = value.trim().to_ascii_lowercase();
+    match mode {
+        OutputMode::Html => {
+            (lower.starts_with("<tr") || lower.starts_with("<td") || lower.starts_with("<th"))
+                && (lower.contains("class=") || lower.contains("style=") || lower.contains("background-color"))
+        }
+        OutputMode::Bbcode => {
+            (lower.starts_with("[tr") || lower.starts_with("[td") || lower.starts_with("[th"))
+                && (lower.contains("=") || lower.contains("background-color"))
+        }
+        _ => false,
+    }
 }
 
 fn strip_html_tags(value: &str) -> String {
@@ -491,10 +718,32 @@ fn is_markdown_separator_row(cells: &[String]) -> bool {
 }
 
 fn looks_like_table_markup(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
     matches!(
-        value.to_ascii_lowercase().as_str(),
-        "<table>" | "</table>" | "<tr>" | "</tr>" | "[table]" | "[/table]"
-    ) || value.starts_with("<table ")
+        lower.as_str(),
+        "<table>"
+            | "</table>"
+            | "<tr>"
+            | "</tr>"
+            | "<td>"
+            | "</td>"
+            | "<th>"
+            | "</th>"
+            | "[table]"
+            | "[/table]"
+            | "[tr]"
+            | "[/tr]"
+            | "[td]"
+            | "[/td]"
+            | "[th]"
+            | "[/th]"
+    ) || lower.starts_with("<table ")
+        || lower.starts_with("<tr ")
+        || lower.starts_with("<td ")
+        || lower.starts_with("<th ")
+        || lower.starts_with("[tr=")
+        || lower.starts_with("[td=")
+        || lower.starts_with("[th=")
 }
 
 fn first_mismatch_index<T: PartialEq>(left: &[T], right: &[T]) -> Option<usize> {
@@ -555,4 +804,50 @@ mod tests {
         let rows = semantic_rows_from_lines(&["a;\"b;c\"".to_string()], &config);
         assert_eq!(rows, vec![vec!["a".to_string(), "b;c".to_string()]]);
     }
+
+    #[test]
+    fn styled_bbcode_cells_normalize_like_plain_bbcode_cells() {
+        let config = TableViewOutputParityConfig::default().with_mode(OutputMode::Bbcode);
+        let styled = vec![
+            "[table]".to_string(),
+            r#"[tr="background-color:#66ff66;color:#000000;"][td=""]A[/td][td=""]B[/td][/tr]"#.to_string(),
+            "[/table]".to_string(),
+        ];
+        let plain = vec!["[tr][td]A[/td][td]B[/td][/tr]".to_string()];
+        let report = compare_output_lines(&plain, &styled, &config);
+        assert!(!report.raw_equal);
+        assert!(report.semantic_equal);
+        assert!(report.right.style_wrapper_line_count >= 1);
+        assert!(report.right.document_normalized);
+    }
+
+    #[test]
+    fn multiline_html_cells_normalize_to_same_semantic_rows_as_compact_html() {
+        let config = TableViewOutputParityConfig::default().with_mode(OutputMode::Html);
+        let multiline = vec![
+            r#"<table border=0 id="bigtable">"#.to_string(),
+            r#"<tr style="background-color:#66ff66;color:#000000;">"#.to_string(),
+            r#"<td class="z_0 r_493 catalog" style="color:#000;">"#.to_string(),
+            "A &amp; B".to_string(),
+            "</td>".to_string(),
+            "</tr>".to_string(),
+            "</table>".to_string(),
+        ];
+        let compact = vec!["<tr><td>A &amp; B</td></tr>".to_string()];
+        let report = compare_output_lines(&compact, &multiline, &config);
+        assert!(report.semantic_equal);
+        assert_eq!(report.left.semantic_rows, vec![vec!["A & B".to_string()]]);
+        assert!(report.right.style_wrapper_line_count >= 2);
+    }
+
+    #[test]
+    fn style_aware_normalization_does_not_make_raw_commit_safe() {
+        let config = TableViewOutputParityConfig::default().with_mode(OutputMode::Html);
+        let plain = vec!["<tr><td>A</td></tr>".to_string()];
+        let styled = vec![r#"<tr style="background-color:#fff;"><td class="x">A</td></tr>"#.to_string()];
+        let report = compare_output_lines(&plain, &styled, &config);
+        assert!(report.semantic_equal);
+        assert!(!report.is_commit_safe_raw());
+    }
+
 }

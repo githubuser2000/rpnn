@@ -1,0 +1,37 @@
+{
+  "changed_files": [
+    "Cargo.toml",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/table_view_output_parity.rs",
+    "src/ffi.rs"
+  ],
+  "checks": {
+    "cargo_check": "not run in container; cargo unavailable",
+    "cargo_test": "not run in container; cargo unavailable",
+    "coverage_audit": "passed",
+    "python_probes": "passed",
+    "semantic_surface_audit": "passed"
+  },
+  "focus": "style-aware table_view_output parity for HTML/BBCode wrappers",
+  "new_binary": "rreta_arch_style_parity",
+  "new_ffi_exports": [
+    "reta_architecture_table_view_style_parity_json"
+  ],
+  "new_files": [
+    "src/bin/reta_arch_style_parity.rs",
+    "tools/architecture_style_parity_probe.py"
+  ],
+  "new_migration_steps": [
+    "step-table-view-style-parity"
+  ],
+  "new_runtime_gates": [
+    "table_view_style_parity.markup_document_normalize",
+    "table_view_style_parity.bbcode_styled_td",
+    "table_view_style_parity.raw_commit_guard"
+  ],
+  "safety_invariant": "semantic_equal may explain style-only differences, but raw_equal remains the guarded commit condition",
+  "stage": 35,
+  "status": "complete"
+}

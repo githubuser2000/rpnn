@@ -344,6 +344,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "html_attribute_and_cell_style_sections_compose_without_losing_either_witness",
         ),
         step(
+            "step-table-view-style-parity",
+            "wave-02-table-adapters",
+            "styled HTML/BBCode output + TableViewOutputParity",
+            "table_view_style_parity.markup_document_normalize",
+            "table_view_style_parity.raw_commit_guard",
+            "table-view-style-parity-shadow-diff",
+            "style_wrappers_are_semantically_ignored_but_raw_diff_still_guards_commit",
+        ),
+        step(
             "step-table-view-output",
             "wave-02-table-adapters",
             "MaterializedTableView",

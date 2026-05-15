@@ -571,6 +571,50 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
     }
 }
 
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_style_parity_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
+        let mode = parsed
+            .selected_output_mode
+            .unwrap_or(reta_architecture::OutputMode::Html);
+        let view = reta_architecture::table_view_for_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::MaterializedTableViewConfig::default(),
+        );
+        let options = reta_architecture::parse_table_view_output_cli_options(&args);
+        let styled_config = reta_architecture::TableViewOutputConfig::default()
+            .with_mode(mode)
+            .with_cli_options(options.clone());
+        let plain_config = reta_architecture::TableViewOutputConfig::default().with_mode(mode);
+        let styled = reta_architecture::render_materialized_table_view(&view, &styled_config);
+        let plain = reta_architecture::render_materialized_table_view(&view, &plain_config);
+        let parity = reta_architecture::compare_table_view_output_lines(
+            &plain.rendered_lines,
+            &styled.rendered_lines,
+            &reta_architecture::TableViewOutputParityConfig::default().with_mode(mode),
+        );
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "mode": mode.canonical_name(),
+            "options": options,
+            "plain": plain,
+            "styled": styled,
+            "parity": parity,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_style_parity_json"),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_architecture_snapshot_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&crate::shared_architecture().snapshot_ref()))
