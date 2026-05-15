@@ -1,0 +1,62 @@
+{
+  "args": [
+    "reta",
+    "-zeilen",
+    "--vorhervonausschnitt=3,1-2",
+    "-spalten",
+    "--religion=493",
+    "--breite=0"
+  ],
+  "case": "vorhervonausschnitt-order-3-1-2",
+  "checks": {
+    "ffi_export": true,
+    "inspect_binary": true,
+    "materialization_ordered_rows": true,
+    "materialization_report_fields": true,
+    "migration_step": true,
+    "parameter_runtime_no_column_row_leak_test": true,
+    "parameter_runtime_rows_as_ordered": true,
+    "runtime_gate": true,
+    "table_generation_ordered_selected_rows": true,
+    "table_generation_row_order_override": true
+  },
+  "expected_materialized_row_order_zero_based": [
+    0,
+    3,
+    1,
+    2
+  ],
+  "expected_ordered_selected_rows": [
+    3,
+    1,
+    2
+  ],
+  "source_column_493_witnesses": [
+    {
+      "contains_text": true,
+      "legacy_column": 493,
+      "preview": "M Kontinuum (dreizehn)",
+      "source_row_zero_based": 0
+    },
+    {
+      "contains_text": true,
+      "legacy_column": 493,
+      "preview": "Straße, Weg, Pfad",
+      "source_row_zero_based": 3
+    },
+    {
+      "contains_text": true,
+      "legacy_column": 493,
+      "preview": "Wege-Gabelung von negativ zu positiv, wie mit elektrischer Spannung und oder bei Ionen-Kristalle",
+      "source_row_zero_based": 1
+    },
+    {
+      "contains_text": true,
+      "legacy_column": 493,
+      "preview": "Barriere, damit zwei Pole negativ und positiv",
+      "source_row_zero_based": 2
+    }
+  ],
+  "stage": 27,
+  "status": "ok"
+}

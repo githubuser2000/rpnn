@@ -1,0 +1,57 @@
+{
+  "case": "table-view-shell-layout",
+  "checks": {
+    "config_type": true,
+    "facade_tracks_layout": true,
+    "ffi_export": true,
+    "inspect_binary": true,
+    "layout_function": true,
+    "lib_exports_layout": true,
+    "measure_function": true,
+    "migration_step": true,
+    "module_present": true,
+    "output_config_embeds_layout": true,
+    "output_report_has_layout_fields": true,
+    "page_function": true,
+    "report_type": true,
+    "runtime_gates": true,
+    "shell_renderer_uses_layout": true
+  },
+  "effective_widths_with_override_0_4_0": [
+    4,
+    4,
+    4
+  ],
+  "expected_first_padded_line": "A    | Breit | C   ",
+  "measured_widths": [
+    4,
+    5,
+    4
+  ],
+  "sample_pages_max_width_11": [
+    {
+      "end": 2,
+      "start": 0,
+      "width": 11
+    },
+    {
+      "end": 3,
+      "start": 2,
+      "width": 4
+    }
+  ],
+  "sample_rows": [
+    [
+      "A",
+      "Breit",
+      "C"
+    ],
+    [
+      "eins",
+      "zwei",
+      "drei"
+    ]
+  ],
+  "stage": 30,
+  "status": "ok"
+}

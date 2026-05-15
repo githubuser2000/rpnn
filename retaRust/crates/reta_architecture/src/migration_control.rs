@@ -353,6 +353,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "style_wrappers_are_semantically_ignored_but_raw_diff_still_guards_commit",
         ),
         step(
+            "step-table-view-shell-styles",
+            "wave-02-table-adapters",
+            "MaterializedTableView + table_output.colorize",
+            "table_view_shell_styles.legacy_colorize",
+            "table_view_shell_styles.legacy_colorize",
+            "table-view-shell-style-shadow-diff",
+            "ANSI_shell_colours_are_policy_controlled_and_semantically_stripped_for_parity",
+        ),
+        step(
             "step-table-view-output",
             "wave-02-table-adapters",
             "MaterializedTableView",
@@ -584,16 +593,18 @@ fn validate_migration_control(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime_switch::{bootstrap_runtime_switch, ArchitectureSwitchMode};
+    use crate::runtime_switch::{ArchitectureSwitchMode, bootstrap_runtime_switch};
 
     #[test]
     fn migration_control_is_validation_ready() {
         let bundle = bootstrap_migration_control();
         assert!(bundle.validation.is_ready());
-        assert!(bundle
-            .steps
-            .iter()
-            .any(|step| step.morphism == "table_adapters.prepare"));
+        assert!(
+            bundle
+                .steps
+                .iter()
+                .any(|step| step.morphism == "table_adapters.prepare")
+        );
     }
 
     #[test]

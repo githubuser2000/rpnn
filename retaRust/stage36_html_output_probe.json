@@ -1,0 +1,31 @@
+{
+  "checks": {
+    "cli_flags": true,
+    "default_disabled": true,
+    "ffi_export": true,
+    "html_catalog_493_class_has_r493": true,
+    "html_catalog_493_present": true,
+    "html_catalog_744_present": true,
+    "html_catalog_744_text_question": true,
+    "html_catalog_m_kontinuum_class_present": true,
+    "html_catalog_m_kontinuum_present": true,
+    "html_renderer_wired": true,
+    "inspect_binary": true,
+    "lib_exported": true,
+    "migration_step": true,
+    "module_exists": true,
+    "output_config_field": true,
+    "output_report_fields": true,
+    "policies_present": true,
+    "row_text_match_wired": true,
+    "runtime_gates": true
+  },
+  "column_493_text_preview": "15/n Universum",
+  "column_744_text": "?",
+  "html_catalog_record_count": 1372,
+  "m_kontinuum_html_column": 395,
+  "m_kontinuum_text_preview": "M Kontinuum (dreizehn)",
+  "stage": 31,
+  "status": "ok",
+  "universal_property": "HTML class witnesses are explicit local attributes and remain disabled until policy/gate activation"
+}

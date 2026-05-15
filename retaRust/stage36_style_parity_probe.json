@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "document_parser_present": true,
+    "duplicate_cell_count_increment_removed": true,
+    "ffi_export_present": true,
+    "inspect_binary_present": true,
+    "lib_exports_document_parser": true,
+    "migration_step_present": true,
+    "multiline_html_test_present": true,
+    "normalized_report_tracks_wrappers": true,
+    "raw_commit_guard_test_present": true,
+    "runtime_gates_present": true,
+    "style_aware_config_fields": true,
+    "styled_bbcode_td_parser_present": true
+  },
+  "invariant": "Styled HTML/BBCode wrappers, catalog classes, generateCell wrappers and multiline cell markup are semantically normalized for shadow diagnostics, but raw line equality is still required before any visible output commit.",
+  "stage": 35,
+  "status": "ok"
+}

@@ -1,0 +1,43 @@
+{
+  "base_stage": 35,
+  "changed_files": [
+    "Cargo.toml",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/shadow_pipeline.rs",
+    "crates/reta_architecture/src/table_view_output.rs",
+    "crates/reta_architecture/src/table_view_shell_styles.rs",
+    "src/bin/reta_arch_shell_styles.rs",
+    "src/ffi.rs",
+    "tools/architecture_shell_style_probe.py"
+  ],
+  "checks": {
+    "coverage_classes": "239/239",
+    "coverage_functions": "1096/1096",
+    "full_workspace_check": "blocked by crates.io DNS/dependency resolution in container",
+    "isolated_reta_architecture_cargo_check": "passed with local serde stubs",
+    "isolated_reta_architecture_cargo_test": "193 passed, 0 failed",
+    "python_probes": "passed",
+    "semantic_surface_marker_only": 0,
+    "semantic_surface_missing": 0
+  },
+  "core_invariant": "Shell ANSI colouring is disabled by default, opt-in through shell colour flags, disabled again by --nocolor, and semantically strip-able for parity diagnostics while raw output remains the commit guard.",
+  "date": "2026-05-15",
+  "new_binaries": [
+    "rreta_arch_shell_styles"
+  ],
+  "new_ffi_exports": [
+    "reta_architecture_table_view_shell_styles_json"
+  ],
+  "new_modules": [
+    "crates/reta_architecture/src/table_view_shell_styles.rs"
+  ],
+  "new_tools": [
+    "tools/architecture_shell_style_probe.py"
+  ],
+  "stage": 36,
+  "status": "implemented",
+  "title": "Shell ANSI style projection for materialized TableView output"
+}

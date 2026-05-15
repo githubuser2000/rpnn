@@ -1,0 +1,68 @@
+{
+  "stage": 29,
+  "numbering_module_present": true,
+  "numbering_mode_enum_present": true,
+  "legacy_pair_present": true,
+  "legacy_zaehlung_function_present": true,
+  "table_view_output_uses_numbering": true,
+  "lib_exports_numbering": true,
+  "facade_tracks_numbering": true,
+  "ffi_export_present": true,
+  "inspect_binary_registered": true,
+  "zaehlung_sample": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      1
+    ],
+    [
+      3,
+      1
+    ],
+    [
+      4,
+      1
+    ],
+    [
+      5,
+      2
+    ],
+    [
+      6,
+      2
+    ],
+    [
+      7,
+      2
+    ],
+    [
+      8,
+      2
+    ],
+    [
+      9,
+      2
+    ],
+    [
+      10,
+      3
+    ],
+    [
+      11,
+      3
+    ],
+    [
+      12,
+      3
+    ]
+  ],
+  "initial_intervals_match_python_docs": true,
+  "legacy_pair_headers": [
+    "Zählung",
+    "Nummerierung"
+  ],
+  "status": "ok"
+}

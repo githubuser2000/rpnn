@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
-use crate::{build_cli_request, run_reta, RetaRuntime};
+use crate::{RetaRuntime, build_cli_request, run_reta};
 
 pub const RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_ARGC: usize = 4096;
@@ -486,10 +486,8 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_composition_json(
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
-        let composition_counts = reta_architecture::html_cell_style_composition_counts(
-            &view.rows,
-            &output_config,
-        );
+        let composition_counts =
+            reta_architecture::html_cell_style_composition_counts(&view.rows, &output_config);
         let output = reta_architecture::render_materialized_table_view(&view, &output_config);
         serde_json::to_string(&serde_json::json!({
             "args": args,
@@ -503,7 +501,9 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_composition_json(
     })) {
         Ok(Ok(json)) => into_c_string(json),
         Ok(Err(error)) => json_error_string(&error.to_string()),
-        Err(_) => json_error_string("panic inside reta_architecture_table_view_style_composition_json"),
+        Err(_) => {
+            json_error_string("panic inside reta_architecture_table_view_style_composition_json")
+        }
     }
 }
 
@@ -571,6 +571,58 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
     }
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_shell_styles_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let options = reta_architecture::parse_table_view_output_cli_options(&args);
+        let parsed = reta_architecture::bootstrap_parameter_runtime().parse_cli_args(&args);
+        let mode = parsed
+            .selected_output_mode
+            .unwrap_or(reta_architecture::OutputMode::Shell);
+        let output_config = reta_architecture::TableViewOutputConfig::default()
+            .with_mode(mode)
+            .with_cli_options(options.clone());
+        let view = reta_architecture::table_view_for_cli_args(
+            &args,
+            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::MaterializedTableViewConfig::default()
+                .with_virtual_policy(output_config.virtual_column_policy),
+        );
+        let prefix_column_count = reta_architecture::output_prefix_column_count(&output_config);
+        let shell_styles = reta_architecture::shell_style_report_for_rows(
+            &view.rows,
+            &output_config.shell_styles,
+            output_config.suppress_headers,
+            output_config.include_empty_rows,
+            prefix_column_count,
+        );
+        let output = reta_architecture::render_materialized_table_view(&view, &output_config);
+        let parity = reta_architecture::compare_table_view_output_lines(
+            &reta_architecture::strip_ansi_escape_sequences(&output.rendered_text)
+                .lines()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            &output.rendered_lines,
+            &reta_architecture::TableViewOutputParityConfig::default()
+                .with_mode(reta_architecture::OutputMode::Shell),
+        );
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "options": options,
+            "shell_styles": shell_styles,
+            "output": output,
+            "strip_ansi_parity": parity,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_shell_styles_json"),
+    }
+}
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_style_parity_json(

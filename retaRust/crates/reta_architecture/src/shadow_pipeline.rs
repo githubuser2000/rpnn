@@ -11,26 +11,26 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::dataflow::DataflowDiscipline;
-use crate::execution_network::{execution_network_plan_for_indices, ExecutionNetworkPlan};
-use crate::migration_control::{bootstrap_migration_control, ActivationUnitSpec};
+use crate::execution_network::{ExecutionNetworkPlan, execution_network_plan_for_indices};
+use crate::migration_control::{ActivationUnitSpec, bootstrap_migration_control};
 use crate::output_syntax::OutputMode;
-use crate::parity_harness::{bootstrap_parity_harness, ParityProbePlan};
-use crate::prompt_interaction::{bootstrap_prompt_interaction, PromptInteractionPlan};
+use crate::parity_harness::{ParityProbePlan, bootstrap_parity_harness};
+use crate::prompt_interaction::{PromptInteractionPlan, bootstrap_prompt_interaction};
 use crate::prompt_language::PromptModus;
 use crate::runtime_switch::{
-    bootstrap_runtime_switch, ArchitectureSwitchConfig, ArchitectureSwitchMode, SwitchGateDecision,
+    ArchitectureSwitchConfig, ArchitectureSwitchMode, SwitchGateDecision, bootstrap_runtime_switch,
 };
 use crate::table_materialization::{
-    bootstrap_table_materialization, TableMaterializationConfig, TableMaterializationReport,
+    TableMaterializationConfig, TableMaterializationReport, bootstrap_table_materialization,
 };
-use crate::table_output::{render_prepared_table, TableOutputConfig, TableRenderResult};
-use crate::table_preparation::{prepare_row_cells, PreparedTable};
-use crate::table_view::{bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig};
+use crate::table_output::{TableOutputConfig, TableRenderResult, render_prepared_table};
+use crate::table_preparation::{PreparedTable, prepare_row_cells};
+use crate::table_view::{MaterializedTableView, MaterializedTableViewConfig, bootstrap_table_view};
 use crate::table_view_output::{
-    bootstrap_table_view_output, TableViewOutputConfig, TableViewOutputReport,
+    TableViewOutputConfig, TableViewOutputReport, bootstrap_table_view_output,
 };
 use crate::table_view_output_parity::{
-    bootstrap_table_view_output_parity, TableViewOutputParityConfig, TableViewOutputParityReport,
+    TableViewOutputParityConfig, TableViewOutputParityReport, bootstrap_table_view_output_parity,
 };
 use crate::table_wrapping::TableWidthContext;
 
@@ -938,6 +938,11 @@ mod tests {
                 cell_style_styled_cell_count: 0,
                 cell_style_virtual_cell_count: 0,
                 cell_style_report: None,
+                shell_style_enabled: false,
+                shell_style_policy: "plain".to_string(),
+                shell_style_cell_count: 0,
+                shell_style_ansi_cell_count: 0,
+                shell_style_report: None,
                 html_cell_style_composition_enabled: false,
                 html_cell_style_composition_count: 0,
                 html_attribute_only_cell_count: 0,

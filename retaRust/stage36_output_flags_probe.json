@@ -1,0 +1,56 @@
+{
+  "args": [
+    "reta",
+    "-zeilen",
+    "--vorhervonausschnitt=1-1",
+    "-spalten",
+    "--kontinuum=m",
+    "-ausgabe",
+    "--keineueberschriften",
+    "--keineleereninhalte",
+    "--breite=8",
+    "--nocolor",
+    "--justtext"
+  ],
+  "case": "ausgabe-output-flags",
+  "checks": {
+    "all_output_options_present": true,
+    "all_output_symbols_present": true,
+    "ffi_export": true,
+    "inspect_binary": true,
+    "limit_set_warning_removed": true,
+    "migration_step": true,
+    "runtime_gate_header_filter": true,
+    "runtime_gate_output_flags": true,
+    "runtime_gate_width": true,
+    "shadow_cli_uses_render_cli_args": true
+  },
+  "expected_data_still_visible_text": "Wege-Gabelung",
+  "expected_header_suppressed_text": "M Kontinuum",
+  "option_checks": {
+    "breite": true,
+    "breiten": true,
+    "dontwrap": true,
+    "endless": true,
+    "endlessscreen": true,
+    "justtext": true,
+    "keineleereninhalte": true,
+    "keinenummerierung": true,
+    "keineueberschriften": true,
+    "nocolor": true,
+    "onetable": true
+  },
+  "religion_first_data_493_preview": "Wege-Gabelung von negativ zu positiv, wie mit elektrischer Spannung und oder bei Ionen-Kristallen oder Ionen-Salzen in e",
+  "religion_header_493": "M Kontinuum (dreizehn)",
+  "stage": 28,
+  "status": "ok",
+  "symbol_checks": {
+    "TableViewOutputCliOptions": true,
+    "filtered_output_rows": true,
+    "output_flags_smoke": true,
+    "parse_table_view_output_cli_options": true,
+    "rendered_row_value_lines": true,
+    "row_values_with_options": true,
+    "wrap_output_cell": true
+  }
+}
