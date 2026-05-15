@@ -7,8 +7,10 @@ use crate::{fresh_program_from_template, preload_reta_runtime, shared_words};
 pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
     let argv = normalize_program_argv(&request.raw_args);
     let _architecture_run = reta_architecture::RetaRunArchitecture::from_cli_args(&argv);
-    let (arch_clean_argv, _) = reta_architecture::extract_architecture_switch_from_argv(&argv, None);
-    let (legacy_argv, _) = reta_architecture::extract_parallel_config_from_argv(&arch_clean_argv, None);
+    let (arch_clean_argv, _) =
+        reta_architecture::extract_architecture_switch_from_argv(&argv, None);
+    let (legacy_argv, _) =
+        reta_architecture::extract_parallel_config_from_argv(&arch_clean_argv, None);
 
     preload_reta_runtime().map_err(RetaError::Execution)?;
 
@@ -31,22 +33,32 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         });
     }
 
-    if !request.input.stdin_text.as_deref().unwrap_or_default().is_empty() {
+    if !request
+        .input
+        .stdin_text
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
         diagnostics.push(RetaDiagnostic {
             level: DiagnosticLevel::Info,
             code: "STDIN_BUFFER_PRESENT".to_string(),
-            message: "stdin wurde vom Binary entgegengenommen und an die Library weitergereicht.".to_string(),
+            message: "stdin wurde vom Binary entgegengenommen und an die Library weitergereicht."
+                .to_string(),
         });
     }
 
     let mut committed_shadow_lines: Option<Vec<String>> = None;
-    if let Some(shadow_runtime) = crate::reta_arch_shadow::shadow_table_runtime_report_for_program(&program, &argv) {
+    if let Some(shadow_runtime) =
+        crate::reta_arch_shadow::shadow_table_runtime_report_for_program(&program, &argv)
+    {
         let shadow_report = shadow_runtime.report;
         let commit = shadow_runtime.commit;
         let view_output_report = shadow_runtime.view_output_report;
         let view_output_commit = shadow_runtime.view_output_commit;
         let view_output_audit = shadow_runtime.view_output_audit;
         let view_output_transaction = shadow_runtime.view_output_transaction;
+        let view_output_journal = shadow_runtime.view_output_journal;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -165,6 +177,26 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 ),
             });
         }
+        if let Some(journal) = view_output_journal.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if journal.replayable || journal.rejected_record_count > 0 {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_JOURNAL".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Journal: records={} safe={} rejected={} replayable={} latest_source={:?} checksum={:?} rollback={:?}",
+                    journal.record_count,
+                    journal.safe_record_count,
+                    journal.rejected_record_count,
+                    journal.replayable,
+                    journal.latest_selected_source,
+                    journal.latest_selected_checksum,
+                    journal.latest_rollback_anchor,
+                ),
+            });
+        }
         if view_output_transaction
             .as_ref()
             .map(|transaction| transaction.should_replace_visible_output)
@@ -178,11 +210,17 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         }
     }
 
-    diagnostics.extend(program.cliErrors.iter().cloned().map(|message| RetaDiagnostic {
-        level: DiagnosticLevel::Error,
-        code: "CLI_ERROR".to_string(),
-        message,
-    }));
+    diagnostics.extend(
+        program
+            .cliErrors
+            .iter()
+            .cloned()
+            .map(|message| RetaDiagnostic {
+                level: DiagnosticLevel::Error,
+                code: "CLI_ERROR".to_string(),
+                message,
+            }),
+    );
 
     let rendered_text = if let Some(lines) = committed_shadow_lines.as_ref() {
         join_output_lines(lines)
@@ -222,7 +260,12 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         rows_emitted: committed_shadow_lines
             .as_ref()
             .map(Vec::len)
-            .unwrap_or_else(|| program.__resultingTable.len().max(program.finallyDisplayLines.len())),
+            .unwrap_or_else(|| {
+                program
+                    .__resultingTable
+                    .len()
+                    .max(program.finallyDisplayLines.len())
+            }),
     };
 
     Ok(RetaResponse {

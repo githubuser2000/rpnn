@@ -398,6 +398,8 @@ impl ShadowPipelineBundle {
                 "table_view_commit_audit.required_guards".to_string(),
                 "table_view_activation_transaction.select_visible_source".to_string(),
                 "table_view_activation_transaction.rollback_witness".to_string(),
+                "table_view_activation_journal.record_transaction".to_string(),
+                "table_view_activation_journal.replay_selected_lines".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),

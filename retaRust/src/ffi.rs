@@ -1,12 +1,12 @@
 use std::collections::BTreeSet;
 use std::ffi::CString;
 use std::os::raw::c_char;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
-use crate::{RetaRuntime, build_cli_request, run_reta};
+use crate::{build_cli_request, run_reta, RetaRuntime};
 
 pub const RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_ARGC: usize = 4096;
@@ -271,8 +271,9 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_columns_json(
         let output = reta_architecture::render_table_view_for_cli_args(
             &args,
             &reta_architecture::TableMaterializationConfig::default(),
-            &reta_architecture::TableViewOutputConfig::default()
-                .with_cli_options(reta_architecture::parse_table_view_output_cli_options(&args)),
+            &reta_architecture::TableViewOutputConfig::default().with_cli_options(
+                reta_architecture::parse_table_view_output_cli_options(&args),
+            ),
         );
         serde_json::to_string(&serde_json::json!({
             "args": args,
@@ -302,10 +303,8 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_parity_json(
             .selected_output_mode
             .unwrap_or(reta_architecture::OutputMode::Shell);
         let config = reta_architecture::TableViewVirtualParityConfig::from_cli_args(&args, mode);
-        let report = reta_architecture::compare_virtual_column_policies_for_cli_args(
-            &args,
-            &config,
-        );
+        let report =
+            reta_architecture::compare_virtual_column_policies_for_cli_args(&args, &config);
         serde_json::to_string(&serde_json::json!({
             "args": args,
             "config": config,
@@ -331,7 +330,10 @@ pub unsafe extern "C" fn reta_architecture_table_view_commit_audit_json(
         let legacy_text = unsafe { read_optional_string(legacy_text) }
             .unwrap_or_default()
             .unwrap_or_default();
-        let legacy_lines = legacy_text.lines().map(ToString::to_string).collect::<Vec<_>>();
+        let legacy_lines = legacy_text
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
         let (_, switch_config) =
             reta_architecture::extract_architecture_switch_from_argv(&args, None);
         let audit = reta_architecture::audit_table_view_output_for_cli_args(
@@ -347,9 +349,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_commit_audit_json(
     })) {
         Ok(Ok(json)) => into_c_string(json),
         Ok(Err(error)) => json_error_string(&error.to_string()),
-        Err(_) => {
-            json_error_string("panic inside reta_architecture_table_view_commit_audit_json")
-        }
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_commit_audit_json"),
     }
 }
 
@@ -364,7 +364,10 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_transaction_jso
         let legacy_text = unsafe { read_optional_string(legacy_text) }
             .unwrap_or_default()
             .unwrap_or_default();
-        let legacy_lines = legacy_text.lines().map(ToString::to_string).collect::<Vec<_>>();
+        let legacy_lines = legacy_text
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
         let (_, switch_config) =
             reta_architecture::extract_architecture_switch_from_argv(&args, None);
         let transaction = reta_architecture::table_view_activation_transaction_for_cli_args(
@@ -381,8 +384,48 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_transaction_jso
     })) {
         Ok(Ok(json)) => into_c_string(json),
         Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string(
+            "panic inside reta_architecture_table_view_activation_transaction_json",
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_activation_journal_json(
+    argc: usize,
+    argv: *const *const c_char,
+    legacy_text: *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let legacy_text = unsafe { read_optional_string(legacy_text) }
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let legacy_lines = legacy_text
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let (_, switch_config) =
+            reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let policy = reta_architecture::TableViewActivationJournalPolicy::default();
+        let journal = reta_architecture::activation_journal_for_cli_args(
+            &args,
+            &legacy_lines,
+            &switch_config,
+            &policy,
+        );
+        let replay = reta_architecture::replay_activation_journal(&journal, &legacy_lines, &policy);
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "legacy_line_count": legacy_lines.len(),
+            "journal": journal,
+            "replay": replay,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
         Err(_) => {
-            json_error_string("panic inside reta_architecture_table_view_activation_transaction_json")
+            json_error_string("panic inside reta_architecture_table_view_activation_journal_json")
         }
     }
 }

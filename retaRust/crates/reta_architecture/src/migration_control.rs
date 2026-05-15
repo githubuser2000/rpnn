@@ -335,6 +335,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "visible_output_source_is_selected_by_the_unique_safe_commit_transaction",
         ),
         step(
+            "step-table-view-activation-journal",
+            "wave-02-table-adapters",
+            "activation transaction + replayable rollback journal",
+            "table_view_activation_journal.record_transaction",
+            "table_view_activation_journal.replay_selected_lines",
+            "table-view-activation-journal-witness",
+            "activation_records_replay_visible_output_only_through_matching_transaction_checksums",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

@@ -16,6 +16,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_commit: Option<reta_architecture::ShadowTableViewOutputCommitDecision>,
     pub view_output_audit: Option<reta_architecture::TableViewCommitAuditReport>,
     pub view_output_transaction: Option<reta_architecture::TableViewActivationTransactionReport>,
+    pub view_output_journal: Option<reta_architecture::TableViewActivationJournal>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -37,11 +38,8 @@ pub fn shadow_table_runtime_report_for_program(
     let pipeline = reta_architecture::bootstrap_shadow_pipeline();
     let report = pipeline.shadow_table(&input, &switch_config);
     let commit = pipeline.table_commit_decision(&report, &switch_config);
-    let view_output_report = Some(pipeline.shadow_table_view_output(
-        argv,
-        &program.finallyDisplayLines,
-        &switch_config,
-    ));
+    let view_output_report =
+        Some(pipeline.shadow_table_view_output(argv, &program.finallyDisplayLines, &switch_config));
     let view_output_commit = view_output_report
         .as_ref()
         .map(|report| pipeline.table_view_output_commit_decision(report, &switch_config));
@@ -60,6 +58,12 @@ pub fn shadow_table_runtime_report_for_program(
                 &reta_architecture::TableViewActivationTransactionPolicy::default(),
             )
         });
+    let view_output_journal = view_output_transaction.as_ref().map(|transaction| {
+        reta_architecture::activation_journal_from_transactions(
+            std::slice::from_ref(transaction),
+            &reta_architecture::TableViewActivationJournalPolicy::default(),
+        )
+    });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -67,6 +71,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_commit,
         view_output_audit,
         view_output_transaction,
+        view_output_journal,
     })
 }
 
