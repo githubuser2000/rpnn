@@ -20,6 +20,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_replay: Option<reta_architecture::TableViewActivationReplayReport>,
     pub view_output_ledger: Option<reta_architecture::TableViewActivationLedger>,
     pub view_output_store: Option<reta_architecture::TableViewActivationStore>,
+    pub view_output_persistence: Option<reta_architecture::TableViewActivationPersistenceReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -99,6 +100,16 @@ pub fn shadow_table_runtime_report_for_program(
                 &reta_architecture::TableViewActivationStorePolicy::default(),
             )
         });
+    let view_output_persistence = view_output_store.as_ref().map(|store| {
+        let mut persistence = reta_architecture::PersistenceStore::default();
+        reta_architecture::persist_activation_store_to_persistence(
+            store,
+            &program.finallyDisplayLines,
+            store.latest_transaction_id.as_deref(),
+            &mut persistence,
+            &reta_architecture::TableViewActivationPersistencePolicy::default(),
+        )
+    });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -110,6 +121,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_replay,
         view_output_ledger,
         view_output_store,
+        view_output_persistence,
     })
 }
 

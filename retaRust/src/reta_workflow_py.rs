@@ -62,6 +62,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_replay = shadow_runtime.view_output_replay;
         let view_output_ledger = shadow_runtime.view_output_ledger;
         let view_output_store = shadow_runtime.view_output_store;
+        let view_output_persistence = shadow_runtime.view_output_persistence;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -262,6 +263,26 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     store.text_checksum,
                     store.latest_chain_hash,
                     store.validation.failed_guards,
+                ),
+            });
+        }
+        if let Some(persistence) = view_output_persistence.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if persistence.is_ready() {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_PERSISTENCE".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Persistenz: status={} kind={} name={} loaded_matches={} parse_ready={} source_digest={} parse_failed={:?}",
+                    persistence.status,
+                    persistence.store_kind,
+                    persistence.store_name,
+                    persistence.loaded_matches_source,
+                    persistence.parse_ready,
+                    persistence.source_text_digest,
+                    persistence.parse_failed_guards,
                 ),
             });
         }

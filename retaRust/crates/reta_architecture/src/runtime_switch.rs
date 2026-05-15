@@ -199,6 +199,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_activation_replay")
                     || morphism.starts_with("table_view_activation_ledger")
                     || morphism.starts_with("table_view_activation_store")
+                    || morphism.starts_with("table_view_activation_persistence")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -376,6 +377,11 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_store.parse_line_store".to_string(),
             "table_view_activation_store.validate_stored_hash_chain".to_string(),
             "table_view_activation_store.rollback_on_store_drift".to_string(),
+            "table_view_activation_persistence.persist_store_text".to_string(),
+            "table_view_activation_persistence.load_store_text".to_string(),
+            "table_view_activation_persistence.parse_loaded_store".to_string(),
+            "table_view_activation_persistence.record_audit_event".to_string(),
+            "table_view_activation_persistence.cache_latest_digest".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),

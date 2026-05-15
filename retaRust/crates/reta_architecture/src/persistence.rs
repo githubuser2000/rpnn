@@ -430,6 +430,7 @@ impl PersistenceBundle {
                 "execution_runs".to_string(),
                 "audit_events".to_string(),
                 "cache_entries".to_string(),
+                "activation_stores_via_local_sections".to_string(),
             ],
             morphisms: vec![
                 "persist_section".to_string(),
@@ -444,6 +445,10 @@ impl PersistenceBundle {
                 "cache_put_many".to_string(),
                 "cache_get".to_string(),
                 "invalidate_cache".to_string(),
+                "persist_activation_store_text".to_string(),
+                "load_activation_store_text".to_string(),
+                "audit_activation_store_persistence".to_string(),
+                "cache_latest_activation_store_digest".to_string(),
             ],
             universal_property:
                 "load_persisted_snapshot_equals_original_snapshot_when_digest_matches".to_string(),

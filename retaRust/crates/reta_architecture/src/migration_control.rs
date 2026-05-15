@@ -371,6 +371,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "stored_activation_sections_replay_only_when_header_selected_lines_and_ledger_hashes_reconstruct_the_same_chain",
         ),
         step(
+            "step-table-view-activation-persistence",
+            "wave-02-table-adapters",
+            "activation store + persistence/audit/cache bridge",
+            "table_view_activation_persistence.persist_store_text",
+            "table_view_activation_persistence.parse_loaded_store",
+            "table-view-activation-persistence-witness",
+            "persisted_activation_store_is_ready_only_when_load_parse_and_hash_match_the_source_store",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",
