@@ -63,6 +63,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_ledger = shadow_runtime.view_output_ledger;
         let view_output_store = shadow_runtime.view_output_store;
         let view_output_persistence = shadow_runtime.view_output_persistence;
+        let view_output_file = shadow_runtime.view_output_file;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -283,6 +284,27 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     persistence.parse_ready,
                     persistence.source_text_digest,
                     persistence.parse_failed_guards,
+                ),
+            });
+        }
+        if let Some(file) = view_output_file.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if file.is_ready() {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_FILE".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Datei: status={} path={} wrote={} read={} matches={} parse_ready={} source_digest={} failed={:?}",
+                    file.status,
+                    file.path,
+                    file.wrote_file,
+                    file.read_file,
+                    file.read_matches_source,
+                    file.parse_ready,
+                    file.source_text_digest,
+                    file.failed_guards,
                 ),
             });
         }

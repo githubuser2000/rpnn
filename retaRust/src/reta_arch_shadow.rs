@@ -21,6 +21,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_ledger: Option<reta_architecture::TableViewActivationLedger>,
     pub view_output_store: Option<reta_architecture::TableViewActivationStore>,
     pub view_output_persistence: Option<reta_architecture::TableViewActivationPersistenceReport>,
+    pub view_output_file: Option<reta_architecture::TableViewActivationFileReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -110,6 +111,22 @@ pub fn shadow_table_runtime_report_for_program(
             &reta_architecture::TableViewActivationPersistencePolicy::default(),
         )
     });
+    let view_output_file = view_output_store.as_ref().and_then(|store| {
+        let (file_policy, file_enabled) = reta_architecture::activation_file_policy_from_cli_args(
+            argv,
+            &reta_architecture::TableViewActivationFilePolicy::default(),
+        );
+        if file_enabled {
+            Some(reta_architecture::write_activation_store_file(
+                store,
+                &program.finallyDisplayLines,
+                store.latest_transaction_id.as_deref(),
+                &file_policy,
+            ))
+        } else {
+            None
+        }
+    });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -122,6 +139,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_ledger,
         view_output_store,
         view_output_persistence,
+        view_output_file,
     })
 }
 

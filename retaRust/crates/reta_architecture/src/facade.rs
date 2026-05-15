@@ -183,6 +183,10 @@ use crate::table_view_activation_persistence::{
     TableViewActivationPersistenceBundle,
     bootstrap_table_view_activation_persistence as bootstrap_table_view_activation_persistence_impl,
 };
+use crate::table_view_activation_file::{
+    TableViewActivationFileBundle,
+    bootstrap_table_view_activation_file as bootstrap_table_view_activation_file_impl,
+};
 use crate::table_view::{
     MaterializedTableViewConfig, TableViewBundle, bootstrap_table_view as bootstrap_table_view_impl,
 };
@@ -307,6 +311,7 @@ pub struct ArchitectureRuntime {
     pub table_view_activation_ledger: TableViewActivationLedgerBundle,
     pub table_view_activation_store: TableViewActivationStoreBundle,
     pub table_view_activation_persistence: TableViewActivationPersistenceBundle,
+    pub table_view_activation_file: TableViewActivationFileBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
     pub table_view_cell_styles: TableViewCellStyleBundle,
     pub table_view_commit_audit: TableViewCommitAuditBundle,
@@ -478,6 +483,7 @@ impl ArchitectureRuntime {
             table_view_activation_ledger: bootstrap_table_view_activation_ledger_impl(),
             table_view_activation_store: bootstrap_table_view_activation_store_impl(),
             table_view_activation_persistence: bootstrap_table_view_activation_persistence_impl(),
+            table_view_activation_file: bootstrap_table_view_activation_file_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
             table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
             table_view_commit_audit: bootstrap_table_view_commit_audit_impl(),
@@ -559,6 +565,7 @@ impl ArchitectureRuntime {
             "table_view_activation_ledger",
             "table_view_activation_store",
             "table_view_activation_persistence",
+            "table_view_activation_file",
             "table_view_html_attributes",
             "table_view_cell_styles",
             "table_view_commit_audit",
@@ -766,6 +773,13 @@ impl ArchitectureRuntime {
             rust_table_view_activation_persistence_validation_status:
                 crate::table_view_activation_persistence::continuum_m_activation_persistence_smoke()
                     .status,
+            rust_table_view_activation_file_morphism_count: self
+                .table_view_activation_file
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_activation_file_validation_status:
+                crate::table_view_activation_file::continuum_m_activation_file_smoke().status,
             rust_table_view_html_attribute_morphism_count: self
                 .table_view_html_attributes
                 .snapshot()
@@ -1013,6 +1027,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_activation_store_validation_status: String,
     pub rust_table_view_activation_persistence_morphism_count: usize,
     pub rust_table_view_activation_persistence_validation_status: String,
+    pub rust_table_view_activation_file_morphism_count: usize,
+    pub rust_table_view_activation_file_validation_status: String,
     pub rust_table_view_html_attribute_morphism_count: usize,
     pub rust_table_view_html_attribute_smoke_cell_count: usize,
     pub rust_table_view_cell_style_morphism_count: usize,

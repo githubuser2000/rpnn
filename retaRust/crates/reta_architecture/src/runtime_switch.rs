@@ -200,6 +200,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_activation_ledger")
                     || morphism.starts_with("table_view_activation_store")
                     || morphism.starts_with("table_view_activation_persistence")
+                    || morphism.starts_with("table_view_activation_file")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -382,6 +383,11 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_persistence.parse_loaded_store".to_string(),
             "table_view_activation_persistence.record_audit_event".to_string(),
             "table_view_activation_persistence.cache_latest_digest".to_string(),
+            "table_view_activation_file.choose_file_path".to_string(),
+            "table_view_activation_file.atomic_write_store".to_string(),
+            "table_view_activation_file.read_store_file".to_string(),
+            "table_view_activation_file.parse_read_store".to_string(),
+            "table_view_activation_file.rollback_on_file_drift".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),
@@ -492,6 +498,23 @@ pub fn extract_architecture_switch_from_argv(
             "--no-reta-arch-trace" | "--no-arch-trace" => {
                 config.trace = false;
                 config.source = "argv".to_string();
+                recognised = true;
+            }
+            "--activation-store-file" | "--reta-arch-activation-file"
+            | "--activation-store-dir" | "--reta-arch-activation-dir" => {
+                recognised = true;
+                skip_next = argv.get(index + 1).is_some();
+            }
+            "--activation-store-no-atomic" | "--activation-store-no-backup"
+            | "--activation-store-no-readback" | "--no-activation-store-file"
+            | "--reta-arch-no-activation-file" => {
+                recognised = true;
+            }
+            _ if arg.starts_with("--activation-store-file=")
+                || arg.starts_with("--reta-arch-activation-file=")
+                || arg.starts_with("--activation-store-dir=")
+                || arg.starts_with("--reta-arch-activation-dir=") =>
+            {
                 recognised = true;
             }
             _ if arg.starts_with("--reta-arch=")

@@ -380,6 +380,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "persisted_activation_store_is_ready_only_when_load_parse_and_hash_match_the_source_store",
         ),
         step(
+            "step-table-view-activation-file",
+            "wave-02-table-adapters",
+            "activation store + dependency-free file backend",
+            "table_view_activation_file.atomic_write_store",
+            "table_view_activation_file.parse_read_store",
+            "table-view-activation-file-witness",
+            "file_backed_activation_store_is_ready_only_when_write_read_parse_and_digest_are_identity",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

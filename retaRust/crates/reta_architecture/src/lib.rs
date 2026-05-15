@@ -79,6 +79,7 @@ pub mod table_view_activation_replay;
 pub mod table_view_activation_ledger;
 pub mod table_view_activation_store;
 pub mod table_view_activation_persistence;
+pub mod table_view_activation_file;
 pub mod table_view_cell_styles;
 pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
@@ -437,6 +438,14 @@ pub use table_view_activation_persistence::{
     TableViewActivationPersistenceReport, TableViewActivationPersistenceSnapshot,
     activation_persistence_for_cli_args, bootstrap_table_view_activation_persistence,
     continuum_m_activation_persistence_smoke, persist_activation_store_to_persistence,
+};
+pub use table_view_activation_file::{
+    TableViewActivationFileBundle, TableViewActivationFilePolicy,
+    TableViewActivationFileReport, TableViewActivationFileSnapshot,
+    activation_file_for_cli_args, activation_file_policy_from_cli_args,
+    bootstrap_table_view_activation_file,
+    continuum_m_activation_file_smoke, default_activation_store_file_path,
+    read_activation_store_file, write_activation_store_file,
 };
 pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
