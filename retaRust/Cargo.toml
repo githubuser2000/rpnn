@@ -106,6 +106,10 @@ name = "rreta_arch_commit_audit"
 path = "src/bin/reta_arch_commit_audit.rs"
 
 [[bin]]
+name = "rreta_arch_activation_transaction"
+path = "src/bin/reta_arch_activation_transaction.rs"
+
+[[bin]]
 name = "rreta_arch_view_output_shadow"
 path = "src/bin/reta_arch_view_output_shadow.rs"
 

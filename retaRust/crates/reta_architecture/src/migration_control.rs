@@ -326,6 +326,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "visible_table_view_output_commits_only_when_all_required_audit_guards_commute",
         ),
         step(
+            "step-table-view-activation-transaction",
+            "wave-02-table-adapters",
+            "commit audit + selected visible line source + rollback witness",
+            "table_view_activation_transaction.select_visible_source",
+            "table_view_activation_transaction.commit_audit_gate",
+            "table-view-activation-transaction-witness",
+            "visible_output_source_is_selected_by_the_unique_safe_commit_transaction",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

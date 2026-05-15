@@ -159,6 +159,10 @@ use crate::table_runtime::{
     TableRuntimeBundle, bootstrap_table_runtime as bootstrap_table_runtime_impl,
 };
 use crate::table_state::{TableStateBundle, bootstrap_table_state as bootstrap_table_state_impl};
+use crate::table_view_activation_transaction::{
+    TableViewActivationTransactionBundle,
+    bootstrap_table_view_activation_transaction as bootstrap_table_view_activation_transaction_impl,
+};
 use crate::table_view::{
     MaterializedTableViewConfig, TableViewBundle, bootstrap_table_view as bootstrap_table_view_impl,
 };
@@ -277,6 +281,7 @@ pub struct ArchitectureRuntime {
     pub table_generation: TableGenerationBundle,
     pub table_materialization: TableMaterializationBundle,
     pub table_view: TableViewBundle,
+    pub table_view_activation_transaction: TableViewActivationTransactionBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
     pub table_view_cell_styles: TableViewCellStyleBundle,
     pub table_view_commit_audit: TableViewCommitAuditBundle,
@@ -442,6 +447,7 @@ impl ArchitectureRuntime {
             table_generation: bootstrap_table_generation_impl(),
             table_materialization: bootstrap_table_materialization_impl(),
             table_view: bootstrap_table_view_impl(),
+            table_view_activation_transaction: bootstrap_table_view_activation_transaction_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
             table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
             table_view_commit_audit: bootstrap_table_view_commit_audit_impl(),
@@ -517,6 +523,7 @@ impl ArchitectureRuntime {
             "table_generation",
             "table_materialization",
             "table_view",
+            "table_view_activation_transaction",
             "table_view_html_attributes",
             "table_view_cell_styles",
             "table_view_commit_audit",
@@ -668,6 +675,14 @@ impl ArchitectureRuntime {
                 )
                 .materialized_cell_count,
             rust_table_view_morphism_count: self.table_view.snapshot().morphisms.len(),
+            rust_table_view_activation_transaction_morphism_count: self
+                .table_view_activation_transaction
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_activation_transaction_smoke_selected_lines:
+                crate::table_view_activation_transaction::continuum_m_activation_transaction_smoke()
+                    .selected_line_count,
             rust_table_view_html_attribute_morphism_count: self
                 .table_view_html_attributes
                 .snapshot()
@@ -901,6 +916,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_materialization_morphism_count: usize,
     pub rust_table_materialization_smoke_cell_count: usize,
     pub rust_table_view_morphism_count: usize,
+    pub rust_table_view_activation_transaction_morphism_count: usize,
+    pub rust_table_view_activation_transaction_smoke_selected_lines: usize,
     pub rust_table_view_html_attribute_morphism_count: usize,
     pub rust_table_view_html_attribute_smoke_cell_count: usize,
     pub rust_table_view_cell_style_morphism_count: usize,

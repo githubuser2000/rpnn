@@ -46,6 +46,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_report = shadow_runtime.view_output_report;
         let view_output_commit = shadow_runtime.view_output_commit;
         let view_output_audit = shadow_runtime.view_output_audit;
+        let view_output_transaction = shadow_runtime.view_output_transaction;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -141,13 +142,36 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 ),
             });
         }
-        if view_output_commit
+        if let Some(transaction) = view_output_transaction.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if transaction.should_replace_visible_output || !transaction.commit_decision_allows_view_output {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_TRANSACTION".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Transaktion: mode={} source={} replace={} safe={} reason={} selected_lines={} legacy_lines={} view_lines={} checksum={} rollback={:?}",
+                    transaction.switch_mode,
+                    transaction.selected_source,
+                    transaction.should_replace_visible_output,
+                    transaction.safe_to_apply,
+                    transaction.reason,
+                    transaction.selected_line_count,
+                    transaction.legacy_line_count,
+                    transaction.view_output_line_count,
+                    transaction.selected_lines_checksum,
+                    transaction.rollback_anchor,
+                ),
+            });
+        }
+        if view_output_transaction
             .as_ref()
-            .map(|commit| commit.use_view_output)
+            .map(|transaction| transaction.should_replace_visible_output)
             .unwrap_or(false)
         {
-            if let Some(report) = view_output_report {
-                committed_shadow_lines = Some(report.output_report.rendered_lines.clone());
+            if let Some(transaction) = view_output_transaction {
+                committed_shadow_lines = Some(transaction.selected_lines.clone());
             }
         } else if commit.use_shadow_output {
             committed_shadow_lines = Some(shadow_report.rendered_lines.clone());
