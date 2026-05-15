@@ -171,6 +171,10 @@ use crate::table_view_activation_replay::{
     TableViewActivationReplayBundle,
     bootstrap_table_view_activation_replay as bootstrap_table_view_activation_replay_impl,
 };
+use crate::table_view_activation_ledger::{
+    TableViewActivationLedgerBundle,
+    bootstrap_table_view_activation_ledger as bootstrap_table_view_activation_ledger_impl,
+};
 use crate::table_view::{
     MaterializedTableViewConfig, TableViewBundle, bootstrap_table_view as bootstrap_table_view_impl,
 };
@@ -292,6 +296,7 @@ pub struct ArchitectureRuntime {
     pub table_view_activation_transaction: TableViewActivationTransactionBundle,
     pub table_view_activation_journal: TableViewActivationJournalBundle,
     pub table_view_activation_replay: TableViewActivationReplayBundle,
+    pub table_view_activation_ledger: TableViewActivationLedgerBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
     pub table_view_cell_styles: TableViewCellStyleBundle,
     pub table_view_commit_audit: TableViewCommitAuditBundle,
@@ -460,6 +465,7 @@ impl ArchitectureRuntime {
             table_view_activation_transaction: bootstrap_table_view_activation_transaction_impl(),
             table_view_activation_journal: bootstrap_table_view_activation_journal_impl(),
             table_view_activation_replay: bootstrap_table_view_activation_replay_impl(),
+            table_view_activation_ledger: bootstrap_table_view_activation_ledger_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
             table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
             table_view_commit_audit: bootstrap_table_view_commit_audit_impl(),
@@ -538,6 +544,7 @@ impl ArchitectureRuntime {
             "table_view_activation_transaction",
             "table_view_activation_journal",
             "table_view_activation_replay",
+            "table_view_activation_ledger",
             "table_view_html_attributes",
             "table_view_cell_styles",
             "table_view_commit_audit",
@@ -713,6 +720,18 @@ impl ArchitectureRuntime {
             rust_table_view_activation_replay_smoke_selected_lines:
                 crate::table_view_activation_replay::continuum_m_activation_replay_smoke()
                     .selected_line_count,
+            rust_table_view_activation_ledger_morphism_count: self
+                .table_view_activation_ledger
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_activation_ledger_smoke_entry_count:
+                crate::table_view_activation_ledger::continuum_m_activation_ledger_smoke()
+                    .entry_count,
+            rust_table_view_activation_ledger_validation_status:
+                crate::table_view_activation_ledger::continuum_m_activation_ledger_smoke()
+                    .validation
+                    .status,
             rust_table_view_html_attribute_morphism_count: self
                 .table_view_html_attributes
                 .snapshot()
@@ -952,6 +971,9 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_activation_journal_smoke_record_count: usize,
     pub rust_table_view_activation_replay_morphism_count: usize,
     pub rust_table_view_activation_replay_smoke_selected_lines: usize,
+    pub rust_table_view_activation_ledger_morphism_count: usize,
+    pub rust_table_view_activation_ledger_smoke_entry_count: usize,
+    pub rust_table_view_activation_ledger_validation_status: String,
     pub rust_table_view_html_attribute_morphism_count: usize,
     pub rust_table_view_html_attribute_smoke_cell_count: usize,
     pub rust_table_view_cell_style_morphism_count: usize,

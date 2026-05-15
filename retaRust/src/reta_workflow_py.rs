@@ -60,6 +60,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_transaction = shadow_runtime.view_output_transaction;
         let view_output_journal = shadow_runtime.view_output_journal;
         let view_output_replay = shadow_runtime.view_output_replay;
+        let view_output_ledger = shadow_runtime.view_output_ledger;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -220,23 +221,54 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 ),
             });
         }
-        if view_output_replay
-            .as_ref()
-            .map(|replay| replay.replay_visible_output)
-            .unwrap_or(false)
+        if let Some(ledger) = view_output_ledger.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if ledger.validation.is_ready() {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_LEDGER".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Ledger: entries={} safe={} rejected={} status={} chain_valid={} replay={} source={} chain={:?} failed={:?}",
+                    ledger.entry_count,
+                    ledger.safe_entry_count,
+                    ledger.rejected_entry_count,
+                    ledger.validation.status,
+                    ledger.validation.hash_chain_valid,
+                    ledger.replay_visible_output,
+                    ledger.replay_selected_source,
+                    ledger.latest_chain_hash,
+                    ledger.validation.failed_guards,
+                ),
+            });
+        }
+        if let Some(ledger) = view_output_ledger.as_ref() {
+            if ledger.validation.is_ready() && ledger.replay_visible_output {
+                if let Some(replay) = ledger.replay.as_ref() {
+                    committed_shadow_lines = Some(replay.selected_lines.clone());
+                }
+            }
+        }
+        if committed_shadow_lines.is_none()
+            && view_output_replay
+                .as_ref()
+                .map(|replay| replay.replay_visible_output)
+                .unwrap_or(false)
         {
             if let Some(replay) = view_output_replay {
                 committed_shadow_lines = Some(replay.selected_lines.clone());
             }
-        } else if view_output_transaction
-            .as_ref()
-            .map(|transaction| transaction.should_replace_visible_output)
-            .unwrap_or(false)
+        } else if committed_shadow_lines.is_none()
+            && view_output_transaction
+                .as_ref()
+                .map(|transaction| transaction.should_replace_visible_output)
+                .unwrap_or(false)
         {
             if let Some(transaction) = view_output_transaction {
                 committed_shadow_lines = Some(transaction.selected_lines.clone());
             }
-        } else if commit.use_shadow_output {
+        } else if committed_shadow_lines.is_none() && commit.use_shadow_output {
             committed_shadow_lines = Some(shadow_report.rendered_lines.clone());
         }
     }

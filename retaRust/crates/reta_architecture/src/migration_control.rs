@@ -353,6 +353,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "journal_replay_is_identity_on_safe_records_and_rollback_on_transaction_or_checksum_drift",
         ),
         step(
+            "step-table-view-activation-ledger",
+            "wave-02-table-adapters",
+            "activation replay + hash chained journal records",
+            "table_view_activation_ledger.hash_chain",
+            "table_view_activation_ledger.validate_chain",
+            "table-view-activation-ledger-witness",
+            "activation_records_form_one_valid_hash_chain_before_replay_can_be_trusted",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",
