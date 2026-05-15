@@ -335,6 +335,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "legacy_cell_wrappers_are_policy_controlled_and_do_not_change_cell_values",
         ),
         step(
+            "step-table-view-style-composition",
+            "wave-02-table-adapters",
+            "htmlclassesPy witnesses + output_syntax.generateCell",
+            "table_view_style_composition.html_cell_merge",
+            "table_view_style_composition.html_cell_merge",
+            "table-view-style-composition-shadow-diff",
+            "html_attribute_and_cell_style_sections_compose_without_losing_either_witness",
+        ),
+        step(
             "step-table-view-output",
             "wave-02-table-adapters",
             "MaterializedTableView",

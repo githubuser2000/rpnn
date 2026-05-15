@@ -22,11 +22,11 @@ use crate::output_syntax::OutputMode;
 use crate::parameter_runtime::bootstrap_parameter_runtime;
 use crate::table_materialization::{bootstrap_table_materialization, TableMaterializationConfig};
 use crate::table_view::{
-    bootstrap_table_view, MaterializedTableView, MaterializedTableViewConfig,
+    bootstrap_table_view, MaterializedTableView, MaterializedTableViewCell, MaterializedTableViewConfig,
     MaterializedTableViewRow, VirtualColumnDisplayPolicy,
 };
 use crate::table_view_html_attributes::{
-    html_attribute_report_for_rows, render_html_table_with_attributes,
+    html_attribute_for_cell, html_attribute_report_for_rows, render_html_table_with_attributes,
     TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy, TableViewHtmlAttributeReport,
 };
 use crate::table_view_cell_styles::{
@@ -311,6 +311,7 @@ pub struct TableViewOutputSnapshot {
     pub stage29_numbering_modes: Vec<String>,
     pub stage32_row_style_policies: Vec<String>,
     pub stage33_cell_style_policies: Vec<String>,
+    pub stage34_style_composition_morphisms: Vec<String>,
     pub universal_property: String,
 }
 
@@ -351,6 +352,9 @@ pub struct TableViewOutputReport {
     pub cell_style_styled_cell_count: usize,
     pub cell_style_virtual_cell_count: usize,
     pub cell_style_report: Option<TableViewCellStyleReport>,
+    pub html_cell_style_composition_enabled: bool,
+    pub html_cell_style_composition_count: usize,
+    pub html_attribute_only_cell_count: usize,
     pub wrap_cell_width: Option<usize>,
     pub per_column_width_count: usize,
     pub dontwrap: bool,
@@ -447,6 +451,11 @@ impl TableViewOutputBundle {
                 TableViewCellStylePolicy::Plain.canonical().to_string(),
                 TableViewCellStylePolicy::LegacyGenerateCell.canonical().to_string(),
                 TableViewCellStylePolicy::LegacyGenerateCellWitness.canonical().to_string(),
+            ],
+            stage34_style_composition_morphisms: vec![
+                "html_begin_cell_for_output_value".to_string(),
+                "compose_html_td_open_tags".to_string(),
+                "html_cell_style_composition_counts".to_string(),
             ],
             universal_property:
                 "one materialized table view has deterministic images in every output syntax, output-option and numbering context"
@@ -678,6 +687,8 @@ pub fn render_materialized_table_view(
     } else {
         None
     };
+    let (html_cell_style_composition_count, html_attribute_only_cell_count) =
+        html_cell_style_composition_counts(&view.rows, config);
     let rendered_lines = render_table_view_rows_as_mode(&view.rows, config);
     let rendered_text = rendered_lines.join("\n");
     let visible_output_is_empty = rendered_text.is_empty();
@@ -725,6 +736,11 @@ pub fn render_materialized_table_view(
         cell_style_styled_cell_count: cell_style_report.as_ref().map(|report| report.styled_cell_count).unwrap_or_default(),
         cell_style_virtual_cell_count: cell_style_report.as_ref().map(|report| report.virtual_cell_style_count).unwrap_or_default(),
         cell_style_report,
+        html_cell_style_composition_enabled: config.mode == OutputMode::Html
+            && config.html_attributes.activates_catalog()
+            && config.cell_styles.activates_mode(OutputMode::Html),
+        html_cell_style_composition_count,
+        html_attribute_only_cell_count,
         wrap_cell_width: config.wrap_cell_width,
         per_column_width_count: config.per_column_widths.len(),
         dontwrap: config.dontwrap,
@@ -974,6 +990,226 @@ pub fn render_markdown_rows(
     out
 }
 
+pub fn html_begin_cell_for_output_value(
+    row: &MaterializedTableViewRow,
+    display_cell_index: usize,
+    continuation_line: bool,
+    prefix_column_count: usize,
+    config: &TableViewOutputConfig,
+) -> String {
+    let cell_style_begin = styled_begin_cell_for_output_value(
+        row,
+        OutputMode::Html,
+        display_cell_index,
+        continuation_line,
+        prefix_column_count,
+        &config.cell_styles,
+    );
+    if !config.html_attributes.activates_catalog() {
+        return cell_style_begin;
+    }
+    let Some(cell) = data_cell_for_output_value(row, display_cell_index, prefix_column_count) else {
+        return cell_style_begin;
+    };
+    let attribute = html_attribute_for_cell(cell, &config.html_attributes);
+    if !attribute.record_found && attribute.rendered_open_tag.trim() == "<td>" {
+        return cell_style_begin;
+    }
+    if config.cell_styles.activates_mode(OutputMode::Html) {
+        compose_html_td_open_tags(&cell_style_begin, &attribute.rendered_open_tag)
+    } else {
+        attribute.rendered_open_tag
+    }
+}
+
+pub fn data_cell_for_output_value<'a>(
+    row: &'a MaterializedTableViewRow,
+    display_cell_index: usize,
+    prefix_column_count: usize,
+) -> Option<&'a MaterializedTableViewCell> {
+    display_cell_index
+        .checked_sub(prefix_column_count)
+        .and_then(|data_index| row.cells.get(data_index))
+}
+
+pub fn html_cell_style_composition_counts(
+    rows: &[MaterializedTableViewRow],
+    config: &TableViewOutputConfig,
+) -> (usize, usize) {
+    if config.mode != OutputMode::Html || !config.html_attributes.activates_catalog() {
+        return (0, 0);
+    }
+    let prefix_column_count = output_prefix_column_count(config);
+    let mut composed = 0usize;
+    let mut attribute_only = 0usize;
+    for row in filtered_output_rows(rows, config) {
+        for display_cell_index in prefix_column_count..prefix_column_count + row.cells.len() {
+            let Some(cell) = data_cell_for_output_value(row, display_cell_index, prefix_column_count) else {
+                continue;
+            };
+            let attribute = html_attribute_for_cell(cell, &config.html_attributes);
+            if !attribute.record_found && attribute.rendered_open_tag.trim() == "<td>" {
+                continue;
+            }
+            let style = crate::table_view_cell_styles::cell_style_for_output_value(
+                row,
+                OutputMode::Html,
+                display_cell_index,
+                false,
+                prefix_column_count,
+                &config.cell_styles,
+            );
+            if config.cell_styles.activates_mode(OutputMode::Html) && style.styled {
+                composed += 1;
+            } else {
+                attribute_only += 1;
+            }
+        }
+    }
+    (composed, attribute_only)
+}
+
+pub fn compose_html_td_open_tags(style_begin: &str, attribute_begin: &str) -> String {
+    let style = normalize_td_open_tag(style_begin).unwrap_or_else(|| "<td>".to_string());
+    let attribute = normalize_td_open_tag(attribute_begin).unwrap_or_else(|| "<td>".to_string());
+    if is_plain_td(&attribute) {
+        return style;
+    }
+    if is_plain_td(&style) {
+        return attribute;
+    }
+
+    let class_values = dedup_words(
+        quoted_attr_values(&style, "class")
+            .into_iter()
+            .chain(quoted_attr_values(&attribute, "class"))
+            .flat_map(|value| value.split_whitespace().map(str::to_string).collect::<Vec<_>>())
+            .collect(),
+    );
+    let style_values = quoted_attr_values(&style, "style")
+        .into_iter()
+        .chain(quoted_attr_values(&attribute, "style"))
+        .filter(|value| !value.trim().is_empty())
+        .collect::<Vec<_>>();
+    let mut other_attrs = Vec::new();
+    for tag in [&style, &attribute] {
+        let stripped = remove_quoted_attr(&remove_quoted_attr(tag, "class"), "style");
+        if let Some(inner) = td_inner_attrs(&stripped) {
+            let inner = inner.trim();
+            if !inner.is_empty() {
+                other_attrs.push(inner.to_string());
+            }
+        }
+    }
+    let mut attrs = Vec::new();
+    if !class_values.is_empty() {
+        attrs.push(format!("class=\"{}\"", html_escape_attr_value(&class_values.join(" "))));
+    }
+    if !style_values.is_empty() {
+        let merged_style = style_values
+            .iter()
+            .map(|value| value.trim().trim_end_matches(';'))
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+            .join(";");
+        if !merged_style.is_empty() {
+            attrs.push(format!("style=\"{};\"", html_escape_attr_value(&merged_style)));
+        }
+    }
+    attrs.extend(other_attrs);
+    if attrs.is_empty() {
+        "<td>".to_string()
+    } else {
+        format!("<td {}>", attrs.join(" "))
+    }
+}
+
+fn normalize_td_open_tag(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.starts_with("<td") && trimmed.ends_with('>') {
+        Some(trimmed.replace('\n', ""))
+    } else {
+        None
+    }
+}
+
+fn is_plain_td(value: &str) -> bool {
+    value.trim() == "<td>" || value.trim() == "<td>\n"
+}
+
+fn td_inner_attrs(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if !trimmed.starts_with("<td") || !trimmed.ends_with('>') {
+        return None;
+    }
+    Some(trimmed[3..trimmed.len() - 1].trim().to_string())
+}
+
+fn quoted_attr_values(tag: &str, name: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut cursor = 0usize;
+    let needle = format!("{name}=\"");
+    while let Some(rel) = tag[cursor..].find(&needle) {
+        let start = cursor + rel;
+        let before_is_boundary = start == 0
+            || tag[..start]
+                .chars()
+                .last()
+                .map(|ch| ch.is_whitespace() || ch == '<')
+                .unwrap_or(true);
+        let value_start = start + needle.len();
+        if before_is_boundary {
+            if let Some(end_rel) = tag[value_start..].find('"') {
+                values.push(tag[value_start..value_start + end_rel].to_string());
+                cursor = value_start + end_rel + 1;
+                continue;
+            }
+        }
+        cursor = value_start;
+    }
+    values
+}
+
+fn remove_quoted_attr(tag: &str, name: &str) -> String {
+    let mut out = tag.to_string();
+    let needle = format!("{name}=\"");
+    loop {
+        let Some(pos) = out.find(&needle) else { break };
+        let start = out[..pos]
+            .char_indices()
+            .rev()
+            .find(|(_, ch)| !ch.is_whitespace())
+            .map(|(idx, ch)| idx + ch.len_utf8())
+            .unwrap_or(0);
+        let value_start = pos + needle.len();
+        let Some(end_rel) = out[value_start..].find('"') else { break };
+        out.replace_range(start..value_start + end_rel + 1, "");
+    }
+    out
+}
+
+fn dedup_words(values: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    for value in values {
+        if value.trim().is_empty() {
+            continue;
+        }
+        if seen.insert(value.clone()) {
+            out.push(value);
+        }
+    }
+    out
+}
+
+fn html_escape_attr_value(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 pub fn render_html_rows(
     rows: &[MaterializedTableViewRow],
     include_empty_rows: bool,
@@ -1020,13 +1256,12 @@ pub fn render_html_rows_with_config(
             out.push(clean_row_begin(&begin, "<tr>"));
             let prefix_column_count = output_prefix_column_count(config);
             for (value_index, value) in values.into_iter().enumerate() {
-                let begin = styled_begin_cell_for_output_value(
+                let begin = html_begin_cell_for_output_value(
                     row,
-                    OutputMode::Html,
                     value_index,
                     line_index > 0,
                     prefix_column_count,
-                    &config.cell_styles,
+                    config,
                 );
                 let end = styled_end_cell_for_mode(OutputMode::Html);
                 out.push(format!("{}{}{}", begin, html_escape_cell(&value), end));
@@ -1509,6 +1744,46 @@ mod tests {
         assert!(bbcode_report.cell_style_enabled);
         assert_eq!(bbcode_report.cell_style_policy, "legacy-generate-cell-witness");
         assert!(bbcode_report.rendered_lines.iter().any(|line| line.contains("[td")));
+    }
+
+    #[test]
+    fn htmlclasses_and_cellstyles_compose_in_one_td_begin_tag() {
+        let args = vec![
+            "reta".to_string(),
+            "-zeilen".to_string(),
+            "--vorhervonausschnitt=1-1".to_string(),
+            "-spalten".to_string(),
+            "--kontinuum=m".to_string(),
+            "-ausgabe".to_string(),
+            "--art=html".to_string(),
+            "--htmlclasses".to_string(),
+            "--cellstyles".to_string(),
+        ];
+        let report = render_table_view_for_cli_args(
+            &args,
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert!(report.html_attribute_enabled);
+        assert!(report.cell_style_enabled);
+        assert!(report.html_cell_style_composition_enabled);
+        assert!(report.html_cell_style_composition_count > 0);
+        assert!(report
+            .rendered_lines
+            .iter()
+            .any(|line| line.contains("<td") && line.contains("class=\"")));
+    }
+
+    #[test]
+    fn compose_html_td_open_tags_merges_class_and_style_attributes() {
+        let merged = compose_html_td_open_tags(
+            "<td class=\"z_0 r_493\" style=\"background:#fff;\">",
+            "<td class=\"catalog witness\" style=\"color:#000;\">",
+        );
+        assert!(merged.contains("class=\"z_0 r_493 catalog witness\""));
+        assert!(merged.contains("background:#fff"));
+        assert!(merged.contains("color:#000"));
+        assert!(!merged.contains("class=\"z_0 r_493\" class="));
     }
 
     #[test]

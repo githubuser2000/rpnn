@@ -426,10 +426,12 @@ pub use table_view_numbering::{
 pub use table_view_output::{
     bbcode_escape_cell, bootstrap_table_view_output, continuum_m_table_view_output_smoke,
     csv_escape_cell, expand_row_to_value_lines, filtered_output_rows, html_escape_cell,
-    markdown_escape_cell, output_flags_smoke, output_layout_smoke, output_prefix_column_count,
-    parse_table_view_output_cli_options, render_materialized_table_view,
-    render_table_view_for_cli_args, render_table_view_rows_as_mode, rendered_row_value_lines,
-    row_values, row_values_with_options, shell_layout_report_for_rows, wrap_output_cell,
+    compose_html_td_open_tags, data_cell_for_output_value, html_begin_cell_for_output_value,
+    html_cell_style_composition_counts, markdown_escape_cell, output_flags_smoke,
+    output_layout_smoke, output_prefix_column_count, parse_table_view_output_cli_options,
+    render_materialized_table_view, render_table_view_for_cli_args, render_table_view_rows_as_mode,
+    rendered_row_value_lines, row_values, row_values_with_options, shell_layout_report_for_rows,
+    wrap_output_cell,
     TableViewOutputBundle, TableViewOutputCliOptions, TableViewOutputConfig, TableViewOutputReport,
     TableViewOutputSnapshot,
 };

@@ -191,6 +191,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view")
                     || morphism.starts_with("table_view_html_attributes")
                     || morphism.starts_with("table_view_cell_styles")
+                    || morphism.starts_with("table_view_style_composition")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -343,6 +344,8 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_cell_styles.legacy_generate_cell".to_string(),
             "table_view_cell_styles.html_cell_wrapper".to_string(),
             "table_view_cell_styles.bbcode_cell_wrapper".to_string(),
+            "table_view_style_composition.html_cell_merge".to_string(),
+            "table_view_style_composition.attribute_cell_style_law".to_string(),
             "table_view_layout.column_widths".to_string(),
             "table_view_layout.horizontal_pages".to_string(),
             "table_view_layout.shell_padding".to_string(),
