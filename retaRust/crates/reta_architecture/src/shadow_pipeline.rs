@@ -32,6 +32,10 @@ use crate::table_view_output::{
 use crate::table_view_output_parity::{
     TableViewOutputParityConfig, TableViewOutputParityReport, bootstrap_table_view_output_parity,
 };
+use crate::table_view_virtual_parity::{
+    TableViewVirtualParityConfig, TableViewVirtualParityReport,
+    compare_virtual_column_policies_for_cli_args,
+};
 use crate::table_wrapping::TableWidthContext;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -345,6 +349,7 @@ pub struct ShadowCliPlan {
     pub materialization_report: TableMaterializationReport,
     pub table_view: MaterializedTableView,
     pub table_view_output: TableViewOutputReport,
+    pub virtual_column_parity: TableViewVirtualParityReport,
     pub universal_property: String,
 }
 
@@ -380,6 +385,7 @@ impl ShadowPipelineBundle {
                 "table_materialization.generation_plan".to_string(),
                 "table_view.materialized_view".to_string(),
                 "table_view_output.render".to_string(),
+                "table_view_virtual_parity.direct_cell_identity".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -420,6 +426,10 @@ impl ShadowPipelineBundle {
             &TableMaterializationConfig::default(),
             &TableViewOutputConfig::default().with_mode(output_mode),
         );
+        let virtual_column_parity = compare_virtual_column_policies_for_cli_args(
+            &cleaned_args,
+            &TableViewVirtualParityConfig::default().with_mode(output_mode),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -431,6 +441,7 @@ impl ShadowPipelineBundle {
             materialization_report,
             table_view,
             table_view_output,
+            virtual_column_parity,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }

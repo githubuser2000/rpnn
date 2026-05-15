@@ -196,6 +196,10 @@ use crate::table_view_virtual_columns::{
     TableViewVirtualColumnBundle,
     bootstrap_table_view_virtual_columns as bootstrap_table_view_virtual_columns_impl,
 };
+use crate::table_view_virtual_parity::{
+    TableViewVirtualParityBundle,
+    bootstrap_table_view_virtual_parity as bootstrap_table_view_virtual_parity_impl,
+};
 use crate::table_wrapping::{
     TableWrappingBundle, bootstrap_table_wrapping as bootstrap_table_wrapping_impl,
 };
@@ -278,6 +282,7 @@ pub struct ArchitectureRuntime {
     pub table_view_row_styles: TableViewRowStyleBundle,
     pub table_view_shell_styles: TableViewShellStyleBundle,
     pub table_view_virtual_columns: TableViewVirtualColumnBundle,
+    pub table_view_virtual_parity: TableViewVirtualParityBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -441,6 +446,7 @@ impl ArchitectureRuntime {
             table_view_row_styles: bootstrap_table_view_row_styles_impl(),
             table_view_shell_styles: bootstrap_table_view_shell_styles_impl(),
             table_view_virtual_columns: bootstrap_table_view_virtual_columns_impl(),
+            table_view_virtual_parity: bootstrap_table_view_virtual_parity_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -514,6 +520,7 @@ impl ArchitectureRuntime {
             "table_view_row_styles",
             "table_view_shell_styles",
             "table_view_virtual_columns",
+            "table_view_virtual_parity",
             "table_preparation",
             "table_output",
             "table_wrapping",
@@ -738,6 +745,14 @@ impl ArchitectureRuntime {
                     crate::table_view::VirtualColumnDisplayPolicy::TagSummary,
                 )
                 .rendered_virtual_cell_count,
+            rust_table_view_virtual_parity_morphism_count: self
+                .table_view_virtual_parity
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_virtual_parity_smoke_added_count:
+                crate::table_view_virtual_parity::continuum_m_virtual_parity_smoke()
+                    .added_virtual_cell_count,
             rust_table_view_output_smoke_line_count: self
                 .table_view_output
                 .render_cli_args(
@@ -886,6 +901,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_shell_style_smoke_ansi_count: usize,
     pub rust_table_view_virtual_column_morphism_count: usize,
     pub rust_table_view_virtual_column_smoke_rendered_count: usize,
+    pub rust_table_view_virtual_parity_morphism_count: usize,
+    pub rust_table_view_virtual_parity_smoke_added_count: usize,
     pub rust_table_view_output_smoke_line_count: usize,
     pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,
@@ -932,6 +949,8 @@ pub struct RetaRunArchitecture {
     pub materialized_row_order_preview: Vec<usize>,
     pub materialized_table_view_row_count: usize,
     pub materialized_table_view_virtual_cell_count: usize,
+    pub materialized_table_virtual_parity_direct_cells_equal: bool,
+    pub materialized_table_virtual_parity_added_count: usize,
     pub materialized_table_output_mode: String,
     pub materialized_table_output_line_count: usize,
     pub materialized_table_output_semantic_row_count: usize,
@@ -988,6 +1007,12 @@ impl RetaRunArchitecture {
                 &materialized_table_output.rendered_lines,
                 &TableViewOutputParityConfig::default().with_mode(table_output_mode),
             );
+        let materialized_table_virtual_parity =
+            crate::table_view_virtual_parity::compare_virtual_column_policies_for_cli_args(
+                &clean_args,
+                &crate::table_view_virtual_parity::TableViewVirtualParityConfig::default()
+                    .with_mode(table_output_mode),
+            );
         let switch_bundle = bootstrap_runtime_switch(Some(arch_switch_config.clone()));
         let migration_control = bootstrap_migration_control();
         let activation_units =
@@ -1039,6 +1064,10 @@ impl RetaRunArchitecture {
             materialized_table_view_row_count: materialized_table_view.row_count,
             materialized_table_view_virtual_cell_count: materialized_table_view
                 .rendered_virtual_cell_count,
+            materialized_table_virtual_parity_direct_cells_equal: materialized_table_virtual_parity
+                .direct_cells_equal,
+            materialized_table_virtual_parity_added_count: materialized_table_virtual_parity
+                .added_virtual_cell_count,
             materialized_table_output_mode: materialized_table_output.mode.clone(),
             materialized_table_output_line_count: materialized_table_output.rendered_line_count,
             materialized_table_output_semantic_row_count: materialized_table_output_semantic
@@ -1064,7 +1093,7 @@ impl RetaRunArchitecture {
 
     pub fn summary(&self) -> String {
         format!(
-            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} row_order_override={} row_order={:?} view_rows={} view_virtual_cells={} view_output={} view_output_lines={} view_output_semantic_rows={} numbering={} numbering_cols={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
+            "args={} clean_args={} tasks={} exec_net={} mains={} output={:?} upper={:?} cols={}/-{} pairs={} buckets={} symbolic_buckets={} csv_assets={} materialized_sections={} materialized_cells={} continuum_m={} column_order_override={} column_order={:?} row_order_override={} row_order={:?} view_rows={} view_virtual_cells={} virtual_parity_direct={} virtual_parity_added={} view_output={} view_output_lines={} view_output_semantic_rows={} numbering={} numbering_cols={} parallel={} workers={} arch={} source={} gates={}/{} owner={} universal={}",
             self.args_len,
             self.clean_args_len,
             self.scheduled_task_count,
@@ -1087,6 +1116,8 @@ impl RetaRunArchitecture {
             self.materialized_row_order_preview,
             self.materialized_table_view_row_count,
             self.materialized_table_view_virtual_cell_count,
+            self.materialized_table_virtual_parity_direct_cells_equal,
+            self.materialized_table_virtual_parity_added_count,
             self.materialized_table_output_mode,
             self.materialized_table_output_line_count,
             self.materialized_table_output_semantic_row_count,

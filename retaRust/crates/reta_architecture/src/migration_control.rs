@@ -299,6 +299,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "virtual_columns_are_suppressed_or_rendered_only_by_explicit_policy",
         ),
         step(
+            "step-table-view-virtual-parity",
+            "wave-02-table-adapters",
+            "virtual_column_policy + direct_csv_cell_signatures",
+            "table_view_virtual_parity.direct_cell_identity",
+            "table_view_virtual_parity.added_virtual_only",
+            "table-view-virtual-parity-shadow-diff",
+            "rendered_virtual_columns_may_add_witnesses_but_preserve_direct_cells",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

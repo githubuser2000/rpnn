@@ -82,6 +82,7 @@ pub mod table_view_output_parity;
 pub mod table_view_row_styles;
 pub mod table_view_shell_styles;
 pub mod table_view_virtual_columns;
+pub mod table_view_virtual_parity;
 pub mod table_wrapping;
 pub mod tag_schema;
 pub mod topology;
@@ -453,6 +454,13 @@ pub use table_view_virtual_columns::{
     bootstrap_table_view_virtual_columns, continuum_m_virtual_column_policy_smoke,
     parse_table_view_virtual_column_cli_options, virtual_column_report_for_cli_args,
     virtual_column_report_from_view,
+};
+pub use table_view_virtual_parity::{
+    DirectCellSignature, TableViewVirtualParityBundle, TableViewVirtualParityConfig,
+    TableViewVirtualParityReport, TableViewVirtualParitySnapshot, VirtualCellSignature,
+    bootstrap_table_view_virtual_parity, compare_virtual_column_policies_for_cli_args,
+    continuum_m_virtual_parity_smoke, direct_cell_signatures, first_line_mismatch,
+    first_signature_mismatch, virtual_cell_signature, virtual_cell_signatures,
 };
 pub use table_view_shell_styles::{
     TableViewShellStyle, TableViewShellStyleBundle, TableViewShellStyleConfig,
