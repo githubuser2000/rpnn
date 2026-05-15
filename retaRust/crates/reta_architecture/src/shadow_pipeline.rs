@@ -188,6 +188,7 @@ pub struct ShadowTableViewOutputReport {
     pub output_mode: String,
     pub diff: ShadowDiffSummary,
     pub semantic_diff: TableViewOutputParityReport,
+    pub virtual_column_parity: TableViewVirtualParityReport,
     pub output_report: TableViewOutputReport,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
@@ -200,6 +201,7 @@ pub struct ShadowTableViewOutputCommitPolicy {
     pub require_equal_diff: bool,
     pub allow_force_mismatch_commit: bool,
     pub max_shadow_lines: Option<usize>,
+    pub require_virtual_direct_identity: bool,
 }
 
 impl Default for ShadowTableViewOutputCommitPolicy {
@@ -209,6 +211,7 @@ impl Default for ShadowTableViewOutputCommitPolicy {
             require_equal_diff: true,
             allow_force_mismatch_commit: true,
             max_shadow_lines: None,
+            require_virtual_direct_identity: true,
         }
     }
 }
@@ -223,6 +226,9 @@ pub struct ShadowTableViewOutputCommitDecision {
     pub gate_allowed_to_commit: bool,
     pub diff_equal: bool,
     pub semantic_equal: bool,
+    pub virtual_direct_cells_equal: bool,
+    pub virtual_rendered_policy: String,
+    pub virtual_added_column_count: usize,
     pub force_override: bool,
     pub rendered_line_count: usize,
     pub rollback_anchor: Option<String>,
@@ -386,6 +392,8 @@ impl ShadowPipelineBundle {
                 "table_view.materialized_view".to_string(),
                 "table_view_output.render".to_string(),
                 "table_view_virtual_parity.direct_cell_identity".to_string(),
+                "table_view_virtual_parity.cli_policy_lift".to_string(),
+                "table_view_output.commit_virtual_guard".to_string(),
             ],
             table_morphism: "shadow_pipeline.table_adapter".to_string(),
             prompt_morphism: "shadow_pipeline.prompt_adapter".to_string(),
@@ -426,9 +434,13 @@ impl ShadowPipelineBundle {
             &TableMaterializationConfig::default(),
             &TableViewOutputConfig::default().with_mode(output_mode),
         );
+        let virtual_column_parity_config = TableViewVirtualParityConfig::from_cli_args(
+            &cleaned_args,
+            output_mode,
+        );
         let virtual_column_parity = compare_virtual_column_policies_for_cli_args(
             &cleaned_args,
-            &TableViewVirtualParityConfig::default().with_mode(output_mode),
+            &virtual_column_parity_config,
         );
         ShadowCliPlan {
             original_args: args.to_vec(),
@@ -523,6 +535,14 @@ impl ShadowPipelineBundle {
                 legacy_display_lines,
                 &TableViewOutputParityConfig::default().with_mode(output_mode),
             );
+        let virtual_column_parity_config = TableViewVirtualParityConfig::from_cli_args(
+            &cleaned_args,
+            output_mode,
+        );
+        let virtual_column_parity = compare_virtual_column_policies_for_cli_args(
+            &cleaned_args,
+            &virtual_column_parity_config,
+        );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -535,6 +555,7 @@ impl ShadowPipelineBundle {
             output_mode: output_report.mode.clone(),
             diff,
             semantic_diff,
+            virtual_column_parity,
             rendered_preview: output_report
                 .rendered_lines
                 .iter()
@@ -692,11 +713,13 @@ pub fn evaluate_shadow_table_view_output_commit(
         && policy.allow_force_mismatch_commit
         && commit_gate.allowed_to_commit;
     let diff_ok = !policy.require_equal_diff || report.diff.equal || force_override;
+    let virtual_direct_ok = !policy.require_virtual_direct_identity
+        || report.virtual_column_parity.direct_cells_equal;
     let size_ok = policy
         .max_shadow_lines
         .map(|limit| report.output_report.rendered_lines.len() <= limit)
         .unwrap_or(true);
-    let use_view_output = gate_ok && diff_ok && size_ok;
+    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && size_ok;
     let reason = if use_view_output {
         if force_override && !report.diff.equal {
             "force_commit_table_view_output_mismatch".to_string()
@@ -709,6 +732,8 @@ pub fn evaluate_shadow_table_view_output_commit(
         "gate_not_allowed_to_commit".to_string()
     } else if !diff_ok {
         "table_view_output_diff_not_equal".to_string()
+    } else if !virtual_direct_ok {
+        "virtual_policy_changed_direct_csv_cells".to_string()
     } else if !size_ok {
         "table_view_output_too_large_for_policy".to_string()
     } else {
@@ -723,6 +748,9 @@ pub fn evaluate_shadow_table_view_output_commit(
         gate_allowed_to_commit: commit_gate.allowed_to_commit,
         diff_equal: report.diff.equal,
         semantic_equal: report.semantic_diff.semantic_equal,
+        virtual_direct_cells_equal: report.virtual_column_parity.direct_cells_equal,
+        virtual_rendered_policy: report.virtual_column_parity.rendered_policy.clone(),
+        virtual_added_column_count: report.virtual_column_parity.added_virtual_column_count,
         force_override,
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),
@@ -913,6 +941,10 @@ mod tests {
                 &["view".to_string()],
                 &crate::table_view_output_parity::TableViewOutputParityConfig::default(),
             ),
+            virtual_column_parity: crate::table_view_virtual_parity::compare_virtual_column_policies_for_cli_args(
+                &["reta", "-spalten", "--kontinuum=m"],
+                &crate::table_view_virtual_parity::TableViewVirtualParityConfig::default(),
+            ),
             output_report: TableViewOutputReport {
                 class: "TableViewOutputReport".to_string(),
                 mode: "shell".to_string(),
@@ -995,6 +1027,7 @@ mod tests {
             evaluate_shadow_table_view_output_commit(&report, &config, &Default::default());
         assert!(decision.use_view_output);
         assert_eq!(decision.reason, "commit_equal_table_view_output");
+        assert!(decision.virtual_direct_cells_equal);
     }
 
     #[test]

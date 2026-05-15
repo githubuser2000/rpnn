@@ -297,7 +297,11 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_parity_json(
 ) -> *mut c_char {
     match catch_unwind(AssertUnwindSafe(|| {
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
-        let config = reta_architecture::TableViewVirtualParityConfig::default();
+        let mode = reta_architecture::bootstrap_parameter_runtime()
+            .parse_cli_args(&args)
+            .selected_output_mode
+            .unwrap_or(reta_architecture::OutputMode::Shell);
+        let config = reta_architecture::TableViewVirtualParityConfig::from_cli_args(&args, mode);
         let report = reta_architecture::compare_virtual_column_policies_for_cli_args(
             &args,
             &config,

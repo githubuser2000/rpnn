@@ -18,9 +18,9 @@ use crate::table_view::{
     MaterializedTableViewConfig, VirtualColumnDisplayPolicy, bootstrap_table_view,
 };
 use crate::table_view_output::{
-    TableViewOutputConfig, TableViewOutputReport, parse_table_view_output_cli_options,
-    render_materialized_table_view,
+    TableViewOutputConfig, parse_table_view_output_cli_options, render_materialized_table_view,
 };
+use crate::table_view_virtual_columns::parse_table_view_virtual_column_cli_options;
 use crate::table_view_output_parity::{
     TableViewOutputParityConfig, TableViewOutputParityReport, compare_output_lines,
 };
@@ -85,6 +85,23 @@ impl TableViewVirtualParityConfig {
         self
     }
 
+    pub fn with_cli_virtual_options<S: AsRef<str>>(mut self, args: &[S]) -> Self {
+        let options = parse_table_view_virtual_column_cli_options(args);
+        if let Some(policy) = options.policy {
+            self = self.with_rendered_policy(policy);
+        }
+        if let Some(suppress) = options.suppress_question_mark_virtuals {
+            self.rendered_suppress_question_marks = suppress;
+        }
+        self
+    }
+
+    pub fn from_cli_args<S: AsRef<str>>(args: &[S], mode: OutputMode) -> Self {
+        Self::default()
+            .with_mode(mode)
+            .with_cli_virtual_options(args)
+    }
+
     pub fn reference_view_config(&self) -> MaterializedTableViewConfig {
         MaterializedTableViewConfig {
             virtual_column_policy: self.reference_policy,
@@ -108,6 +125,9 @@ pub struct TableViewVirtualParityReport {
     pub mode: String,
     pub reference_policy: String,
     pub rendered_policy: String,
+    pub rendered_policy_source: String,
+    pub cli_virtual_option_count: usize,
+    pub rendered_policy_matches_cli: bool,
     pub direct_cells_equal: bool,
     pub raw_lines_equal: bool,
     pub semantic_rows_equal: bool,
@@ -256,6 +276,19 @@ pub fn compare_virtual_column_policies_for_cli_args<S: AsRef<str>>(
     config: &TableViewVirtualParityConfig,
 ) -> TableViewVirtualParityReport {
     let args_owned = args.iter().map(|arg| arg.as_ref().to_string()).collect::<Vec<_>>();
+    let cli_virtual_options = parse_table_view_virtual_column_cli_options(&args_owned);
+    let rendered_policy_matches_cli = cli_virtual_options
+        .policy
+        .map(|policy| policy == config.rendered_policy)
+        .unwrap_or(false);
+    let rendered_policy_source = if cli_virtual_options.policy.is_some()
+        || cli_virtual_options.suppress_question_mark_virtuals.is_some()
+    {
+        "cli"
+    } else {
+        "config"
+    }
+    .to_string();
     let parsed = bootstrap_parameter_runtime().parse_cli_args(&args_owned);
     let mode = config
         .mode_override
@@ -348,6 +381,9 @@ pub fn compare_virtual_column_policies_for_cli_args<S: AsRef<str>>(
         mode: mode.canonical_name().to_string(),
         reference_policy: config.reference_policy.canonical().to_string(),
         rendered_policy: config.rendered_policy.canonical().to_string(),
+        rendered_policy_source,
+        cli_virtual_option_count: cli_virtual_options.recognized_option_count,
+        rendered_policy_matches_cli,
         direct_cells_equal,
         raw_lines_equal,
         semantic_rows_equal,
@@ -443,5 +479,25 @@ mod tests {
         );
         assert!(report.direct_cells_equal);
         assert!(report.rendered_preview.iter().any(|line| line.contains('?')));
+    }
+
+    #[test]
+    fn cli_virtual_policy_is_used_when_requested() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=1-1",
+            "-spalten",
+            "--kontinuum=m",
+            "-ausgabe",
+            "--spaltenreihenfolgeundnurdiese=744,493",
+            "--virtualwitness",
+        ];
+        let config = TableViewVirtualParityConfig::default().with_cli_virtual_options(&args);
+        let report = compare_virtual_column_policies_for_cli_args(&args, &config);
+        assert_eq!(report.rendered_policy, "witness");
+        assert_eq!(report.rendered_policy_source, "cli");
+        assert!(report.rendered_policy_matches_cli);
+        assert!(report.direct_cells_equal);
     }
 }

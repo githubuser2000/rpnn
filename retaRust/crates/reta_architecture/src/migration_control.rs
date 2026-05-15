@@ -308,6 +308,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "rendered_virtual_columns_may_add_witnesses_but_preserve_direct_cells",
         ),
         step(
+            "step-table-view-virtual-commit-guard",
+            "wave-02-table-adapters",
+            "CLI virtual-column flags + commit guard",
+            "table_view_virtual_parity.cli_policy_lift",
+            "table_view_output.commit_virtual_guard",
+            "table-view-virtual-policy-commit-guard",
+            "CLI-selected_virtual_policy_may_commit_only_if_direct_cells_are_identity",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",
