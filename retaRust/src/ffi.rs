@@ -509,6 +509,52 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_ledger_json(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_activation_store_json(
+    argc: usize,
+    argv: *const *const c_char,
+    legacy_text: *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let legacy_text = unsafe { read_optional_string(legacy_text) }
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let legacy_lines = legacy_text
+            .lines()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let (_, switch_config) =
+            reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let policy = reta_architecture::TableViewActivationStorePolicy::default();
+        let store = reta_architecture::activation_store_for_cli_args(
+            &args,
+            &legacy_lines,
+            &switch_config,
+            &policy,
+        );
+        let parse_report = reta_architecture::parse_activation_store_text(
+            &store.store_text,
+            &legacy_lines,
+            store.latest_transaction_id.as_deref(),
+            &policy,
+        );
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "legacy_line_count": legacy_lines.len(),
+            "policy": policy,
+            "store": store,
+            "parse_report": parse_report,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => {
+            json_error_string("panic inside reta_architecture_table_view_activation_store_json")
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     argc: usize,
     argv: *const *const c_char,

@@ -19,6 +19,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_journal: Option<reta_architecture::TableViewActivationJournal>,
     pub view_output_replay: Option<reta_architecture::TableViewActivationReplayReport>,
     pub view_output_ledger: Option<reta_architecture::TableViewActivationLedger>,
+    pub view_output_store: Option<reta_architecture::TableViewActivationStore>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -88,6 +89,16 @@ pub fn shadow_table_runtime_report_for_program(
                 &reta_architecture::TableViewActivationLedgerPolicy::default(),
             )
         });
+    let view_output_store = view_output_journal
+        .as_ref()
+        .zip(view_output_ledger.as_ref())
+        .map(|(journal, ledger)| {
+            reta_architecture::activation_store_from_journal_and_ledger(
+                journal,
+                ledger,
+                &reta_architecture::TableViewActivationStorePolicy::default(),
+            )
+        });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -98,6 +109,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_journal,
         view_output_replay,
         view_output_ledger,
+        view_output_store,
     })
 }
 

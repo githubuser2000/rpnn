@@ -61,6 +61,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_journal = shadow_runtime.view_output_journal;
         let view_output_replay = shadow_runtime.view_output_replay;
         let view_output_ledger = shadow_runtime.view_output_ledger;
+        let view_output_store = shadow_runtime.view_output_store;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -240,6 +241,27 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     ledger.replay_selected_source,
                     ledger.latest_chain_hash,
                     ledger.validation.failed_guards,
+                ),
+            });
+        }
+        if let Some(store) = view_output_store.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if store.validation.is_ready() {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_STORE".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Store: records={} lines={} selected_lines={} ledger_entries={} status={} checksum={} chain={:?} failed={:?}",
+                    store.record_count,
+                    store.line_count,
+                    store.selected_line_count,
+                    store.ledger_entry_count,
+                    store.validation.status,
+                    store.text_checksum,
+                    store.latest_chain_hash,
+                    store.validation.failed_guards,
                 ),
             });
         }

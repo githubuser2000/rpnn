@@ -362,6 +362,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "activation_records_form_one_valid_hash_chain_before_replay_can_be_trusted",
         ),
         step(
+            "step-table-view-activation-store",
+            "wave-02-table-adapters",
+            "activation ledger + line-oriented persistent store",
+            "table_view_activation_store.encode_line_store",
+            "table_view_activation_store.validate_stored_hash_chain",
+            "table-view-activation-store-witness",
+            "stored_activation_sections_replay_only_when_header_selected_lines_and_ledger_hashes_reconstruct_the_same_chain",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

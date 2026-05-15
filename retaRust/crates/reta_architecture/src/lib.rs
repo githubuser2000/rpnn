@@ -77,6 +77,7 @@ pub mod table_view_activation_transaction;
 pub mod table_view_activation_journal;
 pub mod table_view_activation_replay;
 pub mod table_view_activation_ledger;
+pub mod table_view_activation_store;
 pub mod table_view_cell_styles;
 pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
@@ -421,6 +422,14 @@ pub use table_view_activation_ledger::{
     activation_ledger_for_cli_args, activation_ledger_from_journal,
     bootstrap_table_view_activation_ledger, continuum_m_activation_ledger_smoke,
     validate_activation_ledger_entries,
+};
+pub use table_view_activation_store::{
+    TableViewActivationStore, TableViewActivationStoreBundle,
+    TableViewActivationStoreParseReport, TableViewActivationStorePolicy,
+    TableViewActivationStoreSnapshot, TableViewActivationStoreValidation,
+    activation_store_for_cli_args, activation_store_from_journal_and_ledger,
+    activation_store_text_from_journal_and_ledger, bootstrap_table_view_activation_store,
+    continuum_m_activation_store_smoke, parse_activation_store_text,
 };
 pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,
