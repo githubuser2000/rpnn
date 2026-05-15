@@ -74,6 +74,7 @@ pub mod table_runtime;
 pub mod table_state;
 pub mod table_view;
 pub mod table_view_cell_styles;
+pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
 pub mod table_view_layout;
 pub mod table_view_numbering;
@@ -392,6 +393,12 @@ pub use table_view::{
     VirtualColumnDisplayPolicy, bootstrap_table_view, build_materialized_table_view,
     continuum_m_table_view_smoke, render_table_view_lines,
     view_for_cli_args as table_view_for_cli_args, virtual_column_value,
+};
+pub use table_view_commit_audit::{
+    TableViewCommitAuditBundle, TableViewCommitAuditCheck, TableViewCommitAuditReport,
+    TableViewCommitAuditSnapshot, audit_table_view_output_commit,
+    audit_table_view_output_for_cli_args, bootstrap_table_view_commit_audit,
+    continuum_m_commit_audit_smoke,
 };
 pub use table_view_html_attributes::{
     TableViewHtmlAttributeBundle, TableViewHtmlAttributeConfig, TableViewHtmlAttributePolicy,

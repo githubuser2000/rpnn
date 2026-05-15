@@ -45,6 +45,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let commit = shadow_runtime.commit;
         let view_output_report = shadow_runtime.view_output_report;
         let view_output_commit = shadow_runtime.view_output_commit;
+        let view_output_audit = shadow_runtime.view_output_audit;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -112,6 +113,31 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     commit.semantic_equal,
                     commit.rendered_line_count,
                     commit.rollback_anchor,
+                ),
+            });
+        }
+        if let Some(audit) = view_output_audit.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if audit.safe_to_commit || !audit.use_view_output {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_COMMIT_AUDIT".to_string(),
+                message: format!(
+                    "Rust-Architektur-Commit-Audit: mode={} safe={} use_view_output={} required={}/{} failed={:?} raw_equal={} semantic_equal={} virtual_direct={} virtual_added={} first_raw_diff={:?} first_semantic_diff={:?}",
+                    audit.switch_mode,
+                    audit.safe_to_commit,
+                    audit.use_view_output,
+                    audit.passed_required_check_count,
+                    audit.required_check_count,
+                    audit.failed_required_checks,
+                    audit.raw_equal,
+                    audit.semantic_equal,
+                    audit.virtual_direct_cells_equal,
+                    audit.virtual_added_column_count,
+                    audit.first_raw_mismatch_index,
+                    audit.first_semantic_mismatch_index,
                 ),
             });
         }

@@ -317,6 +317,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "CLI-selected_virtual_policy_may_commit_only_if_direct_cells_are_identity",
         ),
         step(
+            "step-table-view-commit-audit",
+            "wave-02-table-adapters",
+            "raw diff + semantic diff + virtual direct identity",
+            "table_view_commit_audit.audit_report",
+            "table_view_commit_audit.required_guards",
+            "table-view-commit-audit-shadow-witness",
+            "visible_table_view_output_commits_only_when_all_required_audit_guards_commute",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

@@ -166,6 +166,10 @@ use crate::table_view_cell_styles::{
     TableViewCellStyleBundle,
     bootstrap_table_view_cell_styles as bootstrap_table_view_cell_styles_impl,
 };
+use crate::table_view_commit_audit::{
+    TableViewCommitAuditBundle,
+    bootstrap_table_view_commit_audit as bootstrap_table_view_commit_audit_impl,
+};
 use crate::table_view_html_attributes::{
     TableViewHtmlAttributeBundle,
     bootstrap_table_view_html_attributes as bootstrap_table_view_html_attributes_impl,
@@ -275,6 +279,7 @@ pub struct ArchitectureRuntime {
     pub table_view: TableViewBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
     pub table_view_cell_styles: TableViewCellStyleBundle,
+    pub table_view_commit_audit: TableViewCommitAuditBundle,
     pub table_view_layout: TableViewLayoutBundle,
     pub table_view_numbering: TableViewNumberingBundle,
     pub table_view_output: TableViewOutputBundle,
@@ -439,6 +444,7 @@ impl ArchitectureRuntime {
             table_view: bootstrap_table_view_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
             table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
+            table_view_commit_audit: bootstrap_table_view_commit_audit_impl(),
             table_view_layout: bootstrap_table_view_layout_impl(),
             table_view_numbering: bootstrap_table_view_numbering_impl(),
             table_view_output: bootstrap_table_view_output_impl(),
@@ -513,6 +519,7 @@ impl ArchitectureRuntime {
             "table_view",
             "table_view_html_attributes",
             "table_view_cell_styles",
+            "table_view_commit_audit",
             "table_view_layout",
             "table_view_numbering",
             "table_view_output",
@@ -753,6 +760,16 @@ impl ArchitectureRuntime {
             rust_table_view_virtual_parity_smoke_added_count:
                 crate::table_view_virtual_parity::continuum_m_virtual_parity_smoke()
                     .added_virtual_cell_count,
+            rust_table_view_commit_audit_morphism_count: self
+                .table_view_commit_audit
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_commit_audit_required_guard_count: self
+                .table_view_commit_audit
+                .snapshot()
+                .required_guards
+                .len(),
             rust_table_view_output_smoke_line_count: self
                 .table_view_output
                 .render_cli_args(
@@ -903,6 +920,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_virtual_column_smoke_rendered_count: usize,
     pub rust_table_view_virtual_parity_morphism_count: usize,
     pub rust_table_view_virtual_parity_smoke_added_count: usize,
+    pub rust_table_view_commit_audit_morphism_count: usize,
+    pub rust_table_view_commit_audit_required_guard_count: usize,
     pub rust_table_view_output_smoke_line_count: usize,
     pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,

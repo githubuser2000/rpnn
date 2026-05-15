@@ -14,6 +14,7 @@ pub struct ShadowTableRuntimeReport {
     pub commit: reta_architecture::ShadowCommitDecision,
     pub view_output_report: Option<reta_architecture::ShadowTableViewOutputReport>,
     pub view_output_commit: Option<reta_architecture::ShadowTableViewOutputCommitDecision>,
+    pub view_output_audit: Option<reta_architecture::TableViewCommitAuditReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -43,11 +44,16 @@ pub fn shadow_table_runtime_report_for_program(
     let view_output_commit = view_output_report
         .as_ref()
         .map(|report| pipeline.table_view_output_commit_decision(report, &switch_config));
+    let view_output_audit = view_output_report
+        .as_ref()
+        .zip(view_output_commit.as_ref())
+        .map(|(report, commit)| reta_architecture::audit_table_view_output_commit(report, commit));
     Some(ShadowTableRuntimeReport {
         report,
         commit,
         view_output_report,
         view_output_commit,
+        view_output_audit,
     })
 }
 

@@ -193,6 +193,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_cell_styles")
                     || morphism.starts_with("table_view_style_composition")
                     || morphism.starts_with("table_view_style_parity")
+                    || morphism.starts_with("table_view_commit_audit")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -348,6 +349,10 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_virtual_parity.raw_commit_guard".to_string(),
             "table_view_virtual_parity.cli_policy_lift".to_string(),
             "table_view_output.commit_virtual_guard".to_string(),
+            "table_view_commit_audit.audit_report".to_string(),
+            "table_view_commit_audit.required_guards".to_string(),
+            "table_view_commit_audit.semantic_witness".to_string(),
+            "table_view_commit_audit.virtual_direct_identity".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),
