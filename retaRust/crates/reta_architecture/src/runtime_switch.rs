@@ -196,6 +196,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_commit_audit")
                     || morphism.starts_with("table_view_activation_transaction")
                     || morphism.starts_with("table_view_activation_journal")
+                    || morphism.starts_with("table_view_activation_replay")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -361,6 +362,10 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_journal.record_transaction".to_string(),
             "table_view_activation_journal.replay_selected_lines".to_string(),
             "table_view_activation_journal.rollback_checksum_witness".to_string(),
+            "table_view_activation_replay.guard_journal_replay".to_string(),
+            "table_view_activation_replay.match_transaction_id".to_string(),
+            "table_view_activation_replay.match_legacy_checksum".to_string(),
+            "table_view_activation_replay.rollback_to_legacy_lines".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),

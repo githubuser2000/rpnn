@@ -344,6 +344,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "activation_records_replay_visible_output_only_through_matching_transaction_checksums",
         ),
         step(
+            "step-table-view-activation-replay",
+            "wave-02-table-adapters",
+            "activation journal + current transaction/legacy replay guard",
+            "table_view_activation_replay.guard_journal_replay",
+            "table_view_activation_replay.rollback_to_legacy_lines",
+            "table-view-activation-replay-witness",
+            "journal_replay_is_identity_on_safe_records_and_rollback_on_transaction_or_checksum_drift",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

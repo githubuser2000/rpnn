@@ -59,6 +59,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_audit = shadow_runtime.view_output_audit;
         let view_output_transaction = shadow_runtime.view_output_transaction;
         let view_output_journal = shadow_runtime.view_output_journal;
+        let view_output_replay = shadow_runtime.view_output_replay;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -197,7 +198,37 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 ),
             });
         }
-        if view_output_transaction
+        if let Some(replay) = view_output_replay.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if replay.replay_visible_output || replay.selected_source == "legacy_output" {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_REPLAY".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Replay: replay={} safe={} source={} reason={} selected_lines={} checksum={} current_legacy_checksum={} tx_match={} legacy_match={}",
+                    replay.replay_visible_output,
+                    replay.replay_safe,
+                    replay.selected_source,
+                    replay.reason,
+                    replay.selected_line_count,
+                    replay.selected_lines_checksum,
+                    replay.current_legacy_checksum,
+                    replay.latest_transaction_matches_current,
+                    replay.latest_legacy_checksum_matches_current,
+                ),
+            });
+        }
+        if view_output_replay
+            .as_ref()
+            .map(|replay| replay.replay_visible_output)
+            .unwrap_or(false)
+        {
+            if let Some(replay) = view_output_replay {
+                committed_shadow_lines = Some(replay.selected_lines.clone());
+            }
+        } else if view_output_transaction
             .as_ref()
             .map(|transaction| transaction.should_replace_visible_output)
             .unwrap_or(false)

@@ -75,6 +75,7 @@ pub mod table_state;
 pub mod table_view;
 pub mod table_view_activation_transaction;
 pub mod table_view_activation_journal;
+pub mod table_view_activation_replay;
 pub mod table_view_cell_styles;
 pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
@@ -403,6 +404,12 @@ pub use table_view_activation_journal::{
     activation_journal_from_records, activation_journal_from_transactions,
     activation_journal_record_from_transaction, bootstrap_table_view_activation_journal,
     continuum_m_activation_journal_smoke, replay_activation_journal,
+};
+pub use table_view_activation_replay::{
+    TableViewActivationReplayBundle, TableViewActivationReplayPolicy,
+    TableViewActivationReplayReport, TableViewActivationReplaySnapshot,
+    activation_replay_for_cli_args, activation_replay_from_journal,
+    bootstrap_table_view_activation_replay, continuum_m_activation_replay_smoke,
 };
 pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,

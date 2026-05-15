@@ -17,6 +17,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_audit: Option<reta_architecture::TableViewCommitAuditReport>,
     pub view_output_transaction: Option<reta_architecture::TableViewActivationTransactionReport>,
     pub view_output_journal: Option<reta_architecture::TableViewActivationJournal>,
+    pub view_output_replay: Option<reta_architecture::TableViewActivationReplayReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -64,6 +65,17 @@ pub fn shadow_table_runtime_report_for_program(
             &reta_architecture::TableViewActivationJournalPolicy::default(),
         )
     });
+    let view_output_replay = view_output_journal
+        .as_ref()
+        .zip(view_output_transaction.as_ref())
+        .map(|(journal, transaction)| {
+            reta_architecture::activation_replay_from_journal(
+                journal,
+                &program.finallyDisplayLines,
+                Some(transaction.transaction_id.as_str()),
+                &reta_architecture::TableViewActivationReplayPolicy::default(),
+            )
+        });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -72,6 +84,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_audit,
         view_output_transaction,
         view_output_journal,
+        view_output_replay,
     })
 }
 
