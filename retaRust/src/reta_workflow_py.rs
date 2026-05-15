@@ -64,6 +64,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_store = shadow_runtime.view_output_store;
         let view_output_persistence = shadow_runtime.view_output_persistence;
         let view_output_file = shadow_runtime.view_output_file;
+        let view_output_recovery = shadow_runtime.view_output_recovery;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -307,6 +308,40 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     file.failed_guards,
                 ),
             });
+        }
+        if let Some(recovery) = view_output_recovery.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if recovery.is_ready() || recovery.selected_source == "legacy_output" {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_RECOVERY".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Recovery: status={} path={:?} read={} parsed={} parse_ready={} replay_safe={} recover={} source={} selected_lines={} checksum={} failed={:?}",
+                    recovery.status,
+                    recovery.path,
+                    recovery.read_file,
+                    recovery.parsed,
+                    recovery.parse_ready,
+                    recovery.replay_safe,
+                    recovery.recover_visible_output,
+                    recovery.selected_source,
+                    recovery.selected_line_count,
+                    recovery.selected_lines_checksum,
+                    recovery.failed_guards,
+                ),
+            });
+        }
+        if committed_shadow_lines.is_none()
+            && view_output_recovery
+                .as_ref()
+                .map(|recovery| recovery.recover_visible_output)
+                .unwrap_or(false)
+        {
+            if let Some(recovery) = view_output_recovery.as_ref() {
+                committed_shadow_lines = Some(recovery.selected_lines.clone());
+            }
         }
         if let Some(ledger) = view_output_ledger.as_ref() {
             if ledger.validation.is_ready() && ledger.replay_visible_output {

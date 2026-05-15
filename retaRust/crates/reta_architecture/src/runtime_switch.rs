@@ -201,6 +201,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_activation_store")
                     || morphism.starts_with("table_view_activation_persistence")
                     || morphism.starts_with("table_view_activation_file")
+                    || morphism.starts_with("table_view_activation_recovery")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -388,6 +389,10 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_file.read_store_file".to_string(),
             "table_view_activation_file.parse_read_store".to_string(),
             "table_view_activation_file.rollback_on_file_drift".to_string(),
+            "table_view_activation_recovery.read_existing_store_file".to_string(),
+            "table_view_activation_recovery.parse_existing_store".to_string(),
+            "table_view_activation_recovery.match_current_transaction".to_string(),
+            "table_view_activation_recovery.replay_or_rollback".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),
@@ -507,13 +512,29 @@ pub fn extract_architecture_switch_from_argv(
             }
             "--activation-store-no-atomic" | "--activation-store-no-backup"
             | "--activation-store-no-readback" | "--no-activation-store-file"
-            | "--reta-arch-no-activation-file" => {
+            | "--reta-arch-no-activation-file"
+            | "--activation-recovery" | "--activation-store-recovery"
+            | "--reta-arch-recovery" | "--activation-recovery-allow-replay"
+            | "--activation-store-recovery-allow-replay"
+            | "--activation-recovery-no-replay" | "--activation-store-recovery-no-replay"
+            | "--no-activation-recovery" | "--reta-arch-no-recovery" => {
                 recognised = true;
+            }
+            "--activation-recovery-file" | "--activation-recover-file"
+            | "--activation-store-recover" | "--reta-arch-recovery-file"
+            | "--reta-arch-recover-file" => {
+                recognised = true;
+                skip_next = argv.get(index + 1).is_some();
             }
             _ if arg.starts_with("--activation-store-file=")
                 || arg.starts_with("--reta-arch-activation-file=")
                 || arg.starts_with("--activation-store-dir=")
-                || arg.starts_with("--reta-arch-activation-dir=") =>
+                || arg.starts_with("--reta-arch-activation-dir=")
+                || arg.starts_with("--activation-recovery-file=")
+                || arg.starts_with("--activation-recover-file=")
+                || arg.starts_with("--activation-store-recover=")
+                || arg.starts_with("--reta-arch-recovery-file=")
+                || arg.starts_with("--reta-arch-recover-file=") =>
             {
                 recognised = true;
             }

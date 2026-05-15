@@ -389,6 +389,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "file_backed_activation_store_is_ready_only_when_write_read_parse_and_digest_are_identity",
         ),
         step(
+            "step-table-view-activation-recovery",
+            "wave-02-table-adapters",
+            "existing activation-store file + current replay guards",
+            "table_view_activation_recovery.read_existing_store_file",
+            "table_view_activation_recovery.replay_or_rollback",
+            "table-view-activation-recovery-witness",
+            "file_recovery_replays_only_when_existing_store_matches_current_transaction_and_legacy_checksum",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

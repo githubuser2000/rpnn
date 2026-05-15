@@ -22,6 +22,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_store: Option<reta_architecture::TableViewActivationStore>,
     pub view_output_persistence: Option<reta_architecture::TableViewActivationPersistenceReport>,
     pub view_output_file: Option<reta_architecture::TableViewActivationFileReport>,
+    pub view_output_recovery: Option<reta_architecture::TableViewActivationRecoveryReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -127,6 +128,20 @@ pub fn shadow_table_runtime_report_for_program(
             None
         }
     });
+    let (recovery_policy, recovery_enabled) = reta_architecture::activation_recovery_policy_from_cli_args(
+        argv,
+        &reta_architecture::TableViewActivationRecoveryPolicy::default(),
+    );
+    let view_output_recovery = if recovery_enabled {
+        Some(reta_architecture::activation_recovery_for_cli_args(
+            argv,
+            &program.finallyDisplayLines,
+            &switch_config,
+            &recovery_policy,
+        ))
+    } else {
+        None
+    };
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -140,6 +155,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_store,
         view_output_persistence,
         view_output_file,
+        view_output_recovery,
     })
 }
 
