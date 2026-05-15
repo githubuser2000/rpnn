@@ -192,6 +192,10 @@ use crate::table_view_shell_styles::{
     TableViewShellStyleBundle,
     bootstrap_table_view_shell_styles as bootstrap_table_view_shell_styles_impl,
 };
+use crate::table_view_virtual_columns::{
+    TableViewVirtualColumnBundle,
+    bootstrap_table_view_virtual_columns as bootstrap_table_view_virtual_columns_impl,
+};
 use crate::table_wrapping::{
     TableWrappingBundle, bootstrap_table_wrapping as bootstrap_table_wrapping_impl,
 };
@@ -273,6 +277,7 @@ pub struct ArchitectureRuntime {
     pub table_view_output_parity: TableViewOutputParityBundle,
     pub table_view_row_styles: TableViewRowStyleBundle,
     pub table_view_shell_styles: TableViewShellStyleBundle,
+    pub table_view_virtual_columns: TableViewVirtualColumnBundle,
     pub table_output: TableOutputBundle,
     pub table_preparation: TablePreparationBundle,
     pub table_runtime: TableRuntimeBundle,
@@ -435,6 +440,7 @@ impl ArchitectureRuntime {
             table_view_output_parity: bootstrap_table_view_output_parity_impl(),
             table_view_row_styles: bootstrap_table_view_row_styles_impl(),
             table_view_shell_styles: bootstrap_table_view_shell_styles_impl(),
+            table_view_virtual_columns: bootstrap_table_view_virtual_columns_impl(),
             table_output: bootstrap_table_output_impl(),
             table_preparation: bootstrap_table_preparation_impl(),
             table_runtime: bootstrap_table_runtime_impl(),
@@ -507,6 +513,7 @@ impl ArchitectureRuntime {
             "table_view_output_parity",
             "table_view_row_styles",
             "table_view_shell_styles",
+            "table_view_virtual_columns",
             "table_preparation",
             "table_output",
             "table_wrapping",
@@ -721,6 +728,16 @@ impl ArchitectureRuntime {
                 .len(),
             rust_table_view_shell_style_smoke_ansi_count:
                 crate::table_view_shell_styles::continuum_m_shell_style_smoke().ansi_cell_count,
+            rust_table_view_virtual_column_morphism_count: self
+                .table_view_virtual_columns
+                .snapshot()
+                .morphisms
+                .len(),
+            rust_table_view_virtual_column_smoke_rendered_count:
+                crate::table_view_virtual_columns::continuum_m_virtual_column_policy_smoke(
+                    crate::table_view::VirtualColumnDisplayPolicy::TagSummary,
+                )
+                .rendered_virtual_cell_count,
             rust_table_view_output_smoke_line_count: self
                 .table_view_output
                 .render_cli_args(
@@ -867,6 +884,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_table_view_row_style_smoke_colored_count: usize,
     pub rust_table_view_shell_style_morphism_count: usize,
     pub rust_table_view_shell_style_smoke_ansi_count: usize,
+    pub rust_table_view_virtual_column_morphism_count: usize,
+    pub rust_table_view_virtual_column_smoke_rendered_count: usize,
     pub rust_table_view_output_smoke_line_count: usize,
     pub rust_table_view_smoke_row_count: usize,
     pub rust_parallel_execution_morphism_count: usize,

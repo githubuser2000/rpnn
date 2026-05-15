@@ -290,6 +290,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "materialized_sections_glue_to_same_ordered_renderable_rows",
         ),
         step(
+            "step-table-view-virtual-columns",
+            "wave-02-table-adapters",
+            "virtual_column_witnesses + output CLI flags",
+            "table_view_virtual_columns.policy",
+            "table_view_virtual_columns.policy",
+            "table-view-virtual-column-shadow-diff",
+            "virtual_columns_are_suppressed_or_rendered_only_by_explicit_policy",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

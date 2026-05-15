@@ -81,6 +81,7 @@ pub mod table_view_output;
 pub mod table_view_output_parity;
 pub mod table_view_row_styles;
 pub mod table_view_shell_styles;
+pub mod table_view_virtual_columns;
 pub mod table_wrapping;
 pub mod tag_schema;
 pub mod topology;
@@ -445,6 +446,13 @@ pub use table_view_row_styles::{
     TableViewRowStyleReport, TableViewRowStyleSnapshot, bootstrap_table_view_row_styles,
     continuum_m_row_style_smoke, row_style_for_row, row_style_for_source_row,
     row_style_report_for_rows, styled_begin_row_for_row,
+};
+pub use table_view_virtual_columns::{
+    TableViewVirtualColumnBundle, TableViewVirtualColumnCliOptions, TableViewVirtualColumnConfig,
+    TableViewVirtualColumnReport, TableViewVirtualColumnSnapshot,
+    bootstrap_table_view_virtual_columns, continuum_m_virtual_column_policy_smoke,
+    parse_table_view_virtual_column_cli_options, virtual_column_report_for_cli_args,
+    virtual_column_report_from_view,
 };
 pub use table_view_shell_styles::{
     TableViewShellStyle, TableViewShellStyleBundle, TableViewShellStyleConfig,

@@ -15,6 +15,8 @@
 //! legacy `generateCell`/`generate_cell_begin` syntax.
 //! Stage 36 adds a disabled-by-default shell ANSI style projection backed by
 //! the legacy `table_output.colorize` function.
+//! Stage 37 makes virtual/non-direct columns explicitly render-policy controlled
+//! through CLI/shadow flags while keeping suppression as the default.
 //! The legacy renderer is still the behaviour oracle; this module makes those
 //! options inspectable and shadow-comparable before any guarded commit.
 
@@ -47,6 +49,9 @@ use crate::table_view_shell_styles::{
     TableViewShellStyleConfig, TableViewShellStylePolicy, TableViewShellStyleReport,
     colorize_shell_output_value, shell_style_report_for_rows,
 };
+use crate::table_view_virtual_columns::{
+    TableViewVirtualColumnCliOptions, parse_table_view_virtual_column_cli_options,
+};
 use crate::table_wrapping::alxwrap;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -69,6 +74,12 @@ pub struct TableViewOutputCliOptions {
     pub cellstylewitness: bool,
     pub shellcolors: bool,
     pub shellcolorwitness: bool,
+    pub virtualcolumns: bool,
+    pub virtualplaceholder: bool,
+    pub virtualquestionmarks: bool,
+    pub virtualwitness: bool,
+    pub suppressvirtualcolumns: bool,
+    pub virtual_column_options: TableViewVirtualColumnCliOptions,
     pub width: Option<usize>,
     pub widths: Vec<usize>,
     pub recognized_option_count: usize,
@@ -96,6 +107,12 @@ impl Default for TableViewOutputCliOptions {
             cellstylewitness: false,
             shellcolors: false,
             shellcolorwitness: false,
+            virtualcolumns: false,
+            virtualplaceholder: false,
+            virtualquestionmarks: false,
+            virtualwitness: false,
+            suppressvirtualcolumns: false,
+            virtual_column_options: TableViewVirtualColumnCliOptions::default(),
             width: None,
             widths: Vec::new(),
             recognized_option_count: 0,
@@ -127,6 +144,11 @@ impl TableViewOutputCliOptions {
             || self.cellstylewitness
             || self.shellcolors
             || self.shellcolorwitness
+            || self.virtualcolumns
+            || self.virtualplaceholder
+            || self.virtualquestionmarks
+            || self.virtualwitness
+            || self.suppressvirtualcolumns
     }
 
     pub fn apply_to_config(&self, base: &TableViewOutputConfig) -> TableViewOutputConfig {
@@ -176,6 +198,28 @@ impl TableViewOutputCliOptions {
                 TableViewShellStyleConfig::legacy_colorize()
             };
         }
+        if self.suppressvirtualcolumns {
+            config.virtual_column_policy = VirtualColumnDisplayPolicy::Suppress;
+            config.suppress_question_mark_virtuals = true;
+        }
+        if self.virtualcolumns {
+            config.virtual_column_policy = VirtualColumnDisplayPolicy::TagSummary;
+        }
+        if self.virtualplaceholder || self.virtualquestionmarks {
+            config.virtual_column_policy = VirtualColumnDisplayPolicy::Placeholder;
+            config.suppress_question_mark_virtuals = false;
+        }
+        if self.virtualwitness {
+            config.virtual_column_policy = VirtualColumnDisplayPolicy::Witness;
+            config.suppress_question_mark_virtuals = false;
+        }
+        config.virtual_column_options = self.virtual_column_options.clone();
+        if let Some(policy) = self.virtual_column_options.policy {
+            config.virtual_column_policy = policy;
+        }
+        if let Some(suppress) = self.virtual_column_options.suppress_question_mark_virtuals {
+            config.suppress_question_mark_virtuals = suppress;
+        }
         if config.nocolor {
             config.html_attributes.include_inline_style = false;
             config.row_styles = config.row_styles.clone().without_color();
@@ -211,6 +255,8 @@ pub struct TableViewOutputConfig {
     pub include_markdown_header_separator: bool,
     pub include_empty_rows: bool,
     pub virtual_column_policy: VirtualColumnDisplayPolicy,
+    pub suppress_question_mark_virtuals: bool,
+    pub virtual_column_options: TableViewVirtualColumnCliOptions,
     /// Drop source/header rows before output rendering.  This corresponds to
     /// Python's `--keineueberschriften` flag.
     pub suppress_headers: bool,
@@ -246,6 +292,8 @@ impl Default for TableViewOutputConfig {
             include_markdown_header_separator: true,
             include_empty_rows: true,
             virtual_column_policy: VirtualColumnDisplayPolicy::Suppress,
+            suppress_question_mark_virtuals: true,
+            virtual_column_options: TableViewVirtualColumnCliOptions::default(),
             suppress_headers: false,
             include_row_numbers: false,
             row_number_header: "#".to_string(),
@@ -340,6 +388,7 @@ pub struct TableViewOutputSnapshot {
     pub stage33_cell_style_policies: Vec<String>,
     pub stage34_style_composition_morphisms: Vec<String>,
     pub stage36_shell_style_policies: Vec<String>,
+    pub stage37_virtual_column_policies: Vec<String>,
     pub universal_property: String,
 }
 
@@ -355,6 +404,9 @@ pub struct TableViewOutputReport {
     pub rendered_lines: Vec<String>,
     pub rendered_text: String,
     pub table_view_policy: String,
+    pub virtual_column_policy: String,
+    pub suppress_question_mark_virtuals: bool,
+    pub virtual_column_option_count: usize,
     pub suppress_headers: bool,
     pub include_empty_rows: bool,
     pub include_row_numbers: bool,
@@ -436,6 +488,7 @@ impl TableViewOutputBundle {
                 "styled_end_cell_for_mode".to_string(),
                 "shell_style_report_for_rows".to_string(),
                 "colorize_shell_output_value".to_string(),
+                "parse_table_view_virtual_column_cli_options".to_string(),
                 "csv_escape_cell".to_string(),
                 "html_escape_cell".to_string(),
                 "markdown_escape_cell".to_string(),
@@ -474,6 +527,11 @@ impl TableViewOutputBundle {
                 "shellcolors".to_string(),
                 "ansicolors".to_string(),
                 "shellcolorwitness".to_string(),
+                "virtualcolumns".to_string(),
+                "virtualplaceholder".to_string(),
+                "virtualquestionmarks".to_string(),
+                "virtualwitness".to_string(),
+                "suppressvirtualcolumns".to_string(),
             ],
             stage29_numbering_modes: vec![
                 TableViewNumberingMode::Disabled.canonical().to_string(),
@@ -499,6 +557,12 @@ impl TableViewOutputBundle {
                 TableViewShellStylePolicy::Plain.canonical().to_string(),
                 TableViewShellStylePolicy::LegacyColorize.canonical().to_string(),
                 TableViewShellStylePolicy::LegacyColorizeWitness.canonical().to_string(),
+            ],
+            stage37_virtual_column_policies: vec![
+                VirtualColumnDisplayPolicy::Suppress.canonical().to_string(),
+                VirtualColumnDisplayPolicy::Placeholder.canonical().to_string(),
+                VirtualColumnDisplayPolicy::TagSummary.canonical().to_string(),
+                VirtualColumnDisplayPolicy::Witness.canonical().to_string(),
             ],
             universal_property:
                 "one materialized table view has deterministic images in every output syntax, output-option and numbering context"
@@ -623,6 +687,29 @@ pub fn parse_table_view_output_cli_options<S: AsRef<str>>(args: &[S]) -> TableVi
                 options.shellcolorwitness = true;
                 true
             }
+            "virtualcolumns" | "virtualcolumnsummary" | "virtualsummary" | "virtualtags"
+            | "showvirtualcolumns" | "virtuellespalten" | "virtuellespaltenzusammenfassung"
+            | "virtuellenspalten" => {
+                options.virtualcolumns = true;
+                true
+            }
+            "virtualplaceholder" | "virtualplaceholders" | "virtualquestionmarks"
+            | "virtualquestionmark" | "virtuelleplatzhalter" | "virtuellefragezeichen" => {
+                options.virtualplaceholder = true;
+                options.virtualquestionmarks = true;
+                true
+            }
+            "novirtualquestionmarks" | "suppressvirtualquestionmarks" => true,
+            "virtualwitness" | "virtualcolumnwitness" | "virtualwitnesses"
+            | "virtuellenspaltenwitness" | "virtuellenspaltenzeugen" => {
+                options.virtualwitness = true;
+                true
+            }
+            "suppressvirtualcolumns" | "hidevirtualcolumns" | "novirtualcolumns"
+            | "keinevirtuellenspalten" => {
+                options.suppressvirtualcolumns = true;
+                true
+            }
             "breite" => {
                 if let Some(value) = value.as_deref() {
                     options.width = parse_positive_width(value);
@@ -646,6 +733,10 @@ pub fn parse_table_view_output_cli_options<S: AsRef<str>>(args: &[S]) -> TableVi
         } else if active_output_context {
             options.unknown_output_options.push(key);
         }
+    }
+    options.virtual_column_options = parse_table_view_virtual_column_cli_options(args);
+    if options.virtual_column_options.suppress_question_mark_virtuals == Some(true) {
+        options.virtualquestionmarks = false;
     }
     if options.dontwrap {
         options.width = None;
@@ -691,8 +782,11 @@ pub fn render_table_view_for_cli_args<S: AsRef<str>>(
         mode_config.wrap_cell_width = None;
         mode_config.per_column_widths.clear();
     }
-    let view_config = MaterializedTableViewConfig::default()
-        .with_virtual_policy(mode_config.virtual_column_policy);
+    let view_config = MaterializedTableViewConfig {
+        virtual_column_policy: mode_config.virtual_column_policy,
+        suppress_question_mark_virtuals: mode_config.suppress_question_mark_virtuals,
+        ..MaterializedTableViewConfig::default()
+    };
     let report = bootstrap_table_materialization()
         .materialize_command_sets(&parsed.command_sets, materialization_config);
     let view = bootstrap_table_view().view_from_report(&report, &view_config);
@@ -769,6 +863,9 @@ pub fn render_materialized_table_view(
         rendered_lines,
         rendered_text,
         table_view_policy: view.policy.clone(),
+        virtual_column_policy: config.virtual_column_policy.canonical().to_string(),
+        suppress_question_mark_virtuals: config.suppress_question_mark_virtuals,
+        virtual_column_option_count: config.virtual_column_options.recognized_option_count,
         suppress_headers: config.suppress_headers,
         include_empty_rows: config.include_empty_rows,
         include_row_numbers: config.include_row_numbers,
@@ -1988,4 +2085,63 @@ mod tests {
         assert_eq!(report.shell_style_ansi_cell_count, 0);
         assert!(!report.rendered_text.contains("\u{1b}["));
     }
+
+    #[test]
+    fn virtual_columns_flag_renders_744_tag_summary_without_enabling_by_default() {
+        let plain = render_table_view_for_cli_args(
+            &[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=1-1",
+                "-spalten",
+                "--kontinuum=m",
+                "-ausgabe",
+                "--spaltenreihenfolgeundnurdiese=744,493",
+            ],
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert_eq!(plain.virtual_column_policy, "suppress");
+        assert!(!plain.rendered_text.contains("744:sternPolygon"));
+
+        let summary = render_table_view_for_cli_args(
+            &[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=1-1",
+                "-spalten",
+                "--kontinuum=m",
+                "-ausgabe",
+                "--spaltenreihenfolgeundnurdiese=744,493",
+                "--virtualcolumns",
+            ],
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert_eq!(summary.virtual_column_policy, "tag-summary");
+        assert!(summary.rendered_text.contains("744:sternPolygon,keinParaOdMetaP"));
+        assert!(summary.virtual_cell_count > 0);
+    }
+
+    #[test]
+    fn virtual_placeholder_flag_can_emit_question_mark_virtuals() {
+        let report = render_table_view_for_cli_args(
+            &[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=1-1",
+                "-spalten",
+                "--kontinuum=m",
+                "-ausgabe",
+                "--spaltenreihenfolgeundnurdiese=744,493",
+                "--virtualplaceholder",
+            ],
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert_eq!(report.virtual_column_policy, "placeholder");
+        assert!(!report.suppress_question_mark_virtuals);
+        assert!(report.rendered_text.contains('?'));
+    }
+
 }
