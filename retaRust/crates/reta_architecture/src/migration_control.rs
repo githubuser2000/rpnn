@@ -362,6 +362,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "language_sync_must_be_ready_before_a_synchronized_language_table_view_can_be_promoted",
         ),
         step(
+            "step-prompt-language-completion",
+            "wave-03-prompt-interaction",
+            "prompt language switch/value completion + language sync witness",
+            "prompt_language_completion.language_parameter_candidates",
+            "prompt_language_completion.language_value_candidates",
+            "prompt-language-completion-witness",
+            "prompt_language_candidates_must_glue_to_the_same_language_csv_cover_as_compiled_reta",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::completion_runtime::{bootstrap_completion_runtime, CompletionRuntimeBundle};
 use crate::completion_word::{word_completion_matches, CompletionCandidate, PromptDocument, WordCompletionOptions};
 use crate::prompt_language::custom_split;
+use crate::prompt_language_completion::{is_partial_language_parameter, language_switch_key_value};
 
 pub const HUNDERT: [&str; 100] = [
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
@@ -40,6 +41,7 @@ pub enum ComplSitua {
     ZeilenValPara,
     KombiValPara,
     AusgabeValPara,
+    LanguageValPara,
     BefehleNichtReta,
 }
 
@@ -61,13 +63,14 @@ impl ComplSitua {
             Self::KombiValPara => 13,
             Self::AusgabeValPara => 14,
             Self::BefehleNichtReta => 15,
+            Self::LanguageValPara => 16,
         }
     }
 
     pub const fn is_value_context(self) -> bool {
         matches!(
             self,
-            Self::SpaltenValPara | Self::ZeilenValPara | Self::KombiValPara | Self::AusgabeValPara | Self::Value
+            Self::SpaltenValPara | Self::ZeilenValPara | Self::KombiValPara | Self::AusgabeValPara | Self::LanguageValPara | Self::Value
         )
     }
 }
@@ -90,6 +93,8 @@ pub struct NestedCompletionRuntimeView {
     pub zeilen_typen_b: Vec<String>,
     pub zeilen_zeit: Vec<String>,
     pub kombi_value_options: BTreeMap<String, Vec<String>>,
+    pub language_parameters: Vec<String>,
+    pub language_values: Vec<String>,
 }
 
 impl NestedCompletionRuntimeView {
@@ -111,6 +116,8 @@ impl NestedCompletionRuntimeView {
             zeilen_typen_b: runtime.zeilen_typen_b.clone(),
             zeilen_zeit: runtime.zeilen_zeit.clone(),
             kombi_value_options: runtime.kombi_value_options.clone(),
+            language_parameters: runtime.language_parameters.clone(),
+            language_values: runtime.language_values.clone(),
         }
     }
 
@@ -123,6 +130,8 @@ impl NestedCompletionRuntimeView {
             spalten_len: self.spalten.len(),
             zeilen_paras_len: self.zeilen_paras.len(),
             kombi_option_keys: self.kombi_value_options.keys().cloned().collect(),
+            language_parameter_count: self.language_parameters.len(),
+            language_value_count: self.language_values.len(),
         }
     }
 }
@@ -142,6 +151,8 @@ pub struct NestedCompletionRuntimeSnapshot {
     pub spalten_len: usize,
     pub zeilen_paras_len: usize,
     pub kombi_option_keys: Vec<String>,
+    pub language_parameter_count: usize,
+    pub language_value_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -322,7 +333,11 @@ pub fn classify_nested_completion_context(
     let mut equality_value_prefix = None;
     if first == "reta" {
         if let Some(last) = tokens.last() {
-            if let Some((parameter, value_prefix)) = last.strip_prefix("--").and_then(|tail| tail.split_once('=')) {
+            if let Some((parameter, value_prefix)) = language_switch_key_value(last) {
+                current_value_parameter = Some(parameter);
+                equality_value_prefix = Some(value_prefix.rsplit(',').next().unwrap_or_default().to_string());
+                situation = ComplSitua::LanguageValPara;
+            } else if let Some((parameter, value_prefix)) = last.strip_prefix("--").and_then(|tail| tail.split_once('=')) {
                 current_value_parameter = Some(parameter.to_string());
                 equality_value_prefix = Some(value_prefix.rsplit(',').next().unwrap_or_default().to_string());
                 situation = match current_main_parameter.as_deref() {
@@ -340,6 +355,8 @@ pub fn classify_nested_completion_context(
                     Some("ausgabe") => ComplSitua::AusgabePara,
                     _ => ComplSitua::HauptPara,
                 };
+            } else if is_partial_language_parameter(last) {
+                situation = ComplSitua::HauptPara;
             } else if last.starts_with('-') && !last.starts_with("--") {
                 situation = ComplSitua::HauptPara;
             } else if runtime.haupt_for_neben_set.contains(last) {
@@ -400,6 +417,7 @@ pub fn candidates_for_situation(
             .main_parameters
             .iter()
             .map(|item| format!("-{item}"))
+            .chain(runtime.language_parameters.iter().cloned())
             .collect(),
         ComplSitua::SpaltenPara => runtime
             .spalten
@@ -442,6 +460,7 @@ pub fn candidates_for_situation(
             .cloned()
             .unwrap_or_else(|| runtime.kombi_value_options.values().flatten().cloned().collect()),
         ComplSitua::AusgabeValPara => runtime.ausgabe_art.clone(),
+        ComplSitua::LanguageValPara => runtime.language_values.clone(),
         ComplSitua::Value | ComplSitua::NeitherNor | ComplSitua::Unbekannt => Vec::new(),
     }
 }
@@ -658,6 +677,27 @@ mod tests {
     }
 }
 
+
+
+#[cfg(test)]
+mod stage64_prompt_language_completion_tests {
+    use super::*;
+
+    #[test]
+    fn nested_completion_suggests_language_parameter() {
+        let bundle = bootstrap_nested_completion_morphisms();
+        let completions = bundle.complete("reta -la");
+        assert!(completions.iter().any(|candidate| candidate.text == "-language="));
+    }
+
+    #[test]
+    fn nested_completion_suggests_language_value() {
+        let bundle = bootstrap_nested_completion_morphisms();
+        let completions = bundle.complete("reta -language=e");
+        assert!(completions.iter().any(|candidate| candidate.text == "english"));
+        assert!(completions.iter().any(|candidate| candidate.text == "en"));
+    }
+}
 
 // Stage 15: explicit py-reta-arch compatibility surface markers.
 // Marker-only names still need semantic Rust implementation before activation.

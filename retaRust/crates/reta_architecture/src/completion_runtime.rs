@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::input_semantics::bootstrap_input_semantics;
+use crate::prompt_language_completion::{language_parameter_completions, language_value_completions};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct CompletionSortKey {
@@ -59,6 +60,8 @@ pub struct CompletionRuntimeBundle {
     pub zeilen_zeit: Vec<String>,
     pub zeilen_typen_b: Vec<String>,
     pub kombi_value_options: BTreeMap<String, Vec<String>>,
+    pub language_parameters: Vec<String>,
+    pub language_values: Vec<String>,
 }
 
 impl Default for CompletionRuntimeBundle {
@@ -90,6 +93,8 @@ impl Default for CompletionRuntimeBundle {
             zeilen_zeit: vec!["heute".to_string(), "gestern".to_string(), "morgen".to_string()],
             zeilen_typen_b: Vec::new(),
             kombi_value_options: BTreeMap::new(),
+            language_parameters: language_parameter_completions(),
+            language_values: language_value_completions(),
         }
     }
 }
@@ -185,6 +190,8 @@ impl CompletionRuntimeBundle {
                 .into_iter()
                 .take(10)
                 .collect(),
+            language_parameter_count: self.language_parameters.len(),
+            language_value_count: self.language_values.len(),
         }
     }
 }
@@ -197,6 +204,8 @@ pub struct CompletionRuntimeSnapshot {
     pub spalten_dict_keys: usize,
     pub kombi_option_keys: Vec<String>,
     pub start_commands_with_numeric_shortcuts: Vec<String>,
+    pub language_parameter_count: usize,
+    pub language_value_count: usize,
 }
 
 pub fn bootstrap_completion_runtime() -> CompletionRuntimeBundle {
@@ -228,6 +237,14 @@ mod tests {
             .spalten_dict
             .get("kontinuum")
             .is_some_and(|values| values.iter().any(|value| value == "m")));
+    }
+
+    #[test]
+    fn bundle_exposes_language_completion_surface() {
+        let bundle = bootstrap_completion_runtime();
+        assert!(bundle.language_parameters.iter().any(|value| value == "-language="));
+        assert!(bundle.language_values.iter().any(|value| value == "english"));
+        assert!(bundle.snapshot().language_value_count >= 10);
     }
 }
 

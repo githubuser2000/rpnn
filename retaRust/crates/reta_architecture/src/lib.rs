@@ -53,6 +53,7 @@ pub mod program_workflow;
 pub mod prompt_execution;
 pub mod prompt_interaction;
 pub mod prompt_language;
+pub mod prompt_language_completion;
 pub mod prompt_preparation;
 pub mod prompt_runtime;
 pub mod prompt_session;
@@ -318,6 +319,17 @@ pub use prompt_language::{
     FractionOrIntegerCheck, PromptLanguageBundle, PromptLanguageSnapshot, PromptModus,
     bootstrap_prompt_language, custom_split, custom_split2, is_15_or_16_command, is_reta_parameter,
     verkuerze_dict,
+};
+pub use prompt_language_completion::{
+    PromptLanguageCompletionBundle, PromptLanguageCompletionCandidate,
+    PromptLanguageCompletionContext, PromptLanguageCompletionPolicy,
+    PromptLanguageCompletionReport, PromptLanguageCompletionSituation,
+    PromptLanguageCompletionSnapshot, bootstrap_prompt_language_completion,
+    continuum_m_prompt_language_completion_smoke, current_prompt_token,
+    is_partial_language_parameter, language_parameter_candidates, language_parameter_completions,
+    language_switch_key_value, language_value_candidates, language_value_completions,
+    prompt_language_completion_candidates, prompt_language_completion_context,
+    prompt_language_completion_for_text, prompt_text_to_reta_argv,
 };
 pub use prompt_preparation::{
     PreparedPromptOutput, PromptPreparationBundle, PromptPreparationSnapshot,

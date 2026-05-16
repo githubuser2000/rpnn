@@ -119,6 +119,11 @@ use crate::prompt_interaction::{
 use crate::prompt_language::{
     PromptLanguageBundle, bootstrap_prompt_language as bootstrap_prompt_language_impl,
 };
+use crate::prompt_language_completion::{
+    PromptLanguageCompletionBundle,
+    bootstrap_prompt_language_completion as bootstrap_prompt_language_completion_impl,
+    prompt_language_completion_for_text, PromptLanguageCompletionPolicy,
+};
 use crate::prompt_preparation::{
     PromptPreparationBundle, bootstrap_prompt_preparation as bootstrap_prompt_preparation_impl,
 };
@@ -313,6 +318,7 @@ pub struct ArchitectureRuntime {
     pub prompt_execution: PromptExecutionBundle,
     pub prompt_interaction: PromptInteractionBundle,
     pub prompt_language: PromptLanguageBundle,
+    pub prompt_language_completion: PromptLanguageCompletionBundle,
     pub presheaves: PresheafBundle,
     pub row_filtering: RowFilteringBundle,
     pub row_ranges: RowRangeMorphismBundle,
@@ -491,6 +497,7 @@ impl ArchitectureRuntime {
             prompt_execution: bootstrap_prompt_execution_impl(),
             prompt_interaction: bootstrap_prompt_interaction_impl(),
             prompt_language: bootstrap_prompt_language_impl(),
+            prompt_language_completion: bootstrap_prompt_language_completion_impl(),
             presheaves: bootstrap_presheaves(None),
             row_filtering: bootstrap_row_filtering_impl(),
             row_ranges: bootstrap_row_range_morphisms(None),
@@ -629,6 +636,7 @@ impl ArchitectureRuntime {
             "combi_join",
             "program_workflow",
             "prompt_language",
+            "prompt_language_completion",
             "completion_runtime",
             "completion_word",
             "completion_nested",
@@ -725,6 +733,8 @@ impl ArchitectureRuntime {
                 .snapshot()
                 .known_commands_len,
             rust_prompt_interaction_command_count: self.prompt_interaction.snapshot().befehle_len,
+            rust_prompt_language_completion_morphism_count: self.prompt_language_completion.snapshot().morphisms.len(),
+            rust_prompt_language_completion_smoke_candidate_count: crate::prompt_language_completion::continuum_m_prompt_language_completion_smoke().candidate_count,
             rust_generated_column_morphism_count: self.generated_columns.snapshot().count,
             rust_meta_column_morphism_count: self.meta_columns.snapshot().count,
             rust_concat_csv_morphism_count: self.concat_csv.snapshot().count,
@@ -1064,6 +1074,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_prompt_preparation_domain_count: usize,
     pub rust_prompt_execution_command_count: usize,
     pub rust_prompt_interaction_command_count: usize,
+    pub rust_prompt_language_completion_morphism_count: usize,
+    pub rust_prompt_language_completion_smoke_candidate_count: usize,
     pub rust_generated_column_morphism_count: usize,
     pub rust_meta_column_morphism_count: usize,
     pub rust_concat_csv_morphism_count: usize,
@@ -1370,6 +1382,10 @@ pub struct PromptArchitectureContext {
     pub architecture_mode: String,
     pub activation_preview_count: usize,
     pub architecture_validation_status: String,
+    pub prompt_language_completion_candidate_count: usize,
+    pub prompt_language_detected: String,
+    pub prompt_language_coverage_ready: bool,
+    pub prompt_language_sync_ready: bool,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -1451,6 +1467,10 @@ impl PromptArchitectureContext {
             &[],
         );
         let execution_plan = prompt_execution.plan_prompt_execution(&prepared, &text_state);
+        let prompt_language_completion = prompt_language_completion_for_text(
+            input,
+            &PromptLanguageCompletionPolicy::default(),
+        );
         Self {
             program_name: program_name.to_string(),
             input_len: input.chars().count(),
@@ -1463,6 +1483,10 @@ impl PromptArchitectureContext {
             architecture_mode: switch_bundle.default_config.mode.canonical().to_string(),
             activation_preview_count: activation_units.len(),
             architecture_validation_status: prompt_architecture_validation.summary.status,
+            prompt_language_completion_candidate_count: prompt_language_completion.candidate_count,
+            prompt_language_detected: prompt_language_completion.context.selected_language.clone(),
+            prompt_language_coverage_ready: prompt_language_completion.language_coverage_ready,
+            prompt_language_sync_ready: prompt_language_completion.language_sync_ready,
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
             universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"
