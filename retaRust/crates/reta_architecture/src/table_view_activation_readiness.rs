@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::persistence::PersistenceStore;
 use crate::runtime_switch::ArchitectureSwitchConfig;
 use crate::shadow_pipeline::{
-    ShadowTableViewOutputCommitDecision, ShadowTableViewOutputReport, bootstrap_shadow_pipeline,
+    ShadowTableViewOutputCommitDecision, bootstrap_shadow_pipeline,
 };
 use crate::table_view_activation_journal::{
     TableViewActivationJournal, TableViewActivationJournalPolicy,
@@ -74,6 +74,129 @@ impl Default for TableViewActivationReadinessPolicy {
             include_selected_lines: true,
             preview_limit: 8,
         }
+    }
+}
+
+
+impl TableViewActivationReadinessPolicy {
+    pub fn strict() -> Self {
+        Self::default()
+    }
+
+    pub fn diagnostic() -> Self {
+        Self {
+            require_commit_decision: false,
+            require_commit_audit_safe: false,
+            require_transaction_safe: false,
+            require_transaction_replaces_visible_output: false,
+            require_journal_replayable: false,
+            require_replay_safe: false,
+            require_ledger_ready: false,
+            require_store_ready: false,
+            require_persistence_ready: false,
+            require_recovery_ready_when_enabled: false,
+            include_selected_lines: true,
+            preview_limit: 8,
+        }
+    }
+
+    pub fn without_selected_lines(mut self) -> Self {
+        self.include_selected_lines = false;
+        self
+    }
+
+    pub fn with_preview_limit(mut self, limit: usize) -> Self {
+        self.preview_limit = limit;
+        self
+    }
+
+    pub fn from_cli_args(args: &[String], base: &Self) -> (Self, bool) {
+        let mut policy = base.clone();
+        let mut recognized = false;
+        for arg in args {
+            match arg.as_str() {
+                "--activation-readiness-strict" | "--readiness-strict" => {
+                    policy = Self::strict();
+                    recognized = true;
+                }
+                "--activation-readiness-diagnostic" | "--readiness-diagnostic" => {
+                    policy = Self::diagnostic();
+                    recognized = true;
+                }
+                "--activation-readiness-no-selected-lines" | "--readiness-no-selected-lines" => {
+                    policy.include_selected_lines = false;
+                    recognized = true;
+                }
+                "--activation-readiness-include-selected-lines"
+                | "--readiness-include-selected-lines" => {
+                    policy.include_selected_lines = true;
+                    recognized = true;
+                }
+                "--activation-readiness-require-recovery" | "--readiness-require-recovery" => {
+                    policy.require_recovery_ready_when_enabled = true;
+                    recognized = true;
+                }
+                "--activation-readiness-ignore-recovery" | "--readiness-ignore-recovery" => {
+                    policy.require_recovery_ready_when_enabled = false;
+                    recognized = true;
+                }
+                "--activation-readiness-require-persistence" | "--readiness-require-persistence" => {
+                    policy.require_persistence_ready = true;
+                    recognized = true;
+                }
+                "--activation-readiness-ignore-persistence" | "--readiness-ignore-persistence" => {
+                    policy.require_persistence_ready = false;
+                    recognized = true;
+                }
+                _ => {
+                    if let Some(value) = arg
+                        .strip_prefix("--activation-readiness-preview=")
+                        .or_else(|| arg.strip_prefix("--readiness-preview="))
+                    {
+                        if let Ok(limit) = value.parse::<usize>() {
+                            policy.preview_limit = limit;
+                            recognized = true;
+                        }
+                    }
+                }
+            }
+        }
+        (policy, recognized)
+    }
+
+    pub fn required_guard_names(&self) -> Vec<&'static str> {
+        let mut guards = Vec::new();
+        if self.require_commit_decision {
+            guards.push("shadow_commit_decision_uses_view_output");
+        }
+        if self.require_commit_audit_safe {
+            guards.push("commit_audit_is_safe");
+        }
+        if self.require_transaction_safe {
+            guards.push("activation_transaction_is_safe");
+        }
+        if self.require_transaction_replaces_visible_output {
+            guards.push("activation_transaction_replaces_visible_output");
+        }
+        if self.require_journal_replayable {
+            guards.push("journal_is_replayable");
+        }
+        if self.require_replay_safe {
+            guards.push("replay_is_safe");
+        }
+        if self.require_ledger_ready {
+            guards.push("ledger_validation_ready");
+        }
+        if self.require_store_ready {
+            guards.push("store_validation_ready");
+        }
+        if self.require_persistence_ready {
+            guards.push("persistence_roundtrip_ready");
+        }
+        if self.require_recovery_ready_when_enabled {
+            guards.push("recovery_ready_when_enabled");
+        }
+        guards
     }
 }
 
@@ -168,6 +291,7 @@ impl TableViewActivationReadinessBundle {
                 "table_view_activation_readiness.fold_local_witnesses".to_string(),
                 "table_view_activation_readiness.required_guard_summary".to_string(),
                 "table_view_activation_readiness.promotion_level".to_string(),
+                "table_view_activation_readiness.policy_from_cli".to_string(),
                 "table_view_activation_readiness.rollback_sources".to_string(),
             ],
             required_guards: vec![
@@ -649,4 +773,44 @@ mod tests {
         assert!(report.ready_for_visible_activation);
         assert_eq!(report.promotion_level, "shadow_commit");
     }
+
+    #[test]
+    fn readiness_policy_cli_can_switch_to_diagnostic_mode() {
+        let args = vec![
+            "reta".to_string(),
+            "--activation-readiness-diagnostic".to_string(),
+            "--activation-readiness-no-selected-lines".to_string(),
+            "--activation-readiness-preview=2".to_string(),
+        ];
+        let (policy, recognized) = TableViewActivationReadinessPolicy::from_cli_args(
+            &args,
+            &TableViewActivationReadinessPolicy::default(),
+        );
+        assert!(recognized);
+        assert!(!policy.require_commit_decision);
+        assert!(!policy.require_persistence_ready);
+        assert!(!policy.include_selected_lines);
+        assert_eq!(policy.preview_limit, 2);
+        assert!(policy.required_guard_names().is_empty());
+    }
+
+    #[test]
+    fn readiness_policy_cli_can_require_recovery() {
+        let args = vec![
+            "reta".to_string(),
+            "--activation-readiness-require-recovery".to_string(),
+            "--activation-readiness-ignore-persistence".to_string(),
+        ];
+        let (policy, recognized) = TableViewActivationReadinessPolicy::from_cli_args(
+            &args,
+            &TableViewActivationReadinessPolicy::default(),
+        );
+        assert!(recognized);
+        assert!(policy.require_recovery_ready_when_enabled);
+        assert!(!policy.require_persistence_ready);
+        assert!(policy
+            .required_guard_names()
+            .contains(&"recovery_ready_when_enabled"));
+    }
+
 }

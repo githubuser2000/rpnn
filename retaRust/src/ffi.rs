@@ -697,17 +697,23 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_readiness_json(
             .lines()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
+        let (policy, policy_from_cli) = reta_architecture::TableViewActivationReadinessPolicy::from_cli_args(
+            &args,
+            &reta_architecture::TableViewActivationReadinessPolicy::default(),
+        );
         let (_, switch_config) =
             reta_architecture::extract_architecture_switch_from_argv(&args, None);
         let report = reta_architecture::activation_readiness_for_cli_args(
             &args,
             &legacy_lines,
             &switch_config,
-            &reta_architecture::TableViewActivationReadinessPolicy::default(),
+            &policy,
         );
         serde_json::to_string(&serde_json::json!({
             "args": args,
             "legacy_line_count": legacy_lines.len(),
+            "policy_from_cli": policy_from_cli,
+            "policy": policy,
             "report": report,
         }))
     })) {

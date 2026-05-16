@@ -397,6 +397,7 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_readiness.fold_local_witnesses".to_string(),
             "table_view_activation_readiness.required_guard_summary".to_string(),
             "table_view_activation_readiness.default_promotion_gate".to_string(),
+            "table_view_activation_readiness.policy_from_cli".to_string(),
             "table_view_activation_readiness.rollback_sources".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
@@ -522,7 +523,15 @@ pub fn extract_architecture_switch_from_argv(
             | "--reta-arch-recovery" | "--activation-recovery-allow-replay"
             | "--activation-store-recovery-allow-replay"
             | "--activation-recovery-no-replay" | "--activation-store-recovery-no-replay"
-            | "--no-activation-recovery" | "--reta-arch-no-recovery" => {
+            | "--no-activation-recovery" | "--reta-arch-no-recovery"
+            | "--activation-readiness-strict" | "--readiness-strict"
+            | "--activation-readiness-diagnostic" | "--readiness-diagnostic"
+            | "--activation-readiness-no-selected-lines" | "--readiness-no-selected-lines"
+            | "--activation-readiness-include-selected-lines" | "--readiness-include-selected-lines"
+            | "--activation-readiness-require-recovery" | "--readiness-require-recovery"
+            | "--activation-readiness-ignore-recovery" | "--readiness-ignore-recovery"
+            | "--activation-readiness-require-persistence" | "--readiness-require-persistence"
+            | "--activation-readiness-ignore-persistence" | "--readiness-ignore-persistence" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"
@@ -539,7 +548,9 @@ pub fn extract_architecture_switch_from_argv(
                 || arg.starts_with("--activation-recover-file=")
                 || arg.starts_with("--activation-store-recover=")
                 || arg.starts_with("--reta-arch-recovery-file=")
-                || arg.starts_with("--reta-arch-recover-file=") =>
+                || arg.starts_with("--reta-arch-recover-file=")
+                || arg.starts_with("--activation-readiness-preview=")
+                || arg.starts_with("--readiness-preview=") =>
             {
                 recognised = true;
             }
@@ -639,4 +650,19 @@ mod tests {
                 .allowed_to_commit
         );
     }
+    #[test]
+    fn readiness_policy_flags_are_stripped_before_legacy_execution() {
+        let argv = vec![
+            "reta".to_string(),
+            "--reta-arch=commit".to_string(),
+            "--activation-readiness-diagnostic".to_string(),
+            "--activation-readiness-preview=3".to_string(),
+            "-zeilen".to_string(),
+        ];
+        let (clean, config) =
+            extract_architecture_switch_from_argv(&argv, Some(Default::default()));
+        assert_eq!(clean, vec!["reta".to_string(), "-zeilen".to_string()]);
+        assert_eq!(config.mode, ArchitectureSwitchMode::Commit);
+    }
+
 }

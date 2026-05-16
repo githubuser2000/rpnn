@@ -400,10 +400,10 @@ fn default_steps() -> Vec<MigrationStepSpec> {
         step(
             "step-table-view-activation-readiness",
             "wave-02-table-adapters",
-            "commit audit + activation journal/store/recovery witnesses",
+            "commit audit + activation journal/store/recovery witnesses + CLI policy",
             "table_view_activation_readiness.fold_local_witnesses",
+            "table_view_activation_readiness.policy_from_cli",
             "table_view_activation_readiness.default_promotion_gate",
-            "table-view-activation-readiness-witness",
             "all_local_activation_witnesses_must_glue_before_default_visible_promotion",
         ),
         step(

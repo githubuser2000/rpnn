@@ -143,6 +143,10 @@ pub fn shadow_table_runtime_report_for_program(
     } else {
         None
     };
+    let (readiness_policy, _) = reta_architecture::TableViewActivationReadinessPolicy::from_cli_args(
+        argv,
+        &reta_architecture::TableViewActivationReadinessPolicy::default(),
+    );
     let view_output_readiness = Some(reta_architecture::activation_readiness_from_reports(
         view_output_commit.as_ref(),
         view_output_audit.as_ref(),
@@ -153,7 +157,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_store.as_ref(),
         view_output_persistence.as_ref(),
         view_output_recovery.as_ref(),
-        &reta_architecture::TableViewActivationReadinessPolicy::default(),
+        &readiness_policy,
     ));
     Some(ShadowTableRuntimeReport {
         report,

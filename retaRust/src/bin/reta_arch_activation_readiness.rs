@@ -37,18 +37,24 @@ fn main() {
         None => Vec::new(),
     };
 
+    let (policy, policy_from_cli) = reta_architecture::TableViewActivationReadinessPolicy::from_cli_args(
+        &reta_args,
+        &reta_architecture::TableViewActivationReadinessPolicy::default(),
+    );
     let (_, switch_config) =
         reta_architecture::extract_architecture_switch_from_argv(&reta_args, None);
     let report = reta_architecture::activation_readiness_for_cli_args(
         &reta_args,
         &legacy_lines,
         &switch_config,
-        &reta_architecture::TableViewActivationReadinessPolicy::default(),
+        &policy,
     );
 
     let out = serde_json::json!({
         "args": reta_args,
         "legacy_line_count": legacy_lines.len(),
+        "policy_from_cli": policy_from_cli,
+        "policy": policy,
         "report": report,
     });
     match serde_json::to_string_pretty(&out) {
