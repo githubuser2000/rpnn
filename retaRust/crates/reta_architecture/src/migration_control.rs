@@ -326,6 +326,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "localized_csv_sections_may_glue_only_when_they_cover_requested_direct_columns",
         ),
         step(
+            "step-table-view-language-coverage",
+            "wave-02-table-adapters",
+            "language CSV coverage + translation sync gap report",
+            "table_view_language_coverage.variant_asset_widths",
+            "table_view_language_coverage.translation_gap_report",
+            "table-view-language-coverage-witness",
+            "language_assets_form_a_cover_only_after_each_variant_supports_requested_direct_columns",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",

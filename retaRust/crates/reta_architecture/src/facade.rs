@@ -218,6 +218,10 @@ use crate::table_view_language_parity::{
     TableViewLanguageParityBundle,
     bootstrap_table_view_language_parity as bootstrap_table_view_language_parity_impl,
 };
+use crate::table_view_language_coverage::{
+    TableViewLanguageCoverageBundle,
+    bootstrap_table_view_language_coverage as bootstrap_table_view_language_coverage_impl,
+};
 use crate::table_view_layout::{
     TableViewLayoutBundle, bootstrap_table_view_layout as bootstrap_table_view_layout_impl,
 };
@@ -332,6 +336,7 @@ pub struct ArchitectureRuntime {
     pub table_view_activation_readiness: TableViewActivationReadinessBundle,
     pub table_view_activation_promotion: TableViewActivationPromotionBundle,
     pub table_view_language_parity: TableViewLanguageParityBundle,
+    pub table_view_language_coverage: TableViewLanguageCoverageBundle,
     pub table_view_html_attributes: TableViewHtmlAttributeBundle,
     pub table_view_cell_styles: TableViewCellStyleBundle,
     pub table_view_commit_audit: TableViewCommitAuditBundle,
@@ -508,6 +513,7 @@ impl ArchitectureRuntime {
             table_view_activation_readiness: bootstrap_table_view_activation_readiness_impl(),
             table_view_activation_promotion: bootstrap_table_view_activation_promotion_impl(),
             table_view_language_parity: bootstrap_table_view_language_parity_impl(),
+            table_view_language_coverage: bootstrap_table_view_language_coverage_impl(),
             table_view_html_attributes: bootstrap_table_view_html_attributes_impl(),
             table_view_cell_styles: bootstrap_table_view_cell_styles_impl(),
             table_view_commit_audit: bootstrap_table_view_commit_audit_impl(),
@@ -594,6 +600,7 @@ impl ArchitectureRuntime {
             "table_view_activation_readiness",
             "table_view_activation_promotion",
             "table_view_language_parity",
+            "table_view_language_coverage",
             "table_view_html_attributes",
             "table_view_cell_styles",
             "table_view_commit_audit",

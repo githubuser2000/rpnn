@@ -138,6 +138,28 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                 ),
             });
         }
+        if let Some(report) = view_output_report.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if report.language_coverage.ready() {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_LANGUAGE_COVERAGE".to_string(),
+                message: format!(
+                    "Rust-Architektur-Sprachabdeckung: requested_language={} requested_asset={} effective_asset={} fallback_required={} fallback_applied={} stale_languages={} missing_744={:?} status={} failed={:?}",
+                    report.language_coverage.requested_language,
+                    report.language_coverage.requested_asset_name,
+                    report.language_coverage.effective_asset_name,
+                    report.language_coverage.fallback_required,
+                    report.language_coverage.fallback_applied,
+                    report.language_coverage.stale_language_count,
+                    report.language_coverage.languages_missing_744,
+                    report.language_coverage.status,
+                    report.language_coverage.failed_guards,
+                ),
+            });
+        }
         if let Some(commit) = view_output_commit.as_ref() {
             diagnostics.push(RetaDiagnostic {
                 level: if commit.use_view_output || !commit.gate_allowed_to_commit {

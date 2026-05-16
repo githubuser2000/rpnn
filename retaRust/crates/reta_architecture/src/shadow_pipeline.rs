@@ -32,6 +32,9 @@ use crate::table_view_output::{
 use crate::table_view_language_parity::{
     TableViewLanguageParityReport, TableViewLanguageParityPolicy, language_parity_for_cli_args,
 };
+use crate::table_view_language_coverage::{
+    TableViewLanguageCoverageReport, TableViewLanguageCoveragePolicy, language_coverage_for_cli_args,
+};
 use crate::table_view_output_parity::{
     TableViewOutputParityConfig, TableViewOutputParityReport, bootstrap_table_view_output_parity,
 };
@@ -193,6 +196,7 @@ pub struct ShadowTableViewOutputReport {
     pub semantic_diff: TableViewOutputParityReport,
     pub virtual_column_parity: TableViewVirtualParityReport,
     pub language_parity: TableViewLanguageParityReport,
+    pub language_coverage: TableViewLanguageCoverageReport,
     pub output_report: TableViewOutputReport,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
@@ -368,6 +372,7 @@ pub struct ShadowCliPlan {
     pub table_view_output: TableViewOutputReport,
     pub virtual_column_parity: TableViewVirtualParityReport,
     pub language_parity: TableViewLanguageParityReport,
+    pub language_coverage: TableViewLanguageCoverageReport,
     pub universal_property: String,
 }
 
@@ -407,6 +412,8 @@ impl ShadowPipelineBundle {
                 "table_view_virtual_parity.cli_policy_lift".to_string(),
                 "table_view_language_parity.base_fallback_guard".to_string(),
                 "table_view_language_parity.direct_744_guard".to_string(),
+                "table_view_language_coverage.translation_gap_report".to_string(),
+                "table_view_language_coverage.fallback_readiness_witness".to_string(),
                 "table_view_output.commit_virtual_guard".to_string(),
                 "table_view_commit_audit.audit_report".to_string(),
                 "table_view_commit_audit.required_guards".to_string(),
@@ -470,6 +477,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &TableViewLanguageParityPolicy::default(),
         );
+        let language_coverage = language_coverage_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageCoveragePolicy::default(),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -483,6 +494,7 @@ impl ShadowPipelineBundle {
             table_view_output,
             virtual_column_parity,
             language_parity,
+            language_coverage,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }
@@ -577,6 +589,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &TableViewLanguageParityPolicy::default(),
         );
+        let language_coverage = language_coverage_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageCoveragePolicy::default(),
+        );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -591,6 +607,7 @@ impl ShadowPipelineBundle {
             semantic_diff,
             virtual_column_parity,
             language_parity,
+            language_coverage,
             rendered_preview: output_report
                 .rendered_lines
                 .iter()
@@ -991,6 +1008,10 @@ mod tests {
             language_parity: crate::table_view_language_parity::language_parity_for_cli_args(
                 &["reta", "-language=english", "-spalten", "--kontinuum=m"],
                 &crate::table_view_language_parity::TableViewLanguageParityPolicy::default(),
+            ),
+            language_coverage: crate::table_view_language_coverage::language_coverage_for_cli_args(
+                &["reta", "-language=english", "-spalten", "--kontinuum=m"],
+                &crate::table_view_language_coverage::TableViewLanguageCoveragePolicy::default(),
             ),
             output_report: TableViewOutputReport {
                 class: "TableViewOutputReport".to_string(),
