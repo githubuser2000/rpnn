@@ -398,6 +398,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "file_recovery_replays_only_when_existing_store_matches_current_transaction_and_legacy_checksum",
         ),
         step(
+            "step-table-view-activation-readiness",
+            "wave-02-table-adapters",
+            "commit audit + activation journal/store/recovery witnesses",
+            "table_view_activation_readiness.fold_local_witnesses",
+            "table_view_activation_readiness.default_promotion_gate",
+            "table-view-activation-readiness-witness",
+            "all_local_activation_witnesses_must_glue_before_default_visible_promotion",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

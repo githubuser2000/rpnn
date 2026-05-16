@@ -23,6 +23,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_persistence: Option<reta_architecture::TableViewActivationPersistenceReport>,
     pub view_output_file: Option<reta_architecture::TableViewActivationFileReport>,
     pub view_output_recovery: Option<reta_architecture::TableViewActivationRecoveryReport>,
+    pub view_output_readiness: Option<reta_architecture::TableViewActivationReadinessReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -142,6 +143,18 @@ pub fn shadow_table_runtime_report_for_program(
     } else {
         None
     };
+    let view_output_readiness = Some(reta_architecture::activation_readiness_from_reports(
+        view_output_commit.as_ref(),
+        view_output_audit.as_ref(),
+        view_output_transaction.as_ref(),
+        view_output_journal.as_ref(),
+        view_output_replay.as_ref(),
+        view_output_ledger.as_ref(),
+        view_output_store.as_ref(),
+        view_output_persistence.as_ref(),
+        view_output_recovery.as_ref(),
+        &reta_architecture::TableViewActivationReadinessPolicy::default(),
+    ));
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -156,6 +169,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_persistence,
         view_output_file,
         view_output_recovery,
+        view_output_readiness,
     })
 }
 

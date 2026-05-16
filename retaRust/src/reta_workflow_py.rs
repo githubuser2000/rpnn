@@ -65,6 +65,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_persistence = shadow_runtime.view_output_persistence;
         let view_output_file = shadow_runtime.view_output_file;
         let view_output_recovery = shadow_runtime.view_output_recovery;
+        let view_output_readiness = shadow_runtime.view_output_readiness;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -330,6 +331,29 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     recovery.selected_line_count,
                     recovery.selected_lines_checksum,
                     recovery.failed_guards,
+                ),
+            });
+        }
+        if let Some(readiness) = view_output_readiness.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if readiness.ready_for_visible_activation {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_READINESS".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Readiness: status={} ready={} level={} source={} required={}/{} raw_equal={} semantic_equal={} virtual_direct={} failed={:?}",
+                    readiness.status,
+                    readiness.ready_for_visible_activation,
+                    readiness.promotion_level,
+                    readiness.selected_source,
+                    readiness.passed_required_check_count,
+                    readiness.required_check_count,
+                    readiness.raw_equal,
+                    readiness.semantic_equal,
+                    readiness.virtual_direct_cells_equal,
+                    readiness.failed_required_checks,
                 ),
             });
         }
