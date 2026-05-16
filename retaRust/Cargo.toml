@@ -199,3 +199,7 @@ path = "src/bin/reta_arch_language_sync.rs"
 [[bin]]
 name = "rreta_arch_prompt_language_completion"
 path = "src/bin/reta_arch_prompt_language_completion.rs"
+
+[[bin]]
+name = "rreta_arch_prompt_language_guard"
+path = "src/bin/reta_arch_prompt_language_guard.rs"

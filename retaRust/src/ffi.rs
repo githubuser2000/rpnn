@@ -848,6 +848,27 @@ pub unsafe extern "C" fn reta_architecture_prompt_language_completion_json(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_prompt_language_guard_json(
+    input: *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let text = unsafe { read_required_string(input) }.unwrap_or_default();
+        let args = reta_architecture::prompt_text_to_reta_argv(&text);
+        let policy = reta_architecture::PromptLanguageGuardPolicy::from_cli_args(&args);
+        let report = reta_architecture::prompt_language_guard_for_text(&text, &policy);
+        serde_json::to_string(&serde_json::json!({
+            "input": text,
+            "policy": policy,
+            "report": report,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_prompt_language_guard_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     argc: usize,
     argv: *const *const c_char,

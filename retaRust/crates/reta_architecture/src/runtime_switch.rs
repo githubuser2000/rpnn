@@ -383,6 +383,11 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "prompt_language_completion.language_value_candidates".to_string(),
             "prompt_language_completion.language_sync_witness".to_string(),
             "prompt_language_completion.direct_744_prompt_guard".to_string(),
+            "prompt_language_guard.prompt_to_reta_argv".to_string(),
+            "prompt_language_guard.language_completion_ready".to_string(),
+            "prompt_language_guard.language_coverage_ready".to_string(),
+            "prompt_language_guard.language_sync_ready".to_string(),
+            "prompt_language_guard.direct_744_prompt_guard".to_string(),
             "table_view_output.commit_virtual_guard".to_string(),
             "table_view_output.commit_language_guard".to_string(),
             "table_view_commit_audit.audit_report".to_string(),
@@ -596,7 +601,17 @@ pub fn extract_architecture_switch_from_argv(
             | "--activation-promotion-include-selected-lines" | "--promotion-include-selected-lines"
             | "--no-language-fallback" | "--no-language-base-fallback"
             | "--keine-sprach-fallback" | "--language-fallback"
-            | "--language-base-fallback" | "--sprach-fallback" => {
+            | "--language-base-fallback" | "--sprach-fallback"
+            | "--prompt-language-guard-strict" | "--prompt-guard-strict"
+            | "--prompt-language-guard-diagnostic" | "--prompt-guard-diagnostic"
+            | "--prompt-language-guard-ignore-sync" | "--prompt-guard-ignore-sync"
+            | "--prompt-language-guard-require-sync" | "--prompt-guard-require-sync"
+            | "--prompt-language-guard-ignore-coverage" | "--prompt-guard-ignore-coverage"
+            | "--prompt-language-guard-require-coverage" | "--prompt-guard-require-coverage"
+            | "--prompt-language-guard-ignore-direct-744" | "--prompt-guard-ignore-direct-744"
+            | "--prompt-language-guard-require-direct-744" | "--prompt-guard-require-direct-744"
+            | "--prompt-language-guard-ignore-reta" | "--prompt-guard-ignore-reta"
+            | "--prompt-language-guard-require-reta" | "--prompt-guard-require-reta" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"
@@ -617,7 +632,9 @@ pub fn extract_architecture_switch_from_argv(
                 || arg.starts_with("--activation-readiness-preview=")
                 || arg.starts_with("--readiness-preview=")
                 || arg.starts_with("--activation-promotion-preview=")
-                || arg.starts_with("--promotion-preview=") =>
+                || arg.starts_with("--promotion-preview=")
+                || arg.starts_with("--prompt-language-guard-preview=")
+                || arg.starts_with("--prompt-guard-preview=") =>
             {
                 recognised = true;
             }

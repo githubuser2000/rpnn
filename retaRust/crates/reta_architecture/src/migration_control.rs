@@ -371,6 +371,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "prompt_language_candidates_must_glue_to_the_same_language_csv_cover_as_compiled_reta",
         ),
         step(
+            "step-prompt-language-guard",
+            "wave-03-prompt-interaction",
+            "prompt language completion + execution argv + table-view language cover guard",
+            "prompt_language_guard.prompt_to_reta_argv",
+            "prompt_language_guard.language_sync_ready",
+            "prompt-language-guard-witness",
+            "prompt_language_guard_must_commute_before_prompt_language_activation",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",

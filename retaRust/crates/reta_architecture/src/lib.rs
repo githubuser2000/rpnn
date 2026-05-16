@@ -54,6 +54,7 @@ pub mod prompt_execution;
 pub mod prompt_interaction;
 pub mod prompt_language;
 pub mod prompt_language_completion;
+pub mod prompt_language_guard;
 pub mod prompt_preparation;
 pub mod prompt_runtime;
 pub mod prompt_session;
@@ -330,6 +331,12 @@ pub use prompt_language_completion::{
     language_switch_key_value, language_value_candidates, language_value_completions,
     prompt_language_completion_candidates, prompt_language_completion_context,
     prompt_language_completion_for_text, prompt_text_to_reta_argv,
+};
+pub use prompt_language_guard::{
+    PromptLanguageGuardBundle, PromptLanguageGuardPolicy, PromptLanguageGuardReport,
+    PromptLanguageGuardSnapshot, bootstrap_prompt_language_guard,
+    continuum_m_prompt_language_guard_smoke, prompt_language_guard_for_text,
+    prompt_language_guard_from_argv,
 };
 pub use prompt_preparation::{
     PreparedPromptOutput, PromptPreparationBundle, PromptPreparationSnapshot,
