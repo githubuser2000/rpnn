@@ -1,0 +1,91 @@
+# --- VCS metadata / nested checkouts ---
+.git/
+**/.git/
+
+# --- Rust / Cargo build outputs ---
+/target/
+**/target/
+*.rlib
+*.rmeta
+*.d
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# --- C / shared-library build leftovers ---
+*.lo
+*.la
+*.obj
+*.pdb
+*.ilk
+*.exp
+
+# --- Python caches / test caches ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- Local virtualenvs / local config ---
+.env
+.env.*
+.venv/
+venv/
+env/
+ENV/
+pyvenv.cfg
+
+# --- Editor / OS junk ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+tags
+.~lock.*
+
+# --- Patch leftovers ---
+*.orig
+*.rej
+*.bak
+*.tmp
+
+# --- Runtime history / local app state ---
+.ReTaPromptHistory
+history.sqlite*
+db.sqlite3*
+
+# --- Generated stage/check artifacts from transcompilation work ---
+/stage*_*.json
+/stage*.json
+/stage*_*.txt
+/RUST_STAGE*_CHECKS.md
+/TRANSCOMPILATION_ARCHITECTURE_STAGE*.md
+/TRANSCOMPILATION_ARCHITECTURE_STAGE*.json
+/reta_rust_arch_stage*.tar.bz2
+/reta_rust_arch_stage*_code.patch
+/reta_rust_arch_stage*_changed_files.txt
+
+# --- Activation-store runtime artifacts ---
+/activation-store/
+/activation_store/
+/reta_arch_activation_store/
+/target/reta_arch/
+*.activation-store
+activation-store*.txt
+
+# --- Large local temporary archives ---
+*.tar
+*.tar.bz2
+*.tar.gz
+*.xz
+*.zip
