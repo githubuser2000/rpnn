@@ -1277,6 +1277,43 @@ pub fn csv_asset_by_name(name: &str) -> Option<CsvAsset> {
     CSV_ASSETS.iter().copied().find(|asset| asset.name == name)
 }
 
+pub fn csv_asset_by_base_and_language(base_name: &str, language: CsvLanguage) -> Option<CsvAsset> {
+    CSV_ASSETS
+        .iter()
+        .copied()
+        .find(|asset| asset.base_name == base_name && asset.language == language)
+}
+
+pub fn csv_base_asset(base_name: &str) -> Option<CsvAsset> {
+    csv_asset_by_base_and_language(base_name, CsvLanguage::Base)
+}
+
+pub fn csv_asset_supports_columns(asset: CsvAsset, columns_zero_based: &[usize]) -> bool {
+    columns_zero_based
+        .iter()
+        .all(|column| *column < asset.max_columns)
+}
+
+pub fn csv_asset_for_language_with_required_columns(
+    base_name: &str,
+    language: CsvLanguage,
+    columns_zero_based: &[usize],
+) -> Option<CsvAsset> {
+    let language_asset = csv_asset_by_base_and_language(base_name, language);
+    if let Some(asset) = language_asset {
+        if columns_zero_based.is_empty() || csv_asset_supports_columns(asset, columns_zero_based) {
+            return Some(asset);
+        }
+    }
+    let base_asset = csv_base_asset(base_name);
+    if let Some(asset) = base_asset {
+        if columns_zero_based.is_empty() || csv_asset_supports_columns(asset, columns_zero_based) {
+            return Some(asset);
+        }
+    }
+    language_asset.or(base_asset)
+}
+
 pub fn csv_assets_by_kind(kind: CsvAssetKind) -> Vec<CsvAsset> {
     CSV_ASSETS.iter().copied().filter(|asset| asset.kind == kind).collect()
 }
@@ -1468,5 +1505,15 @@ mod tests {
             assert_eq!(rows.len(), asset.row_count, "{name}");
             assert_eq!(rows.iter().map(Vec::len).max().unwrap_or(0), asset.max_columns, "{name}");
         }
+    }
+
+    #[test]
+    fn language_asset_with_required_columns_falls_back_to_base_when_variant_is_stale() {
+        let base = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493, 744]).unwrap();
+        assert_eq!(base.name, "religion.csv");
+        assert_eq!(base.language, CsvLanguage::Base);
+        let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493]).unwrap();
+        assert_eq!(localized.name, "en-religion.csv");
+        assert_eq!(localized.language, CsvLanguage::English);
     }
 }

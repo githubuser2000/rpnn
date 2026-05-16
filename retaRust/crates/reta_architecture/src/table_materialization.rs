@@ -11,7 +11,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::column_selection::ColumnBucketKey;
-use crate::csv_catalog::{csv_asset_by_name, csv_rows_by_name, CsvAssetKind, CsvLanguage};
+use crate::csv_catalog::{
+    csv_asset_by_name, csv_asset_for_language_with_required_columns, csv_rows_by_name, CsvAssetKind,
+    CsvLanguage,
+};
 use crate::html_class_catalog::html_class_record;
 use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterCommandSets};
 use crate::table_generation::TableGenerationPlan;
@@ -37,6 +40,12 @@ pub struct TableMaterializationConfig {
     /// through materialization.  Membership still lives in a set, but rendering
     /// should use this order when present.
     pub honor_row_order_override: bool,
+    /// Prefer a localized CSV section only if it can satisfy the direct
+    /// zero-based columns requested by the parameter matrix.  This guards the
+    /// Stage-55 religion.csv update: base religion.csv now owns column 744,
+    /// while language variants can still lag at 744 columns and should not
+    /// turn `--kontinuum=m` back into a virtual-column case.
+    pub fallback_to_base_for_missing_language_columns: bool,
 }
 
 impl Default for TableMaterializationConfig {
@@ -48,6 +57,7 @@ impl Default for TableMaterializationConfig {
             max_columns: None,
             honor_column_order_override: true,
             honor_row_order_override: true,
+            fallback_to_base_for_missing_language_columns: true,
         }
     }
 }
@@ -351,10 +361,28 @@ pub fn materialize_generation_plan(
     let mut ordinary_sections = Vec::new();
 
     if !plan.selected_columns.is_empty() {
-        let mut request = CsvProjectionRequest::for_asset(asset_name_for_language(
+        let requested_columns = plan
+            .selected_columns
+            .iter()
+            .filter_map(|column| usize::try_from(*column).ok())
+            .filter(|column| *column > 0)
+            .collect::<BTreeSet<_>>();
+        let ordered_requested_columns = if config.honor_column_order_override {
+            plan.ordered_selected_columns()
+                .into_iter()
+                .filter_map(|column| usize::try_from(column).ok())
+                .filter(|column| *column > 0)
+                .collect::<Vec<_>>()
+        } else {
+            requested_columns.iter().copied().collect::<Vec<_>>()
+        };
+        let ordinary_asset_name = asset_name_for_language_with_columns(
             "religion.csv",
             config.language,
-        ));
+            &ordered_requested_columns,
+            config.fallback_to_base_for_missing_language_columns,
+        );
+        let mut request = CsvProjectionRequest::for_asset(ordinary_asset_name.clone());
         request.include_header = config.include_header;
         request.max_rows = config.max_rows;
         request.max_columns = config.max_columns;
@@ -362,23 +390,13 @@ pub fn materialize_generation_plan(
         if config.honor_row_order_override {
             request.row_order_zero_based = plan_rows_to_source_order(&plan.ordered_selected_rows());
         }
-        request.columns_legacy = plan
-            .selected_columns
-            .iter()
-            .filter_map(|column| usize::try_from(*column).ok())
-            .filter(|column| *column > 0)
-            .collect();
+        request.columns_legacy = requested_columns;
         if config.honor_column_order_override {
-            request.column_order_legacy = plan
-                .ordered_selected_columns()
-                .into_iter()
-                .filter_map(|column| usize::try_from(column).ok())
-                .filter(|column| *column > 0)
-                .collect();
+            request.column_order_legacy = ordered_requested_columns;
         }
         match materialize_csv_projection(request) {
             Some(section) => ordinary_sections.push(section),
-            None => missing_assets.push(asset_name_for_language("religion.csv", config.language)),
+            None => missing_assets.push(ordinary_asset_name),
         }
     }
 
@@ -675,6 +693,24 @@ pub fn asset_name_for_language(base_name: &str, language: CsvLanguage) -> String
     }
 }
 
+pub fn asset_name_for_language_with_columns(
+    base_name: &str,
+    language: CsvLanguage,
+    columns_zero_based: &[usize],
+    fallback_to_base_for_missing_columns: bool,
+) -> String {
+    if fallback_to_base_for_missing_columns {
+        if let Some(asset) = csv_asset_for_language_with_required_columns(
+            base_name,
+            language,
+            columns_zero_based,
+        ) {
+            return asset.name.to_string();
+        }
+    }
+    asset_name_for_language(base_name, language)
+}
+
 pub fn ordered_rows_for_projection(
     request: &CsvProjectionRequest,
     source_has_rows: bool,
@@ -884,5 +920,55 @@ mod tests {
             ),
             "2024-07-06-symbols-alt-ak-circle-sphere-etc.csv"
         );
+    }
+
+
+    #[test]
+    fn language_materialization_falls_back_to_base_for_direct_744() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=1-1",
+            "-spalten",
+            "--kontinuum=m",
+        ];
+        let report = materialize_cli_args(
+            &args,
+            &TableMaterializationConfig {
+                language: CsvLanguage::English,
+                ..TableMaterializationConfig::default()
+            },
+        );
+        let section = report.ordinary_sections.first().unwrap();
+        assert_eq!(section.asset_name, "religion.csv");
+        assert_eq!(section.language, "base");
+        assert!(section.selected_columns_legacy.contains(&744));
+        assert!(!section.missing_columns_legacy.contains(&744));
+        assert!(section
+            .column_headers()
+            .iter()
+            .any(|cell| cell.contains("Neues M")));
+    }
+
+    #[test]
+    fn language_materialization_keeps_variant_when_direct_columns_exist() {
+        let args = [
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=1-1",
+            "-spalten",
+            "--religion=493",
+        ];
+        let report = materialize_cli_args(
+            &args,
+            &TableMaterializationConfig {
+                language: CsvLanguage::English,
+                ..TableMaterializationConfig::default()
+            },
+        );
+        let section = report.ordinary_sections.first().unwrap();
+        assert_eq!(section.asset_name, "en-religion.csv");
+        assert_eq!(section.language, "en");
+        assert!(section.selected_columns_legacy.contains(&493));
     }
 }
