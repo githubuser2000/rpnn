@@ -4,8 +4,7 @@
 This probe does not require a Rust build.  It checks that the Rust sources now
 wire the materialized `TableViewOutputReport` into the shadow pipeline, commit
 policy, runtime diagnostics, migration gates and inspect binary.  It also keeps
-the old continuum/m witness: 493 is directly rendered, 744 remains non-direct
-unless an explicit virtual-column policy renders it.
+the continuum/m witness after the Stage-55 CSV update: both 493 and 744 are directly rendered, while virtual-column policy is reserved for genuinely non-direct columns.
 """
 
 from __future__ import annotations
@@ -73,7 +72,7 @@ def main() -> int:
         "binary_outputs_report_and_commit": '"report"' in binary and '"commit"' in binary,
         "continuum_493_direct_header": "M Kontinuum" in header_493,
         "continuum_493_first_data": "Wege-Gabelung" in data_493,
-        "continuum_744_non_direct": 744 >= source_max_columns,
+        "continuum_744_direct": 744 < source_max_columns and "Neues M" in rows[0][744],
     }
 
     result = {

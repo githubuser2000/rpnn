@@ -458,23 +458,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn continuum_m_view_suppresses_virtual_744_by_default_but_keeps_witness() {
+    fn continuum_m_view_materializes_direct_744_by_default_after_religion_csv_update() {
         let view = continuum_m_table_view_smoke(VirtualColumnDisplayPolicy::Suppress);
         assert!(view.continuum_m_direct_header_present);
-        assert!(view.continuum_m_virtual_744_kept_as_witness);
+        assert!(!view.continuum_m_virtual_744_kept_as_witness);
         assert_eq!(view.rendered_virtual_cell_count, 0);
         assert!(view.contains_text("M Kontinuum"));
+        assert!(view.contains_text("Neues M"));
     }
 
     #[test]
-    fn continuum_m_view_can_render_virtual_744_as_tag_summary() {
+    fn continuum_m_virtual_policy_is_inert_for_now_direct_744() {
         let view = continuum_m_table_view_smoke(VirtualColumnDisplayPolicy::TagSummary);
-        assert!(view.rendered_virtual_cell_count > 0);
-        assert!(view.contains_text("744:sternPolygon,keinParaOdMetaP"));
+        assert_eq!(view.rendered_virtual_cell_count, 0);
+        assert!(!view.contains_text("744:sternPolygon,keinParaOdMetaP"));
+        assert!(view.contains_text("Neues M"));
     }
 
     #[test]
-    fn explicit_spaltenreihenfolge_places_virtual_744_before_493_when_policy_allows_it() {
+    fn explicit_spaltenreihenfolge_places_direct_744_before_493_after_csv_update() {
         let args = [
             "reta",
             "-zeilen",
@@ -494,6 +496,6 @@ mod tests {
             .unwrap();
         assert_eq!(header.cells[0].column_legacy, 744);
         assert_eq!(header.cells[1].column_legacy, 493);
-        assert!(header.cells[0].value.contains("744:sternPolygon"));
+        assert!(header.cells[0].value.contains("Neues M"));
     }
 }

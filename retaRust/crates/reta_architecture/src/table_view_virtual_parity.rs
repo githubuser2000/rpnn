@@ -1,11 +1,10 @@
 //! Parity diagnostics for policy-rendered virtual/non-direct table columns.
 //!
-//! Stage 37 made virtual columns such as the continuum `744` witness explicitly
-//! renderable by policy.  Stage 38 adds the missing safety check: changing the
-//! virtual-column policy must not mutate the already materialized direct CSV
-//! cells.  This module compares a reference policy, normally `Suppress`, with a
-//! rendered policy such as `TagSummary`, `Placeholder` or `Witness` and records
-//! whether only virtual cells were added.
+//! Stage 37 made virtual/non-direct columns explicitly renderable by policy.
+//! Stage 55 updates the base `religion.csv` so the former continuum `744`
+//! witness is now a direct CSV-backed column.  This module now checks both that
+//! virtual-column policies are inert for direct 744 and that genuinely
+//! non-direct columns can still add only witness cells.
 
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +140,7 @@ pub struct TableViewVirtualParityReport {
     pub added_virtual_columns: Vec<usize>,
     pub continuum_m_virtual_744_added_only: bool,
     pub continuum_m_direct_493_preserved: bool,
+    pub continuum_m_direct_744_preserved: bool,
     pub reference_line_count: usize,
     pub rendered_line_count: usize,
     pub reference_preview: Vec<String>,
@@ -369,6 +369,11 @@ pub fn compare_virtual_column_policies_for_cli_args<S: AsRef<str>>(
     }) && rendered_direct.iter().any(|sig| {
         sig.column_legacy == 493 && sig.value.contains("M Kontinuum")
     });
+    let continuum_m_direct_744_preserved = reference_direct.iter().any(|sig| {
+        sig.column_legacy == 744 && sig.value.contains("Neues M")
+    }) && rendered_direct.iter().any(|sig| {
+        sig.column_legacy == 744 && sig.value.contains("Neues M")
+    });
     let continuum_m_virtual_744_added_only = direct_cells_equal
         && added_virtual.iter().any(|sig| {
             sig.column_legacy == 744
@@ -397,6 +402,7 @@ pub fn compare_virtual_column_policies_for_cli_args<S: AsRef<str>>(
         added_virtual_columns,
         continuum_m_virtual_744_added_only,
         continuum_m_direct_493_preserved,
+        continuum_m_direct_744_preserved,
         reference_line_count: reference_output.rendered_line_count,
         rendered_line_count: rendered_output.rendered_line_count,
         reference_preview: reference_output.rendered_lines.iter().take(8).cloned().collect(),
@@ -428,17 +434,41 @@ pub fn continuum_m_virtual_parity_smoke() -> TableViewVirtualParityReport {
     )
 }
 
+pub fn non_direct_999_virtual_parity_smoke() -> TableViewVirtualParityReport {
+    let args = vec![
+        "reta".to_string(),
+        "-zeilen".to_string(),
+        "--vorhervonausschnitt=1-1".to_string(),
+        "-spalten".to_string(),
+        "--religion=999".to_string(),
+        "--breite=0".to_string(),
+    ];
+    compare_virtual_column_policies_for_cli_args(
+        &args,
+        &TableViewVirtualParityConfig::default(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn continuum_m_virtual_policy_adds_744_without_touching_493() {
+    fn continuum_m_virtual_policy_is_inert_for_direct_744_after_csv_update() {
         let report = continuum_m_virtual_parity_smoke();
         assert!(report.direct_cells_equal);
         assert!(report.continuum_m_direct_493_preserved);
-        assert!(report.continuum_m_virtual_744_added_only);
-        assert!(report.added_virtual_columns.contains(&744));
+        assert!(report.continuum_m_direct_744_preserved);
+        assert!(!report.continuum_m_virtual_744_added_only);
+        assert!(!report.added_virtual_columns.contains(&744));
+        assert!(report.raw_lines_equal);
+    }
+
+    #[test]
+    fn non_direct_999_virtual_policy_adds_witness_without_touching_direct_cells() {
+        let report = non_direct_999_virtual_parity_smoke();
+        assert!(report.direct_cells_equal);
+        assert!(report.added_virtual_columns.contains(&999));
         assert!(!report.raw_lines_equal);
     }
 
@@ -470,9 +500,7 @@ mod tests {
                 "-zeilen",
                 "--vorhervonausschnitt=1-1",
                 "-spalten",
-                "--kontinuum=m",
-                "-ausgabe",
-                "--spaltenreihenfolgeundnurdiese=744,493",
+                "--religion=999",
             ],
             &TableViewVirtualParityConfig::default()
                 .with_rendered_policy(VirtualColumnDisplayPolicy::Placeholder),
@@ -488,9 +516,7 @@ mod tests {
             "-zeilen",
             "--vorhervonausschnitt=1-1",
             "-spalten",
-            "--kontinuum=m",
-            "-ausgabe",
-            "--spaltenreihenfolgeundnurdiese=744,493",
+            "--religion=999",
             "--virtualwitness",
         ];
         let config = TableViewVirtualParityConfig::default().with_cli_virtual_options(&args);

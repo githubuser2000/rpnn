@@ -52,7 +52,7 @@ pub struct TableViewHtmlAttributeConfig {
     /// column number.  This is important for `493 -> M Kontinuum`, whose
     /// HTML-class witness lives at a different rendered-output column index.
     pub prefer_row_text_match: bool,
-    /// Use `(column,None)` witnesses for virtual/non-direct columns such as 744.
+    /// Use `(column,None)` witnesses for virtual/non-direct columns. Direct cells only use this fallback when the witness text is compatible.
     pub allow_column_fallback: bool,
     /// Keep inline style attributes when `RawOpenTag` is selected.  Disabled for
     /// class-only mode and for `--nocolor`-like projections.
@@ -264,7 +264,8 @@ pub fn html_attribute_for_cell(
     let fallback = config
         .allow_column_fallback
         .then(|| html_class_record(column, None))
-        .flatten();
+        .flatten()
+        .filter(|record| cell.is_virtual() || record_text_is_compatible(record.text, &cell.value));
     match fallback {
         Some(record) => attribute_from_record(cell, record, false, "column-fallback", config),
         None => TableViewHtmlCellAttribute::plain(cell),
@@ -537,16 +538,17 @@ mod tests {
     use crate::table_view::{view_for_cli_args, MaterializedTableViewConfig, VirtualColumnDisplayPolicy};
 
     #[test]
-    fn continuum_m_html_attribute_smoke_keeps_493_and_744_witnesses() {
+    fn continuum_m_html_attribute_smoke_keeps_493_and_treats_744_as_direct_csv_cell() {
         let report = continuum_m_html_attribute_smoke();
         assert!(report.enabled);
         assert_eq!(report.policy, "class-only");
         assert!(report.direct_493_attributed);
-        assert!(report.virtual_744_attributed);
+        assert!(!report.virtual_744_attributed);
         assert!(report.class_string_cell_count > 0);
         assert!(report.contains_text("class=\""));
         assert!(report.contains_text("M Kontinuum"));
-        assert!(report.contains_text("744:sternPolygon"));
+        assert!(report.contains_text("Neues M"));
+        assert!(!report.contains_text("744:sternPolygon"));
     }
 
     #[test]

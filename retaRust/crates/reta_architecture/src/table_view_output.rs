@@ -1656,9 +1656,10 @@ mod tests {
         let report = continuum_m_table_view_output_smoke(OutputMode::Shell);
         assert_eq!(report.mode, "shell");
         assert!(report.continuum_m_direct_header_present);
-        assert!(report.continuum_m_virtual_744_kept_as_witness);
+        assert!(!report.continuum_m_virtual_744_kept_as_witness);
         assert_eq!(report.virtual_cell_count, 0);
         assert!(report.contains_text("M Kontinuum"));
+        assert!(report.contains_text("Neues M"));
         assert!(!report.contains_text("744:sternPolygon"));
     }
 
@@ -1687,7 +1688,7 @@ mod tests {
         assert_eq!(report.mode, "nichts");
         assert!(report.rendered_lines.is_empty());
         assert!(report.visible_output_is_empty);
-        assert!(report.continuum_m_virtual_744_kept_as_witness);
+        assert!(!report.continuum_m_virtual_744_kept_as_witness);
     }
 
     #[test]
@@ -2087,7 +2088,7 @@ mod tests {
     }
 
     #[test]
-    fn virtual_columns_flag_renders_744_tag_summary_without_enabling_by_default() {
+    fn virtual_columns_flag_is_inert_for_direct_744_and_still_renders_non_direct_columns() {
         let plain = render_table_view_for_cli_args(
             &[
                 "reta",
@@ -2104,7 +2105,7 @@ mod tests {
         assert_eq!(plain.virtual_column_policy, "suppress");
         assert!(!plain.rendered_text.contains("744:sternPolygon"));
 
-        let summary = render_table_view_for_cli_args(
+        let direct_summary = render_table_view_for_cli_args(
             &[
                 "reta",
                 "-zeilen",
@@ -2118,9 +2119,25 @@ mod tests {
             &TableMaterializationConfig::default(),
             &TableViewOutputConfig::default(),
         );
-        assert_eq!(summary.virtual_column_policy, "tag-summary");
-        assert!(summary.rendered_text.contains("744:sternPolygon,keinParaOdMetaP"));
-        assert!(summary.virtual_cell_count > 0);
+        assert_eq!(direct_summary.virtual_column_policy, "tag-summary");
+        assert!(!direct_summary.rendered_text.contains("744:sternPolygon,keinParaOdMetaP"));
+        assert_eq!(direct_summary.virtual_cell_count, 0);
+
+        let non_direct_summary = render_table_view_for_cli_args(
+            &[
+                "reta",
+                "-zeilen",
+                "--vorhervonausschnitt=1-1",
+                "-spalten",
+                "--religion=999",
+                "--virtualcolumns",
+            ],
+            &TableMaterializationConfig::default(),
+            &TableViewOutputConfig::default(),
+        );
+        assert_eq!(non_direct_summary.virtual_column_policy, "tag-summary");
+        assert!(non_direct_summary.rendered_text.contains("999:untagged"));
+        assert!(non_direct_summary.virtual_cell_count > 0);
     }
 
     #[test]
@@ -2131,9 +2148,7 @@ mod tests {
                 "-zeilen",
                 "--vorhervonausschnitt=1-1",
                 "-spalten",
-                "--kontinuum=m",
-                "-ausgabe",
-                "--spaltenreihenfolgeundnurdiese=744,493",
+                "--religion=999",
                 "--virtualplaceholder",
             ],
             &TableMaterializationConfig::default(),

@@ -789,24 +789,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn continuum_m_materializes_493_and_reports_744_as_unresolved_csv_column() {
+    fn continuum_m_materializes_493_and_direct_744_after_religion_csv_update() {
         let report = materialize_kontinuum_m_smoke();
         assert!(report.continuum_m_columns_present);
-        assert!(report.continuum_m_missing_columns.contains(&744));
-        assert!(report.continuum_m_virtual_column_present);
-        assert!(report.virtual_columns.iter().any(|column| {
-            column.column_legacy == 744
-                && column.tag_names.iter().any(|tag| tag == "sternPolygon")
-                && column.tag_names.iter().any(|tag| tag == "keinParaOdMetaP")
-        }));
+        assert!(!report.continuum_m_missing_columns.contains(&744));
+        assert!(!report.continuum_m_virtual_column_present);
+        assert!(report.virtual_columns.iter().all(|column| column.column_legacy != 744));
         assert!(report
             .continuum_m_header_preview
             .iter()
             .any(|cell| cell.contains("M Kontinuum")));
         assert!(report
+            .continuum_m_header_preview
+            .iter()
+            .any(|cell| cell.contains("Neues M")));
+        assert!(report
             .continuum_m_first_data_preview
             .iter()
             .any(|cell| cell.contains("Wege-Gabelung")));
+        assert!(report
+            .continuum_m_first_data_preview
+            .iter()
+            .any(|cell| cell.contains("Identität")));
         assert_eq!(
             report.ordinary_sections[0].selected_columns_legacy,
             vec![493, 744]
@@ -851,7 +855,7 @@ mod tests {
         assert!(report.column_order_override_applied);
         assert_eq!(report.requested_column_order_legacy, vec![744, 493]);
         assert_eq!(report.materialized_column_order_legacy, vec![744, 493]);
-        assert!(report.continuum_m_missing_columns.contains(&744));
+        assert!(!report.continuum_m_missing_columns.contains(&744));
     }
 
     #[test]

@@ -3,8 +3,8 @@
 
 This is intentionally dependency-free and does not require a Rust build.  It
 checks the same data witnesses used by `table_view.rs`: the M-continuum direct
-CSV column, the non-direct virtual column 744, and the default suppress policy
-that keeps 744 as a witness without changing the rendered legacy-like view.
+CSV column and, after the Stage-55 religion.csv update, the now-direct 744
+`Neues M` column. Virtual-column policy remains available for other non-direct columns.
 """
 from __future__ import annotations
 
@@ -60,16 +60,20 @@ def build_probe() -> dict[str, object]:
     html_744 = load_html_744()
     header_493 = rows[0][493]
     data_493 = rows[1][493]
+    header_744 = rows[0][744] if len(rows[0]) > 744 else ""
+    data_744 = rows[1][744] if len(rows[1]) > 744 else ""
     source_max_columns = max(len(row) for row in rows)
-    virtual_744 = 744 >= source_max_columns
-    direct_default_rendered = [header_493, data_493]
-    tag_summary_virtual = "744:sternPolygon,keinParaOdMetaP"
+    direct_744 = 744 < source_max_columns
+    direct_default_rendered = [header_493, header_744, data_493, data_744]
+    tag_summary_virtual = "999:untagged"
     hooks = rust_source_contains_table_view_hooks()
     status = "ok" if (
         "M Kontinuum" in header_493
         and "Wege-Gabelung" in data_493
+        and "Neues M" in header_744
+        and "Identität" in data_744
         and html_744 is not None
-        and virtual_744
+        and direct_744
         and all(hooks.values())
     ) else "mismatch"
     return {
@@ -77,12 +81,14 @@ def build_probe() -> dict[str, object]:
         "source_max_columns": source_max_columns,
         "direct_column_493_header": header_493,
         "direct_column_493_first_data_contains_wege_gabelung": "Wege-Gabelung" in data_493,
-        "virtual_column_744_non_direct": virtual_744,
-        "virtual_column_744_html_text": None if html_744 is None else html_744.get("text"),
+        "direct_column_744_header": header_744,
+        "direct_column_744_first_data_contains_identitaet": "Identität" in data_744,
+        "column_744_directly_addressable": direct_744,
+        "html_column_744_witness_text": None if html_744 is None else html_744.get("text"),
         "default_policy": "suppress",
         "default_rendered_cell_count": len(direct_default_rendered),
         "default_rendered_virtual_cell_count": 0,
-        "tag_summary_policy_virtual_cell": tag_summary_virtual,
+        "tag_summary_policy_non_direct_cell": tag_summary_virtual,
         "rust_hooks": hooks,
     }
 

@@ -3,7 +3,7 @@
 
 The tool is intentionally dependency-free.  Without a built Rust binary it
 checks the source-of-truth CSV, the generated Rust parameter matrix and the
-Stage-21 virtual-column witness path.  With a `--materialize-bin` argument it
+Stage-55 direct-744 CSV materialization path.  With a `--materialize-bin` argument it
 can also compare the runtime JSON emitted by `rreta_arch_materialize`.
 """
 from __future__ import annotations
@@ -73,7 +73,10 @@ def source_probe(root: pathlib.Path) -> dict[str, Any]:
         "first_data_preview": first_data_preview,
         "missing_legacy_columns": [column for column in selected_columns if column >= len(header)],
         "header_contains_m_kontinuum": any("M Kontinuum" in cell for cell in header_preview),
+        "header_contains_neues_m": any("Neues M" in cell for cell in header_preview),
         "first_data_contains_weges_gabelung": any("Wege-Gabelung" in cell for cell in first_data_preview),
+        "first_data_contains_identitaet": any("Identität" in cell for cell in first_data_preview),
+        "column_744_directly_addressable": 744 < len(header),
         "virtual_column_path_present": virtual_column_path_present(root),
     }
 
@@ -116,6 +119,12 @@ def main() -> int:
         problems.append("religion_header_missing_m_kontinuum")
     if not source["first_data_contains_weges_gabelung"]:
         problems.append("religion_first_data_missing_wege_gabelung")
+    if not source["header_contains_neues_m"]:
+        problems.append("religion_header_missing_neues_m")
+    if not source["first_data_contains_identitaet"]:
+        problems.append("religion_first_data_missing_identitaet")
+    if not source["column_744_directly_addressable"]:
+        problems.append("religion_744_not_direct_after_update")
     if not source["virtual_column_path_present"]:
         problems.append("virtual_column_path_missing")
     if binary is not None:
@@ -124,8 +133,10 @@ def main() -> int:
         report = binary.get("json") or {}
         if report and not report.get("continuum_m_columns_present"):
             problems.append("materialize_binary_missing_continuum_m")
-        if report and not report.get("continuum_m_virtual_column_present"):
-            problems.append("materialize_binary_missing_virtual_744")
+        if report and report.get("continuum_m_virtual_column_present"):
+            problems.append("materialize_binary_still_treats_744_as_virtual")
+        if report and 744 in report.get("continuum_m_missing_columns", []):
+            problems.append("materialize_binary_still_missing_direct_744")
     if problems:
         status = "failed"
 

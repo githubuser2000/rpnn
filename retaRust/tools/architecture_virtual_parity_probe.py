@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Stage-38 probe for virtual-column parity diagnostics.
 
-The Rust architecture may render virtual/non-direct columns such as the
-continuum `744` witness in shadow/inspect modes.  This probe checks that the new
+The Rust architecture may render virtual/non-direct columns in shadow/inspect modes. After the Stage-55 religion.csv update, continuum `744` is direct, so the probe also checks that virtual policy is inert for direct 744.  This probe checks that the new
 parity layer is present and that its contract is explicit: rendering virtual
 columns may add witness cells, but must not mutate direct CSV-backed cells such
 as the `493` M-Kontinuum column.
@@ -44,9 +43,9 @@ def main() -> int:
         "virtual_signature_declared": "pub struct VirtualCellSignature" in parity,
         "direct_cells_compare_present": "direct_cells_equal" in parity and "direct_cell_signatures" in parity,
         "raw_and_semantic_diff_present": "raw_lines_equal" in parity and "semantic_diff" in parity,
-        "744_added_only_invariant_present": "continuum_m_virtual_744_added_only" in parity,
+        "direct_744_inert_invariant_present": "continuum_m_direct_744_preserved" in parity,
         "493_preserved_invariant_present": "continuum_m_direct_493_preserved" in parity,
-        "smoke_test_present": "continuum_m_virtual_policy_adds_744_without_touching_493" in parity,
+        "non_direct_999_smoke_present": "non_direct_999_virtual_policy_adds_witness_without_touching_direct_cells" in parity,
         "suppress_vs_suppress_test_present": "suppress_vs_suppress_is_raw_equal" in parity,
         "lib_exports_module": "pub mod table_view_virtual_parity" in lib and "TableViewVirtualParityReport" in lib,
         "facade_runtime_contains_bundle": "pub table_view_virtual_parity: TableViewVirtualParityBundle" in facade,
@@ -68,7 +67,8 @@ def main() -> int:
         "rendered_policy": "tag-summary",
         "known_regression_case": "-spalten --kontinuum=m -ausgabe --spaltenreihenfolgeundnurdiese=744,493",
         "expected_direct_column": 493,
-        "expected_virtual_column": 744,
+        "expected_direct_column_after_stage55": 744,
+        "expected_generic_virtual_column": 999,
         "invariant": (
             "Virtual-column rendering is a local policy morphism: it may add virtual witness "
             "cells, but it must be identity on direct CSV-backed cells before any commit gate."

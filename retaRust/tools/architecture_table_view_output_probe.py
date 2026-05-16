@@ -3,8 +3,8 @@
 
 The probe does not require a Rust build.  It checks the static Rust hooks and
 uses the generated Python reference assets to verify the concrete continuum/m
-case that has driven the porting work: 493 is direct CSV-backed, while 744 is a
-virtual witness unless a deliberate virtual-column display policy renders it.
+case that has driven the porting work: 493 is direct CSV-backed, and after the
+Stage-55 religion.csv update 744 is also directly CSV-backed as `Neues M`.
 """
 
 from __future__ import annotations
@@ -51,6 +51,7 @@ def main() -> int:
     direct_493_ok = len(header) > 493 and "M Kontinuum" in header[493]
     first_493_ok = len(first) > 493 and "Wege-Gabelung" in first[493]
     column_744_directly_addressable = len(header) > 744
+    direct_744_ok = column_744_directly_addressable and "Neues M" in header[744]
 
     required_symbols = [
         "TableViewOutputBundle",
@@ -82,7 +83,8 @@ def main() -> int:
         "religion_first_row_493_contains_wege_gabelung": first_493_ok,
         "direct_493_ok": direct_493_ok,
         "column_744_directly_addressable": column_744_directly_addressable,
-        "virtual_744_policy_default_suppress": "VirtualColumnDisplayPolicy::Suppress" in module,
+        "direct_744_ok": direct_744_ok,
+        "virtual_policy_default_suppress": "VirtualColumnDisplayPolicy::Suppress" in module,
         "markdown_separator_supported": "include_markdown_header_separator" in module,
         "html_escape_supported": "html_escape_cell" in module,
         "csv_escape_supported": "csv_escape_cell" in module,
@@ -93,14 +95,12 @@ def main() -> int:
         if key
         not in {
             "religion_header_493",
-            "column_744_directly_addressable",
             "module_symbols_present",
         }
     ):
         result["status"] = "failed"
-    # `column_744_directly_addressable` is expected to be false in the current
-    # materialization model; 744 remains a virtual witness.
-    if result["column_744_directly_addressable"]:
+    # Stage 55 expects 744 to be directly addressable in the updated religion.csv.
+    if not result["direct_744_ok"]:
         result["status"] = "failed"
 
     print(json.dumps(result, ensure_ascii=False, indent=2 if args.pretty else None))

@@ -1,11 +1,10 @@
 //! Policy-controlled rendering of virtual/non-direct table-view columns.
 //!
 //! Stage 37 makes the existing `VirtualColumnDisplayPolicy` visible as an
-//! explicit architecture surface. Earlier stages kept virtual columns such as
-//! the `744` continuum witness internally and suppressed them by default. This
-//! module turns that into a typed CLI/shadow policy: Rust can keep suppressing
-//! virtual columns for visible parity, or deliberately render tag summaries,
-//! placeholders or full witnesses in inspect/shadow paths.
+//! explicit architecture surface. Stage 55 updates the base `religion.csv` so
+//! the former `744` witness is now a direct CSV-backed column. This module
+//! still owns virtual/non-direct column policy for other out-of-range or
+//! generated columns; direct columns are intentionally unaffected by it.
 
 use serde::{Deserialize, Serialize};
 
@@ -314,29 +313,48 @@ pub fn continuum_m_virtual_column_policy_smoke(
     virtual_column_report_for_cli_args(&args, &config)
 }
 
+pub fn non_direct_999_virtual_column_policy_smoke(
+    policy: VirtualColumnDisplayPolicy,
+) -> TableViewVirtualColumnReport {
+    let config = TableViewVirtualColumnConfig {
+        policy,
+        suppress_question_mark_virtuals: policy != VirtualColumnDisplayPolicy::Placeholder,
+    };
+    let args = vec![
+        "reta".to_string(),
+        "-zeilen".to_string(),
+        "--vorhervonausschnitt=1-1".to_string(),
+        "-spalten".to_string(),
+        "--religion=999".to_string(),
+        "--breite=0".to_string(),
+    ];
+    virtual_column_report_for_cli_args(&args, &config)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn default_policy_suppresses_virtual_744_but_keeps_witness() {
+    fn continuum_m_744_is_direct_after_religion_csv_update() {
         let report = continuum_m_virtual_column_policy_smoke(VirtualColumnDisplayPolicy::Suppress);
-        assert!(report.continuum_m_virtual_744_kept_as_witness);
+        assert!(!report.continuum_m_virtual_744_kept_as_witness);
+        assert_eq!(report.virtual_column_count, 0);
         assert_eq!(report.rendered_virtual_cell_count, 0);
         assert!(!report.contains_744_tag_summary);
+        assert!(report.rendered_lines.iter().any(|line| line.contains("Neues M")));
     }
 
     #[test]
-    fn tag_summary_policy_renders_744_before_493_when_order_requests_it() {
-        let report = continuum_m_virtual_column_policy_smoke(VirtualColumnDisplayPolicy::TagSummary);
-        assert!(report.contains_744_tag_summary);
+    fn tag_summary_policy_renders_non_direct_999_when_requested() {
+        let report = non_direct_999_virtual_column_policy_smoke(VirtualColumnDisplayPolicy::TagSummary);
         assert!(report.rendered_virtual_cell_count > 0);
-        assert!(report.rendered_lines.first().unwrap_or(&String::new()).starts_with("744:"));
+        assert!(report.rendered_lines.iter().any(|line| line.contains("999:untagged")));
     }
 
     #[test]
-    fn placeholder_policy_can_emit_question_mark_witnesses() {
-        let report = continuum_m_virtual_column_policy_smoke(VirtualColumnDisplayPolicy::Placeholder);
+    fn placeholder_policy_can_emit_question_mark_witnesses_for_non_direct_columns() {
+        let report = non_direct_999_virtual_column_policy_smoke(VirtualColumnDisplayPolicy::Placeholder);
         assert!(report.contains_question_mark_placeholder);
         assert!(report.rendered_virtual_cell_count > 0);
     }

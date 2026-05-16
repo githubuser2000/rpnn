@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stage-37 probe for virtual/non-direct column render policies.
 
-Checks that virtual columns such as the continuum `744` witness are still
+Checks that virtual-column policy remains available after the Stage-55 CSV update, where continuum `744` is now direct and generic non-direct columns such as 999 remain virtual.
 suppressed by default, but can be rendered in Rust architecture inspect/shadow
 paths through explicit virtual-column policies.
 """
@@ -39,9 +39,9 @@ def main() -> int:
         "bundle_declared": "pub struct TableViewVirtualColumnBundle" in virtuals,
         "cli_parser_declared": "parse_table_view_virtual_column_cli_options" in virtuals,
         "policies_declared": all(name in view for name in ["Suppress", "Placeholder", "TagSummary", "Witness"]),
-        "default_suppression_test_present": "default_policy_suppresses_virtual_744" in virtuals,
-        "tag_summary_test_present": "tag_summary_policy_renders_744" in virtuals,
-        "placeholder_test_present": "placeholder_policy_can_emit_question_mark" in virtuals,
+        "direct_744_test_present": "continuum_m_744_is_direct_after_religion_csv_update" in virtuals,
+        "tag_summary_test_present": "tag_summary_policy_renders_non_direct_999" in virtuals,
+        "placeholder_test_present": "placeholder_policy_can_emit_question_mark_witnesses_for_non_direct_columns" in virtuals,
         "output_config_carries_suppress_question_marks": "pub suppress_question_mark_virtuals: bool" in output,
         "output_cli_flags_parsed": all(flag in output for flag in [
             '"virtualcolumns"', '"virtualplaceholder"', '"virtualwitness"', '"suppressvirtualcolumns"'
@@ -59,7 +59,8 @@ def main() -> int:
         "lib_exports_module": "pub mod table_view_virtual_columns" in lib and "TableViewVirtualColumnReport" in lib,
         "ffi_export_present": "reta_architecture_table_view_virtual_columns_json" in ffi,
         "inspect_binary_present": "rreta_arch_virtual_columns" in cargo and binary.exists(),
-        "744_regression_preserved": "744:sternPolygon,keinParaOdMetaP" in virtuals and "continuum_m_virtual_744_kept_as_witness" in virtuals,
+        "direct_744_transition_preserved": "Neues M" in virtuals and "continuum_m_744_is_direct_after_religion_csv_update" in virtuals,
+        "non_direct_999_virtual_policy_preserved": "999:untagged" in virtuals and "non_direct_999_virtual_column_policy_smoke" in virtuals,
     }
     result = {
         "stage": 37,
