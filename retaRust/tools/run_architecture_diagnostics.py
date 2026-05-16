@@ -84,6 +84,13 @@ CASES: Dict[str, Case] = {
         reta_args=["-zeilen", "--vorhervonausschnitt=3,1-2", "-spalten", "--religion=493", "--breite=0"],
         prompt_args=["reta", "-zeilen", "--vorhervonausschnitt=3,1-2", "-spalten", "--religion=493"],
     ),
+    "prompt_p1234": Case(
+        name="prompt_p1234",
+        description="Prompt short form p1234 must stay math-only (mulpri 1234), not synthesize default absicht/thomas table argv.",
+        reta_args=[],
+        prompt_args=["p1234"],
+        wants_legacy=False,
+    ),
 }
 
 # Binaries that do not need legacy output but produce directly useful JSON.
@@ -146,6 +153,7 @@ PYTHON_PROBES: List[str] = [
     "architecture_prompt_language_guard_probe.py",
     "architecture_prompt_language_commit_guard_probe.py",
     "architecture_prompt_activation_readiness_probe.py",
+    "architecture_prompt_p1234_probe.py",
     "architecture_table_view_output_parity_probe.py",
     "architecture_table_view_output_commit_probe.py",
     "architecture_activation_promotion_probe.py",
@@ -292,20 +300,23 @@ def run_case(root: Path, case: Case, base_out: Path, args: argparse.Namespace) -
     case_dir.mkdir(parents=True, exist_ok=True)
     (case_dir / "case.json").write_text(json.dumps(asdict(case), ensure_ascii=False, indent=2), encoding="utf-8")
     results: List[RunResult] = []
-    legacy_file, legacy_result = write_legacy_lines(root, case, case_dir, args.profile, args.timeout, not args.force_cargo_run, args.force_cargo_run)
-    results.append(legacy_result)
+    legacy_file: Optional[Path] = None
+    if case.wants_legacy:
+        legacy_file, legacy_result = write_legacy_lines(root, case, case_dir, args.profile, args.timeout, not args.force_cargo_run, args.force_cargo_run)
+        results.append(legacy_result)
 
     bins: List[Tuple[str, List[str]]] = []
-    if args.include_table:
-        bins.extend(NO_LEGACY_BINS)
-    if args.include_style:
-        bins.extend(STYLE_BINS)
+    if case.reta_args:
+        if args.include_table:
+            bins.extend(NO_LEGACY_BINS)
+        if args.include_style:
+            bins.extend(STYLE_BINS)
     for name, prefix in bins:
         cmd_args = prefix + case.reta_args
         cmd = build_command_for_bin(root, name, args.profile, cmd_args, not args.force_cargo_run, args.force_cargo_run)
         results.append(run_command(f"{case.name}__{name}", cmd, root, case_dir, args.timeout))
 
-    if args.include_activation:
+    if args.include_activation and legacy_file is not None:
         store_path = case_dir / "activation-store.txt"
         for name, prefix in LEGACY_BINS:
             extra = []
@@ -385,7 +396,7 @@ def main() -> int:
         build_dir.mkdir(parents=True, exist_ok=True)
         results.extend(build_selected(root, names, args.profile, build_dir, args.timeout * 3))
 
-    case_names = args.case or ["continuum_m", "continuum_m_en", "ordered_744_493", "row_order"]
+    case_names = args.case or ["continuum_m", "continuum_m_en", "ordered_744_493", "row_order", "prompt_p1234"]
     for case_name in case_names:
         results.extend(run_case(root, CASES[case_name], out_dir, args))
 

@@ -1,15 +1,14 @@
 use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::{run_reta_from_args, RetaRunResult};
 
-use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 use super::python_like::{
-    libreta_prompt_custom_split,
-    prepare_prompt_big_output_for_stored_reta,
-    python_row_spec_to_numbers, prepare_prompt_big_output_for_stored_reta_prompt_overlay,
-    prepare_prompt_big_output_for_stored_rows, prompt_words, is_15or16_command, PromptGrosseAusgabe,
-    PromptLoescheVorSpeicherungBefehle, PromptModus,
-    PromptSonderBefehlAktion, PromptVonGrosserAusgabeSonderBefehlAusgaben,
+    is_15or16_command, libreta_prompt_custom_split, prepare_prompt_big_output_for_stored_reta,
+    prepare_prompt_big_output_for_stored_reta_prompt_overlay,
+    prepare_prompt_big_output_for_stored_rows, prompt_words, python_row_spec_to_numbers,
+    PromptGrosseAusgabe, PromptLoescheVorSpeicherungBefehle, PromptModus, PromptSonderBefehlAktion,
+    PromptVonGrosserAusgabeSonderBefehlAusgaben,
 };
+use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EditModeKind {
@@ -2834,6 +2833,20 @@ mod tests {
                 );
             }
             other => panic!("expected immediate primfaktorenvergleich output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn p_prefixed_number_is_math_output_not_invalid_reta_table() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("p1234", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.contains("1234"));
+                assert!(!output.text.contains("--absicht"));
+                assert!(!output.text.contains("--thomas"));
+            }
+            other => panic!("expected immediate mulpri output, got {other:?}"),
         }
     }
 

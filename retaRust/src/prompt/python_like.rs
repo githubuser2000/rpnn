@@ -2382,6 +2382,13 @@ fn semantic_columns_for_spec(
     }
 }
 
+fn spalten_parameter_for_prompt_output_command(command: &str) -> Option<&'static str> {
+    semantic_specs()
+        .iter()
+        .find(|spec| spec.names.contains(&command))
+        .map(|spec| spec.integer_para)
+}
+
 fn semantic_non_whole_fraction_reverse_columns(_spec: &PromptSemanticSpec) -> &'static str {
     "1"
 }
@@ -2408,6 +2415,29 @@ fn push_unique_string(target: &mut Vec<String>, value: String) {
     if !target.contains(&value) {
         target.push(value);
     }
+}
+
+fn is_math_only_prompt_output_token(token: &str) -> bool {
+    matches!(
+        token,
+        "p" | "mulpri"
+            | "prim"
+            | "primfaktorzerlegung"
+            | "primfaktorenvergleich"
+            | "prim24"
+            | "primfaktorzerlegungModulo24"
+            | "multis"
+            | "multis3"
+            | "modulo"
+            | "abc"
+            | "abcd"
+    )
+}
+
+fn contains_math_only_prompt_output(tokens: &[String]) -> bool {
+    tokens
+        .iter()
+        .any(|token| is_math_only_prompt_output_token(token.as_str()))
 }
 
 fn parse_simple_fraction_piece(piece: &str) -> Option<(i64, i64)> {
@@ -8372,6 +8402,14 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
         .any(|token| is_ausgabe_parameter_token(token));
 
     if output_commands.is_empty() && !has_explicit_spalten_parameter {
+        // Python prompt short forms distinguish bare numbers from math-prefixed
+        // numbers.  A bare `1234` expands to the default table views
+        // (`absicht`, `thomas`, ...), while `p1234` expands to the math command
+        // `mulpri 1234` and must not synthesize invalid `-spalten --absicht
+        // --thomas` arguments.
+        if contains_math_only_prompt_output(&normalized) {
+            return None;
+        }
         output_commands.extend(["absicht".to_string(), "thomas".to_string()]);
         if row_specs.iter().any(|t| t.contains('/')) {
             output_commands.extend([
@@ -8402,7 +8440,9 @@ pub fn build_reta_argv_from_prompt_tokens(tokens: &[String]) -> Option<Vec<Strin
     if !output_commands.is_empty() || has_explicit_spalten_parameter {
         argv.push("-spalten".to_string());
         for command in output_commands {
-            let token = format!("--{command}");
+            let token = spalten_parameter_for_prompt_output_command(&command)
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("--{command}"));
             if !argv.contains(&token) {
                 argv.push(token);
             }
@@ -9357,6 +9397,25 @@ mod tests {
         assert!(prepared
             .liste
             .contains(&"keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar".to_string()));
+    }
+
+    #[test]
+    fn p_prefixed_number_does_not_synthesize_invalid_default_table_argv() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["p1234"]));
+        assert_eq!(expanded, strings(&["mulpri", "1234"]));
+        assert_eq!(build_reta_argv_from_prompt_tokens(&expanded), None);
+    }
+
+    #[test]
+    fn bare_number_still_synthesizes_default_table_argv() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["1234"]));
+        let argv = build_reta_argv_from_prompt_tokens(&expanded)
+            .expect("bare numeric prompts still produce default table argv");
+        assert!(argv.contains(&"-spalten".to_string()));
+        assert!(argv.contains(&"--menschliches=motivation".to_string()));
+        assert!(argv.contains(&"--galaxie=thomas".to_string()));
+        assert!(!argv.contains(&"--absicht".to_string()));
+        assert!(!argv.contains(&"--thomas".to_string()));
     }
 
     #[test]
