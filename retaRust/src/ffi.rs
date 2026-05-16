@@ -869,6 +869,36 @@ pub unsafe extern "C" fn reta_architecture_prompt_language_guard_json(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_prompt_activation_readiness_json(
+    input: *const c_char,
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let text = unsafe { read_required_string(input) }.unwrap_or_default();
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let (_, switch_config) = reta_architecture::extract_architecture_switch_from_argv(&args, None);
+        let policy = reta_architecture::PromptActivationReadinessPolicy::from_cli_args(&args);
+        let report = reta_architecture::prompt_activation_readiness_for_text(
+            &text,
+            &switch_config,
+            &policy,
+        );
+        serde_json::to_string(&serde_json::json!({
+            "input": text,
+            "args": args,
+            "switch": switch_config.snapshot(),
+            "policy": policy,
+            "report": report,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_prompt_activation_readiness_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     argc: usize,
     argv: *const *const c_char,

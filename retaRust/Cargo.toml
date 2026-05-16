@@ -207,3 +207,7 @@ path = "src/bin/reta_arch_prompt_language_guard.rs"
 [[bin]]
 name = "rreta_arch_prompt_language_commit"
 path = "src/bin/reta_arch_prompt_language_commit.rs"
+
+[[bin]]
+name = "rreta_arch_prompt_activation_readiness"
+path = "src/bin/reta_arch_prompt_activation_readiness.rs"

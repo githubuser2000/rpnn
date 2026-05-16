@@ -128,6 +128,10 @@ use crate::prompt_language_guard::{
     PromptLanguageGuardBundle, bootstrap_prompt_language_guard as bootstrap_prompt_language_guard_impl,
     prompt_language_guard_for_text, PromptLanguageGuardPolicy,
 };
+use crate::prompt_activation_readiness::{
+    PromptActivationReadinessBundle, bootstrap_prompt_activation_readiness as bootstrap_prompt_activation_readiness_impl,
+    prompt_activation_readiness_for_text, PromptActivationReadinessPolicy,
+};
 use crate::prompt_preparation::{
     PromptPreparationBundle, bootstrap_prompt_preparation as bootstrap_prompt_preparation_impl,
 };
@@ -324,6 +328,7 @@ pub struct ArchitectureRuntime {
     pub prompt_language: PromptLanguageBundle,
     pub prompt_language_completion: PromptLanguageCompletionBundle,
     pub prompt_language_guard: PromptLanguageGuardBundle,
+    pub prompt_activation_readiness: PromptActivationReadinessBundle,
     pub presheaves: PresheafBundle,
     pub row_filtering: RowFilteringBundle,
     pub row_ranges: RowRangeMorphismBundle,
@@ -504,6 +509,7 @@ impl ArchitectureRuntime {
             prompt_language: bootstrap_prompt_language_impl(),
             prompt_language_completion: bootstrap_prompt_language_completion_impl(),
             prompt_language_guard: bootstrap_prompt_language_guard_impl(),
+            prompt_activation_readiness: bootstrap_prompt_activation_readiness_impl(),
             presheaves: bootstrap_presheaves(None),
             row_filtering: bootstrap_row_filtering_impl(),
             row_ranges: bootstrap_row_range_morphisms(None),
@@ -644,6 +650,7 @@ impl ArchitectureRuntime {
             "prompt_language",
             "prompt_language_completion",
             "prompt_language_guard",
+            "prompt_activation_readiness",
             "completion_runtime",
             "completion_word",
             "completion_nested",
@@ -744,6 +751,8 @@ impl ArchitectureRuntime {
             rust_prompt_language_completion_smoke_candidate_count: crate::prompt_language_completion::continuum_m_prompt_language_completion_smoke().candidate_count,
             rust_prompt_language_guard_morphism_count: self.prompt_language_guard.snapshot().morphisms.len(),
             rust_prompt_language_guard_smoke_ready: crate::prompt_language_guard::continuum_m_prompt_language_guard_smoke().ready(),
+            rust_prompt_activation_readiness_morphism_count: self.prompt_activation_readiness.snapshot().morphisms.len(),
+            rust_prompt_activation_readiness_smoke_ready: crate::prompt_activation_readiness::continuum_m_prompt_activation_readiness_smoke().ready_for_prompt_activation,
             rust_generated_column_morphism_count: self.generated_columns.snapshot().count,
             rust_meta_column_morphism_count: self.meta_columns.snapshot().count,
             rust_concat_csv_morphism_count: self.concat_csv.snapshot().count,
@@ -1087,6 +1096,8 @@ pub struct ArchitectureSnapshotRef {
     pub rust_prompt_language_completion_smoke_candidate_count: usize,
     pub rust_prompt_language_guard_morphism_count: usize,
     pub rust_prompt_language_guard_smoke_ready: bool,
+    pub rust_prompt_activation_readiness_morphism_count: usize,
+    pub rust_prompt_activation_readiness_smoke_ready: bool,
     pub rust_generated_column_morphism_count: usize,
     pub rust_meta_column_morphism_count: usize,
     pub rust_concat_csv_morphism_count: usize,
@@ -1399,6 +1410,8 @@ pub struct PromptArchitectureContext {
     pub prompt_language_sync_ready: bool,
     pub prompt_language_guard_ready: bool,
     pub prompt_language_guard_failed_guard_count: usize,
+    pub prompt_activation_readiness_ready: bool,
+    pub prompt_activation_readiness_failed_required_check_count: usize,
     pub context: ContextSelection,
     pub data_stream_direction: String,
     pub universal_property: String,
@@ -1488,6 +1501,11 @@ impl PromptArchitectureContext {
             input,
             &PromptLanguageGuardPolicy::default(),
         );
+        let prompt_activation_readiness = prompt_activation_readiness_for_text(
+            input,
+            &switch_bundle.default_config,
+            &PromptActivationReadinessPolicy::diagnostic(),
+        );
         Self {
             program_name: program_name.to_string(),
             input_len: input.chars().count(),
@@ -1506,6 +1524,8 @@ impl PromptArchitectureContext {
             prompt_language_sync_ready: prompt_language_completion.language_sync_ready,
             prompt_language_guard_ready: prompt_language_guard.ready(),
             prompt_language_guard_failed_guard_count: prompt_language_guard.failed_guards.len(),
+            prompt_activation_readiness_ready: prompt_activation_readiness.ready_for_prompt_activation,
+            prompt_activation_readiness_failed_required_check_count: prompt_activation_readiness.failed_required_checks.len(),
             context: ContextSelection::from_prompt_input(program_name, input),
             data_stream_direction: "bidirectional_prompt_reta_channel".to_string(),
             universal_property: "prompt_local_state_glues_to_same_compiled_reta_command"

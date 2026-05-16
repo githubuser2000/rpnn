@@ -215,7 +215,8 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("shadow_pipeline.table_view_output_commit")
                     || morphism.starts_with("shadow_pipeline.table_view_output_semantic_diff")
                     || morphism.starts_with("shadow_pipeline.prompt_adapter")
-                    || morphism.starts_with("shadow_pipeline.prompt_commit");
+                    || morphism.starts_with("shadow_pipeline.prompt_commit")
+                    || morphism.starts_with("prompt_activation_readiness");
                 if may_commit {
                     SwitchGateDecision::allowed(morphism, "adapter_gate", self.mode)
                 } else {
@@ -617,7 +618,21 @@ pub fn extract_architecture_switch_from_argv(
             | "--prompt-language-guard-require-reta" | "--prompt-guard-require-reta"
             | "--prompt-language-commit-require-guard" | "--prompt-commit-require-language-guard"
             | "--prompt-language-commit-ignore-guard" | "--prompt-commit-ignore-language-guard"
-            | "--prompt-commit-allow-force" | "--prompt-commit-no-force" => {
+            | "--prompt-commit-allow-force" | "--prompt-commit-no-force"
+            | "--prompt-activation-readiness-strict" | "--prompt-readiness-strict"
+            | "--prompt-activation-readiness-diagnostic" | "--prompt-readiness-diagnostic"
+            | "--prompt-activation-readiness-require-commit" | "--prompt-readiness-require-commit"
+            | "--prompt-activation-readiness-ignore-commit" | "--prompt-readiness-ignore-commit"
+            | "--prompt-activation-readiness-require-language-guard" | "--prompt-readiness-require-language-guard"
+            | "--prompt-activation-readiness-ignore-language-guard" | "--prompt-readiness-ignore-language-guard"
+            | "--prompt-activation-readiness-require-same-argv" | "--prompt-readiness-require-same-argv"
+            | "--prompt-activation-readiness-ignore-same-argv" | "--prompt-readiness-ignore-same-argv"
+            | "--prompt-activation-readiness-require-gate" | "--prompt-readiness-require-gate"
+            | "--prompt-activation-readiness-ignore-gate" | "--prompt-readiness-ignore-gate"
+            | "--prompt-activation-readiness-allow-force" | "--prompt-readiness-allow-force"
+            | "--prompt-activation-readiness-no-force" | "--prompt-readiness-no-force"
+            | "--prompt-activation-readiness-no-preview" | "--prompt-readiness-no-preview"
+            | "--prompt-activation-readiness-include-preview" | "--prompt-readiness-include-preview" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"
@@ -640,7 +655,9 @@ pub fn extract_architecture_switch_from_argv(
                 || arg.starts_with("--activation-promotion-preview=")
                 || arg.starts_with("--promotion-preview=")
                 || arg.starts_with("--prompt-language-guard-preview=")
-                || arg.starts_with("--prompt-guard-preview=") =>
+                || arg.starts_with("--prompt-guard-preview=")
+                || arg.starts_with("--prompt-activation-readiness-preview=")
+                || arg.starts_with("--prompt-readiness-preview=") =>
             {
                 recognised = true;
             }

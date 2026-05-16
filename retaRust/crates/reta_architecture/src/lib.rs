@@ -55,6 +55,7 @@ pub mod prompt_interaction;
 pub mod prompt_language;
 pub mod prompt_language_completion;
 pub mod prompt_language_guard;
+pub mod prompt_activation_readiness;
 pub mod prompt_preparation;
 pub mod prompt_runtime;
 pub mod prompt_session;
@@ -337,6 +338,13 @@ pub use prompt_language_guard::{
     PromptLanguageGuardSnapshot, bootstrap_prompt_language_guard,
     continuum_m_prompt_language_guard_smoke, prompt_language_guard_for_text,
     prompt_language_guard_from_argv,
+};
+pub use prompt_activation_readiness::{
+    PromptActivationReadinessBundle, PromptActivationReadinessCheck,
+    PromptActivationReadinessPolicy, PromptActivationReadinessReport,
+    PromptActivationReadinessSnapshot, bootstrap_prompt_activation_readiness,
+    continuum_m_prompt_activation_readiness_smoke, prompt_activation_readiness_for_cli_args,
+    prompt_activation_readiness_for_text, prompt_activation_readiness_from_reports,
 };
 pub use prompt_preparation::{
     PreparedPromptOutput, PromptPreparationBundle, PromptPreparationSnapshot,

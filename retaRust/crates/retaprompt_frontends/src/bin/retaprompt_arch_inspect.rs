@@ -181,6 +181,13 @@ fn main() {
         &switch_config,
         &prompt_commit_policy,
     );
+    let prompt_readiness_policy = retaprompt_input::reta_architecture::PromptActivationReadinessPolicy::from_cli_args(&cleaned_argv);
+    let prompt_readiness = retaprompt_input::reta_architecture::prompt_activation_readiness_from_reports(
+        &report,
+        &legacy,
+        &commit,
+        &prompt_readiness_policy,
+    );
     let json = serde_json::json!({
         "program_name": program_name,
         "prompt_text": prompt_text,
@@ -190,6 +197,8 @@ fn main() {
         "legacy": legacy,
         "prompt_commit_policy": prompt_commit_policy,
         "commit": commit,
+        "prompt_activation_readiness_policy": prompt_readiness_policy,
+        "prompt_activation_readiness": prompt_readiness,
     });
     match serde_json::to_string_pretty(&json) {
         Ok(text) => println!("{text}"),

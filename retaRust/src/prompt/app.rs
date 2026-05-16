@@ -319,13 +319,20 @@ fn apply_prompt_shadow_commit_if_safe(
     let report = pipeline.shadow_prompt(&shadow_input, architecture_switch_config);
     let legacy = legacy_prompt_command_snapshot(&compiled);
     let commit = pipeline.prompt_commit_decision(&report, &legacy, architecture_switch_config);
+    let prompt_readiness_policy = reta_architecture::PromptActivationReadinessPolicy::from_cli_args(&report.planned_argv);
+    let prompt_readiness = reta_architecture::prompt_activation_readiness_from_reports(
+        &report,
+        &legacy,
+        &commit,
+        &prompt_readiness_policy,
+    );
 
     if state.logging_enabled || architecture_switch_config.trace {
         append_log_line(
             log_path,
             "ARCH_PROMPT_SHADOW",
             &format!(
-                "mode={} legacy={} planned_argv={} commit={} reason={} same_argv={} language_guard_ready={} language={}",
+                "mode={} legacy={} planned_argv={} commit={} reason={} same_argv={} language_guard_ready={} language={} readiness_ready={} readiness_failed={}",
                 report.switch_mode,
                 legacy.kind,
                 report.planned_argv.len(),
@@ -333,7 +340,9 @@ fn apply_prompt_shadow_commit_if_safe(
                 commit.reason,
                 commit.same_argv,
                 commit.prompt_language_guard_ready,
-                commit.prompt_language_guard_language
+                commit.prompt_language_guard_language,
+                prompt_readiness.ready_for_prompt_activation,
+                prompt_readiness.failed_required_checks.join("|")
             ),
         );
     }
