@@ -296,7 +296,7 @@ pub fn compare_virtual_column_policies_for_cli_args<S: AsRef<str>>(
         .unwrap_or(OutputMode::Shell);
     let plan = TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
     let materialization = bootstrap_table_materialization()
-        .materialize_plan(&plan, &TableMaterializationConfig::default());
+        .materialize_plan(&plan, &TableMaterializationConfig::from_cli_args(&args_owned));
 
     let reference_view = bootstrap_table_view().view_from_report(
         &materialization,

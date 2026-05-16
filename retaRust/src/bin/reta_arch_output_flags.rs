@@ -12,7 +12,7 @@ fn main() {
     let options = reta_architecture::parse_table_view_output_cli_options(&args);
     let report = reta_architecture::render_table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::TableViewOutputConfig::default(),
     );
     let out = OutputFlagsInspectReport {

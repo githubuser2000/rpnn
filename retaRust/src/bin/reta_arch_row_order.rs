@@ -20,11 +20,11 @@ fn main() {
         reta_architecture::TableGenerationPlan::from_parameter_command_sets(&parsed.command_sets);
     let materialization = reta_architecture::bootstrap_table_materialization().materialize_plan(
         &plan,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
     );
     let view = reta_architecture::table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::MaterializedTableViewConfig::default(),
     );
     let report = RowOrderInspectReport {

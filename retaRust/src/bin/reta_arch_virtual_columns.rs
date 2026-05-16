@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let report = reta_architecture::virtual_column_report_for_cli_args(&args, &config);
     let output = reta_architecture::render_table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::TableViewOutputConfig::default().with_cli_options(output_options.clone()),
     );
     println!(

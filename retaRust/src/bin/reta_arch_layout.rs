@@ -13,7 +13,7 @@ fn main() {
     let options = reta_architecture::parse_table_view_output_cli_options(&args);
     let view = reta_architecture::table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::MaterializedTableViewConfig::default(),
     );
     let output_config =
@@ -21,7 +21,7 @@ fn main() {
     let layout = reta_architecture::shell_layout_report_for_rows(&view.rows, &output_config);
     let output = reta_architecture::render_table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &output_config,
     );
     let out = LayoutInspectReport {

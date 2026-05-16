@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::column_selection::ColumnBucketKey;
+use crate::csv_catalog::{language_value_from_cli_arg, CsvLanguage};
 use crate::output_syntax::OutputMode;
 use crate::parameter_matrix::{
     bucket_projections_for_alias_pair, canonical_pair_for_aliases, columns_for_alias_pair,
@@ -121,6 +122,7 @@ pub struct ParameterParseResult {
     pub tokens: Vec<ParameterToken>,
     pub main_context_history: Vec<MainParameter>,
     pub selected_output_mode: Option<OutputMode>,
+    pub selected_language: Option<CsvLanguage>,
     pub upper_limit: Option<i64>,
     pub command_sets: ParameterCommandSets,
 }
@@ -203,6 +205,21 @@ impl ParameterRuntimeBundle {
             }
 
             if raw.starts_with("--") {
+                if let Some(language_value) = language_value_from_cli_arg(raw) {
+                    result.selected_language = CsvLanguage::from_language_value(language_value);
+                    let body = &raw[2..];
+                    result.tokens.push(ParameterToken {
+                        index,
+                        raw: raw.to_string(),
+                        kind: ParameterTokenKind::LanguageSwitch,
+                        main_context: active_main.clone(),
+                        key: body.split('=').next().map(str::to_string),
+                        value: Some(language_value.to_string()),
+                        value_items: Vec::new(),
+                        negated_value: false,
+                    });
+                    continue;
+                }
                 let body = &raw[2..];
                 let (key, value) = split_key_value(body);
                 let value_items = value.as_deref().map(split_comma_values).unwrap_or_default();
@@ -231,14 +248,15 @@ impl ParameterRuntimeBundle {
 
             if raw.starts_with('-') && raw.len() > 1 {
                 let body = &raw[1..];
-                if body.starts_with("sprachen=") || body.starts_with("sprache=") {
+                if let Some(language_value) = language_value_from_cli_arg(raw) {
+                    result.selected_language = CsvLanguage::from_language_value(language_value);
                     result.tokens.push(ParameterToken {
                         index,
                         raw: raw.to_string(),
                         kind: ParameterTokenKind::LanguageSwitch,
                         main_context: active_main.clone(),
                         key: body.split('=').next().map(str::to_string),
-                        value: body.split_once('=').map(|(_key, value)| value.to_string()),
+                        value: Some(language_value.to_string()),
                         value_items: Vec::new(),
                         negated_value: false,
                     });
@@ -580,6 +598,26 @@ fn apply_kombi_token(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+
+
+    #[test]
+    fn parser_tracks_python_language_switches() {
+        let runtime = bootstrap_parameter_runtime();
+        let parsed = runtime.parse_cli_args(&["reta", "-language=english", "--sprache=chinesisch"]);
+        assert_eq!(parsed.selected_language, Some(CsvLanguage::Chinese));
+        assert!(parsed
+            .tokens
+            .iter()
+            .any(|token| token.kind == ParameterTokenKind::LanguageSwitch
+                && token.value.as_deref() == Some("english")));
+        assert!(parsed
+            .tokens
+            .iter()
+            .any(|token| token.kind == ParameterTokenKind::LanguageSwitch
+                && token.value.as_deref() == Some("chinesisch")));
+    }
 
     #[test]
     fn parser_tracks_main_contexts_and_output_mode() {

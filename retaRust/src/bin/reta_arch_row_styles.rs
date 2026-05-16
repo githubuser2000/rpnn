@@ -20,7 +20,7 @@ fn main() {
         .with_cli_options(options.clone());
     let view = reta_architecture::table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::MaterializedTableViewConfig::default()
             .with_virtual_policy(output_config.virtual_column_policy),
     );

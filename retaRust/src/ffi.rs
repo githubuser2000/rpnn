@@ -165,7 +165,7 @@ pub unsafe extern "C" fn reta_architecture_table_materialization_json(
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
         let report = reta_architecture::bootstrap_table_materialization().materialize_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         );
         serde_json::to_string(&report)
     })) {
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn reta_architecture_column_order_json(
         let materialization = reta_architecture::bootstrap_table_materialization()
             .materialize_plan(
                 &plan,
-                &reta_architecture::TableMaterializationConfig::default(),
+                &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             );
         serde_json::to_string(&serde_json::json!({
             "args": args,
@@ -220,7 +220,7 @@ pub unsafe extern "C" fn reta_architecture_row_order_json(
         let materialization = reta_architecture::bootstrap_table_materialization()
             .materialize_plan(
                 &plan,
-                &reta_architecture::TableMaterializationConfig::default(),
+                &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             );
         serde_json::to_string(&serde_json::json!({
             "args": args,
@@ -247,7 +247,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_json(
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default(),
         );
         serde_json::to_string(&view)
@@ -270,7 +270,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_columns_json(
         let report = reta_architecture::virtual_column_report_for_cli_args(&args, &config);
         let output = reta_architecture::render_table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::TableViewOutputConfig::default().with_cli_options(
                 reta_architecture::parse_table_view_output_cli_options(&args),
             ),
@@ -773,7 +773,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_json(
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
         let report = reta_architecture::render_table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::TableViewOutputConfig::default(),
         );
         serde_json::to_string(&report)
@@ -793,7 +793,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_numbering_json(
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default(),
         );
         let config = reta_architecture::TableViewNumberingConfig::legacy_pair();
@@ -819,7 +819,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_layout_json(
         let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default(),
         );
         let options = reta_architecture::parse_table_view_output_cli_options(&args);
@@ -829,7 +829,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_layout_json(
             reta_architecture::shell_layout_report_for_rows(&view.rows, &output_config);
         let output_report = reta_architecture::render_table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &output_config,
         );
         serde_json::to_string(&serde_json::json!({
@@ -858,7 +858,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_html_attributes_json(
             .with_cli_options(options.clone());
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
@@ -902,7 +902,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_row_styles_json(
             .with_cli_options(options.clone());
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_cell_styles_json(
             .with_cli_options(options.clone());
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
@@ -988,7 +988,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_composition_json(
             .with_cli_options(options.clone());
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
@@ -1023,7 +1023,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_options_json(
         let options = reta_architecture::parse_table_view_output_cli_options(&args);
         let report = reta_architecture::render_table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::TableViewOutputConfig::default(),
         );
         serde_json::to_string(&serde_json::json!({
@@ -1061,7 +1061,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
             .unwrap_or(reta_architecture::OutputMode::Shell);
         let output_report = reta_architecture::render_table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::TableViewOutputConfig::default().with_mode(mode),
         );
         let parity = reta_architecture::compare_table_view_output_to_legacy(
@@ -1094,7 +1094,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_shell_styles_json(
             .with_cli_options(options.clone());
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default()
                 .with_virtual_policy(output_config.virtual_column_policy),
         );
@@ -1143,7 +1143,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_parity_json(
             .unwrap_or(reta_architecture::OutputMode::Html);
         let view = reta_architecture::table_view_for_cli_args(
             &args,
-            &reta_architecture::TableMaterializationConfig::default(),
+            &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
             &reta_architecture::MaterializedTableViewConfig::default(),
         );
         let options = reta_architecture::parse_table_view_output_cli_options(&args);

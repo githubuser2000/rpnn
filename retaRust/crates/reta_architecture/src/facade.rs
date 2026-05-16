@@ -1138,6 +1138,7 @@ pub struct RetaRunArchitecture {
     pub column_bucket_count: usize,
     pub symbolic_column_bucket_count: usize,
     pub required_csv_asset_count: usize,
+    pub materialized_language: String,
     pub materialized_csv_section_count: usize,
     pub materialized_csv_cell_count: usize,
     pub materialized_continuum_m: bool,
@@ -1182,10 +1183,11 @@ impl RetaRunArchitecture {
             crate::table_generation::TableGenerationPlan::from_parameter_command_sets(
                 &parsed.command_sets,
             );
+        let materialization_config = TableMaterializationConfig::from_cli_args(&clean_args);
         let materialization_report =
             crate::table_materialization::bootstrap_table_materialization().materialize_plan(
                 &table_generation_plan,
-                &TableMaterializationConfig::default(),
+                &materialization_config,
             );
         let materialized_table_view = crate::table_view::bootstrap_table_view().view_from_report(
             &materialization_report,
@@ -1197,7 +1199,7 @@ impl RetaRunArchitecture {
         let materialized_table_output = crate::table_view_output::bootstrap_table_view_output()
             .render_cli_args(
                 &clean_args,
-                &TableMaterializationConfig::default(),
+                &materialization_config,
                 &TableViewOutputConfig::default().with_mode(table_output_mode),
             );
         let materialized_table_output_semantic =
@@ -1240,6 +1242,7 @@ impl RetaRunArchitecture {
             column_bucket_count: parsed.command_sets.column_buckets.len(),
             symbolic_column_bucket_count: parsed.command_sets.symbolic_column_buckets.len(),
             required_csv_asset_count: table_generation_plan.csv_asset_names.len(),
+            materialized_language: materialization_config.language_name().to_string(),
             materialized_csv_section_count: materialization_report.section_count(),
             materialized_csv_cell_count: materialization_report.materialized_cell_count,
             materialized_continuum_m: materialization_report.continuum_m_columns_present,

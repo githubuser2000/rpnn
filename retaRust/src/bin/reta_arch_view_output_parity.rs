@@ -41,7 +41,7 @@ fn main() {
     let mode = parsed.selected_output_mode.unwrap_or(reta_architecture::OutputMode::Shell);
     let output_report = reta_architecture::render_table_view_for_cli_args(
         &reta_args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&reta_args),
         &reta_architecture::TableViewOutputConfig::default().with_mode(mode),
     );
     let parity = reta_architecture::compare_table_view_output_to_legacy(

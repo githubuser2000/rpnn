@@ -190,8 +190,9 @@ pub use csv_catalog::{
     CSV_ASSETS, CsvAsset, CsvAssetKind, CsvCatalogBundle, CsvCatalogSnapshot, CsvDelimiter,
     CsvLanguage, OwnedCsvAsset, OwnedCsvCatalogBundle, bootstrap_csv_catalog, csv_asset_by_name,
     csv_asset_count, csv_asset_records, csv_assets_by_kind, csv_assets_by_language,
-    csv_catalog_owned, csv_cell_by_name, csv_language_variant_count, csv_rows_by_name,
-    csv_text_by_name, csv_total_row_count, parse_csv_text, parse_csv_text_with_delimiter,
+    csv_catalog_owned, csv_cell_by_name, csv_language_from_cli_args, csv_language_variant_count,
+    csv_rows_by_name, csv_text_by_name, csv_total_row_count, language_value_from_cli_arg,
+    normalize_language_value, parse_csv_text, parse_csv_text_with_delimiter,
     select_csv_rows_one_based,
 };
 pub use dataflow::{
@@ -390,6 +391,7 @@ pub use table_materialization::{
     asset_name_for_language, asset_names_for_symbolic_bucket, bootstrap_table_materialization,
     csv_kind_for_asset, materialize_cli_args, materialize_csv_projection,
     materialize_generation_plan, materialize_kontinuum_m_smoke,
+    table_materialization_config_from_cli_args,
     materialize_symbolic_bucket_sections, numeric_selectors_from_symbols,
     ordered_columns_for_projection, plan_rows_to_source_indices,
 };

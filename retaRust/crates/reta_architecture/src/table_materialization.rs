@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::column_selection::ColumnBucketKey;
 use crate::csv_catalog::{
-    csv_asset_by_name, csv_asset_for_language_with_required_columns, csv_rows_by_name, CsvAssetKind,
-    CsvLanguage,
+    csv_asset_by_name, csv_asset_for_language_with_required_columns, csv_language_from_cli_args,
+    csv_rows_by_name, CsvAssetKind, CsvLanguage,
 };
 use crate::html_class_catalog::html_class_record;
 use crate::parameter_runtime::{bootstrap_parameter_runtime, ParameterCommandSets};
@@ -60,6 +60,41 @@ impl Default for TableMaterializationConfig {
             fallback_to_base_for_missing_language_columns: true,
         }
     }
+}
+
+impl TableMaterializationConfig {
+    pub fn from_cli_args<S: AsRef<str>>(args: &[S]) -> Self {
+        let mut config = Self::default();
+        config.language = csv_language_from_cli_args(args);
+        for arg in args {
+            let raw = arg.as_ref();
+            match raw {
+                "--no-language-fallback" | "--no-language-base-fallback" | "--keine-sprach-fallback" => {
+                    config.fallback_to_base_for_missing_language_columns = false;
+                }
+                "--language-fallback" | "--language-base-fallback" | "--sprach-fallback" => {
+                    config.fallback_to_base_for_missing_language_columns = true;
+                }
+                _ => {}
+            }
+        }
+        config
+    }
+
+    pub fn with_language(mut self, language: CsvLanguage) -> Self {
+        self.language = language;
+        self
+    }
+
+    pub fn language_name(&self) -> &'static str {
+        self.language.canonical()
+    }
+}
+
+pub fn table_materialization_config_from_cli_args<S: AsRef<str>>(
+    args: &[S],
+) -> TableMaterializationConfig {
+    TableMaterializationConfig::from_cli_args(args)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -971,4 +1006,27 @@ mod tests {
         assert_eq!(section.language, "en");
         assert!(section.selected_columns_legacy.contains(&493));
     }
+
+    #[test]
+    fn materialization_config_reads_python_language_parameter() {
+        let args = ["reta", "-language=english", "-spalten", "--religion=493"];
+        let config = TableMaterializationConfig::from_cli_args(&args);
+        assert_eq!(config.language, CsvLanguage::English);
+        let report = materialize_cli_args(&args, &config);
+        let section = report.ordinary_sections.first().unwrap();
+        assert_eq!(section.asset_name, "en-religion.csv");
+    }
+
+    #[test]
+    fn materialization_config_language_fallback_keeps_744_direct() {
+        let args = ["reta", "-language=english", "-spalten", "--kontinuum=m"];
+        let config = TableMaterializationConfig::from_cli_args(&args);
+        let report = materialize_cli_args(&args, &config);
+        let section = report.ordinary_sections.first().unwrap();
+        assert_eq!(section.asset_name, "religion.csv");
+        assert!(section.selected_columns_legacy.contains(&493));
+        assert!(section.selected_columns_legacy.contains(&744));
+        assert!(report.virtual_columns.iter().all(|column| column.column_legacy != 744));
+    }
+
 }

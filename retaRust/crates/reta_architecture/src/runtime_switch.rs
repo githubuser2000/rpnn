@@ -546,7 +546,10 @@ pub fn extract_architecture_switch_from_argv(
             | "--activation-promotion-require-readiness" | "--promotion-require-readiness"
             | "--activation-promotion-ignore-readiness" | "--promotion-ignore-readiness"
             | "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines"
-            | "--activation-promotion-include-selected-lines" | "--promotion-include-selected-lines" => {
+            | "--activation-promotion-include-selected-lines" | "--promotion-include-selected-lines"
+            | "--no-language-fallback" | "--no-language-base-fallback"
+            | "--keine-sprach-fallback" | "--language-fallback"
+            | "--language-base-fallback" | "--sprach-fallback" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"

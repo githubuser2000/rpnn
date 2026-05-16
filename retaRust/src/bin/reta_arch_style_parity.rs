@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(reta_architecture::OutputMode::Html);
     let view = reta_architecture::table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::MaterializedTableViewConfig::default(),
     );
     let options = reta_architecture::parse_table_view_output_cli_options(&args);

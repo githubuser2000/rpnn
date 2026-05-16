@@ -12,14 +12,14 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let view = reta_architecture::table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::MaterializedTableViewConfig::default(),
     );
     let config = reta_architecture::TableViewNumberingConfig::legacy_pair();
     let report = reta_architecture::numbering_report_for_rows(&view.rows, &config);
     let output_with_legacy_numbering = reta_architecture::render_table_view_for_cli_args(
         &args,
-        &reta_architecture::TableMaterializationConfig::default(),
+        &reta_architecture::TableMaterializationConfig::from_cli_args(&args),
         &reta_architecture::TableViewOutputConfig::default().with_legacy_numbering(),
     );
     let out = NumberingInspectReport {

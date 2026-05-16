@@ -26,6 +26,61 @@ impl CsvLanguage {
             CsvLanguage::Korean => "kr",
         }
     }
+
+    pub fn from_language_value(value: &str) -> Option<Self> {
+        let normalized = normalize_language_value(value);
+        match normalized.as_str() {
+            "" | "de" | "deutsch" | "german" | "base" => Some(CsvLanguage::Base),
+            "en" | "english" | "englisch" => Some(CsvLanguage::English),
+            "cn" | "chinese" | "chinesisch" | "中國人" => Some(CsvLanguage::Chinese),
+            "vn" | "vietnamese" | "vietnamesisch" | "tiếngviệt" | "tiengviet" => {
+                Some(CsvLanguage::Vietnamese)
+            }
+            "kr" | "korean" | "koreanisch" | "한국인" => Some(CsvLanguage::Korean),
+            _ => None,
+        }
+    }
+
+    pub fn from_cli_args<S: AsRef<str>>(args: &[S]) -> Self {
+        csv_language_from_cli_args(args)
+    }
+}
+
+pub fn normalize_language_value(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('\'')
+        .trim_matches('"')
+        .replace([' ', '_', '-'], "")
+        .to_lowercase()
+}
+
+pub fn language_value_from_cli_arg(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim();
+    let body = trimmed
+        .strip_prefix("--")
+        .or_else(|| trimmed.strip_prefix('-'))
+        .unwrap_or(trimmed);
+    for prefix in [
+        "language=",
+        "languages=",
+        "sprache=",
+        "sprachen=",
+        "lang=",
+    ] {
+        if let Some(value) = body.strip_prefix(prefix) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+pub fn csv_language_from_cli_args<S: AsRef<str>>(args: &[S]) -> CsvLanguage {
+    args.iter()
+        .filter_map(|arg| language_value_from_cli_arg(arg.as_ref()))
+        .filter_map(CsvLanguage::from_language_value)
+        .last()
+        .unwrap_or(CsvLanguage::Base)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -1515,5 +1570,23 @@ mod tests {
         let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493]).unwrap();
         assert_eq!(localized.name, "en-religion.csv");
         assert_eq!(localized.language, CsvLanguage::English);
+    }
+
+    #[test]
+    fn language_aliases_match_python_language_parameter() {
+        assert_eq!(CsvLanguage::from_language_value("english"), Some(CsvLanguage::English));
+        assert_eq!(CsvLanguage::from_language_value("englisch"), Some(CsvLanguage::English));
+        assert_eq!(CsvLanguage::from_language_value("deutsch"), Some(CsvLanguage::Base));
+        assert_eq!(CsvLanguage::from_language_value("vietnamese"), Some(CsvLanguage::Vietnamese));
+        assert_eq!(CsvLanguage::from_language_value("chinesisch"), Some(CsvLanguage::Chinese));
+        assert_eq!(CsvLanguage::from_language_value("korean"), Some(CsvLanguage::Korean));
+    }
+
+    #[test]
+    fn csv_language_from_cli_args_uses_last_valid_language_switch() {
+        let args = ["reta", "-language=english", "-sprache=deutsch", "--language=chinese"];
+        assert_eq!(csv_language_from_cli_args(&args), CsvLanguage::Chinese);
+        assert_eq!(language_value_from_cli_arg("-language=english"), Some("english"));
+        assert_eq!(language_value_from_cli_arg("--sprache=englisch"), Some("englisch"));
     }
 }

@@ -429,8 +429,9 @@ impl ShadowPipelineBundle {
         let task_indices = (0..cleaned_args.len()).collect::<Vec<_>>();
         let execution_network_plan =
             execution_network_plan_for_indices(&task_indices, DataflowDiscipline::Fifo);
+        let materialization_config = TableMaterializationConfig::from_cli_args(&cleaned_args);
         let materialization_report = bootstrap_table_materialization()
-            .materialize_cli_args(&cleaned_args, &TableMaterializationConfig::default());
+            .materialize_cli_args(&cleaned_args, &materialization_config);
         let table_view = bootstrap_table_view().view_from_report(
             &materialization_report,
             &MaterializedTableViewConfig::default(),
@@ -440,7 +441,7 @@ impl ShadowPipelineBundle {
         let output_mode = parsed.selected_output_mode.unwrap_or(OutputMode::Shell);
         let table_view_output = bootstrap_table_view_output().render_cli_args(
             &cleaned_args,
-            &TableMaterializationConfig::default(),
+            &materialization_config,
             &TableViewOutputConfig::default().with_mode(output_mode),
         );
         let virtual_column_parity_config = TableViewVirtualParityConfig::from_cli_args(
@@ -527,9 +528,10 @@ impl ShadowPipelineBundle {
             crate::parameter_runtime::bootstrap_parameter_runtime().parse_cli_args(&cleaned_args);
         let output_mode = parsed.selected_output_mode.unwrap_or(OutputMode::Shell);
         let output_config = TableViewOutputConfig::default().with_mode(output_mode);
+        let materialization_config = TableMaterializationConfig::from_cli_args(&cleaned_args);
         let output_report = bootstrap_table_view_output().render_cli_args(
             &cleaned_args,
-            &TableMaterializationConfig::default(),
+            &materialization_config,
             &output_config,
         );
         let diff = ShadowDiffSummary::from_lines(
