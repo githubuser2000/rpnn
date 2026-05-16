@@ -91,6 +91,13 @@ CASES: Dict[str, Case] = {
         prompt_args=["p1234"],
         wants_legacy=False,
     ),
+    "prompt_p12345": Case(
+        name="prompt_p12345",
+        description="Prompt short form p12345 must produce direct math output above the table row limit, not the known-command/no-output fallback.",
+        reta_args=[],
+        prompt_args=["p12345"],
+        wants_legacy=False,
+    ),
 }
 
 # Binaries that do not need legacy output but produce directly useful JSON.
@@ -154,6 +161,8 @@ PYTHON_PROBES: List[str] = [
     "architecture_prompt_language_commit_guard_probe.py",
     "architecture_prompt_activation_readiness_probe.py",
     "architecture_prompt_p1234_probe.py",
+    "architecture_prompt_p12345_probe.py",
+    "run_prompt_regression_tests.py",
     "architecture_table_view_output_parity_probe.py",
     "architecture_table_view_output_commit_probe.py",
     "architecture_activation_promotion_probe.py",
@@ -396,7 +405,7 @@ def main() -> int:
         build_dir.mkdir(parents=True, exist_ok=True)
         results.extend(build_selected(root, names, args.profile, build_dir, args.timeout * 3))
 
-    case_names = args.case or ["continuum_m", "continuum_m_en", "ordered_744_493", "row_order", "prompt_p1234"]
+    case_names = args.case or ["continuum_m", "continuum_m_en", "ordered_744_493", "row_order", "prompt_p1234", "prompt_p12345"]
     for case_name in case_names:
         results.extend(run_case(root, CASES[case_name], out_dir, args))
 

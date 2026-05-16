@@ -9407,6 +9407,23 @@ mod tests {
     }
 
     #[test]
+    fn p_prefixed_large_number_stays_math_only_before_direct_output() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["p12345"]));
+        assert_eq!(expanded, strings(&["mulpri", "12345"]));
+        assert_eq!(build_reta_argv_from_prompt_tokens(&expanded), None);
+    }
+
+    #[test]
+    fn bare_large_number_still_gets_default_table_argv() {
+        let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["12345"]));
+        let argv = build_reta_argv_from_prompt_tokens(&expanded)
+            .expect("bare large numeric prompts still produce default table argv");
+        assert!(argv.contains(&"-spalten".to_string()));
+        assert!(argv.contains(&"--menschliches=motivation".to_string()));
+        assert!(argv.contains(&"--galaxie=thomas".to_string()));
+    }
+
+    #[test]
     fn bare_number_still_synthesizes_default_table_argv() {
         let (_, expanded) = expand_kurz_kurz_befehl(PromptModus::Normal, &strings(&["1234"]));
         let argv = build_reta_argv_from_prompt_tokens(&expanded)

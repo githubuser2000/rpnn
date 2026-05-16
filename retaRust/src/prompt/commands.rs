@@ -1375,6 +1375,60 @@ fn execute_command_sequence(
     }
 }
 
+const MAX_DIRECT_MATH_RANGE_ITEMS: usize = 10_000;
+
+fn parse_direct_math_integer(text: &str) -> Option<i64> {
+    let trimmed = text.trim();
+    let body = trimmed.strip_prefix('+').unwrap_or(trimmed);
+    if body.is_empty() || !body.chars().all(|ch| ch.is_ascii_digit()) {
+        return None;
+    }
+    let value = body.parse::<i64>().ok()?;
+    (value > 0).then_some(value)
+}
+
+fn parse_direct_math_number_piece(piece: &str) -> Option<Vec<i64>> {
+    let trimmed = piece
+        .trim()
+        .trim_matches(|ch| matches!(ch, '{' | '}' | '[' | ']' | '(' | ')'))
+        .trim();
+    if trimmed.is_empty() || trimmed.contains('/') {
+        return None;
+    }
+
+    if let Some((left, right)) = trimmed.split_once('-') {
+        let start = parse_direct_math_integer(left)?;
+        let end = parse_direct_math_integer(right)?;
+        let len = if start <= end { end - start + 1 } else { start - end + 1 };
+        if len <= 0 || len as usize > MAX_DIRECT_MATH_RANGE_ITEMS {
+            return None;
+        }
+        let values = if start <= end {
+            (start..=end).collect::<Vec<_>>()
+        } else {
+            (end..=start).rev().collect::<Vec<_>>()
+        };
+        return Some(values);
+    }
+
+    parse_direct_math_integer(trimmed).map(|value| vec![value])
+}
+
+fn parse_unbounded_direct_math_numbers(token: &str) -> Option<Vec<i64>> {
+    let mut out = Vec::new();
+    let mut saw_piece = false;
+    for piece in token.split(',') {
+        let trimmed = piece.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let values = parse_direct_math_number_piece(trimmed)?;
+        saw_piece = true;
+        out.extend(values);
+    }
+    (saw_piece && !out.is_empty()).then_some(out)
+}
+
 fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
     let mut out: Vec<i64> = Vec::new();
     for token in tokens {
@@ -1383,6 +1437,20 @@ fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
         }
 
         if let Some(numbers) = python_row_spec_to_numbers(token) {
+            if !numbers.is_empty() {
+                out.extend(numbers);
+                continue;
+            }
+        }
+
+        // Direct math prompt commands (`p12345`, `mulpri 12345`, `prim 12345`, ...)
+        // are not table-row selections.  The Python table-row parser is capped by
+        // the current reta table maximum, so values above that maximum can produce
+        // an empty row set and then fall through to the misleading "known command
+        // but nothing to output" message.  For math output we preserve the table
+        // parser for normal in-table row specs and add an unbounded single-number
+        // fallback for positive integers/ranges.
+        if let Some(numbers) = parse_unbounded_direct_math_numbers(token) {
             out.extend(numbers);
         }
     }
@@ -2847,6 +2915,49 @@ mod tests {
                 assert!(!output.text.contains("--thomas"));
             }
             other => panic!("expected immediate mulpri output, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn p_prefixed_large_number_outputs_math_instead_of_no_output_message() {
+        let state = SessionState::new("rp".to_string(), false, false);
+        let command = compile_command_with_state("p12345", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.contains("12345:"));
+                assert!(output.text.contains("823") || output.text.contains("2469"));
+                assert!(!output.text.contains("nichts auszugeben"));
+                assert!(!output.text.contains("--absicht"));
+                assert!(!output.text.contains("--thomas"));
+            }
+            other => panic!("expected immediate mulpri output for p12345, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mulpri_large_number_outputs_math_above_table_limit() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("mulpri 12345", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.contains("12345:"));
+                assert!(!output.text.contains("nichts auszugeben"));
+            }
+            other => panic!("expected immediate mulpri output for large number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn direct_math_integer_list_above_table_limit_outputs_each_number() {
+        let state = SessionState::new("rp".to_string(), true, false);
+        let command = compile_command_with_state("prim 12345,12346", &state).unwrap();
+        match command {
+            PromptCommand::Immediate(output) => {
+                assert!(output.text.contains("12345:"));
+                assert!(output.text.contains("12346:"));
+                assert!(!output.text.contains("nichts auszugeben"));
+            }
+            other => panic!("expected immediate prim output for large list, got {other:?}"),
         }
     }
 
