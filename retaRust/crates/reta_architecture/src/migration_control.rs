@@ -317,6 +317,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "CLI-selected_virtual_policy_may_commit_only_if_direct_cells_are_identity",
         ),
         step(
+            "step-table-view-language-parity",
+            "wave-02-table-adapters",
+            "CLI language selection + column-aware CSV fallback",
+            "table_view_language_parity.selected_language",
+            "table_view_language_parity.base_fallback_guard",
+            "table-view-language-parity-witness",
+            "localized_csv_sections_may_glue_only_when_they_cover_requested_direct_columns",
+        ),
+        step(
             "step-table-view-commit-audit",
             "wave-02-table-adapters",
             "raw diff + semantic diff + virtual direct identity",

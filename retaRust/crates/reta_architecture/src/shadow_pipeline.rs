@@ -29,6 +29,9 @@ use crate::table_view::{MaterializedTableView, MaterializedTableViewConfig, boot
 use crate::table_view_output::{
     TableViewOutputConfig, TableViewOutputReport, bootstrap_table_view_output,
 };
+use crate::table_view_language_parity::{
+    TableViewLanguageParityReport, TableViewLanguageParityPolicy, language_parity_for_cli_args,
+};
 use crate::table_view_output_parity::{
     TableViewOutputParityConfig, TableViewOutputParityReport, bootstrap_table_view_output_parity,
 };
@@ -189,6 +192,7 @@ pub struct ShadowTableViewOutputReport {
     pub diff: ShadowDiffSummary,
     pub semantic_diff: TableViewOutputParityReport,
     pub virtual_column_parity: TableViewVirtualParityReport,
+    pub language_parity: TableViewLanguageParityReport,
     pub output_report: TableViewOutputReport,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
@@ -356,6 +360,7 @@ pub struct ShadowCliPlan {
     pub table_view: MaterializedTableView,
     pub table_view_output: TableViewOutputReport,
     pub virtual_column_parity: TableViewVirtualParityReport,
+    pub language_parity: TableViewLanguageParityReport,
     pub universal_property: String,
 }
 
@@ -393,6 +398,8 @@ impl ShadowPipelineBundle {
                 "table_view_output.render".to_string(),
                 "table_view_virtual_parity.direct_cell_identity".to_string(),
                 "table_view_virtual_parity.cli_policy_lift".to_string(),
+                "table_view_language_parity.base_fallback_guard".to_string(),
+                "table_view_language_parity.direct_744_guard".to_string(),
                 "table_view_output.commit_virtual_guard".to_string(),
                 "table_view_commit_audit.audit_report".to_string(),
                 "table_view_commit_audit.required_guards".to_string(),
@@ -452,6 +459,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &virtual_column_parity_config,
         );
+        let language_parity = language_parity_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageParityPolicy::default(),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -464,6 +475,7 @@ impl ShadowPipelineBundle {
             table_view,
             table_view_output,
             virtual_column_parity,
+            language_parity,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }
@@ -554,6 +566,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &virtual_column_parity_config,
         );
+        let language_parity = language_parity_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageParityPolicy::default(),
+        );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -567,6 +583,7 @@ impl ShadowPipelineBundle {
             diff,
             semantic_diff,
             virtual_column_parity,
+            language_parity,
             rendered_preview: output_report
                 .rendered_lines
                 .iter()
@@ -955,6 +972,10 @@ mod tests {
             virtual_column_parity: crate::table_view_virtual_parity::compare_virtual_column_policies_for_cli_args(
                 &["reta", "-spalten", "--kontinuum=m"],
                 &crate::table_view_virtual_parity::TableViewVirtualParityConfig::default(),
+            ),
+            language_parity: crate::table_view_language_parity::language_parity_for_cli_args(
+                &["reta", "-language=english", "-spalten", "--kontinuum=m"],
+                &crate::table_view_language_parity::TableViewLanguageParityPolicy::default(),
             ),
             output_report: TableViewOutputReport {
                 class: "TableViewOutputReport".to_string(),
