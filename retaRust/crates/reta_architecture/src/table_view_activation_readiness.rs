@@ -56,6 +56,7 @@ pub struct TableViewActivationReadinessPolicy {
     pub require_recovery_ready_when_enabled: bool,
     pub require_language_parity_ready: bool,
     pub require_language_coverage_ready: bool,
+    pub require_language_sync_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
 }
@@ -75,6 +76,7 @@ impl Default for TableViewActivationReadinessPolicy {
             require_recovery_ready_when_enabled: false,
             require_language_parity_ready: true,
             require_language_coverage_ready: true,
+            require_language_sync_ready: true,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -101,6 +103,7 @@ impl TableViewActivationReadinessPolicy {
             require_recovery_ready_when_enabled: false,
             require_language_parity_ready: false,
             require_language_coverage_ready: false,
+            require_language_sync_ready: false,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -174,6 +177,16 @@ impl TableViewActivationReadinessPolicy {
                     policy.require_language_coverage_ready = false;
                     recognized = true;
                 }
+                "--activation-readiness-require-language-sync"
+                | "--readiness-require-language-sync" => {
+                    policy.require_language_sync_ready = true;
+                    recognized = true;
+                }
+                "--activation-readiness-ignore-language-sync"
+                | "--readiness-ignore-language-sync" => {
+                    policy.require_language_sync_ready = false;
+                    recognized = true;
+                }
                 _ => {
                     if let Some(value) = arg
                         .strip_prefix("--activation-readiness-preview=")
@@ -227,6 +240,9 @@ impl TableViewActivationReadinessPolicy {
         }
         if self.require_language_coverage_ready {
             guards.push("language_coverage_ready");
+        }
+        if self.require_language_sync_ready {
+            guards.push("language_sync_ready");
         }
         guards
     }
@@ -286,6 +302,12 @@ pub struct TableViewActivationReadinessReport {
     pub language_coverage_stale_language_count: usize,
     pub language_coverage_languages_missing_744: Vec<String>,
     pub language_coverage_failed_guards: Vec<String>,
+    pub language_sync_ready: bool,
+    pub language_sync_status: String,
+    pub language_sync_pending_action_count: usize,
+    pub language_sync_pending_languages: Vec<String>,
+    pub language_sync_pending_columns: Vec<usize>,
+    pub language_sync_failed_guards: Vec<String>,
     pub commit_decision: bool,
     pub audit_safe: bool,
     pub transaction_safe: bool,
@@ -346,12 +368,14 @@ impl TableViewActivationReadinessBundle {
                 "ledger_validation_ready".to_string(),
                 "store_validation_ready".to_string(),
                 "persistence_roundtrip_ready".to_string(),
+                "language_sync_ready".to_string(),
             ],
             diagnostic_guards: vec![
                 "semantic_rows_equal".to_string(),
                 "virtual_columns_are_witnesses".to_string(),
                 "file_recovery_candidate".to_string(),
                 "language_coverage_gap_report".to_string(),
+                "language_sync_backlog_report".to_string(),
                 "rollback_anchor_available".to_string(),
             ],
             universal_property:
@@ -436,6 +460,30 @@ pub fn activation_readiness_from_reports(
     let language_coverage_failed_guards = audit
         .map(|value| value.language_coverage_failed_guards.clone())
         .or_else(|| commit.map(|value| value.language_coverage_failed_guards.clone()))
+        .unwrap_or_default();
+    let language_sync_ready = audit
+        .map(|value| value.language_sync_ready)
+        .or_else(|| commit.map(|value| value.language_sync_ready))
+        .unwrap_or(false);
+    let language_sync_status = audit
+        .map(|value| value.language_sync_status.clone())
+        .or_else(|| commit.map(|value| value.language_sync_status.clone()))
+        .unwrap_or_else(|| "unknown".to_string());
+    let language_sync_pending_action_count = audit
+        .map(|value| value.language_sync_pending_action_count)
+        .or_else(|| commit.map(|value| value.language_sync_pending_action_count))
+        .unwrap_or(0);
+    let language_sync_pending_languages = audit
+        .map(|value| value.language_sync_pending_languages.clone())
+        .or_else(|| commit.map(|value| value.language_sync_pending_languages.clone()))
+        .unwrap_or_default();
+    let language_sync_pending_columns = audit
+        .map(|value| value.language_sync_pending_columns.clone())
+        .or_else(|| commit.map(|value| value.language_sync_pending_columns.clone()))
+        .unwrap_or_default();
+    let language_sync_failed_guards = audit
+        .map(|value| value.language_sync_failed_guards.clone())
+        .or_else(|| commit.map(|value| value.language_sync_failed_guards.clone()))
         .unwrap_or_default();
     let switch_mode = commit
         .map(|value| value.switch_mode.clone())
@@ -576,6 +624,15 @@ pub fn activation_readiness_from_reports(
         "language coverage must confirm every requested direct column is covered by the effective asset or safe fallback",
     ));
     checks.push(TableViewActivationReadinessCheck::new(
+        "language_sync_ready",
+        policy.require_language_sync_ready,
+        language_sync_ready,
+        format!(
+            "status={language_sync_status} pending_actions={language_sync_pending_action_count} pending_languages={language_sync_pending_languages:?} pending_columns={language_sync_pending_columns:?} failed_guards={language_sync_failed_guards:?}"
+        ),
+        "language synchronization backlog must be empty before default visible promotion",
+    ));
+    checks.push(TableViewActivationReadinessCheck::new(
         "semantic_rows_equal",
         false,
         semantic_equal,
@@ -703,6 +760,12 @@ pub fn activation_readiness_from_reports(
         language_coverage_stale_language_count,
         language_coverage_languages_missing_744,
         language_coverage_failed_guards,
+        language_sync_ready,
+        language_sync_status,
+        language_sync_pending_action_count,
+        language_sync_pending_languages,
+        language_sync_pending_columns,
+        language_sync_failed_guards,
         commit_decision,
         audit_safe,
         transaction_safe,
@@ -863,6 +926,12 @@ mod tests {
             language_coverage_stale_language_count: 0,
             language_coverage_languages_missing_744: Vec::new(),
             language_coverage_failed_guards: Vec::new(),
+            language_sync_ready: true,
+            language_sync_status: "ready".to_string(),
+            language_sync_pending_action_count: 0,
+            language_sync_pending_languages: Vec::new(),
+            language_sync_pending_columns: Vec::new(),
+            language_sync_failed_guards: Vec::new(),
             force_override: false,
             rendered_line_count: 1,
             rollback_anchor: Some("rollback:test".to_string()),
@@ -910,6 +979,7 @@ mod tests {
         assert!(recognized);
         assert!(!policy.require_commit_decision);
         assert!(!policy.require_persistence_ready);
+        assert!(!policy.require_language_sync_ready);
         assert!(!policy.include_selected_lines);
         assert_eq!(policy.preview_limit, 2);
         assert!(policy.required_guard_names().is_empty());

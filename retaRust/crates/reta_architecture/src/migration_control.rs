@@ -353,6 +353,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "language_variant_assets_can_remove_base_fallback_only_after_missing_columns_are_glued",
         ),
         step(
+            "step-table-view-language-sync-guard",
+            "wave-02-table-adapters",
+            "language sync backlog + commit/readiness/promotion guard",
+            "table_view_language_sync.commit_guard",
+            "table_view_activation_readiness.language_sync_guard",
+            "table-view-language-sync-guard",
+            "language_sync_must_be_ready_before_a_synchronized_language_table_view_can_be_promoted",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",
@@ -364,7 +373,7 @@ fn default_steps() -> Vec<MigrationStepSpec> {
         step(
             "step-table-view-commit-audit",
             "wave-02-table-adapters",
-            "raw diff + semantic diff + virtual direct identity + language parity",
+            "raw diff + semantic diff + virtual direct identity + language parity/coverage/sync",
             "table_view_commit_audit.audit_report",
             "table_view_commit_audit.required_guards",
             "table-view-commit-audit-shadow-witness",
@@ -445,7 +454,7 @@ fn default_steps() -> Vec<MigrationStepSpec> {
         step(
             "step-table-view-activation-readiness",
             "wave-02-table-adapters",
-            "commit audit + activation journal/store/recovery witnesses + CLI policy + language parity",
+            "commit audit + activation journal/store/recovery witnesses + CLI policy + language guards",
             "table_view_activation_readiness.fold_local_witnesses",
             "table_view_activation_readiness.policy_from_cli",
             "table_view_activation_readiness.default_promotion_gate",
@@ -458,7 +467,7 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "table_view_activation_promotion.default_visible_source",
             "table_view_activation_promotion.policy_from_cli",
             "table_view_activation_promotion.guard_summary",
-            "default_visible_promotion_only_after_readiness_raw_parity_and_language_guards",
+            "default_visible_promotion_only_after_readiness_raw_parity_and_language_sync_guards",
         ),
         step(
             "step-table-view-html-attributes",

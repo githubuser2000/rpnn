@@ -41,7 +41,7 @@ def main() -> int:
         and "pub language_coverage_stale_language_count: usize" in shadow
         and "pub language_coverage_failed_guards: Vec<String>" in shadow,
         "shadow_commit_uses_coverage_guard": "let language_coverage_ok = !policy.require_language_coverage_ready || report.language_coverage.ready();" in shadow
-        and "gate_ok && diff_ok && virtual_direct_ok && language_ok && language_coverage_ok && size_ok" in shadow
+        and "gate_ok && diff_ok && virtual_direct_ok && language_ok && language_coverage_ok" in shadow
         and "language_coverage_blocked" in shadow,
         "commit_audit_requires_coverage_guard": "pub language_coverage_ready: bool" in audit
         and "language_coverage_ready" in audit

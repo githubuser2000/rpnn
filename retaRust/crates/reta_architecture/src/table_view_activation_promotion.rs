@@ -27,6 +27,7 @@ pub struct TableViewActivationPromotionPolicy {
     pub require_virtual_direct_identity: bool,
     pub require_language_parity_ready: bool,
     pub require_language_coverage_ready: bool,
+    pub require_language_sync_ready: bool,
     pub allow_force_when_not_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
@@ -43,6 +44,7 @@ impl Default for TableViewActivationPromotionPolicy {
             require_virtual_direct_identity: true,
             require_language_parity_ready: true,
             require_language_coverage_ready: true,
+            require_language_sync_ready: true,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -65,6 +67,7 @@ impl TableViewActivationPromotionPolicy {
             require_virtual_direct_identity: false,
             require_language_parity_ready: false,
             require_language_coverage_ready: false,
+            require_language_sync_ready: false,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -139,6 +142,16 @@ impl TableViewActivationPromotionPolicy {
                     policy.require_language_coverage_ready = false;
                     recognized = true;
                 }
+                "--activation-promotion-require-language-sync"
+                | "--promotion-require-language-sync" => {
+                    policy.require_language_sync_ready = true;
+                    recognized = true;
+                }
+                "--activation-promotion-ignore-language-sync"
+                | "--promotion-ignore-language-sync" => {
+                    policy.require_language_sync_ready = false;
+                    recognized = true;
+                }
                 "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines" => {
                     policy.include_selected_lines = false;
                     recognized = true;
@@ -189,6 +202,9 @@ impl TableViewActivationPromotionPolicy {
         }
         if self.require_language_coverage_ready {
             guards.push("language_coverage_ready");
+        }
+        if self.require_language_sync_ready {
+            guards.push("language_sync_ready");
         }
         guards
     }
@@ -245,6 +261,11 @@ pub struct TableViewActivationPromotionReport {
     pub language_coverage_status: String,
     pub language_coverage_stale_language_count: usize,
     pub language_coverage_languages_missing_744: Vec<String>,
+    pub language_sync_ready: bool,
+    pub language_sync_status: String,
+    pub language_sync_pending_action_count: usize,
+    pub language_sync_pending_languages: Vec<String>,
+    pub language_sync_pending_columns: Vec<usize>,
     pub selected_source: String,
     pub selected_line_count: usize,
     pub selected_lines_checksum: u64,
@@ -298,6 +319,7 @@ impl TableViewActivationPromotionBundle {
             diagnostic_guards: vec![
                 "semantic_rows_equal".to_string(),
                 "readiness_failed_required_checks".to_string(),
+                "language_sync_backlog_report".to_string(),
                 "rollback_anchor_available".to_string(),
             ],
             universal_property:
@@ -401,6 +423,19 @@ pub fn activation_promotion_from_readiness(
         "localized materialization may become default only when requested direct columns are covered by the effective language asset or fallback",
     ));
     checks.push(TableViewActivationPromotionCheck::new(
+        "language_sync_ready",
+        policy.require_language_sync_ready,
+        readiness.language_sync_ready,
+        format!(
+            "status={} pending_actions={} pending_languages={:?} pending_columns={:?}",
+            readiness.language_sync_status,
+            readiness.language_sync_pending_action_count,
+            readiness.language_sync_pending_languages,
+            readiness.language_sync_pending_columns
+        ),
+        "default promotion requires every language sync action to be ready",
+    ));
+    checks.push(TableViewActivationPromotionCheck::new(
         "semantic_rows_equal",
         false,
         readiness.semantic_equal,
@@ -480,6 +515,11 @@ pub fn activation_promotion_from_readiness(
         language_coverage_status: readiness.language_coverage_status.clone(),
         language_coverage_stale_language_count: readiness.language_coverage_stale_language_count,
         language_coverage_languages_missing_744: readiness.language_coverage_languages_missing_744.clone(),
+        language_sync_ready: readiness.language_sync_ready,
+        language_sync_status: readiness.language_sync_status.clone(),
+        language_sync_pending_action_count: readiness.language_sync_pending_action_count,
+        language_sync_pending_languages: readiness.language_sync_pending_languages.clone(),
+        language_sync_pending_columns: readiness.language_sync_pending_columns.clone(),
         selected_source: readiness.selected_source.clone(),
         selected_line_count: readiness.selected_line_count,
         selected_lines_checksum: readiness.selected_lines_checksum,
@@ -573,6 +613,12 @@ mod tests {
             language_coverage_stale_language_count: 0,
             language_coverage_languages_missing_744: Vec::new(),
             language_coverage_failed_guards: Vec::new(),
+            language_sync_ready: true,
+            language_sync_status: "ready".to_string(),
+            language_sync_pending_action_count: 0,
+            language_sync_pending_languages: Vec::new(),
+            language_sync_pending_columns: Vec::new(),
+            language_sync_failed_guards: Vec::new(),
             commit_decision: true,
             audit_safe: true,
             transaction_safe: true,
@@ -646,5 +692,6 @@ mod tests {
         assert!(recognized);
         assert_eq!(policy.preview_limit, 2);
         assert!(!policy.require_commit_gate);
+        assert!(!policy.require_language_sync_ready);
     }
 }

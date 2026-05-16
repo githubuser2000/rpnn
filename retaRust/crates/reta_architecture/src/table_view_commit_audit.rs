@@ -13,6 +13,7 @@ use crate::shadow_pipeline::{
 };
 use crate::table_view_language_coverage::TableViewLanguageCoverageReport;
 use crate::table_view_language_parity::TableViewLanguageParityReport;
+use crate::table_view_language_sync::TableViewLanguageSyncReport;
 use crate::table_view_output_parity::TableViewOutputParityReport;
 use crate::table_view_virtual_parity::TableViewVirtualParityReport;
 
@@ -70,6 +71,12 @@ pub struct TableViewCommitAuditReport {
     pub language_coverage_stale_language_count: usize,
     pub language_coverage_languages_missing_744: Vec<String>,
     pub language_coverage_failed_guards: Vec<String>,
+    pub language_sync_ready: bool,
+    pub language_sync_status: String,
+    pub language_sync_pending_action_count: usize,
+    pub language_sync_pending_languages: Vec<String>,
+    pub language_sync_pending_columns: Vec<usize>,
+    pub language_sync_failed_guards: Vec<String>,
     pub rendered_line_count: usize,
     pub legacy_line_count: usize,
     pub first_raw_mismatch_index: Option<usize>,
@@ -81,6 +88,7 @@ pub struct TableViewCommitAuditReport {
     pub virtual_column_parity: TableViewVirtualParityReport,
     pub language_parity: TableViewLanguageParityReport,
     pub language_coverage: TableViewLanguageCoverageReport,
+    pub language_sync: TableViewLanguageSyncReport,
     pub universal_property: String,
 }
 
@@ -113,6 +121,7 @@ impl TableViewCommitAuditBundle {
                 "virtual_direct_cells_equal".to_string(),
                 "language_parity_ready".to_string(),
                 "language_coverage_ready".to_string(),
+                "language_sync_ready".to_string(),
                 "decision_uses_view_output".to_string(),
             ],
             diagnostic_guards: vec![
@@ -120,6 +129,7 @@ impl TableViewCommitAuditBundle {
                 "virtual_added_columns".to_string(),
                 "language_fallback_witness".to_string(),
                 "language_coverage_gap_report".to_string(),
+                "language_sync_backlog_report".to_string(),
                 "rollback_anchor".to_string(),
             ],
             universal_property:
@@ -169,6 +179,7 @@ pub fn audit_table_view_output_commit(
     let virtual_direct_guard = decision.virtual_direct_cells_equal;
     let language_guard = decision.language_parity_ready;
     let language_coverage_guard = decision.language_coverage_ready;
+    let language_sync_guard = decision.language_sync_ready;
     let gate_guard = decision.gate_allowed_to_commit;
     let decision_guard = decision.use_view_output;
 
@@ -227,6 +238,20 @@ pub fn audit_table_view_output_commit(
             "language coverage must show that requested direct columns are covered by the effective asset or safe fallback",
         ),
         TableViewCommitAuditCheck::new(
+            "language_sync_ready",
+            true,
+            language_sync_guard,
+            format!(
+                "status={} pending_actions={} pending_languages={:?} pending_columns={:?} failed_guards={:?}",
+                decision.language_sync_status,
+                decision.language_sync_pending_action_count,
+                decision.language_sync_pending_languages,
+                decision.language_sync_pending_columns,
+                decision.language_sync_failed_guards
+            ),
+            "language synchronization backlog must be empty before a localized table-view output can be promoted",
+        ),
+        TableViewCommitAuditCheck::new(
             "decision_uses_view_output",
             true,
             decision_guard,
@@ -274,6 +299,18 @@ pub fn audit_table_view_output_commit(
                 report.language_coverage.languages_missing_744
             ),
             "language coverage is diagnostic for synchronization gaps even when fallback keeps output safe",
+        ),
+        TableViewCommitAuditCheck::new(
+            "language_sync_backlog_report",
+            false,
+            report.language_sync.ready(),
+            format!(
+                "pending_actions={} pending_languages={:?} pending_columns={:?}",
+                report.language_sync.pending_action_count,
+                report.language_sync.pending_languages,
+                report.language_sync.pending_columns
+            ),
+            "language sync report is diagnostic after all translations cover requested direct columns",
         ),
         TableViewCommitAuditCheck::new(
             "rollback_anchor_recorded",
@@ -326,6 +363,12 @@ pub fn audit_table_view_output_commit(
         language_coverage_stale_language_count: decision.language_coverage_stale_language_count,
         language_coverage_languages_missing_744: decision.language_coverage_languages_missing_744.clone(),
         language_coverage_failed_guards: decision.language_coverage_failed_guards.clone(),
+        language_sync_ready: decision.language_sync_ready,
+        language_sync_status: decision.language_sync_status.clone(),
+        language_sync_pending_action_count: decision.language_sync_pending_action_count,
+        language_sync_pending_languages: decision.language_sync_pending_languages.clone(),
+        language_sync_pending_columns: decision.language_sync_pending_columns.clone(),
+        language_sync_failed_guards: decision.language_sync_failed_guards.clone(),
         rendered_line_count: decision.rendered_line_count,
         legacy_line_count: report.legacy_rows,
         first_raw_mismatch_index: report.diff.first_mismatch_index,
@@ -337,8 +380,9 @@ pub fn audit_table_view_output_commit(
         virtual_column_parity: report.virtual_column_parity.clone(),
         language_parity: report.language_parity.clone(),
         language_coverage: report.language_coverage.clone(),
+        language_sync: report.language_sync.clone(),
         universal_property:
-            "commit_audit_glues_raw_diff_semantic_diff_virtual_identity_language_parity_and_language_coverage_into_one_guarded_witness"
+            "commit_audit_glues_raw_diff_semantic_diff_virtual_identity_language_parity_language_coverage_and_language_sync_into_one_guarded_witness"
                 .to_string(),
     }
 }
@@ -378,6 +422,9 @@ mod tests {
         assert!(audit.checks
             .iter()
             .any(|check| check.name == "language_coverage_ready"));
+        assert!(audit.checks
+            .iter()
+            .any(|check| check.name == "language_sync_ready"));
         assert_eq!(audit.virtual_rendered_policy, "tag-summary");
         assert!(!audit.safe_to_commit);
     }

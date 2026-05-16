@@ -1563,13 +1563,14 @@ mod tests {
     }
 
     #[test]
-    fn language_asset_with_required_columns_falls_back_to_base_when_variant_is_stale() {
-        let base = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493, 744]).unwrap();
-        assert_eq!(base.name, "religion.csv");
-        assert_eq!(base.language, CsvLanguage::Base);
-        let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493]).unwrap();
+    fn language_asset_with_required_columns_uses_synced_variant_after_stage62() {
+        let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493, 744]).unwrap();
         assert_eq!(localized.name, "en-religion.csv");
         assert_eq!(localized.language, CsvLanguage::English);
+        assert!(csv_asset_supports_columns(localized, &[493, 744]));
+        let base = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::Base, &[493, 744]).unwrap();
+        assert_eq!(base.name, "religion.csv");
+        assert_eq!(base.language, CsvLanguage::Base);
     }
 
     #[test]

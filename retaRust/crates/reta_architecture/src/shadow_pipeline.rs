@@ -200,6 +200,7 @@ pub struct ShadowTableViewOutputReport {
     pub virtual_column_parity: TableViewVirtualParityReport,
     pub language_parity: TableViewLanguageParityReport,
     pub language_coverage: TableViewLanguageCoverageReport,
+    pub language_sync: TableViewLanguageSyncReport,
     pub output_report: TableViewOutputReport,
     pub rendered_preview: Vec<String>,
     pub commit_candidate: bool,
@@ -215,6 +216,7 @@ pub struct ShadowTableViewOutputCommitPolicy {
     pub require_virtual_direct_identity: bool,
     pub require_language_parity_ready: bool,
     pub require_language_coverage_ready: bool,
+    pub require_language_sync_ready: bool,
 }
 
 impl Default for ShadowTableViewOutputCommitPolicy {
@@ -227,6 +229,7 @@ impl Default for ShadowTableViewOutputCommitPolicy {
             require_virtual_direct_identity: true,
             require_language_parity_ready: true,
             require_language_coverage_ready: true,
+            require_language_sync_ready: true,
         }
     }
 }
@@ -254,6 +257,12 @@ pub struct ShadowTableViewOutputCommitDecision {
     pub language_coverage_stale_language_count: usize,
     pub language_coverage_languages_missing_744: Vec<String>,
     pub language_coverage_failed_guards: Vec<String>,
+    pub language_sync_ready: bool,
+    pub language_sync_status: String,
+    pub language_sync_pending_action_count: usize,
+    pub language_sync_pending_languages: Vec<String>,
+    pub language_sync_pending_columns: Vec<usize>,
+    pub language_sync_failed_guards: Vec<String>,
     pub force_override: bool,
     pub rendered_line_count: usize,
     pub rollback_anchor: Option<String>,
@@ -611,6 +620,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &TableViewLanguageCoveragePolicy::default(),
         );
+        let language_sync = language_sync_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageSyncPolicy::strict(),
+        );
         let commit_gate = switch_config.gate_for_morphism("table_view_output.commit");
         let commit_candidate = commit_gate.allowed_to_commit
             && (diff.equal || switch_config.mode == ArchitectureSwitchMode::Force);
@@ -626,6 +639,7 @@ impl ShadowPipelineBundle {
             virtual_column_parity,
             language_parity,
             language_coverage,
+            language_sync,
             rendered_preview: output_report
                 .rendered_lines
                 .iter()
@@ -787,11 +801,12 @@ pub fn evaluate_shadow_table_view_output_commit(
         || report.virtual_column_parity.direct_cells_equal;
     let language_ok = !policy.require_language_parity_ready || report.language_parity.ready();
     let language_coverage_ok = !policy.require_language_coverage_ready || report.language_coverage.ready();
+    let language_sync_ok = !policy.require_language_sync_ready || report.language_sync.ready();
     let size_ok = policy
         .max_shadow_lines
         .map(|limit| report.output_report.rendered_lines.len() <= limit)
         .unwrap_or(true);
-    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && language_ok && language_coverage_ok && size_ok;
+    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && language_ok && language_coverage_ok && language_sync_ok && size_ok;
     let reason = if use_view_output {
         if force_override && !report.diff.equal {
             "force_commit_table_view_output_mismatch".to_string()
@@ -810,6 +825,8 @@ pub fn evaluate_shadow_table_view_output_commit(
         "language_parity_blocked".to_string()
     } else if !language_coverage_ok {
         "language_coverage_blocked".to_string()
+    } else if !language_sync_ok {
+        "language_sync_blocked".to_string()
     } else if !size_ok {
         "table_view_output_too_large_for_policy".to_string()
     } else {
@@ -837,6 +854,12 @@ pub fn evaluate_shadow_table_view_output_commit(
         language_coverage_stale_language_count: report.language_coverage.stale_language_count,
         language_coverage_languages_missing_744: report.language_coverage.languages_missing_744.clone(),
         language_coverage_failed_guards: report.language_coverage.failed_guards.clone(),
+        language_sync_ready: report.language_sync.ready(),
+        language_sync_status: report.language_sync.status.clone(),
+        language_sync_pending_action_count: report.language_sync.pending_action_count,
+        language_sync_pending_languages: report.language_sync.pending_languages.clone(),
+        language_sync_pending_columns: report.language_sync.pending_columns.clone(),
+        language_sync_failed_guards: report.language_sync.failed_guards.clone(),
         force_override,
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),
@@ -1039,6 +1062,10 @@ mod tests {
                 &["reta", "-language=english", "-spalten", "--kontinuum=m"],
                 &crate::table_view_language_coverage::TableViewLanguageCoveragePolicy::default(),
             ),
+            language_sync: crate::table_view_language_sync::language_sync_for_cli_args(
+                &["reta", "-language=english", "-spalten", "--kontinuum=m"],
+                &crate::table_view_language_sync::TableViewLanguageSyncPolicy::strict(),
+            ),
             output_report: TableViewOutputReport {
                 class: "TableViewOutputReport".to_string(),
                 mode: "shell".to_string(),
@@ -1122,6 +1149,7 @@ mod tests {
         assert!(decision.use_view_output);
         assert_eq!(decision.reason, "commit_equal_table_view_output");
         assert!(decision.virtual_direct_cells_equal);
+        assert!(decision.language_sync_ready);
     }
 
     #[test]

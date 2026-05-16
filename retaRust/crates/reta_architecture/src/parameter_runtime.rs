@@ -600,9 +600,6 @@ mod tests {
     use super::*;
 
     #[test]
-
-
-    #[test]
     fn parser_tracks_python_language_switches() {
         let runtime = bootstrap_parameter_runtime();
         let parsed = runtime.parse_cli_args(&["reta", "-language=english", "--sprache=chinesisch"]);
