@@ -350,14 +350,14 @@ mod tests {
     }
 
     #[test]
-    fn english_kontinuum_m_falls_back_to_base_for_direct_744() {
+    fn english_kontinuum_m_can_use_synced_language_asset_for_direct_744() {
         let report = continuum_m_language_parity_smoke();
         assert!(report.ready());
         assert_eq!(report.requested_language, "en");
         assert_eq!(report.requested_asset_name, "en-religion.csv");
-        assert_eq!(report.effective_asset_name, "religion.csv");
-        assert!(report.fallback_required);
-        assert!(report.fallback_applied);
+        assert_eq!(report.effective_asset_name, "en-religion.csv");
+        assert!(!report.fallback_required);
+        assert!(!report.fallback_applied);
         assert!(report.direct_493_materialized);
         assert!(report.direct_744_materialized);
         assert!(report.selected_columns_legacy.contains(&493));
@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn disabling_language_fallback_blocks_direct_744() {
+    fn disabling_language_fallback_is_ready_after_language_asset_sync() {
         let args = [
             "reta",
             "-language=english",
@@ -377,9 +377,9 @@ mod tests {
         ];
         let report = language_parity_for_cli_args(&args, &Default::default());
         assert_eq!(report.effective_asset_name, "en-religion.csv");
-        assert!(report.fallback_required);
+        assert!(!report.fallback_required);
         assert!(!report.fallback_applied);
-        assert!(!report.direct_744_materialized);
-        assert_eq!(report.status, "blocked");
+        assert!(report.direct_744_materialized);
+        assert_eq!(report.status, "ready");
     }
 }

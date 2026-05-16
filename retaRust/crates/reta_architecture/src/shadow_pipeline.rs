@@ -35,6 +35,9 @@ use crate::table_view_language_parity::{
 use crate::table_view_language_coverage::{
     TableViewLanguageCoverageReport, TableViewLanguageCoveragePolicy, language_coverage_for_cli_args,
 };
+use crate::table_view_language_sync::{
+    TableViewLanguageSyncReport, TableViewLanguageSyncPolicy, language_sync_for_cli_args,
+};
 use crate::table_view_output_parity::{
     TableViewOutputParityConfig, TableViewOutputParityReport, bootstrap_table_view_output_parity,
 };
@@ -380,6 +383,7 @@ pub struct ShadowCliPlan {
     pub virtual_column_parity: TableViewVirtualParityReport,
     pub language_parity: TableViewLanguageParityReport,
     pub language_coverage: TableViewLanguageCoverageReport,
+    pub language_sync: TableViewLanguageSyncReport,
     pub universal_property: String,
 }
 
@@ -422,6 +426,7 @@ impl ShadowPipelineBundle {
                 "table_view_language_coverage.translation_gap_report".to_string(),
                 "table_view_language_coverage.fallback_readiness_witness".to_string(),
                 "table_view_language_coverage.commit_guard".to_string(),
+                "table_view_language_sync.translation_backlog_report".to_string(),
                 "table_view_output.commit_virtual_guard".to_string(),
                 "table_view_commit_audit.audit_report".to_string(),
                 "table_view_commit_audit.required_guards".to_string(),
@@ -489,6 +494,10 @@ impl ShadowPipelineBundle {
             &cleaned_args,
             &TableViewLanguageCoveragePolicy::default(),
         );
+        let language_sync = language_sync_for_cli_args(
+            &cleaned_args,
+            &TableViewLanguageSyncPolicy::default(),
+        );
         ShadowCliPlan {
             original_args: args.to_vec(),
             cleaned_args,
@@ -503,6 +512,7 @@ impl ShadowPipelineBundle {
             virtual_column_parity,
             language_parity,
             language_coverage,
+            language_sync,
             universal_property: "same_clean_cli_args_feed_legacy_and_shadow_sections".to_string(),
         }
     }

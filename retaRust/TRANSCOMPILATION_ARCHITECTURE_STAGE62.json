@@ -1,0 +1,98 @@
+{
+  "stage": 62,
+  "title": "Language sync completion witness and python_arch_reference religion variant sync",
+  "date": "2026-05-16",
+  "base": "stage61",
+  "outputs": {
+    "archive": "reta_rust_arch_stage62.tar.bz2",
+    "code_patch": "reta_rust_arch_stage62_code.patch",
+    "changed_files": "reta_rust_arch_stage62_changed_files.txt",
+    "checks": "RUST_STAGE62_CHECKS.md"
+  },
+  "changed_files": [
+    "Cargo.toml",
+    "crates/reta_architecture/src/csv_catalog.rs",
+    "crates/reta_architecture/src/facade.rs",
+    "crates/reta_architecture/src/lib.rs",
+    "crates/reta_architecture/src/migration_control.rs",
+    "crates/reta_architecture/src/runtime_switch.rs",
+    "crates/reta_architecture/src/shadow_pipeline.rs",
+    "crates/reta_architecture/src/table_materialization.rs",
+    "crates/reta_architecture/src/table_view_language_coverage.rs",
+    "crates/reta_architecture/src/table_view_language_parity.rs",
+    "crates/reta_architecture/src/table_view_language_sync.rs",
+    "python_arch_reference/csv/cn-religion.csv",
+    "python_arch_reference/csv/en-religion.csv",
+    "python_arch_reference/csv/kr-religion.csv",
+    "python_arch_reference/csv/vn-religion.csv",
+    "src/bin/reta_arch_language_sync.rs",
+    "src/ffi.rs",
+    "src/reta_arch_shadow.rs",
+    "src/reta_workflow_py.rs",
+    "tools/architecture_language_cli_probe.py",
+    "tools/architecture_language_coverage_probe.py",
+    "tools/architecture_language_fallback_probe.py",
+    "tools/architecture_language_parity_probe.py",
+    "tools/architecture_language_sync_probe.py"
+  ],
+  "summary": [
+    "Added table_view_language_sync.rs to expose translation/synchronization actions for language CSV variants.",
+    "Synchronized python_arch_reference en/cn/vn/kr religion CSV files to 745 columns so column 744 is direct in all religion mirrors.",
+    "Regenerated csv_catalog.rs so translated religion assets report 745 columns.",
+    "Updated language fallback/parity/coverage tests and probes from stale-variant assumptions to synchronized-variant expectations.",
+    "Added FFI export and inspect binary for language sync reports.",
+    "Added ARCH_TABLE_VIEW_LANGUAGE_SYNC diagnostic to rreta shadow diagnostics."
+  ],
+  "semantic_invariants": [
+    "-spalten --kontinuum=m resolves 493 and 744.",
+    "493 remains M Kontinuum (dreizehn).",
+    "744 is direct CSV-backed in base and synchronized language religion assets.",
+    "Virtual column tests continue to use non-direct column 999.",
+    "Language commit/readiness/promotion guards remain in place, but no longer block synchronized 744 assets."
+  ],
+  "probe_status": {
+    "stage62_migration_step_arity_probe.json": "ok",
+    "stage62_activation_promotion_probe.json": "ok",
+    "stage62_csv_catalog_probe.json": "ok",
+    "stage62_language_cli_probe.json": "ok",
+    "stage62_language_commit_guard_probe.json": "ok",
+    "stage62_language_coverage_guard_probe.json": "ok",
+    "stage62_language_coverage_probe.json": "ok",
+    "stage62_language_fallback_probe.json": "ok",
+    "stage62_language_parity_probe.json": "ok",
+    "stage62_language_sync_probe.json": "ok",
+    "stage62_religion_csv_update_probe.json": "ok",
+    "stage62_table_materialization_probe.json": "ok",
+    "stage62_table_view_probe.json": "ok",
+    "stage62_virtual_column_probe.json": "ok",
+    "stage62_virtual_parity_probe.json": "ok",
+    "stage62_table_view_output_parity_probe.json": "ok",
+    "stage62_table_view_output_commit_probe.json": "ok"
+  },
+  "coverage": {
+    "modules": 59,
+    "functions": 1096,
+    "functions_represented_by_name": 1096,
+    "classes": 239,
+    "classes_represented_by_name": 239,
+    "functions_declared": 1096,
+    "functions_marker_only": 0,
+    "functions_missing": 0,
+    "classes_declared": 239,
+    "classes_marker_only": 0,
+    "classes_missing": 0
+  },
+  "cargo": {
+    "workspace_build_in_container": "not_run",
+    "reason": "cargo/rustc unavailable in this container shell",
+    "recommended_local_checks": [
+      "cargo check -p reta_architecture",
+      "cargo test -p reta_architecture",
+      "cargo check --bin rreta_arch_language_sync",
+      "cargo check -p reta --lib",
+      "cargo check -p retaprompt_commands --lib",
+      "cargo check -p retaprompt_input --lib",
+      "cargo check -p retaprompt_frontends"
+    ]
+  }
+}

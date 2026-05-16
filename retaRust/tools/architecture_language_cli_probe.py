@@ -3,8 +3,7 @@
 
 Stage 56 made language fallback column-aware.  Stage 57 makes the language
 choice itself CLI-aware in the Rust architecture path, so `-language=english`
-can select localized CSV sections when they are complete and fall back to the
-base religion.csv when requested columns such as 744 are only present there.
+can select localized CSV sections when they are complete.  After the Stage-55 CSV sync, English also contains 744 directly.
 """
 from __future__ import annotations
 
@@ -57,7 +56,7 @@ def main() -> None:
         and "table_materialization_config_from_cli_args" in mat,
         "materialization_config_uses_csv_language": "config.language = csv_language_from_cli_args(args)" in mat,
         "materialization_language_tests_present": "materialization_config_reads_python_language_parameter" in mat
-        and "materialization_config_language_fallback_keeps_744_direct" in mat,
+        and "materialization_config_language_variant_keeps_744_direct_after_sync" in mat,
         "parameter_runtime_tracks_language": "selected_language: Option<CsvLanguage>" in param
         and "language_value_from_cli_arg(raw)" in param,
         "shadow_pipeline_uses_cli_materialization_config": "TableMaterializationConfig::from_cli_args(&cleaned_args)" in shadow,
@@ -67,7 +66,7 @@ def main() -> None:
         "inspect_bins_use_cli_materialization_config": "TableMaterializationConfig::from_cli_args(&args)" in view_bin
         and "TableMaterializationConfig::from_cli_args(&reta_args)" in parity_bin,
         "base_religion_has_745_columns": base_cols >= 745,
-        "en_religion_still_lags_744_columns": en_cols == 744,
+        "en_religion_synced_745_columns": en_cols == 745,
     }
     report = {
         "status": "ok" if all(checks.values()) else "failed",

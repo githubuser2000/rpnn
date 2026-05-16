@@ -67,6 +67,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_recovery = shadow_runtime.view_output_recovery;
         let view_output_readiness = shadow_runtime.view_output_readiness;
         let view_output_promotion = shadow_runtime.view_output_promotion;
+        let view_output_language_sync = shadow_runtime.view_output_language_sync;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -157,6 +158,26 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     report.language_coverage.languages_missing_744,
                     report.language_coverage.status,
                     report.language_coverage.failed_guards,
+                ),
+            });
+        }
+        if let Some(report) = view_output_language_sync.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if report.pending_action_count == 0 {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_LANGUAGE_SYNC".to_string(),
+                message: format!(
+                    "Rust-Architektur-Sprachsync: requested_language={} effective_asset={} pending_actions={} pending_languages={:?} pending_columns={:?} target_assets={:?} status={}",
+                    report.requested_language,
+                    report.effective_asset_name,
+                    report.pending_action_count,
+                    report.pending_languages,
+                    report.pending_columns,
+                    report.target_assets,
+                    report.status,
                 ),
             });
         }

@@ -959,7 +959,7 @@ mod tests {
 
 
     #[test]
-    fn language_materialization_falls_back_to_base_for_direct_744() {
+    fn language_materialization_uses_synced_variant_for_direct_744() {
         let args = [
             "reta",
             "-zeilen",
@@ -975,8 +975,8 @@ mod tests {
             },
         );
         let section = report.ordinary_sections.first().unwrap();
-        assert_eq!(section.asset_name, "religion.csv");
-        assert_eq!(section.language, "base");
+        assert_eq!(section.asset_name, "en-religion.csv");
+        assert_eq!(section.language, "en");
         assert!(section.selected_columns_legacy.contains(&744));
         assert!(!section.missing_columns_legacy.contains(&744));
         assert!(section
@@ -1018,12 +1018,12 @@ mod tests {
     }
 
     #[test]
-    fn materialization_config_language_fallback_keeps_744_direct() {
+    fn materialization_config_language_variant_keeps_744_direct_after_sync() {
         let args = ["reta", "-language=english", "-spalten", "--kontinuum=m"];
         let config = TableMaterializationConfig::from_cli_args(&args);
         let report = materialize_cli_args(&args, &config);
         let section = report.ordinary_sections.first().unwrap();
-        assert_eq!(section.asset_name, "religion.csv");
+        assert_eq!(section.asset_name, "en-religion.csv");
         assert!(section.selected_columns_legacy.contains(&493));
         assert!(section.selected_columns_legacy.contains(&744));
         assert!(report.virtual_columns.iter().all(|column| column.column_legacy != 744));

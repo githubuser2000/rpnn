@@ -3,7 +3,7 @@
 
 The base religion.csv has been updated to 745 columns, so the matrix projection
 `--kontinuum=m -> 493,744` can be directly CSV-backed in the base language.
-Language variants may still lag at 744 columns.  The Rust materializer must not
+Language variants are now expected to be synchronized at 745 columns.  The Rust materializer must not
 turn 744 back into a virtual column just because English/Chinese/Vietnamese/
 Korean assets are stale; it should fall back to base religion.csv for that
 projection while keeping localized assets for projections that they can satisfy.
@@ -50,12 +50,12 @@ def main() -> None:
     checks = {
         "base_religion_has_direct_744": base_max >= 745,
         "base_744_header_is_neues_m": len(base_rows[0]) > 744 and "Neues M" in base_rows[0][744],
-        "language_variants_lag_at_744_columns": all(value == 744 for value in variant_max.values()),
+        "language_variants_synced_at_745_columns": all(value == 745 for value in variant_max.values()),
         "csv_catalog_has_required_column_helper": "csv_asset_for_language_with_required_columns" in csv_catalog,
         "generator_preserves_required_column_helper": "csv_asset_for_language_with_required_columns" in generator,
         "materialization_config_has_fallback_flag": "fallback_to_base_for_missing_language_columns" in table_materialization,
         "ordinary_materialization_uses_column_aware_language_asset": "asset_name_for_language_with_columns" in table_materialization,
-        "english_744_fallback_test_present": "language_materialization_falls_back_to_base_for_direct_744" in table_materialization,
+        "english_744_synced_variant_test_present": "language_materialization_uses_synced_variant_for_direct_744" in table_materialization,
         "english_493_variant_test_present": "language_materialization_keeps_variant_when_direct_columns_exist" in table_materialization,
         "old_plain_ordinary_asset_call_removed": 'CsvProjectionRequest::for_asset(asset_name_for_language(\n            "religion.csv"' not in table_materialization,
     }

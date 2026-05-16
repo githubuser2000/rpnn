@@ -191,3 +191,7 @@ path = "src/bin/reta_arch_language_parity.rs"
 [[bin]]
 name = "rreta_arch_language_coverage"
 path = "src/bin/reta_arch_language_coverage.rs"
+
+[[bin]]
+name = "rreta_arch_language_sync"
+path = "src/bin/reta_arch_language_sync.rs"

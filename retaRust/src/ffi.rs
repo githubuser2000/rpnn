@@ -807,6 +807,27 @@ pub unsafe extern "C" fn reta_architecture_table_view_language_coverage_json(
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_architecture_table_view_language_sync_json(
+    argc: usize,
+    argv: *const *const c_char,
+) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let args = unsafe { read_argv(argc, argv) }.unwrap_or_default();
+        let policy = reta_architecture::TableViewLanguageSyncPolicy::default();
+        let report = reta_architecture::language_sync_for_cli_args(&args, &policy);
+        serde_json::to_string(&serde_json::json!({
+            "args": args,
+            "policy": policy,
+            "report": report,
+        }))
+    })) {
+        Ok(Ok(json)) => into_c_string(json),
+        Ok(Err(error)) => json_error_string(&error.to_string()),
+        Err(_) => json_error_string("panic inside reta_architecture_table_view_language_sync_json"),
+    }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     argc: usize,
     argv: *const *const c_char,

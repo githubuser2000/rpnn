@@ -63,10 +63,10 @@ def main() -> int:
         "runtime_gates": "table_view_language_coverage.translation_gap_report" in runtime_switch,
         "migration_step": "step-table-view-language-coverage" in migration,
         "base_religion_has_745_columns": base_cols == 745,
-        "en_religion_still_stale_744_columns": en_cols == 744,
-        "cn_religion_still_stale_744_columns": cn_cols == 744,
-        "vn_religion_still_stale_744_columns": vn_cols == 744,
-        "kr_religion_still_stale_744_columns": kr_cols == 744,
+        "en_religion_synced_745_columns": en_cols == 745,
+        "cn_religion_synced_745_columns": cn_cols == 745,
+        "vn_religion_synced_745_columns": vn_cols == 745,
+        "kr_religion_synced_745_columns": kr_cols == 745,
         "base_has_expected_rows": base_rows == 1025,
     }
     status = "ok" if all(checks.values()) else "failed"
@@ -83,8 +83,8 @@ def main() -> int:
         },
         "expected_language_gap": {
             "required_columns_for_kontinuum_m": [493, 744],
-            "stale_languages_missing_744": ["en", "cn", "vn", "kr"],
-            "safe_action": "fallback_to_base_religion_until_language_variants_are_extended_to_745_columns",
+            "stale_languages_missing_744": [],
+            "safe_action": "localized_religion_assets_now_cover_493_and_744_directly",
         },
     }
     print(json.dumps(payload, indent=2 if args.pretty else None, ensure_ascii=False))

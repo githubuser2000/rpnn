@@ -89,6 +89,7 @@ pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
 pub mod table_view_language_parity;
 pub mod table_view_language_coverage;
+pub mod table_view_language_sync;
 pub mod table_view_layout;
 pub mod table_view_numbering;
 pub mod table_view_output;
@@ -518,6 +519,14 @@ pub use table_view_language_coverage::{
     bootstrap_table_view_language_coverage, continuum_m_language_coverage_smoke,
     language_asset_coverage, language_asset_coverages, language_coverage_for_cli_args,
     language_coverage_from_report, language_coverage_status_for_cli_args,
+};
+pub use table_view_language_sync::{
+    LanguageColumnSyncAction, TableViewLanguageSyncBundle, TableViewLanguageSyncPolicy,
+    TableViewLanguageSyncReport, TableViewLanguageSyncSnapshot, bootstrap_table_view_language_sync,
+    continuum_m_language_sync_smoke, language_asset_name_for_sync, language_sync_action,
+    language_sync_actions_for_asset, language_sync_for_cli_args, language_sync_from_coverage,
+    language_sync_pending_actions_for_cli_args, language_sync_status_for_cli_args, preview_csv_cell,
+    preview_text,
 };
 pub use table_view_layout::{
     TableViewColumnPage, TableViewLayoutBundle, TableViewLayoutConfig, TableViewLayoutReport,

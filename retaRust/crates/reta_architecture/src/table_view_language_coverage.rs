@@ -351,18 +351,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn continuum_m_reports_stale_language_assets_and_base_744() {
+    fn continuum_m_reports_synced_language_assets_and_base_744() {
         let report = continuum_m_language_coverage_smoke();
         assert!(report.ready());
         assert_eq!(report.base_max_columns, 745);
         assert!(report.required_columns_legacy.contains(&493));
         assert!(report.required_columns_legacy.contains(&744));
         assert!(report.base_supports_required_columns);
-        assert!(report.stale_language_count >= 1);
-        assert!(report.languages_missing_744.contains(&"en".to_string()));
-        assert_eq!(report.effective_asset_name, "religion.csv");
-        assert!(report.fallback_required);
-        assert!(report.fallback_applied);
+        assert_eq!(report.stale_language_count, 0);
+        assert!(report.languages_missing_744.is_empty());
+        assert_eq!(report.effective_asset_name, "en-religion.csv");
+        assert!(!report.fallback_required);
+        assert!(!report.fallback_applied);
     }
 
     #[test]
@@ -384,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn disabling_fallback_blocks_incomplete_language_asset() {
+    fn disabling_fallback_keeps_synced_language_asset_ready() {
         let args = [
             "reta",
             "-language=english",
@@ -395,9 +395,8 @@ mod tests {
             "--kontinuum=m",
         ];
         let report = language_coverage_for_cli_args(&args, &Default::default());
-        assert_eq!(report.status, "blocked");
-        assert!(report
-            .failed_guards
-            .contains(&"fallback_disabled_for_incomplete_requested_language_asset".to_string()));
+        assert_eq!(report.status, "ready");
+        assert!(report.failed_guards.is_empty());
+        assert_eq!(report.effective_asset_name, "en-religion.csv");
     }
 }

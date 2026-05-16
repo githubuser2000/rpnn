@@ -1,0 +1,110 @@
+{
+  "stage": 62,
+  "items": [
+    {
+      "path": "csv/religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "csv/en-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "csv/cn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "csv/vn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "csv/kr-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_reference/csv/religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_reference/csv/en-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_reference/csv/cn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_reference/csv/vn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_reference/csv/kr-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_arch_reference/csv/religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_arch_reference/csv/en-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_arch_reference/csv/cn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_arch_reference/csv/vn-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    },
+    {
+      "path": "python_arch_reference/csv/kr-religion.csv",
+      "sha256": "107e314cf00d158ba591d52c60bc5504a07c09096405c9c60bc9b46ca81d8a56",
+      "rows": 1025,
+      "max_columns": 745,
+      "header_744": "Neues M (13) Kontinuum"
+    }
+  ]
+}

@@ -344,6 +344,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "language_coverage_must_be_ready_before_a_localized_view_output_can_be_promoted",
         ),
         step(
+            "step-table-view-language-sync",
+            "wave-02-table-adapters",
+            "translation backlog projection for language CSV variants",
+            "table_view_language_sync.detect_missing_variant_columns",
+            "table_view_language_sync.translation_backlog_report",
+            "table-view-language-sync-witness",
+            "language_variant_assets_can_remove_base_fallback_only_after_missing_columns_are_glued",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",

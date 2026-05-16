@@ -25,6 +25,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_recovery: Option<reta_architecture::TableViewActivationRecoveryReport>,
     pub view_output_readiness: Option<reta_architecture::TableViewActivationReadinessReport>,
     pub view_output_promotion: Option<reta_architecture::TableViewActivationPromotionReport>,
+    pub view_output_language_sync: Option<reta_architecture::TableViewLanguageSyncReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -171,6 +172,10 @@ pub fn shadow_table_runtime_report_for_program(
             &promotion_policy,
         )
     });
+    let view_output_language_sync = Some(reta_architecture::language_sync_for_cli_args(
+        argv,
+        &reta_architecture::TableViewLanguageSyncPolicy::default(),
+    ));
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -187,6 +192,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_recovery,
         view_output_readiness,
         view_output_promotion,
+        view_output_language_sync,
     })
 }
 

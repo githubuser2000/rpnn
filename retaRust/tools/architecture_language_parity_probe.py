@@ -3,9 +3,7 @@
 
 The Stage 55 religion.csv update made base column 744 direct.  Stage 56/57 made
 language fallback CLI-aware.  This probe checks the new Rust language-parity
-witness: an English section may remain localized for column 493, but must fall
-back to base religion.csv for `--kontinuum=m` because English religion still
-lacks direct column 744.
+witness: an English section may remain localized for column 493, but must use the synchronized English religion asset for `--kontinuum=m` because English religion now contains direct column 744.
 """
 from __future__ import annotations
 
@@ -60,8 +58,8 @@ def main() -> None:
         "module_has_cli_runner": "language_parity_for_cli_args" in module
         and "TableMaterializationConfig::from_cli_args" in module,
         "module_checks_english_493_variant": "english_493_can_use_language_variant" in module,
-        "module_checks_english_744_base_fallback": "english_kontinuum_m_falls_back_to_base_for_direct_744" in module,
-        "module_blocks_no_fallback_744": "disabling_language_fallback_blocks_direct_744" in module,
+        "module_checks_english_744_synced_variant": "english_kontinuum_m_can_use_synced_language_asset_for_direct_744" in module,
+        "module_allows_no_fallback_after_sync": "disabling_language_fallback_is_ready_after_language_asset_sync" in module,
         "lib_reexports_language_parity": "pub mod table_view_language_parity" in lib
         and "TableViewLanguageParityReport" in lib
         and "language_parity_for_cli_args" in lib,
@@ -79,7 +77,7 @@ def main() -> None:
         and "report.language_parity.ready()" in workflow,
         "base_religion_has_direct_744": base_cols >= 745
         and "Neues M" in (base_rows[0][744] if base_cols > 744 else ""),
-        "english_religion_lacks_direct_744": en_cols == 744,
+        "english_religion_has_direct_744": en_cols == 745,
         "english_religion_can_direct_493": en_cols > 493
         and bool(en_rows[0][493]),
     }
@@ -91,7 +89,7 @@ def main() -> None:
         "base_744_header": base_rows[0][744] if base_cols > 744 else None,
         "english_493_header_preview": en_rows[0][493][:80] if en_cols > 493 else None,
         "expected_english_493_effective_asset": "en-religion.csv",
-        "expected_english_kontinuum_m_effective_asset": "religion.csv",
+        "expected_english_kontinuum_m_effective_asset": "en-religion.csv",
         "checks": checks,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2 if args.pretty else None))
