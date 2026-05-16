@@ -211,6 +211,7 @@ pub struct ShadowTableViewOutputCommitPolicy {
     pub max_shadow_lines: Option<usize>,
     pub require_virtual_direct_identity: bool,
     pub require_language_parity_ready: bool,
+    pub require_language_coverage_ready: bool,
 }
 
 impl Default for ShadowTableViewOutputCommitPolicy {
@@ -222,6 +223,7 @@ impl Default for ShadowTableViewOutputCommitPolicy {
             max_shadow_lines: None,
             require_virtual_direct_identity: true,
             require_language_parity_ready: true,
+            require_language_coverage_ready: true,
         }
     }
 }
@@ -244,6 +246,11 @@ pub struct ShadowTableViewOutputCommitDecision {
     pub language_effective_asset_name: String,
     pub language_fallback_applied: bool,
     pub language_failed_guards: Vec<String>,
+    pub language_coverage_ready: bool,
+    pub language_coverage_status: String,
+    pub language_coverage_stale_language_count: usize,
+    pub language_coverage_languages_missing_744: Vec<String>,
+    pub language_coverage_failed_guards: Vec<String>,
     pub force_override: bool,
     pub rendered_line_count: usize,
     pub rollback_anchor: Option<String>,
@@ -414,6 +421,7 @@ impl ShadowPipelineBundle {
                 "table_view_language_parity.direct_744_guard".to_string(),
                 "table_view_language_coverage.translation_gap_report".to_string(),
                 "table_view_language_coverage.fallback_readiness_witness".to_string(),
+                "table_view_language_coverage.commit_guard".to_string(),
                 "table_view_output.commit_virtual_guard".to_string(),
                 "table_view_commit_audit.audit_report".to_string(),
                 "table_view_commit_audit.required_guards".to_string(),
@@ -768,11 +776,12 @@ pub fn evaluate_shadow_table_view_output_commit(
     let virtual_direct_ok = !policy.require_virtual_direct_identity
         || report.virtual_column_parity.direct_cells_equal;
     let language_ok = !policy.require_language_parity_ready || report.language_parity.ready();
+    let language_coverage_ok = !policy.require_language_coverage_ready || report.language_coverage.ready();
     let size_ok = policy
         .max_shadow_lines
         .map(|limit| report.output_report.rendered_lines.len() <= limit)
         .unwrap_or(true);
-    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && language_ok && size_ok;
+    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && language_ok && language_coverage_ok && size_ok;
     let reason = if use_view_output {
         if force_override && !report.diff.equal {
             "force_commit_table_view_output_mismatch".to_string()
@@ -789,6 +798,8 @@ pub fn evaluate_shadow_table_view_output_commit(
         "virtual_policy_changed_direct_csv_cells".to_string()
     } else if !language_ok {
         "language_parity_blocked".to_string()
+    } else if !language_coverage_ok {
+        "language_coverage_blocked".to_string()
     } else if !size_ok {
         "table_view_output_too_large_for_policy".to_string()
     } else {
@@ -811,6 +822,11 @@ pub fn evaluate_shadow_table_view_output_commit(
         language_effective_asset_name: report.language_parity.effective_asset_name.clone(),
         language_fallback_applied: report.language_parity.fallback_applied,
         language_failed_guards: report.language_parity.failed_guards.clone(),
+        language_coverage_ready: report.language_coverage.ready(),
+        language_coverage_status: report.language_coverage.status.clone(),
+        language_coverage_stale_language_count: report.language_coverage.stale_language_count,
+        language_coverage_languages_missing_744: report.language_coverage.languages_missing_744.clone(),
+        language_coverage_failed_guards: report.language_coverage.failed_guards.clone(),
         force_override,
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),

@@ -335,6 +335,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "language_assets_form_a_cover_only_after_each_variant_supports_requested_direct_columns",
         ),
         step(
+            "step-table-view-language-coverage-guard",
+            "wave-02-table-adapters",
+            "language coverage + commit/readiness/promotion guard",
+            "table_view_language_coverage.commit_guard",
+            "table_view_activation_readiness.language_coverage_guard",
+            "table-view-language-coverage-guard",
+            "language_coverage_must_be_ready_before_a_localized_view_output_can_be_promoted",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",

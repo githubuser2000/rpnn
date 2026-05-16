@@ -368,6 +368,9 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_language_coverage.variant_asset_widths".to_string(),
             "table_view_language_coverage.translation_gap_report".to_string(),
             "table_view_language_coverage.fallback_readiness_witness".to_string(),
+            "table_view_language_coverage.commit_guard".to_string(),
+            "table_view_language_coverage.readiness_guard".to_string(),
+            "table_view_language_coverage.promotion_guard".to_string(),
             "table_view_language_coverage.sync_completion_guard".to_string(),
             "table_view_output.commit_virtual_guard".to_string(),
             "table_view_output.commit_language_guard".to_string(),
@@ -376,6 +379,7 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_commit_audit.semantic_witness".to_string(),
             "table_view_commit_audit.virtual_direct_identity".to_string(),
             "table_view_commit_audit.language_parity_guard".to_string(),
+            "table_view_commit_audit.language_coverage_guard".to_string(),
             "table_view_activation_transaction.select_visible_source".to_string(),
             "table_view_activation_transaction.rollback_witness".to_string(),
             "table_view_activation_transaction.commit_audit_gate".to_string(),
@@ -413,11 +417,13 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_readiness.default_promotion_gate".to_string(),
             "table_view_activation_readiness.policy_from_cli".to_string(),
             "table_view_activation_readiness.language_parity_guard".to_string(),
+            "table_view_activation_readiness.language_coverage_guard".to_string(),
             "table_view_activation_readiness.rollback_sources".to_string(),
             "table_view_activation_promotion.default_visible_source".to_string(),
             "table_view_activation_promotion.policy_from_cli".to_string(),
             "table_view_activation_promotion.guard_summary".to_string(),
             "table_view_activation_promotion.language_parity_guard".to_string(),
+            "table_view_activation_promotion.language_coverage_guard".to_string(),
             "table_view_activation_promotion.rollback_to_legacy".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
@@ -554,6 +560,8 @@ pub fn extract_architecture_switch_from_argv(
             | "--activation-readiness-ignore-persistence" | "--readiness-ignore-persistence"
             | "--activation-readiness-require-language-parity" | "--readiness-require-language-parity"
             | "--activation-readiness-ignore-language-parity" | "--readiness-ignore-language-parity"
+            | "--activation-readiness-require-language-coverage" | "--readiness-require-language-coverage"
+            | "--activation-readiness-ignore-language-coverage" | "--readiness-ignore-language-coverage"
             | "--activation-promotion-strict" | "--promotion-strict"
             | "--activation-promotion-diagnostic" | "--promotion-diagnostic"
             | "--activation-promotion-allow-force" | "--promotion-allow-force"
@@ -564,6 +572,8 @@ pub fn extract_architecture_switch_from_argv(
             | "--activation-promotion-ignore-readiness" | "--promotion-ignore-readiness"
             | "--activation-promotion-require-language-parity" | "--promotion-require-language-parity"
             | "--activation-promotion-ignore-language-parity" | "--promotion-ignore-language-parity"
+            | "--activation-promotion-require-language-coverage" | "--promotion-require-language-coverage"
+            | "--activation-promotion-ignore-language-coverage" | "--promotion-ignore-language-coverage"
             | "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines"
             | "--activation-promotion-include-selected-lines" | "--promotion-include-selected-lines"
             | "--no-language-fallback" | "--no-language-base-fallback"

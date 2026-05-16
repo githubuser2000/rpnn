@@ -55,6 +55,7 @@ pub struct TableViewActivationReadinessPolicy {
     pub require_persistence_ready: bool,
     pub require_recovery_ready_when_enabled: bool,
     pub require_language_parity_ready: bool,
+    pub require_language_coverage_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
 }
@@ -73,6 +74,7 @@ impl Default for TableViewActivationReadinessPolicy {
             require_persistence_ready: true,
             require_recovery_ready_when_enabled: false,
             require_language_parity_ready: true,
+            require_language_coverage_ready: true,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -98,6 +100,7 @@ impl TableViewActivationReadinessPolicy {
             require_persistence_ready: false,
             require_recovery_ready_when_enabled: false,
             require_language_parity_ready: false,
+            require_language_coverage_ready: false,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -161,6 +164,16 @@ impl TableViewActivationReadinessPolicy {
                     policy.require_language_parity_ready = false;
                     recognized = true;
                 }
+                "--activation-readiness-require-language-coverage"
+                | "--readiness-require-language-coverage" => {
+                    policy.require_language_coverage_ready = true;
+                    recognized = true;
+                }
+                "--activation-readiness-ignore-language-coverage"
+                | "--readiness-ignore-language-coverage" => {
+                    policy.require_language_coverage_ready = false;
+                    recognized = true;
+                }
                 _ => {
                     if let Some(value) = arg
                         .strip_prefix("--activation-readiness-preview=")
@@ -211,6 +224,9 @@ impl TableViewActivationReadinessPolicy {
         }
         if self.require_language_parity_ready {
             guards.push("language_parity_ready");
+        }
+        if self.require_language_coverage_ready {
+            guards.push("language_coverage_ready");
         }
         guards
     }
@@ -265,6 +281,11 @@ pub struct TableViewActivationReadinessReport {
     pub language_effective_asset_name: String,
     pub language_fallback_applied: bool,
     pub language_failed_guards: Vec<String>,
+    pub language_coverage_ready: bool,
+    pub language_coverage_status: String,
+    pub language_coverage_stale_language_count: usize,
+    pub language_coverage_languages_missing_744: Vec<String>,
+    pub language_coverage_failed_guards: Vec<String>,
     pub commit_decision: bool,
     pub audit_safe: bool,
     pub transaction_safe: bool,
@@ -330,6 +351,7 @@ impl TableViewActivationReadinessBundle {
                 "semantic_rows_equal".to_string(),
                 "virtual_columns_are_witnesses".to_string(),
                 "file_recovery_candidate".to_string(),
+                "language_coverage_gap_report".to_string(),
                 "rollback_anchor_available".to_string(),
             ],
             universal_property:
@@ -394,6 +416,26 @@ pub fn activation_readiness_from_reports(
     let language_failed_guards = audit
         .map(|value| value.language_failed_guards.clone())
         .or_else(|| commit.map(|value| value.language_failed_guards.clone()))
+        .unwrap_or_default();
+    let language_coverage_ready = audit
+        .map(|value| value.language_coverage_ready)
+        .or_else(|| commit.map(|value| value.language_coverage_ready))
+        .unwrap_or(false);
+    let language_coverage_status = audit
+        .map(|value| value.language_coverage_status.clone())
+        .or_else(|| commit.map(|value| value.language_coverage_status.clone()))
+        .unwrap_or_else(|| "unknown".to_string());
+    let language_coverage_stale_language_count = audit
+        .map(|value| value.language_coverage_stale_language_count)
+        .or_else(|| commit.map(|value| value.language_coverage_stale_language_count))
+        .unwrap_or(0);
+    let language_coverage_languages_missing_744 = audit
+        .map(|value| value.language_coverage_languages_missing_744.clone())
+        .or_else(|| commit.map(|value| value.language_coverage_languages_missing_744.clone()))
+        .unwrap_or_default();
+    let language_coverage_failed_guards = audit
+        .map(|value| value.language_coverage_failed_guards.clone())
+        .or_else(|| commit.map(|value| value.language_coverage_failed_guards.clone()))
         .unwrap_or_default();
     let switch_mode = commit
         .map(|value| value.switch_mode.clone())
@@ -525,6 +567,15 @@ pub fn activation_readiness_from_reports(
         "localized materialization may be promoted only when missing direct columns fall back to a safe base asset",
     ));
     checks.push(TableViewActivationReadinessCheck::new(
+        "language_coverage_ready",
+        policy.require_language_coverage_ready,
+        language_coverage_ready,
+        format!(
+            "status={language_coverage_status} stale_languages={language_coverage_stale_language_count} missing_744={language_coverage_languages_missing_744:?} failed_guards={language_coverage_failed_guards:?}"
+        ),
+        "language coverage must confirm every requested direct column is covered by the effective asset or safe fallback",
+    ));
+    checks.push(TableViewActivationReadinessCheck::new(
         "semantic_rows_equal",
         false,
         semantic_equal,
@@ -647,6 +698,11 @@ pub fn activation_readiness_from_reports(
         language_effective_asset_name,
         language_fallback_applied,
         language_failed_guards,
+        language_coverage_ready,
+        language_coverage_status,
+        language_coverage_stale_language_count,
+        language_coverage_languages_missing_744,
+        language_coverage_failed_guards,
         commit_decision,
         audit_safe,
         transaction_safe,
@@ -802,6 +858,11 @@ mod tests {
             language_effective_asset_name: "religion.csv".to_string(),
             language_fallback_applied: false,
             language_failed_guards: Vec::new(),
+            language_coverage_ready: true,
+            language_coverage_status: "ready".to_string(),
+            language_coverage_stale_language_count: 0,
+            language_coverage_languages_missing_744: Vec::new(),
+            language_coverage_failed_guards: Vec::new(),
             force_override: false,
             rendered_line_count: 1,
             rollback_anchor: Some("rollback:test".to_string()),

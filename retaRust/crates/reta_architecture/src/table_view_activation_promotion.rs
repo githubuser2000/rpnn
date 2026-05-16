@@ -26,6 +26,7 @@ pub struct TableViewActivationPromotionPolicy {
     pub require_raw_equal: bool,
     pub require_virtual_direct_identity: bool,
     pub require_language_parity_ready: bool,
+    pub require_language_coverage_ready: bool,
     pub allow_force_when_not_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
@@ -41,6 +42,7 @@ impl Default for TableViewActivationPromotionPolicy {
             require_raw_equal: true,
             require_virtual_direct_identity: true,
             require_language_parity_ready: true,
+            require_language_coverage_ready: true,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -62,6 +64,7 @@ impl TableViewActivationPromotionPolicy {
             require_raw_equal: false,
             require_virtual_direct_identity: false,
             require_language_parity_ready: false,
+            require_language_coverage_ready: false,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -126,6 +129,16 @@ impl TableViewActivationPromotionPolicy {
                     policy.require_language_parity_ready = false;
                     recognized = true;
                 }
+                "--activation-promotion-require-language-coverage"
+                | "--promotion-require-language-coverage" => {
+                    policy.require_language_coverage_ready = true;
+                    recognized = true;
+                }
+                "--activation-promotion-ignore-language-coverage"
+                | "--promotion-ignore-language-coverage" => {
+                    policy.require_language_coverage_ready = false;
+                    recognized = true;
+                }
                 "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines" => {
                     policy.include_selected_lines = false;
                     recognized = true;
@@ -173,6 +186,9 @@ impl TableViewActivationPromotionPolicy {
         }
         if self.require_language_parity_ready {
             guards.push("language_parity_ready");
+        }
+        if self.require_language_coverage_ready {
+            guards.push("language_coverage_ready");
         }
         guards
     }
@@ -225,6 +241,10 @@ pub struct TableViewActivationPromotionReport {
     pub language_requested_language: String,
     pub language_effective_asset_name: String,
     pub language_fallback_applied: bool,
+    pub language_coverage_ready: bool,
+    pub language_coverage_status: String,
+    pub language_coverage_stale_language_count: usize,
+    pub language_coverage_languages_missing_744: Vec<String>,
     pub selected_source: String,
     pub selected_line_count: usize,
     pub selected_lines_checksum: u64,
@@ -368,6 +388,19 @@ pub fn activation_promotion_from_readiness(
         "localized materialization may be promoted only when all requested direct columns are safely covered",
     ));
     checks.push(TableViewActivationPromotionCheck::new(
+        "language_coverage_ready",
+        policy.require_language_coverage_ready,
+        readiness.language_coverage_ready,
+        format!(
+            "status={} stale_languages={} missing_744={:?} failed_guards={:?}",
+            readiness.language_coverage_status,
+            readiness.language_coverage_stale_language_count,
+            readiness.language_coverage_languages_missing_744,
+            readiness.language_coverage_failed_guards
+        ),
+        "localized materialization may become default only when requested direct columns are covered by the effective language asset or fallback",
+    ));
+    checks.push(TableViewActivationPromotionCheck::new(
         "semantic_rows_equal",
         false,
         readiness.semantic_equal,
@@ -443,6 +476,10 @@ pub fn activation_promotion_from_readiness(
         language_requested_language: readiness.language_requested_language.clone(),
         language_effective_asset_name: readiness.language_effective_asset_name.clone(),
         language_fallback_applied: readiness.language_fallback_applied,
+        language_coverage_ready: readiness.language_coverage_ready,
+        language_coverage_status: readiness.language_coverage_status.clone(),
+        language_coverage_stale_language_count: readiness.language_coverage_stale_language_count,
+        language_coverage_languages_missing_744: readiness.language_coverage_languages_missing_744.clone(),
         selected_source: readiness.selected_source.clone(),
         selected_line_count: readiness.selected_line_count,
         selected_lines_checksum: readiness.selected_lines_checksum,
@@ -531,6 +568,11 @@ mod tests {
             language_effective_asset_name: "religion.csv".to_string(),
             language_fallback_applied: false,
             language_failed_guards: Vec::new(),
+            language_coverage_ready: true,
+            language_coverage_status: "ready".to_string(),
+            language_coverage_stale_language_count: 0,
+            language_coverage_languages_missing_744: Vec::new(),
+            language_coverage_failed_guards: Vec::new(),
             commit_decision: true,
             audit_safe: true,
             transaction_safe: true,

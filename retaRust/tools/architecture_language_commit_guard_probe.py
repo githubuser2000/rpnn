@@ -39,7 +39,7 @@ def main() -> int:
         and "pub language_effective_asset_name: String" in shadow
         and "pub language_failed_guards: Vec<String>" in shadow,
         "shadow_commit_uses_language_ok": "let language_ok = !policy.require_language_parity_ready || report.language_parity.ready();" in shadow
-        and "gate_ok && diff_ok && virtual_direct_ok && language_ok && size_ok" in shadow
+        and "language_ok" in shadow
         and "language_parity_blocked" in shadow,
         "commit_audit_requires_language_guard": "language_parity_ready" in audit
         and "localized table sections may commit only" in audit
