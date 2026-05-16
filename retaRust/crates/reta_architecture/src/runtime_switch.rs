@@ -388,6 +388,9 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "prompt_language_guard.language_coverage_ready".to_string(),
             "prompt_language_guard.language_sync_ready".to_string(),
             "prompt_language_guard.direct_744_prompt_guard".to_string(),
+            "prompt_language_guard.shadow_prompt_commit_guard".to_string(),
+            "prompt_language_guard.prompt_commit_guard".to_string(),
+            "shadow_pipeline.prompt_language_guard_commit".to_string(),
             "table_view_output.commit_virtual_guard".to_string(),
             "table_view_output.commit_language_guard".to_string(),
             "table_view_commit_audit.audit_report".to_string(),
@@ -611,7 +614,10 @@ pub fn extract_architecture_switch_from_argv(
             | "--prompt-language-guard-ignore-direct-744" | "--prompt-guard-ignore-direct-744"
             | "--prompt-language-guard-require-direct-744" | "--prompt-guard-require-direct-744"
             | "--prompt-language-guard-ignore-reta" | "--prompt-guard-ignore-reta"
-            | "--prompt-language-guard-require-reta" | "--prompt-guard-require-reta" => {
+            | "--prompt-language-guard-require-reta" | "--prompt-guard-require-reta"
+            | "--prompt-language-commit-require-guard" | "--prompt-commit-require-language-guard"
+            | "--prompt-language-commit-ignore-guard" | "--prompt-commit-ignore-language-guard"
+            | "--prompt-commit-allow-force" | "--prompt-commit-no-force" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"

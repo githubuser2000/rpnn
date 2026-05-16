@@ -16,6 +16,9 @@ use crate::migration_control::{ActivationUnitSpec, bootstrap_migration_control};
 use crate::output_syntax::OutputMode;
 use crate::parity_harness::{ParityProbePlan, bootstrap_parity_harness};
 use crate::prompt_interaction::{PromptInteractionPlan, bootstrap_prompt_interaction};
+use crate::prompt_language_guard::{
+    PromptLanguageGuardPolicy, PromptLanguageGuardReport, prompt_language_guard_for_text,
+};
 use crate::prompt_language::PromptModus;
 use crate::runtime_switch::{
     ArchitectureSwitchConfig, ArchitectureSwitchMode, SwitchGateDecision, bootstrap_runtime_switch,
@@ -315,6 +318,7 @@ pub struct ShadowPromptCommitPolicy {
     pub require_gate_commit: bool,
     pub require_same_argv: bool,
     pub allow_force_mismatch_commit: bool,
+    pub require_prompt_language_guard_ready: bool,
 }
 
 impl Default for ShadowPromptCommitPolicy {
@@ -323,7 +327,32 @@ impl Default for ShadowPromptCommitPolicy {
             require_gate_commit: true,
             require_same_argv: true,
             allow_force_mismatch_commit: false,
+            require_prompt_language_guard_ready: true,
         }
+    }
+}
+
+impl ShadowPromptCommitPolicy {
+    pub fn from_cli_args<S: AsRef<str>>(args: &[S]) -> Self {
+        let mut policy = Self::default();
+        for arg in args {
+            match arg.as_ref() {
+                "--prompt-language-commit-require-guard" | "--prompt-commit-require-language-guard" => {
+                    policy.require_prompt_language_guard_ready = true;
+                }
+                "--prompt-language-commit-ignore-guard" | "--prompt-commit-ignore-language-guard" => {
+                    policy.require_prompt_language_guard_ready = false;
+                }
+                "--prompt-commit-allow-force" => {
+                    policy.allow_force_mismatch_commit = true;
+                }
+                "--prompt-commit-no-force" => {
+                    policy.allow_force_mismatch_commit = false;
+                }
+                _ => {}
+            }
+        }
+        policy
     }
 }
 
@@ -337,6 +366,10 @@ pub struct ShadowPromptCommitDecision {
     pub gate_allowed_to_commit: bool,
     pub legacy_kind: String,
     pub same_argv: bool,
+    pub prompt_language_guard_ready: bool,
+    pub prompt_language_guard_language: String,
+    pub prompt_language_guard_compiled_language: String,
+    pub prompt_language_guard_failed_guards: Vec<String>,
     pub force_override: bool,
     pub planned_argv: Vec<String>,
     pub legacy_argv: Vec<String>,
@@ -373,6 +406,11 @@ pub struct ShadowPromptReport {
     pub completion_preview_count: usize,
     pub planned_argv: Vec<String>,
     pub completion_preview: Vec<String>,
+    pub prompt_language_guard: PromptLanguageGuardReport,
+    pub prompt_language_guard_ready: bool,
+    pub prompt_language_guard_failed_guard_count: usize,
+    pub prompt_language_guard_language: String,
+    pub prompt_language_guard_compiled_language: String,
     pub commit_candidate: bool,
     pub universal_property: String,
 }
@@ -424,6 +462,7 @@ impl ShadowPipelineBundle {
                 "table_view_output_parity.compare_output_lines".to_string(),
                 "shadow_pipeline.prompt_adapter".to_string(),
                 "shadow_pipeline.prompt_commit".to_string(),
+                "shadow_pipeline.prompt_language_guard_commit".to_string(),
                 "shadow_pipeline.diff_lines".to_string(),
                 "table_materialization.generation_plan".to_string(),
                 "table_view.materialized_view".to_string(),
@@ -680,6 +719,15 @@ impl ShadowPipelineBundle {
         let prepared_token_count = plan.prepared.tokens.len();
         let planned_argv = plan.execution_plan.reta_argv.clone();
         let completion_preview = plan.completion_preview.clone();
+        let prompt_language_guard_policy = PromptLanguageGuardPolicy::from_cli_args(&planned_argv);
+        let prompt_language_guard = prompt_language_guard_for_text(
+            &input.prompt_text,
+            &prompt_language_guard_policy,
+        );
+        let prompt_language_guard_ready = prompt_language_guard.ready();
+        let prompt_language_guard_failed_guard_count = prompt_language_guard.failed_guards.len();
+        let prompt_language_guard_language = prompt_language_guard.prompt_language.clone();
+        let prompt_language_guard_compiled_language = prompt_language_guard.compiled_language.clone();
         ShadowPromptReport {
             morphism: "shadow_pipeline.prompt_adapter".to_string(),
             gate: gate.clone(),
@@ -689,8 +737,13 @@ impl ShadowPipelineBundle {
             completion_preview_count: completion_preview.len(),
             planned_argv,
             completion_preview,
-            commit_candidate: gate.allowed_to_commit,
-            universal_property: "prompt_shadow_plan_must_compile_to_same_reta_argv_before_commit"
+            prompt_language_guard,
+            prompt_language_guard_ready,
+            prompt_language_guard_failed_guard_count,
+            prompt_language_guard_language,
+            prompt_language_guard_compiled_language,
+            commit_candidate: gate.allowed_to_commit && prompt_language_guard_ready,
+            universal_property: "prompt_shadow_plan_must_compile_to_same_reta_argv_and_ready_language_guard_before_commit"
                 .to_string(),
         }
     }
@@ -701,7 +754,8 @@ impl ShadowPipelineBundle {
         legacy: &ShadowPromptLegacyCommand,
         config: &ArchitectureSwitchConfig,
     ) -> ShadowPromptCommitDecision {
-        evaluate_shadow_prompt_commit(report, legacy, config, &ShadowPromptCommitPolicy::default())
+        let policy = ShadowPromptCommitPolicy::from_cli_args(&report.planned_argv);
+        evaluate_shadow_prompt_commit(report, legacy, config, &policy)
     }
 }
 
@@ -882,7 +936,8 @@ pub fn evaluate_shadow_prompt_commit(
         && policy.allow_force_mismatch_commit
         && commit_gate.allowed_to_commit;
     let argv_ok = !policy.require_same_argv || same_argv || force_override;
-    let use_shadow_prompt_plan = gate_ok && kind_ok && argv_ok;
+    let language_guard_ok = !policy.require_prompt_language_guard_ready || report.prompt_language_guard_ready;
+    let use_shadow_prompt_plan = gate_ok && kind_ok && argv_ok && language_guard_ok;
     let reason = if use_shadow_prompt_plan {
         if force_override && !same_argv {
             "force_commit_prompt_mismatch".to_string()
@@ -895,6 +950,8 @@ pub fn evaluate_shadow_prompt_commit(
         "unsupported_legacy_prompt_kind".to_string()
     } else if !argv_ok {
         "prompt_argv_not_equal".to_string()
+    } else if !language_guard_ok {
+        "prompt_language_guard_not_ready".to_string()
     } else {
         "prompt_commit_policy_rejected".to_string()
     };
@@ -907,12 +964,16 @@ pub fn evaluate_shadow_prompt_commit(
         gate_allowed_to_commit: commit_gate.allowed_to_commit,
         legacy_kind: legacy.kind.clone(),
         same_argv,
+        prompt_language_guard_ready: report.prompt_language_guard_ready,
+        prompt_language_guard_language: report.prompt_language_guard_language.clone(),
+        prompt_language_guard_compiled_language: report.prompt_language_guard_compiled_language.clone(),
+        prompt_language_guard_failed_guards: report.prompt_language_guard.failed_guards.clone(),
         force_override,
         planned_argv: report.planned_argv.clone(),
         legacy_argv: legacy.argv.clone(),
         rollback_anchor: config.rollback_anchor.clone(),
         universal_property:
-            "prompt_shadow_plan_commits_only_when_legacy_compile_and_rust_prompt_execution_commute"
+            "prompt_shadow_plan_commits_only_when_legacy_compile_rust_execution_and_prompt_language_guard_commute"
                 .to_string(),
     }
 }
@@ -1171,6 +1232,14 @@ mod tests {
                 "--alles".to_string(),
             ],
             completion_preview: Vec::new(),
+            prompt_language_guard: crate::prompt_language_guard::prompt_language_guard_for_text(
+                "reta -zeilen --alles",
+                &crate::prompt_language_guard::PromptLanguageGuardPolicy::default(),
+            ),
+            prompt_language_guard_ready: true,
+            prompt_language_guard_failed_guard_count: 0,
+            prompt_language_guard_language: "base".to_string(),
+            prompt_language_guard_compiled_language: "base".to_string(),
             commit_candidate: true,
             universal_property: "test".to_string(),
         };
@@ -1200,6 +1269,47 @@ mod tests {
         let decision = evaluate_shadow_prompt_commit(&report, &same, &dry_run, &Default::default());
         assert!(!decision.use_shadow_prompt_plan);
         assert_eq!(decision.reason, "gate_not_allowed_to_commit");
+    }
+
+    #[test]
+    fn prompt_commit_requires_language_guard_by_default() {
+        let failed_guard = crate::prompt_language_guard::prompt_language_guard_for_text(
+            "help -language=english",
+            &crate::prompt_language_guard::PromptLanguageGuardPolicy::default(),
+        );
+        assert!(!failed_guard.ready());
+        let report = ShadowPromptReport {
+            morphism: "shadow_pipeline.prompt_adapter".to_string(),
+            gate: SwitchGateDecision::allowed(
+                "shadow_pipeline.prompt_adapter",
+                "commit_gate",
+                ArchitectureSwitchMode::Commit,
+            ),
+            switch_mode: "commit".to_string(),
+            prepared_token_count: 1,
+            execution_argv_count: 1,
+            completion_preview_count: 0,
+            planned_argv: vec!["reta".to_string()],
+            completion_preview: Vec::new(),
+            prompt_language_guard: failed_guard.clone(),
+            prompt_language_guard_ready: false,
+            prompt_language_guard_failed_guard_count: failed_guard.failed_guards.len(),
+            prompt_language_guard_language: failed_guard.prompt_language.clone(),
+            prompt_language_guard_compiled_language: failed_guard.compiled_language.clone(),
+            commit_candidate: true,
+            universal_property: "test".to_string(),
+        };
+        let legacy = ShadowPromptLegacyCommand::reta(vec!["reta".to_string()]);
+        let config = ArchitectureSwitchConfig::default().with_mode(ArchitectureSwitchMode::Commit, "test");
+        let decision = evaluate_shadow_prompt_commit(&report, &legacy, &config, &Default::default());
+        assert!(!decision.use_shadow_prompt_plan);
+        assert_eq!(decision.reason, "prompt_language_guard_not_ready");
+        assert!(!decision.prompt_language_guard_ready);
+
+        let mut relaxed = ShadowPromptCommitPolicy::default();
+        relaxed.require_prompt_language_guard_ready = false;
+        let decision = evaluate_shadow_prompt_commit(&report, &legacy, &config, &relaxed);
+        assert!(decision.use_shadow_prompt_plan);
     }
 
     #[test]

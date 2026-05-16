@@ -1,0 +1,23 @@
+{
+  "stage": 66,
+  "title": "Prompt Language Commit Guard",
+  "status": "implemented",
+  "new_binary": "rreta_arch_prompt_language_commit",
+  "new_probe": "tools/architecture_prompt_language_commit_guard_probe.py",
+  "changed_focus": [
+    "ShadowPromptReport carries PromptLanguageGuardReport",
+    "ShadowPromptCommitPolicy requires prompt-language guard readiness by default",
+    "ShadowPromptCommitDecision exposes prompt-language guard status",
+    "retaprompt_arch_inspect uses CLI-derived prompt commit policy",
+    "runtime switch and migration control know prompt-language commit gates"
+  ],
+  "safety_invariant": "prompt shadow plan commits only when legacy argv, rust planned argv, commit gate, and prompt-language guard commute",
+  "cargo_workspace_checked": false,
+  "cargo_workspace_check_reason": "cargo/rustc unavailable in container",
+  "coverage": {
+    "functions": "1096/1096",
+    "classes": "239/239",
+    "semantic_surface_marker_only": 0,
+    "semantic_surface_missing": 0
+  }
+}

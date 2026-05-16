@@ -174,7 +174,13 @@ fn main() {
             error,
         ),
     };
-    let commit = pipeline.prompt_commit_decision(&report, &legacy, &switch_config);
+    let prompt_commit_policy = retaprompt_input::reta_architecture::ShadowPromptCommitPolicy::from_cli_args(&cleaned_argv);
+    let commit = retaprompt_input::reta_architecture::evaluate_shadow_prompt_commit(
+        &report,
+        &legacy,
+        &switch_config,
+        &prompt_commit_policy,
+    );
     let json = serde_json::json!({
         "program_name": program_name,
         "prompt_text": prompt_text,
@@ -182,6 +188,7 @@ fn main() {
         "switch": switch_config.snapshot(),
         "shadow_report": report,
         "legacy": legacy,
+        "prompt_commit_policy": prompt_commit_policy,
         "commit": commit,
     });
     match serde_json::to_string_pretty(&json) {

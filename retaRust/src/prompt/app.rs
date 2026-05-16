@@ -325,13 +325,15 @@ fn apply_prompt_shadow_commit_if_safe(
             log_path,
             "ARCH_PROMPT_SHADOW",
             &format!(
-                "mode={} legacy={} planned_argv={} commit={} reason={} same_argv={}",
+                "mode={} legacy={} planned_argv={} commit={} reason={} same_argv={} language_guard_ready={} language={}",
                 report.switch_mode,
                 legacy.kind,
                 report.planned_argv.len(),
                 commit.use_shadow_prompt_plan,
                 commit.reason,
-                commit.same_argv
+                commit.same_argv,
+                commit.prompt_language_guard_ready,
+                commit.prompt_language_guard_language
             ),
         );
     }

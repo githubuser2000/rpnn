@@ -380,6 +380,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "prompt_language_guard_must_commute_before_prompt_language_activation",
         ),
         step(
+            "step-prompt-language-commit-guard",
+            "wave-03-prompt-interaction",
+            "prompt language guard folded into prompt shadow commit",
+            "prompt_language_guard.shadow_prompt_commit_guard",
+            "shadow_pipeline.prompt_language_guard_commit",
+            "prompt-language-commit-guard-witness",
+            "prompt_shadow_plan_may_commit_only_when_language_guard_and_legacy_argv_commute",
+        ),
+        step(
             "step-table-view-language-commit-guard",
             "wave-02-table-adapters",
             "language parity + commit/readiness/promotion guard",
