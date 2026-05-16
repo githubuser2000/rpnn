@@ -179,3 +179,7 @@ path = "src/bin/reta_arch_activation_recovery.rs"
 [[bin]]
 name = "rreta_arch_activation_readiness"
 path = "src/bin/reta_arch_activation_readiness.rs"
+
+[[bin]]
+name = "rreta_arch_activation_promotion"
+path = "src/bin/reta_arch_activation_promotion.rs"

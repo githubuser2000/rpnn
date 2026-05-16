@@ -82,7 +82,8 @@ pub mod table_view_activation_persistence;
 pub mod table_view_activation_file;
 pub mod table_view_activation_recovery;
 pub mod table_view_activation_readiness;
-// Stable root-level recovery/readiness exports are intentionally kept for reta/rreta binaries.
+pub mod table_view_activation_promotion;
+// Stable root-level recovery/readiness/promotion exports are intentionally kept for reta/rreta binaries.
 pub mod table_view_cell_styles;
 pub mod table_view_commit_audit;
 pub mod table_view_html_attributes;
@@ -463,6 +464,13 @@ pub use self::table_view_activation_readiness::{
     TableViewActivationReadinessSnapshot, activation_readiness_for_cli_args,
     activation_readiness_from_reports, bootstrap_table_view_activation_readiness,
     continuum_m_activation_readiness_smoke,
+};
+pub use self::table_view_activation_promotion::{
+    TableViewActivationPromotionBundle, TableViewActivationPromotionCheck,
+    TableViewActivationPromotionPolicy, TableViewActivationPromotionReport,
+    TableViewActivationPromotionSnapshot, activation_promotion_checks_from_readiness,
+    activation_promotion_for_cli_args, activation_promotion_from_readiness,
+    bootstrap_table_view_activation_promotion, continuum_m_activation_promotion_smoke,
 };
 pub use table_view::{
     MaterializedTableCellSource, MaterializedTableView, MaterializedTableViewCell,

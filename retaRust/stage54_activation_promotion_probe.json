@@ -1,0 +1,43 @@
+{
+  "checks": {
+    "duplicate_switch_config_removed": true,
+    "duplicate_view_output_replay_literal_removed": true,
+    "facade_runtime_field_present": true,
+    "facade_snapshot_present": true,
+    "ffi_export_present": true,
+    "inspect_binary_registered": true,
+    "inspect_binary_uses_policy": true,
+    "lib_module_exported": true,
+    "lib_symbols_reexported": true,
+    "migration_step_present": true,
+    "promotion_for_cli_args_present": true,
+    "promotion_from_readiness_present": true,
+    "promotion_module_present": true,
+    "promotion_policy_from_cli_present": true,
+    "promotion_smoke_present": true,
+    "runtime_switch_known_morphism_present": true,
+    "runtime_switch_strips_cli_flags": true,
+    "shadow_bridge_builds_promotion": true,
+    "strict_raw_guard_present": true,
+    "virtual_direct_guard_present": true,
+    "workflow_diagnostic_present": true
+  },
+  "failed": [],
+  "fixed_shadow_bridge_duplicates": true,
+  "new_binary": "rreta_arch_activation_promotion",
+  "new_ffi": "reta_architecture_table_view_activation_promotion_json",
+  "new_module": "crates/reta_architecture/src/table_view_activation_promotion.rs",
+  "policy_flags": [
+    "--activation-promotion-strict",
+    "--activation-promotion-diagnostic",
+    "--activation-promotion-allow-force",
+    "--activation-promotion-require-commit-mode",
+    "--activation-promotion-ignore-commit-mode",
+    "--activation-promotion-require-readiness",
+    "--activation-promotion-ignore-readiness",
+    "--activation-promotion-include-selected-lines",
+    "--activation-promotion-preview=N"
+  ],
+  "stage": 54,
+  "status": "ok"
+}

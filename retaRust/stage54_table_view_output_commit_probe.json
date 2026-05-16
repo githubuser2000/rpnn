@@ -1,0 +1,33 @@
+{
+  "checks": {
+    "binary_declared": true,
+    "binary_outputs_report_and_commit": true,
+    "binary_reads_legacy_file": true,
+    "bridge_carries_view_output": true,
+    "continuum_493_direct_header": true,
+    "continuum_493_first_data": true,
+    "continuum_744_non_direct": true,
+    "ffi_policy_export": true,
+    "lib_exports_commit_policy": true,
+    "migration_commit_step": true,
+    "migration_shadow_output_step": true,
+    "runtime_commit_gate": true,
+    "runtime_render_gate": true,
+    "runtime_shadow_adapter_gate": true,
+    "runtime_shadow_commit_gate": true,
+    "shadow_commit_decision_type": true,
+    "shadow_commit_method": true,
+    "shadow_commit_policy_type": true,
+    "shadow_eval_function": true,
+    "shadow_report_method": true,
+    "shadow_report_type": true,
+    "workflow_diagnostic_commit": true,
+    "workflow_diagnostic_output": true,
+    "workflow_prefers_view_output_when_committed": true
+  },
+  "data_493_contains_wege_gabelung": true,
+  "expected_commit_rule": "table_view_output commits only when gate is allowed and legacy lines equal materialized view output lines; force may override mismatch",
+  "header_493": "M Kontinuum (dreizehn)",
+  "source_max_columns": 744,
+  "status": "ok"
+}

@@ -66,6 +66,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
         let view_output_file = shadow_runtime.view_output_file;
         let view_output_recovery = shadow_runtime.view_output_recovery;
         let view_output_readiness = shadow_runtime.view_output_readiness;
+        let view_output_promotion = shadow_runtime.view_output_promotion;
         diagnostics.push(RetaDiagnostic {
             level: if shadow_report.diff.equal { DiagnosticLevel::Info } else { DiagnosticLevel::Warning },
             code: "ARCH_SHADOW_TABLE".to_string(),
@@ -354,6 +355,31 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
                     readiness.semantic_equal,
                     readiness.virtual_direct_cells_equal,
                     readiness.failed_required_checks,
+                ),
+            });
+        }
+        if let Some(promotion) = view_output_promotion.as_ref() {
+            diagnostics.push(RetaDiagnostic {
+                level: if promotion.ready_for_default_promotion {
+                    DiagnosticLevel::Info
+                } else {
+                    DiagnosticLevel::Warning
+                },
+                code: "ARCH_TABLE_VIEW_ACTIVATION_PROMOTION".to_string(),
+                message: format!(
+                    "Rust-Architektur-Aktivierungs-Promotion: status={} ready={} level={} action={} visible_source={} required={}/{} raw_equal={} semantic_equal={} virtual_direct={} gate={} failed={:?}",
+                    promotion.status,
+                    promotion.ready_for_default_promotion,
+                    promotion.promotion_level,
+                    promotion.promotion_action,
+                    promotion.visible_output_source,
+                    promotion.passed_required_check_count,
+                    promotion.required_check_count,
+                    promotion.raw_equal,
+                    promotion.semantic_equal,
+                    promotion.virtual_direct_cells_equal,
+                    promotion.gate.reason,
+                    promotion.failed_required_checks,
                 ),
             });
         }

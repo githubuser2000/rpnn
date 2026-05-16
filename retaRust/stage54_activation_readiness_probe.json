@@ -1,0 +1,18 @@
+{
+  "status": "ok",
+  "checks": {
+    "module_exists": true,
+    "lib_pub_mod": true,
+    "lib_root_exports": true,
+    "facade_runtime_field": true,
+    "facade_snapshot_count": true,
+    "runtime_switch_gates": true,
+    "migration_step": true,
+    "shadow_bridge_report_field": true,
+    "root_diagnostic": true,
+    "ffi_export": true,
+    "inspect_binary_declared": true,
+    "inspect_binary_exists": true
+  },
+  "failed": []
+}

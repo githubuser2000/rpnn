@@ -1,0 +1,23 @@
+{
+  "checks": {
+    "audit_uses_shadow_report_and_decision": true,
+    "binary_reads_legacy_lines": true,
+    "binary_registered": true,
+    "continuum_smoke_present": true,
+    "diagnostic_checks_named": true,
+    "facade_runtime_contains_audit": true,
+    "ffi_export_present": true,
+    "lib_exports_commit_audit": true,
+    "migration_step_present": true,
+    "module_file_present": true,
+    "required_checks_named": true,
+    "runtime_switch_gates_present": true,
+    "safe_to_commit_requires_failed_list_empty_and_decision": true,
+    "shadow_snapshot_mentions_audit": true
+  },
+  "diagnostic_guard_count": 3,
+  "required_guard_count": 4,
+  "stage": 40,
+  "status": "ok",
+  "universal_property": "raw diff, semantic diff, runtime gate and virtual direct-cell identity are glued into one auditable commit witness before visible output can switch."
+}

@@ -407,6 +407,15 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "all_local_activation_witnesses_must_glue_before_default_visible_promotion",
         ),
         step(
+            "step-table-view-activation-promotion",
+            "wave-02-table-adapters",
+            "readiness report + runtime gate -> guarded default promotion decision",
+            "table_view_activation_promotion.default_visible_source",
+            "table_view_activation_promotion.policy_from_cli",
+            "table_view_activation_promotion.guard_summary",
+            "default_visible_promotion_only_after_readiness_and_raw_parity_guards",
+        ),
+        step(
             "step-table-view-html-attributes",
             "wave-02-table-adapters",
             "MaterializedTableView + htmlclassesPy.jsonl",

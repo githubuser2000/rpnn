@@ -24,6 +24,7 @@ pub struct ShadowTableRuntimeReport {
     pub view_output_file: Option<reta_architecture::TableViewActivationFileReport>,
     pub view_output_recovery: Option<reta_architecture::TableViewActivationRecoveryReport>,
     pub view_output_readiness: Option<reta_architecture::TableViewActivationReadinessReport>,
+    pub view_output_promotion: Option<reta_architecture::TableViewActivationPromotionReport>,
 }
 
 pub fn shadow_table_report_for_program(
@@ -159,6 +160,17 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_recovery.as_ref(),
         &readiness_policy,
     ));
+    let (promotion_policy, _) = reta_architecture::TableViewActivationPromotionPolicy::from_cli_args(
+        argv,
+        &reta_architecture::TableViewActivationPromotionPolicy::default(),
+    );
+    let view_output_promotion = view_output_readiness.as_ref().map(|readiness| {
+        reta_architecture::activation_promotion_from_readiness(
+            readiness,
+            &switch_config,
+            &promotion_policy,
+        )
+    });
     Some(ShadowTableRuntimeReport {
         report,
         commit,
@@ -174,6 +186,7 @@ pub fn shadow_table_runtime_report_for_program(
         view_output_file,
         view_output_recovery,
         view_output_readiness,
+        view_output_promotion,
     })
 }
 

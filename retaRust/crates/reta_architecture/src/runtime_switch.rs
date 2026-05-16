@@ -203,6 +203,7 @@ impl ArchitectureSwitchConfig {
                     || morphism.starts_with("table_view_activation_file")
                     || morphism.starts_with("table_view_activation_recovery")
                     || morphism.starts_with("table_view_activation_readiness")
+                    || morphism.starts_with("table_view_activation_promotion")
                     || morphism.starts_with("table_view_layout")
                     || morphism.starts_with("table_view_numbering")
                     || morphism.starts_with("table_view_row_styles")
@@ -399,6 +400,10 @@ pub fn bootstrap_runtime_switch(config: Option<ArchitectureSwitchConfig>) -> Run
             "table_view_activation_readiness.default_promotion_gate".to_string(),
             "table_view_activation_readiness.policy_from_cli".to_string(),
             "table_view_activation_readiness.rollback_sources".to_string(),
+            "table_view_activation_promotion.default_visible_source".to_string(),
+            "table_view_activation_promotion.policy_from_cli".to_string(),
+            "table_view_activation_promotion.guard_summary".to_string(),
+            "table_view_activation_promotion.rollback_to_legacy".to_string(),
             "table_view_html_attributes.class_projection".to_string(),
             "table_view_html_attributes.raw_open_tag".to_string(),
             "table_view_html_attributes.raw_html_witness".to_string(),
@@ -531,7 +536,17 @@ pub fn extract_architecture_switch_from_argv(
             | "--activation-readiness-require-recovery" | "--readiness-require-recovery"
             | "--activation-readiness-ignore-recovery" | "--readiness-ignore-recovery"
             | "--activation-readiness-require-persistence" | "--readiness-require-persistence"
-            | "--activation-readiness-ignore-persistence" | "--readiness-ignore-persistence" => {
+            | "--activation-readiness-ignore-persistence" | "--readiness-ignore-persistence"
+            | "--activation-promotion-strict" | "--promotion-strict"
+            | "--activation-promotion-diagnostic" | "--promotion-diagnostic"
+            | "--activation-promotion-allow-force" | "--promotion-allow-force"
+            | "--activation-promotion-no-force" | "--promotion-no-force"
+            | "--activation-promotion-require-commit-mode" | "--promotion-require-commit-mode"
+            | "--activation-promotion-ignore-commit-mode" | "--promotion-ignore-commit-mode"
+            | "--activation-promotion-require-readiness" | "--promotion-require-readiness"
+            | "--activation-promotion-ignore-readiness" | "--promotion-ignore-readiness"
+            | "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines"
+            | "--activation-promotion-include-selected-lines" | "--promotion-include-selected-lines" => {
                 recognised = true;
             }
             "--activation-recovery-file" | "--activation-recover-file"
@@ -550,7 +565,9 @@ pub fn extract_architecture_switch_from_argv(
                 || arg.starts_with("--reta-arch-recovery-file=")
                 || arg.starts_with("--reta-arch-recover-file=")
                 || arg.starts_with("--activation-readiness-preview=")
-                || arg.starts_with("--readiness-preview=") =>
+                || arg.starts_with("--readiness-preview=")
+                || arg.starts_with("--activation-promotion-preview=")
+                || arg.starts_with("--promotion-preview=") =>
             {
                 recognised = true;
             }
@@ -657,6 +674,8 @@ mod tests {
             "--reta-arch=commit".to_string(),
             "--activation-readiness-diagnostic".to_string(),
             "--activation-readiness-preview=3".to_string(),
+            "--activation-promotion-diagnostic".to_string(),
+            "--activation-promotion-preview=3".to_string(),
             "-zeilen".to_string(),
         ];
         let (clean, config) =
