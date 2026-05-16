@@ -326,9 +326,18 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "localized_csv_sections_may_glue_only_when_they_cover_requested_direct_columns",
         ),
         step(
+            "step-table-view-language-commit-guard",
+            "wave-02-table-adapters",
+            "language parity + commit/readiness/promotion guard",
+            "table_view_language_parity.commit_guard",
+            "table_view_activation_readiness.language_parity_guard",
+            "table-view-language-commit-guard",
+            "localized_csv_sections_may_glue_only_when_they_cover_requested_direct_columns",
+        ),
+        step(
             "step-table-view-commit-audit",
             "wave-02-table-adapters",
-            "raw diff + semantic diff + virtual direct identity",
+            "raw diff + semantic diff + virtual direct identity + language parity",
             "table_view_commit_audit.audit_report",
             "table_view_commit_audit.required_guards",
             "table-view-commit-audit-shadow-witness",
@@ -409,7 +418,7 @@ fn default_steps() -> Vec<MigrationStepSpec> {
         step(
             "step-table-view-activation-readiness",
             "wave-02-table-adapters",
-            "commit audit + activation journal/store/recovery witnesses + CLI policy",
+            "commit audit + activation journal/store/recovery witnesses + CLI policy + language parity",
             "table_view_activation_readiness.fold_local_witnesses",
             "table_view_activation_readiness.policy_from_cli",
             "table_view_activation_readiness.default_promotion_gate",
@@ -422,7 +431,7 @@ fn default_steps() -> Vec<MigrationStepSpec> {
             "table_view_activation_promotion.default_visible_source",
             "table_view_activation_promotion.policy_from_cli",
             "table_view_activation_promotion.guard_summary",
-            "default_visible_promotion_only_after_readiness_and_raw_parity_guards",
+            "default_visible_promotion_only_after_readiness_raw_parity_and_language_guards",
         ),
         step(
             "step-table-view-html-attributes",

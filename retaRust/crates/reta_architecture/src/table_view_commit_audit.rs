@@ -11,6 +11,7 @@ use crate::runtime_switch::ArchitectureSwitchConfig;
 use crate::shadow_pipeline::{
     ShadowTableViewOutputCommitDecision, ShadowTableViewOutputReport, bootstrap_shadow_pipeline,
 };
+use crate::table_view_language_parity::TableViewLanguageParityReport;
 use crate::table_view_output_parity::TableViewOutputParityReport;
 use crate::table_view_virtual_parity::TableViewVirtualParityReport;
 
@@ -58,6 +59,11 @@ pub struct TableViewCommitAuditReport {
     pub semantic_equal: bool,
     pub virtual_direct_cells_equal: bool,
     pub virtual_added_column_count: usize,
+    pub language_parity_ready: bool,
+    pub language_requested_language: String,
+    pub language_effective_asset_name: String,
+    pub language_fallback_applied: bool,
+    pub language_failed_guards: Vec<String>,
     pub rendered_line_count: usize,
     pub legacy_line_count: usize,
     pub first_raw_mismatch_index: Option<usize>,
@@ -67,6 +73,7 @@ pub struct TableViewCommitAuditReport {
     pub checks: Vec<TableViewCommitAuditCheck>,
     pub semantic_diff: TableViewOutputParityReport,
     pub virtual_column_parity: TableViewVirtualParityReport,
+    pub language_parity: TableViewLanguageParityReport,
     pub universal_property: String,
 }
 
@@ -97,11 +104,13 @@ impl TableViewCommitAuditBundle {
                 "commit_gate_allowed".to_string(),
                 "raw_line_diff_equal_or_force".to_string(),
                 "virtual_direct_cells_equal".to_string(),
+                "language_parity_ready".to_string(),
                 "decision_uses_view_output".to_string(),
             ],
             diagnostic_guards: vec![
                 "semantic_rows_equal".to_string(),
                 "virtual_added_columns".to_string(),
+                "language_fallback_witness".to_string(),
                 "rollback_anchor".to_string(),
             ],
             universal_property:
@@ -149,6 +158,7 @@ pub fn audit_table_view_output_commit(
 ) -> TableViewCommitAuditReport {
     let raw_guard = decision.diff_equal || decision.force_override;
     let virtual_direct_guard = decision.virtual_direct_cells_equal;
+    let language_guard = decision.language_parity_ready;
     let gate_guard = decision.gate_allowed_to_commit;
     let decision_guard = decision.use_view_output;
 
@@ -181,6 +191,19 @@ pub fn audit_table_view_output_commit(
             "virtual-column policies may add witnesses but must preserve every direct CSV cell",
         ),
         TableViewCommitAuditCheck::new(
+            "language_parity_ready",
+            true,
+            language_guard,
+            format!(
+                "requested_language={} effective_asset={} fallback_applied={} failed_guards={:?}",
+                decision.language_requested_language,
+                decision.language_effective_asset_name,
+                decision.language_fallback_applied,
+                decision.language_failed_guards
+            ),
+            "localized table sections may commit only when missing requested direct columns fallback to a safe base asset",
+        ),
+        TableViewCommitAuditCheck::new(
             "decision_uses_view_output",
             true,
             decision_guard,
@@ -206,6 +229,17 @@ pub fn audit_table_view_output_commit(
                 report.virtual_column_parity.added_virtual_columns
             ),
             "added virtual columns are valid only as witnesses around unchanged direct cells",
+        ),
+        TableViewCommitAuditCheck::new(
+            "language_fallback_witness",
+            false,
+            report.language_parity.fallback_applied,
+            format!(
+                "{} -> {}",
+                report.language_parity.requested_asset_name,
+                report.language_parity.effective_asset_name
+            ),
+            "fallback to the base CSV is diagnostic unless a localized asset lacks requested direct columns",
         ),
         TableViewCommitAuditCheck::new(
             "rollback_anchor_recorded",
@@ -248,6 +282,11 @@ pub fn audit_table_view_output_commit(
         semantic_equal: decision.semantic_equal,
         virtual_direct_cells_equal: decision.virtual_direct_cells_equal,
         virtual_added_column_count: decision.virtual_added_column_count,
+        language_parity_ready: decision.language_parity_ready,
+        language_requested_language: decision.language_requested_language.clone(),
+        language_effective_asset_name: decision.language_effective_asset_name.clone(),
+        language_fallback_applied: decision.language_fallback_applied,
+        language_failed_guards: decision.language_failed_guards.clone(),
         rendered_line_count: decision.rendered_line_count,
         legacy_line_count: report.legacy_rows,
         first_raw_mismatch_index: report.diff.first_mismatch_index,
@@ -257,8 +296,9 @@ pub fn audit_table_view_output_commit(
         checks,
         semantic_diff: report.semantic_diff.clone(),
         virtual_column_parity: report.virtual_column_parity.clone(),
+        language_parity: report.language_parity.clone(),
         universal_property:
-            "commit_audit_glues_raw_diff_semantic_diff_and_virtual_identity_into_one_guarded_witness"
+            "commit_audit_glues_raw_diff_semantic_diff_virtual_identity_and_language_parity_into_one_guarded_witness"
                 .to_string(),
     }
 }
@@ -291,6 +331,10 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.name == "virtual_direct_cells_equal"));
+        assert!(audit
+            .checks
+            .iter()
+            .any(|check| check.name == "language_parity_ready"));
         assert_eq!(audit.virtual_rendered_policy, "tag-summary");
         assert!(!audit.safe_to_commit);
     }

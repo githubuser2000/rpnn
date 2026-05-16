@@ -25,6 +25,7 @@ pub struct TableViewActivationPromotionPolicy {
     pub require_table_view_source: bool,
     pub require_raw_equal: bool,
     pub require_virtual_direct_identity: bool,
+    pub require_language_parity_ready: bool,
     pub allow_force_when_not_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
@@ -39,6 +40,7 @@ impl Default for TableViewActivationPromotionPolicy {
             require_table_view_source: true,
             require_raw_equal: true,
             require_virtual_direct_identity: true,
+            require_language_parity_ready: true,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -59,6 +61,7 @@ impl TableViewActivationPromotionPolicy {
             require_table_view_source: false,
             require_raw_equal: false,
             require_virtual_direct_identity: false,
+            require_language_parity_ready: false,
             allow_force_when_not_ready: false,
             include_selected_lines: false,
             preview_limit: 8,
@@ -113,6 +116,16 @@ impl TableViewActivationPromotionPolicy {
                     policy.require_readiness_ready = false;
                     recognized = true;
                 }
+                "--activation-promotion-require-language-parity"
+                | "--promotion-require-language-parity" => {
+                    policy.require_language_parity_ready = true;
+                    recognized = true;
+                }
+                "--activation-promotion-ignore-language-parity"
+                | "--promotion-ignore-language-parity" => {
+                    policy.require_language_parity_ready = false;
+                    recognized = true;
+                }
                 "--activation-promotion-no-selected-lines" | "--promotion-no-selected-lines" => {
                     policy.include_selected_lines = false;
                     recognized = true;
@@ -157,6 +170,9 @@ impl TableViewActivationPromotionPolicy {
         }
         if self.require_virtual_direct_identity {
             guards.push("virtual_direct_cells_equal");
+        }
+        if self.require_language_parity_ready {
+            guards.push("language_parity_ready");
         }
         guards
     }
@@ -205,6 +221,10 @@ pub struct TableViewActivationPromotionReport {
     pub raw_equal: bool,
     pub semantic_equal: bool,
     pub virtual_direct_cells_equal: bool,
+    pub language_parity_ready: bool,
+    pub language_requested_language: String,
+    pub language_effective_asset_name: String,
+    pub language_fallback_applied: bool,
     pub selected_source: String,
     pub selected_line_count: usize,
     pub selected_lines_checksum: u64,
@@ -335,6 +355,19 @@ pub fn activation_promotion_from_readiness(
         "virtual column policies must be identity on direct CSV-backed cells",
     ));
     checks.push(TableViewActivationPromotionCheck::new(
+        "language_parity_ready",
+        policy.require_language_parity_ready,
+        readiness.language_parity_ready,
+        format!(
+            "requested_language={} effective_asset={} fallback_applied={} failed_guards={:?}",
+            readiness.language_requested_language,
+            readiness.language_effective_asset_name,
+            readiness.language_fallback_applied,
+            readiness.language_failed_guards
+        ),
+        "localized materialization may be promoted only when all requested direct columns are safely covered",
+    ));
+    checks.push(TableViewActivationPromotionCheck::new(
         "semantic_rows_equal",
         false,
         readiness.semantic_equal,
@@ -406,6 +439,10 @@ pub fn activation_promotion_from_readiness(
         raw_equal: readiness.raw_equal,
         semantic_equal: readiness.semantic_equal,
         virtual_direct_cells_equal: readiness.virtual_direct_cells_equal,
+        language_parity_ready: readiness.language_parity_ready,
+        language_requested_language: readiness.language_requested_language.clone(),
+        language_effective_asset_name: readiness.language_effective_asset_name.clone(),
+        language_fallback_applied: readiness.language_fallback_applied,
         selected_source: readiness.selected_source.clone(),
         selected_line_count: readiness.selected_line_count,
         selected_lines_checksum: readiness.selected_lines_checksum,
@@ -489,6 +526,11 @@ mod tests {
             semantic_equal: true,
             virtual_direct_cells_equal: true,
             virtual_added_column_count: 1,
+            language_parity_ready: true,
+            language_requested_language: "base".to_string(),
+            language_effective_asset_name: "religion.csv".to_string(),
+            language_fallback_applied: false,
+            language_failed_guards: Vec::new(),
             commit_decision: true,
             audit_safe: true,
             transaction_safe: true,
@@ -501,8 +543,8 @@ mod tests {
             recovery_enabled: false,
             recovery_ready: false,
             recovery_replays_visible_output: false,
-            required_check_count: 9,
-            passed_required_check_count: 9,
+            required_check_count: 10,
+            passed_required_check_count: 10,
             failed_required_checks: Vec::new(),
             diagnostic_check_count: 2,
             checks: vec![

@@ -206,6 +206,7 @@ pub struct ShadowTableViewOutputCommitPolicy {
     pub allow_force_mismatch_commit: bool,
     pub max_shadow_lines: Option<usize>,
     pub require_virtual_direct_identity: bool,
+    pub require_language_parity_ready: bool,
 }
 
 impl Default for ShadowTableViewOutputCommitPolicy {
@@ -216,6 +217,7 @@ impl Default for ShadowTableViewOutputCommitPolicy {
             allow_force_mismatch_commit: true,
             max_shadow_lines: None,
             require_virtual_direct_identity: true,
+            require_language_parity_ready: true,
         }
     }
 }
@@ -233,6 +235,11 @@ pub struct ShadowTableViewOutputCommitDecision {
     pub virtual_direct_cells_equal: bool,
     pub virtual_rendered_policy: String,
     pub virtual_added_column_count: usize,
+    pub language_parity_ready: bool,
+    pub language_requested_language: String,
+    pub language_effective_asset_name: String,
+    pub language_fallback_applied: bool,
+    pub language_failed_guards: Vec<String>,
     pub force_override: bool,
     pub rendered_line_count: usize,
     pub rollback_anchor: Option<String>,
@@ -743,11 +750,12 @@ pub fn evaluate_shadow_table_view_output_commit(
     let diff_ok = !policy.require_equal_diff || report.diff.equal || force_override;
     let virtual_direct_ok = !policy.require_virtual_direct_identity
         || report.virtual_column_parity.direct_cells_equal;
+    let language_ok = !policy.require_language_parity_ready || report.language_parity.ready();
     let size_ok = policy
         .max_shadow_lines
         .map(|limit| report.output_report.rendered_lines.len() <= limit)
         .unwrap_or(true);
-    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && size_ok;
+    let use_view_output = gate_ok && diff_ok && virtual_direct_ok && language_ok && size_ok;
     let reason = if use_view_output {
         if force_override && !report.diff.equal {
             "force_commit_table_view_output_mismatch".to_string()
@@ -762,6 +770,8 @@ pub fn evaluate_shadow_table_view_output_commit(
         "table_view_output_diff_not_equal".to_string()
     } else if !virtual_direct_ok {
         "virtual_policy_changed_direct_csv_cells".to_string()
+    } else if !language_ok {
+        "language_parity_blocked".to_string()
     } else if !size_ok {
         "table_view_output_too_large_for_policy".to_string()
     } else {
@@ -779,6 +789,11 @@ pub fn evaluate_shadow_table_view_output_commit(
         virtual_direct_cells_equal: report.virtual_column_parity.direct_cells_equal,
         virtual_rendered_policy: report.virtual_column_parity.rendered_policy.clone(),
         virtual_added_column_count: report.virtual_column_parity.added_virtual_column_count,
+        language_parity_ready: report.language_parity.ready(),
+        language_requested_language: report.language_parity.requested_language.clone(),
+        language_effective_asset_name: report.language_parity.effective_asset_name.clone(),
+        language_fallback_applied: report.language_parity.fallback_applied,
+        language_failed_guards: report.language_parity.failed_guards.clone(),
         force_override,
         rendered_line_count: report.output_report.rendered_lines.len(),
         rollback_anchor: config.rollback_anchor.clone(),

@@ -54,6 +54,7 @@ pub struct TableViewActivationReadinessPolicy {
     pub require_store_ready: bool,
     pub require_persistence_ready: bool,
     pub require_recovery_ready_when_enabled: bool,
+    pub require_language_parity_ready: bool,
     pub include_selected_lines: bool,
     pub preview_limit: usize,
 }
@@ -71,6 +72,7 @@ impl Default for TableViewActivationReadinessPolicy {
             require_store_ready: true,
             require_persistence_ready: true,
             require_recovery_ready_when_enabled: false,
+            require_language_parity_ready: true,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -95,6 +97,7 @@ impl TableViewActivationReadinessPolicy {
             require_store_ready: false,
             require_persistence_ready: false,
             require_recovery_ready_when_enabled: false,
+            require_language_parity_ready: false,
             include_selected_lines: true,
             preview_limit: 8,
         }
@@ -148,6 +151,16 @@ impl TableViewActivationReadinessPolicy {
                     policy.require_persistence_ready = false;
                     recognized = true;
                 }
+                "--activation-readiness-require-language-parity"
+                | "--readiness-require-language-parity" => {
+                    policy.require_language_parity_ready = true;
+                    recognized = true;
+                }
+                "--activation-readiness-ignore-language-parity"
+                | "--readiness-ignore-language-parity" => {
+                    policy.require_language_parity_ready = false;
+                    recognized = true;
+                }
                 _ => {
                     if let Some(value) = arg
                         .strip_prefix("--activation-readiness-preview=")
@@ -195,6 +208,9 @@ impl TableViewActivationReadinessPolicy {
         }
         if self.require_recovery_ready_when_enabled {
             guards.push("recovery_ready_when_enabled");
+        }
+        if self.require_language_parity_ready {
+            guards.push("language_parity_ready");
         }
         guards
     }
@@ -244,6 +260,11 @@ pub struct TableViewActivationReadinessReport {
     pub semantic_equal: bool,
     pub virtual_direct_cells_equal: bool,
     pub virtual_added_column_count: usize,
+    pub language_parity_ready: bool,
+    pub language_requested_language: String,
+    pub language_effective_asset_name: String,
+    pub language_fallback_applied: bool,
+    pub language_failed_guards: Vec<String>,
     pub commit_decision: bool,
     pub audit_safe: bool,
     pub transaction_safe: bool,
@@ -354,6 +375,26 @@ pub fn activation_readiness_from_reports(
     let virtual_added_column_count = commit
         .map(|value| value.virtual_added_column_count)
         .unwrap_or(0);
+    let language_parity_ready = audit
+        .map(|value| value.language_parity_ready)
+        .or_else(|| commit.map(|value| value.language_parity_ready))
+        .unwrap_or(false);
+    let language_requested_language = audit
+        .map(|value| value.language_requested_language.clone())
+        .or_else(|| commit.map(|value| value.language_requested_language.clone()))
+        .unwrap_or_else(|| "unknown".to_string());
+    let language_effective_asset_name = audit
+        .map(|value| value.language_effective_asset_name.clone())
+        .or_else(|| commit.map(|value| value.language_effective_asset_name.clone()))
+        .unwrap_or_else(|| "unknown".to_string());
+    let language_fallback_applied = audit
+        .map(|value| value.language_fallback_applied)
+        .or_else(|| commit.map(|value| value.language_fallback_applied))
+        .unwrap_or(false);
+    let language_failed_guards = audit
+        .map(|value| value.language_failed_guards.clone())
+        .or_else(|| commit.map(|value| value.language_failed_guards.clone()))
+        .unwrap_or_default();
     let switch_mode = commit
         .map(|value| value.switch_mode.clone())
         .or_else(|| transaction.map(|value| value.switch_mode.clone()))
@@ -475,6 +516,15 @@ pub fn activation_readiness_from_reports(
         "file recovery is optional, but if required it must parse and replay safely",
     ));
     checks.push(TableViewActivationReadinessCheck::new(
+        "language_parity_ready",
+        policy.require_language_parity_ready,
+        language_parity_ready,
+        format!(
+            "requested_language={language_requested_language} effective_asset={language_effective_asset_name} fallback_applied={language_fallback_applied} failed_guards={language_failed_guards:?}"
+        ),
+        "localized materialization may be promoted only when missing direct columns fall back to a safe base asset",
+    ));
+    checks.push(TableViewActivationReadinessCheck::new(
         "semantic_rows_equal",
         false,
         semantic_equal,
@@ -592,6 +642,11 @@ pub fn activation_readiness_from_reports(
         semantic_equal,
         virtual_direct_cells_equal,
         virtual_added_column_count,
+        language_parity_ready,
+        language_requested_language,
+        language_effective_asset_name,
+        language_fallback_applied,
+        language_failed_guards,
         commit_decision,
         audit_safe,
         transaction_safe,
@@ -742,6 +797,11 @@ mod tests {
             virtual_direct_cells_equal: true,
             virtual_rendered_policy: "Suppress".to_string(),
             virtual_added_column_count: 0,
+            language_parity_ready: true,
+            language_requested_language: "base".to_string(),
+            language_effective_asset_name: "religion.csv".to_string(),
+            language_fallback_applied: false,
+            language_failed_guards: Vec::new(),
             force_override: false,
             rendered_line_count: 1,
             rollback_anchor: Some("rollback:test".to_string()),
