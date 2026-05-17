@@ -111,12 +111,14 @@ fn real_main() -> i32 {
             io::stdin().is_terminal() as u8,
         );
 
-        let stderr_text = take_owned_response_string(response.stderr_text, response.stderr_len, &free);
+        let stderr_text =
+            take_owned_response_string(response.stderr_text, response.stderr_len, &free);
         if !stderr_text.is_empty() {
             let _ = write!(io::stderr().lock(), "{stderr_text}");
         }
 
-        let stdout_text = take_owned_response_string(response.stdout_text, response.stdout_len, &free);
+        let stdout_text =
+            take_owned_response_string(response.stdout_text, response.stdout_len, &free);
         if !stdout_text.is_empty() {
             let _ = write!(io::stdout().lock(), "{stdout_text}");
         }
@@ -211,8 +213,14 @@ fn reta_library_candidates() -> Vec<PathBuf> {
         if let Some(dir) = exe.parent() {
             let filename = PathBuf::from(library_filename("reta"));
             candidates.push(dir.join(&filename));
+            // Cargo can leave the freshly-built cdylib under target/<profile>/deps
+            // on Android/Termux.  Check that before falling back to a globally
+            // installed libreta, otherwise the launcher may silently execute an
+            // older library while the rreta binary itself is new.
+            candidates.push(dir.join("deps").join(&filename));
             candidates.push(dir.join("lib").join(&filename));
             candidates.push(dir.join("..").join("lib").join(&filename));
+            candidates.push(dir.join("..").join("deps").join(&filename));
         }
     }
 

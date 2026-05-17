@@ -321,7 +321,10 @@ impl Program {
     fn html_syntax_tuple_for_special_column_exact_py(spalte: i64) -> Option<Vec<Vec<PairStr>>> {
         match spalte {
             -2 => Some(vec![vec![PairStr("Zählung".to_string(), String::new())]]),
-            -1 => Some(vec![vec![PairStr("Nummerierung".to_string(), String::new())]]),
+            -1 => Some(vec![vec![PairStr(
+                "Nummerierung".to_string(),
+                String::new(),
+            )]]),
             _ => None,
         }
     }
@@ -346,7 +349,10 @@ impl Program {
             Self::html_syntax_tuple_for_special_column_exact_py(spalte_for_metadata)
         {
             special
-        } else if let Some(found) = self.generatedSpaltenParameter_Exact.get(&spalte_for_metadata) {
+        } else if let Some(found) = self
+            .generatedSpaltenParameter_Exact
+            .get(&spalte_for_metadata)
+        {
             found.clone()
         } else if let Some(found) = self
             .dataDict
@@ -364,14 +370,13 @@ impl Program {
                 continue;
             };
             for para_num in 0..=1usize {
-                things1
-                    .entry(para_num)
-                    .or_default()
-                    .push(Self::html_python_class_name_from_pair_exact_py(
+                things1.entry(para_num).or_default().push(
+                    Self::html_python_class_name_from_pair_exact_py(
                         first_pair,
                         para_num,
                         column_group,
-                    ));
+                    ),
+                );
             }
         }
 
@@ -477,7 +482,11 @@ impl Program {
         // `is_header` flag may enable the large `p1_... p2_... p4_...`
         // header class string.
         if !is_header {
-            return self.html_compact_body_cell_attrs_py(spalte_for_metadata, html_col_idx, content);
+            return self.html_compact_body_cell_attrs_py(
+                spalte_for_metadata,
+                html_col_idx,
+                content,
+            );
         }
 
         let mut attrs = String::new();
@@ -518,6 +527,16 @@ impl Program {
     }
 
     fn ordinary_column_tags_exact_py(&self, original_col: i64) -> Option<BTreeSet<ST>> {
+        // Python Prepare.prepare4out_Tagging uses an if/elif chain.  Once a
+        // normal table column has a dataDict entry, its p4 tags are exactly
+        // lib4tables_Enum.tableTags2[t]; the later prim/gebr fallbacks are not
+        // unioned on top.  The previous Rust code used a union and therefore
+        // produced oversized p4 classes such as 0,4,3,1,6,5 for many ordinary
+        // columns.
+        if let Some(exact_tags) = tableTags2_for_column(original_col) {
+            return Some(exact_tags);
+        }
+
         let mut tags: BTreeSet<ST> = BTreeSet::new();
         let in_set = |key: (usize, usize)| -> bool {
             self.spaltenArtenKey_SpaltennummernValue
@@ -526,38 +545,30 @@ impl Program {
                 .unwrap_or(false)
         };
 
-        if let Some(exact_tags) = tableTags2_for_column(original_col) {
-            tags.extend(exact_tags);
-        }
-
         if self.puniverseprims.contains(&original_col) {
             tags.extend([ST::sternPolygon, ST::universum, ST::galaxie]);
-        }
-        if in_set(self.spaltenTypeNaming.gebrGal1) {
+        } else if in_set(self.spaltenTypeNaming.gebrGal1) {
             tags.extend([
                 ST::sternPolygon,
                 ST::galaxie,
                 ST::gleichfoermigesPolygon,
                 ST::gebrRat,
             ]);
-        }
-        if in_set(self.spaltenTypeNaming.gebroUni1) {
+        } else if in_set(self.spaltenTypeNaming.gebroUni1) {
             tags.extend([
                 ST::sternPolygon,
                 ST::universum,
                 ST::gleichfoermigesPolygon,
                 ST::gebrRat,
             ]);
-        }
-        if in_set(self.spaltenTypeNaming.gebrEmo1) {
+        } else if in_set(self.spaltenTypeNaming.gebrEmo1) {
             tags.extend([
                 ST::sternPolygon,
                 ST::keinParaOdMetaP,
                 ST::gleichfoermigesPolygon,
                 ST::gebrRat,
             ]);
-        }
-        if in_set(self.spaltenTypeNaming.gebrGroe1) {
+        } else if in_set(self.spaltenTypeNaming.gebrGroe1) {
             tags.extend([
                 ST::sternPolygon,
                 ST::gleichfoermigesPolygon,
@@ -2201,9 +2212,11 @@ impl Program {
     where
         F: Fn(usize, &Vec<String>) -> Option<StructuredRowRenderPy> + Sync,
     {
-        let Some((guard, ranges)) =
-            parallel_runtime::reserve_ranges(ParallelArea::Output, newTable.len(), min_rows_per_worker)
-        else {
+        let Some((guard, ranges)) = parallel_runtime::reserve_ranges(
+            ParallelArea::Output,
+            newTable.len(),
+            min_rows_per_worker,
+        ) else {
             let mut rows = Vec::new();
             for (row_idx, row) in newTable.iter().enumerate() {
                 if let Some(rendered) = render_row(row_idx, row) {
@@ -3011,7 +3024,6 @@ mod tests {
         assert!(!old2new.contains(&1041));
     }
 
-
     #[test]
     fn html_cell_renderer_keeps_trusted_fragments_and_existing_entities() {
         assert_eq!(
@@ -3044,10 +3056,9 @@ mod tests {
             program.html_python_cell_attrs_exact_py(Some(0), 2, None, None, false);
         assert_eq!(body_attrs_without_parseable_row_number, "");
 
-        program.generatedSpaltenParameter_Exact.insert(
-            1,
-            vec![vec![PairStr("Symbole".to_string(), String::new())]],
-        );
+        program
+            .generatedSpaltenParameter_Exact
+            .insert(1, vec![vec![PairStr("Symbole".to_string(), String::new())]]);
         let symbol_body_attrs =
             program.html_python_cell_attrs_exact_py(Some(1), 3, Some("☉"), Some(1), false);
         assert!(symbol_body_attrs.contains("tdSymbole"));
