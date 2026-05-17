@@ -402,61 +402,72 @@ impl Program {
             text.pop();
         }
 
+        let render = |value: String| -> Vec<String> {
+            if text_width > 0 {
+                value.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
+            } else {
+                vec![value.replace('\n', "; ")]
+            }
+        };
+
         let open_pos = match text.find('(') {
             Some(v) => v,
-            None => {
-                return if text_width > 0 {
-                    text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
-                } else {
-                    vec![text.replace('\n', "; ")]
-                };
-            }
+            None => return render(text),
         };
 
+        // Python searches for the first ") " after the first "(" and then
+        // rewrites only that leading number list.
         let close_rel = match text[open_pos..].find(") ") {
             Some(v) => v,
-            None => {
-                return if text_width > 0 {
-                    text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
-                } else {
-                    vec![text.replace('\n', "; ")]
-                };
-            }
+            None => return render(text),
         };
-
         let close_pos = open_pos + close_rel;
         let inside = &text[(open_pos + 1)..close_pos];
-        let target_plain = colNum.to_string();
-        let target_paren = format!("({})", colNum);
 
-        let kept_parts: Vec<&str> = inside
-            .split('|')
-            .filter(|part| {
-                let p = part.trim();
-                !(p == target_plain || p == target_paren)
-            })
-            .collect();
+        let mut kept_top_level: Vec<String> = Vec::new();
+        for element in inside.split('|') {
+            // Python de-parenthesizes every top-level element that starts with
+            // "(" via el[1:-1].  These number lists are ASCII, so byte slicing
+            // is safe here and intentionally mirrors that behavior.
+            let deparenthesized = if element.starts_with('(') && element.len() >= 2 {
+                &element[1..(element.len() - 1)]
+            } else {
+                element
+            };
 
-        let rebuilt_inside = kept_parts.join("|");
+            let fraction_parts: Vec<&str> = deparenthesized.split('/').collect();
+            let mut kept_fraction_parts: Vec<&str> = Vec::new();
 
-        let mut rebuilt = String::new();
-        rebuilt.push_str(&text[..open_pos + 1]);
-        rebuilt.push_str(&rebuilt_inside);
-        rebuilt.push_str(&text[close_pos..]);
+            for part in &fraction_parts {
+                let remove = part
+                    .trim()
+                    .parse::<i64>()
+                    .map(|value| colNum.abs() == value.abs() && fraction_parts.len() == 1)
+                    .unwrap_or(false);
+                if !remove {
+                    kept_fraction_parts.push(*part);
+                }
+            }
 
-        let rebuilt = rebuilt
-            .replace("(|", "(")
-            .replace("|)", ")")
-            .replace("||", "|");
-
-        if text_width > 0 {
-            rebuilt
-                .split('\n')
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-        } else {
-            vec![rebuilt.replace('\n', "; ")]
+            if !kept_fraction_parts.is_empty() {
+                kept_top_level.push(kept_fraction_parts.join("/"));
+            }
         }
+
+        let rebuilt = if kept_top_level.is_empty() {
+            // Python drops the complete "(...)" prefix but keeps the blank
+            // after the closing parenthesis, yielding list items such as
+            // " Mikroorganismen (1)" rather than "() Mikroorganismen (1)".
+            text.get((close_pos + 1)..).unwrap_or("").to_string()
+        } else {
+            let mut value = String::new();
+            value.push('(');
+            value.push_str(&kept_top_level.join("|"));
+            value.push_str(&text[close_pos..]);
+            value
+        };
+
+        render(rebuilt)
     }
 
     fn combiTableWorkflow_impl(

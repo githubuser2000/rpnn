@@ -864,7 +864,7 @@ impl Program {
                     }
                 }
             }
-            thema = "thema: ".to_string();
+            thema = "Thema: ".to_string();
         }
         let mut out = String::new();
         if self.outType == "html" {
@@ -2233,15 +2233,16 @@ impl Program {
             3 => (&kombi_a.3 .0, &kombi_b.3 .1),
             _ => return None,
         };
-        let lhs_trimmed = lhs_raw.trim();
-        let rhs_trimmed = rhs_raw.trim();
-        let lhs = if lhs_trimmed.len() > 3 {
-            lhs_trimmed
+        // Python checks the stripped length, but it emits the original
+        // cell text.  Keeping the raw text preserves significant trailing
+        // blanks before the wrapping ")", which show up in py_middle.alx.
+        let lhs = if lhs_raw.trim().len() > 3 {
+            lhs_raw.as_str()
         } else {
             "..."
         };
-        let rhs = if rhs_trimmed.len() > 3 {
-            rhs_trimmed
+        let rhs = if rhs_raw.trim().len() > 3 {
+            rhs_raw.as_str()
         } else {
             "..."
         };
@@ -4138,15 +4139,18 @@ impl Program {
                                         &kombis_all[zwei][multi.1 as usize].3 .1,
                                     ),
                                 };
-                                let lhs = lhsrhs.0.trim();
-                                let rhs = lhsrhs.1.trim();
-                                let lhs_display = if lhs.len() > 3 {
-                                    lhs.to_string()
+                                // Python tests .strip() only for the length check,
+                                // then emits the original string.  Do not trim away
+                                // the trailing blank that Python keeps before ")".
+                                let lhs_raw = lhsrhs.0.as_str();
+                                let rhs_raw = lhsrhs.1.as_str();
+                                let lhs_display = if lhs_raw.trim().len() > 3 {
+                                    lhs_raw.to_string()
                                 } else {
                                     "...".to_string()
                                 };
-                                let rhs_display = if rhs.len() > 3 {
-                                    rhs.to_string()
+                                let rhs_display = if rhs_raw.trim().len() > 3 {
+                                    rhs_raw.to_string()
                                 } else {
                                     "...".to_string()
                                 };
