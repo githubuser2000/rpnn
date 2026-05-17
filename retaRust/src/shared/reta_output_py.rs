@@ -440,10 +440,10 @@ impl Program {
     ) -> String {
         let mut attrs = String::new();
 
-        if html_col_idx == 0 || html_col_idx == 1 {
+        if html_col_idx == 0 {
             if Self::html_cell_content_is_even_exact_py(content) {
                 attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
-            } else if html_col_idx == 0 {
+            } else {
                 attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
             }
             return attrs;
@@ -504,10 +504,10 @@ impl Program {
             Self::html_escape_attr_value_py(&self.html_p4_values_exact_py(spalte_for_metadata))
         ));
 
-        if html_col_idx == 0 || html_col_idx == 1 {
+        if html_col_idx == 0 {
             if Self::html_cell_content_is_even_exact_py(content) {
                 attrs.push_str(r#" style="background-color:#000000;color:#ffffff;""#);
-            } else if html_col_idx == 0 {
+            } else {
                 attrs.push_str(r#" style="background-color:#ffffff;color:#000000;""#);
             }
         } else if has_symbole {

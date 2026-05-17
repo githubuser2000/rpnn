@@ -552,10 +552,10 @@ impl htmlSyntax {
             ));
         }
 
-        if spalte_shifted == 0 || spalte_shifted == 1 {
+        if spalte_shifted == 0 {
             if python_even_cell_content(content) {
                 out.push_str(" style=\"background-color:#000000;color:#ffffff;\"");
-            } else if spalte_shifted == 0 {
+            } else {
                 out.push_str(" style=\"background-color:#ffffff;color:#000000;\"");
             }
         } else if things1

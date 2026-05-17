@@ -180,6 +180,88 @@ impl Program {
         }
     }
 
+    fn pairstr_groups_with_alles_tail_exact_py(pairs: &[(&str, &str)]) -> Vec<Vec<PairStr>> {
+        let mut groups: Vec<Vec<PairStr>> = pairs
+            .iter()
+            .map(|(main, parameter)| vec![PairStr((*main).to_string(), (*parameter).to_string())])
+            .collect();
+        // Python-dataDict contains a trailing `(alles, "")` group for these
+        // generated columns.  It is skipped in p1 but still emits the final
+        // `p3_N_` marker in p2.
+        groups.push(vec![PairStr("alles".to_string(), String::new())]);
+        groups
+    }
+
+    fn prim_creativity_parameter_groups_exact_py() -> Vec<Vec<PairStr>> {
+        Self::pairstr_groups_with_alles_tail_exact_py(&[
+            ("Wichtigstes_zum_verstehen", "Drittwichtigste"),
+            ("Bedeutung", "Gestirn"),
+        ])
+    }
+
+    fn gleichheit_freiheit_parameter_groups_exact_py() -> Vec<Vec<PairStr>> {
+        Self::pairstr_groups_with_alles_tail_exact_py(&[
+            ("Planet_(10_und_oder_12)", "Gleichheit_Freiheit_Ordnung"),
+            ("Menschliches", "Gleichheit_Freiheit"),
+            ("Grundstrukturen", "Ordnung_und_Filterung_12_und_1pro12"),
+        ])
+    }
+
+    fn geist_emotion_parameter_groups_exact_py() -> Vec<Vec<PairStr>> {
+        Self::pairstr_groups_with_alles_tail_exact_py(&[
+            ("Universum", "Geist__(15)"),
+            ("Grundstrukturen", "nachvollziehen_emotional_oder_geistig_durch_Primzahl-Kreuz-Algorithmus_(15)"),
+            ("Grundstrukturen", "Geist_(15)"),
+            ("Multiversum", "Geist_(15)"),
+        ])
+    }
+
+    fn love_polygon_parameter_groups_exact_py() -> Vec<Vec<PairStr>> {
+        Self::pairstr_groups_with_alles_tail_exact_py(&[
+            ("Menschliches", "Liebe"),
+            ("Grundstrukturen", "Liebe_(7)"),
+        ])
+    }
+
+    fn primzahlwirkung_spalten_name_exact_py(kk: Option<usize>) -> &'static str {
+        match kk {
+            None => "Richtung-Richtung",
+            Some(5) => "Transzendentalien, Strukturalien, Universum n",
+            Some(10) => "Galaxie n",
+            Some(42) => "Galaxie 1/n",
+            Some(131) => "Transzendentalien, Strukturalien, Universum 1/n",
+            Some(138) => "Dagegen-Gegen-Transzendentalien, Gegen-Strukturalien, Universum n",
+            Some(202) => "neutrale Gegen-Transzendentalien, Gegen-Strukturalien, Universum n",
+            _ => "",
+        }
+    }
+
+    fn primzahlwirkung_tags_exact_py(kk: Option<usize>) -> Vec<ST> {
+        match kk {
+            None | Some(5) | Some(138) | Some(202) => vec![ST::sternPolygon, ST::universum],
+            Some(10) => vec![ST::sternPolygon, ST::galaxie],
+            Some(42) => vec![ST::gleichfoermigesPolygon, ST::galaxie],
+            Some(131) => vec![ST::gleichfoermigesPolygon, ST::universum],
+            _ => vec![ST::sternPolygon, ST::universum],
+        }
+    }
+
+    fn primzahlwirkung_parameter_groups_exact_py(kk: Option<usize>) -> Vec<Vec<PairStr>> {
+        match kk {
+            None => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "Richtung_als_Richtung")]),
+            Some(5) => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "Universum_Strukturalien_Transzendentalien")]),
+            Some(10) => Self::pairstr_groups_with_alles_tail_exact_py(&[
+                ("Wichtigstes_zum_verstehen", "Zweitwichtigste"),
+                ("Primzahlwirkung", "Galaxieabsicht"),
+            ]),
+            Some(42) => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "Absicht_Reziproke_Galaxie")]),
+            Some(131) => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "Universum_Reziproke")]),
+            Some(138) => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "Dagegen-Gegentranszendentalie")]),
+            Some(202) => Self::pairstr_groups_with_alles_tail_exact_py(&[("Primzahlwirkung", "neutrale_Gegentranszendentalie")]),
+            _ => vec![],
+        }
+    }
+
     fn pairstr_group_exact_py(
         main_name: impl Into<String>,
         parameter_name: impl Into<String>,
@@ -1557,6 +1639,35 @@ impl Program {
         result.entry(key).or_default().insert(pair);
     }
 
+    fn pyfrac_storage_key_exact_py(frac: PyFrac) -> (i64, i64) {
+        (frac.numerator, frac.denominator)
+    }
+
+    fn pyfrac_unordered_pair_key_exact_py(
+        pair: (PyFrac, PyFrac),
+    ) -> ((i64, i64), (i64, i64)) {
+        let left = Self::pyfrac_storage_key_exact_py(pair.0);
+        let right = Self::pyfrac_storage_key_exact_py(pair.1);
+        if left <= right {
+            (left, right)
+        } else {
+            (right, left)
+        }
+    }
+
+    fn unique_pyfrac_pairs_by_frozenset_exact_py(
+        pairs: Vec<(PyFrac, PyFrac)>,
+    ) -> Vec<(PyFrac, PyFrac)> {
+        let mut seen: BTreeSet<((i64, i64), (i64, i64))> = BTreeSet::new();
+        let mut out: Vec<(PyFrac, PyFrac)> = Vec::new();
+        for pair in pairs {
+            if seen.insert(Self::pyfrac_unordered_pair_key_exact_py(pair)) {
+                out.push(pair);
+            }
+        }
+        out
+    }
+
     fn convert_set_of_paaren_to_dict_mul_py(
         &self,
         paare_set: &IndexSet<(PyFrac, PyFrac)>,
@@ -1936,7 +2047,7 @@ impl Program {
                         .and_then(|a| a.get(op))
                         .cloned()
                         .unwrap_or_default();
-                    let converted = if op == "mul" {
+                    let converted_raw = if op == "mul" {
                         self.combine_dicts_pairs_py(
                             self.convert_set_of_paaren_to_dict_mul_py(&couples, gleichf, limit),
                             self.convert_fractions_to_dict_mul_py(fr1, fr2, gleichf, limit),
@@ -1947,6 +2058,12 @@ impl Program {
                             IndexMap::new(),
                         )
                     };
+                    let converted: IndexMap<usize, Vec<(PyFrac, PyFrac)>> = converted_raw
+                        .into_iter()
+                        .map(|(key, values)| {
+                            (key, Self::unique_pyfrac_pairs_by_frozenset_exact_py(values))
+                        })
+                        .collect();
                     md.insert(op.to_string(), converted);
                 }
                 poly_map.insert(poly.to_string(), md);
@@ -2648,6 +2765,7 @@ impl Program {
         });
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(9));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie, ST::gleichfoermigesPolygon]);
+        self.set_generated_spalten_parameter_exact_py(spalte, Self::love_polygon_parameter_groups_exact_py());
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -2664,6 +2782,7 @@ impl Program {
         });
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(132));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
+        self.set_generated_spalten_parameter_exact_py(spalte, Self::gleichheit_freiheit_parameter_groups_exact_py());
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -2680,6 +2799,7 @@ impl Program {
         });
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(242));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
+        self.set_generated_spalten_parameter_exact_py(spalte, Self::geist_emotion_parameter_groups_exact_py());
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -2702,6 +2822,7 @@ impl Program {
         });
         let spalte = self.fuege_spalte_hinzu_py(zeilenInhalte, &self.generierte_spalte_meta_name_py(64));
         self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::galaxie]);
+        self.set_generated_spalten_parameter_exact_py(spalte, Self::prim_creativity_parameter_groups_exact_py());
         Self::push_unique_i64_py(rowsAsNumbers, spalte);
     }
 
@@ -2748,6 +2869,7 @@ impl Program {
             } else {
                 self.set_generated_spalten_tags_exact_py(spalte, &[ST::gleichfoermigesPolygon, ST::universum, ST::galaxie]);
             }
+            self.set_generated_spalten_parameter_exact_py(spalte, Self::prim_creativity_parameter_groups_exact_py());
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -2870,9 +2992,9 @@ impl Program {
                     String::new()
                 }
             } else if i == 2 {
-                "für seitlich und gegen Schwächlinge innen".to_string()
+                "\"für seitlich und gegen Schwächlinge innen\"".to_string()
             } else if i == 3 {
-                "gegen seitlich und für Schwächlinge innen".to_string()
+                "\"gegen seitlich und für Schwächlinge innen\"".to_string()
             } else if i == 1 {
                 "für außen".to_string()
             } else {
@@ -2891,10 +3013,7 @@ impl Program {
             } else {
                 vec![
                     "Primzahlwirkung (7, Richtung) ".to_string(),
-                    match kk {
-                        Some(k) => format!("{}", self.zellenwert_py(0, k)),
-                        None => "Richtung-Richtung".to_string(),
-                    },
+                    Self::primzahlwirkung_spalten_name_exact_py(kk).to_string(),
                 ]
             };
             let oldPrimAmounts = primAmounts;
@@ -2943,15 +3062,22 @@ impl Program {
             return;
         }
 
-        let extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
-        let mut ordered_columns: Vec<Option<Vec<String>>> = vec![None; extraSpalten.len()];
+        let mut extraSpalten: Vec<Option<usize>> = self.boolAndTupleSet1Options_exact_py();
+        extraSpalten.sort_by(|left, right| match (left, right) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(left), Some(right)) => left.cmp(right),
+        });
+
+        let mut ordered_columns: Vec<Option<(Option<usize>, Vec<String>)>> = vec![None; extraSpalten.len()];
         let mut parallel_jobs: Vec<(usize, Option<usize>, Vec<String>)> = vec![];
         let mut vergangenheit: Vec<String> = vec![];
 
         for (index, kk) in extraSpalten.iter().copied().enumerate() {
             if kk.is_none() {
                 let (column, next_history) = self.spalte_fuer_gegen_column_exact_py(kk, &vergangenheit);
-                ordered_columns[index] = Some(column);
+                ordered_columns[index] = Some((kk, column));
                 vergangenheit = next_history;
             } else {
                 parallel_jobs.push((index, kk, vergangenheit.clone()));
@@ -2959,21 +3085,23 @@ impl Program {
         }
 
         let this: &Program = &*self;
-        let computed_columns: Vec<(usize, Vec<String>)> = parallel_map_indexed_py(
+        let computed_columns: Vec<(usize, Option<usize>, Vec<String>)> = parallel_map_indexed_py(
             parallel_jobs.len(),
             |job_index| {
                 let (index, kk, history_snapshot) = &parallel_jobs[job_index];
                 let (column, _unchanged_history) = this.spalte_fuer_gegen_column_exact_py(*kk, history_snapshot);
-                (*index, column)
+                (*index, *kk, column)
             },
         );
-        for (index, column) in computed_columns {
-            ordered_columns[index] = Some(column);
+        for (index, kk, column) in computed_columns {
+            ordered_columns[index] = Some((kk, column));
         }
 
-        for column in ordered_columns.into_iter().flatten() {
+        for (kk, column) in ordered_columns.into_iter().flatten() {
             let spalte = self.fuege_spalte_hinzu_py(column, "Primzahlwirkung (7, Richtung)");
-            self.set_generated_spalten_tags_exact_py(spalte, &[ST::sternPolygon, ST::universum]);
+            let tags = Self::primzahlwirkung_tags_exact_py(kk);
+            self.set_generated_spalten_tags_exact_py(spalte, &tags);
+            self.set_generated_spalten_parameter_exact_py(spalte, Self::primzahlwirkung_parameter_groups_exact_py(kk));
             Self::push_unique_i64_py(rowsAsNumbers, spalte);
         }
     }
@@ -3738,7 +3866,9 @@ impl Program {
             (transzendentalien_nrezi, hard_coded_couple),
             (transzendentalien_nrezi, transzendentalien_nrezi),
         ];
-        let uni_csv = self.readOneCSVAndReturn(4);
+        // Python passes table 2 or 3 here; both resolve to the Galaxie CSV.
+        // The universe/galaxy interpretation is controlled only by the
+        // `is_not_universe` flag below, not by switching to the Universum CSV.
         let gal_csv = self.readOneCSVAndReturn(2);
 
         let mut kombis_all: [Vec<((String, String), (String, String), (String, String), (String, String))>; 2] = [vec![], vec![]];
@@ -3833,8 +3963,8 @@ impl Program {
                                 .cloned()
                                 .unwrap_or_default();
                             for (k, multi) in multipless.iter().enumerate() {
-                                let csv_von = if null_bis_drei >= 2 { &uni_csv } else { &gal_csv };
-                                let csv_bis = if null_bis_drei == 1 || null_bis_drei == 3 { &uni_csv } else { &gal_csv };
+                                let csv_von = &gal_csv;
+                                let csv_bis = &gal_csv;
                                 let gal_or_uni_tuple = if zwei == 0 {
                                     gal_or_uni_n_or_invers[null_bis_drei].0
                                 } else {
