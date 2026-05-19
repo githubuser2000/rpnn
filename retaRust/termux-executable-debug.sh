@@ -1,9 +1,8 @@
-#!/usr/bin/env sh
-set -eu
-./build.sh debug
-for a in rreta rrp rrpl rrpe rrpb
+for a in rreta  rgrundStrukHtml
 do
-  "target/debug/$a" -h
+	cargo run --features="rust-tool-bins" --bin $a -- -h
 done
-
-test -x "target/debug/rgrundStrukHtml"
+for a in rrp rrpl rrpe rrpb
+do
+	cargo run --features="rust-frontends" --bin $a -- -h
+done

@@ -1,9 +1,8 @@
-#!/usr/bin/env sh
-set -eu
-./build.sh release
-for a in rreta rrp rrpl rrpe rrpb
+for a in rreta  rgrundStrukHtml
 do
-  "target/release/$a" -h
+	cargo run --release --features="rust-tool-bins" --bin $a -- -h
 done
-
-test -x "target/release/rgrundStrukHtml"
+for a in rrp rrpl rrpe rrpb
+do
+	cargo run --release --features="rust-frontends" --bin $a -- -h
+done
