@@ -25,3 +25,5 @@ The detailed German and English documentation is in:
 
 - `doc/shared-libs/de/libreta_runtime.md`
 - `doc/shared-libs/en/libreta_runtime.md`
+
+The runtime ABI anchor now links to the concrete data/parse/semantics/table/render/arch component anchors, so `libreta_runtime.so` has real `DT_NEEDED` edges to the split components.

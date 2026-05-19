@@ -1177,6 +1177,11 @@ dependencies = [
 [[package]]
 name = "reta_data"
 version = "0.7.0"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "reta_parse"

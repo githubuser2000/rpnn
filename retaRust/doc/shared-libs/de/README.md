@@ -15,6 +15,10 @@ rreta
        -> libreta_arch.so
        -> libreta_runtime.so
 
+rgrundStrukHtml
+  -> libreta_render.so
+       -> libreta_semantics.so
+
 rrp / rrpl / rrpe
   -> libretaprompt_input.so
   -> libretaprompt_commands.so
@@ -25,7 +29,11 @@ rrpb
 
 ## Grundregel
 
-Die Executables bleiben klein. Programmlogik liegt in `.so`-Bibliotheken. `libreta.so` ist jetzt bewusst nur die stabile, dünne Fassade; der schwere nicht-interaktive Reta-Kern liegt in `libreta_runtime.so` und wird über private `reta_runtime_core_*`-Symbole erreicht. Die übrigen privaten Core-Bibliotheken bilden die explizite interne Topologie und können später weiter mit konkreter Fachlogik gefüllt werden.
+Die Executables bleiben klein. Programmlogik liegt in `.so`-Bibliotheken. `libreta.so` ist jetzt bewusst nur die stabile, dünne Fassade; der schwere nicht-interaktive Reta-Kern liegt in `libreta_runtime.so` und wird über private `reta_runtime_core_*`-Symbole erreicht. Die übrigen privaten Core-Bibliotheken bilden die explizite interne Topologie. `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so` und `libreta_render.so` enthalten jetzt erste konkrete Fachlogik; `rgrundStrukHtml` nutzt direkt `libreta_render.so`.
+
+## Stub-Größenregel
+
+Die Build-Skripte prüfen zusätzlich, dass `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so` und `libreta_render.so` nicht wieder alle exakt dieselbe Größe haben. Gleiche Größen bei allen fünf wären ein Hinweis auf leere ABI-Stubs.
 
 ## Größenregel
 

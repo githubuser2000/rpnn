@@ -26,6 +26,17 @@ Morphismenfamilie von rohem Text oder `argv` in eine kanonische Anfrage. Die Bib
 - `reta_parse_abi_role_de`
 - `reta_parse_abi_role_en`
 
+
+## Reale Code-Auslagerung
+
+Diese Bibliothek enthält jetzt den Shell-/Prompt-Tokenizer `split_shell_like`. Das ist die erste echte Parsing-Funktion hinter dieser ABI-Grenze.
+
+Zusätzliche Symbole:
+
+- `reta_parse_shell_token_count`
+- `reta_parse_shell_tokens_json`
+- `reta_parse_free_string`
+
 ## Build-Regel
 
 `build.sh` baut zuerst die privaten Core-Bibliotheken und danach `libreta.so` mit `RETA_LINK_CORE_SPLIT_LIBS=1`. Dadurch muss `rreta` nur direkt gegen `libreta.so` linken; die privaten Core-Bibliotheken erscheinen als `DT_NEEDED` von `libreta.so`.

@@ -59,6 +59,7 @@ for library in "${CORE_SPLIT_LIBRARIES[@]}"; do
   copy_required "crates/${library}/include/${library}.h" "$OUT_DIR/include/"
 done
 copy_required "$TARGET_DIR/rreta" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rgrundStrukHtml" "$OUT_DIR/"
 copy_required "$TARGET_DIR/libretaprompt_input.so" "$OUT_DIR/"
 copy_required "$TARGET_DIR/libretaprompt_commands.so" "$OUT_DIR/"
 copy_required "$TARGET_DIR/rrp" "$OUT_DIR/"
@@ -97,6 +98,7 @@ Supported runtime layouts:
 
 1. All files in one directory:
 - rreta
+- rgrundStrukHtml
 - libreta.so
 - libreta_data.so
 - libreta_parse.so
@@ -114,7 +116,7 @@ Supported runtime layouts:
 - csv/religion.csv and the other runtime CSV files
 
 2. Executables in one directory and libraries in ./lib:
-- ./rreta ./rrp ./rrpl ./rrpe ./rrpb
+- ./rreta ./rgrundStrukHtml ./rrp ./rrpl ./rrpe ./rrpb
 - ./lib/libreta.so
 - ./lib/libreta_data.so
 - ./lib/libreta_parse.so
@@ -128,7 +130,7 @@ Supported runtime layouts:
 - ./csv/religion.csv and the other runtime CSV files
 
 3. Executables in bin and libraries in ../lib relative to bin:
-- ./bin/rreta ./bin/rrp ./bin/rrpl ./bin/rrpe ./bin/rrpb
+- ./bin/rreta ./bin/rgrundStrukHtml ./bin/rrp ./bin/rrpl ./bin/rrpe ./bin/rrpb
 - ./lib/libreta.so and all private libreta_*.so libraries
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
@@ -155,8 +157,10 @@ Runtime CSV search order:
 
 Dependency chain:
 - rreta -> libreta.so -> libreta_data.so + libreta_parse.so + libreta_semantics.so + libreta_table.so + libreta_render.so + libreta_arch.so + libreta_runtime.so
+- rgrundStrukHtml -> libreta_render.so -> libreta_semantics.so
 - libreta.so is intentionally a thin public ABI facade.
 - libreta_runtime.so carries the heavy non-interactive Reta engine and exports the private reta_runtime_core_* forwarding ABI.
+- libreta_render.so carries the real GrundStrukHtml rendering function used by rgrundStrukHtml and records its semantic dependency on libreta_semantics.so.
 - rrp/rrpl/rrpe -> libretaprompt_input.so + libretaprompt_commands.so
 - rrpb -> libretaprompt_commands.so
 

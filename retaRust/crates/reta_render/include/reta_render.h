@@ -18,6 +18,10 @@ const char *reta_render_abi_math_de(void);
 const char *reta_render_abi_math_en(void);
 const char *reta_render_abi_manifest_json(void);
 
+char *reta_render_grundstruk_html(uint8_t blank);
+size_t reta_render_grundstruk_html_len(uint8_t blank);
+void reta_render_free_string(char *ptr);
+
 #ifdef __cplusplus
 }
 #endif

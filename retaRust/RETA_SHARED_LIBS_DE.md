@@ -7,3 +7,7 @@ Damit gilt im Split-Build: `libreta.so` soll klein sein, `libreta_runtime.so` tr
 Die Prompt-Programme bleiben getrennt: `rrpb` verwendet nur `libretaprompt_commands.so`, während `rrp`, `rrpl` und `rrpe` zusätzlich `libretaprompt_input.so` für Autocomplete und Autosuggest verwenden.
 
 Siehe `doc/shared-libs/de/README.md` für die Einzeldokumentation jeder Bibliothek.
+
+## Aktueller Korrekturstand
+
+`rgrundStrukHtml` wird jetzt als kleiner C-Launcher gebaut und nutzt `libreta_render.so` direkt; `libreta_render.so` verlinkt zusätzlich gegen `libreta_semantics.so`. Außerdem exportieren `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so` und `libreta_render.so` reale Komponentenfunktionen. Die Build-Skripte prüfen, dass diese fünf Bibliotheken nicht wieder alle exakt dieselbe Stub-Größe haben.

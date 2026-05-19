@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vergleicht python_reference/generate4readme.py gegen das Rust-Binary generate4readme."""
+"""Vergleicht python_reference/generate4readme.py gegen das Rust-Binary rgenerate4readme."""
 from __future__ import annotations
 
 import difflib
@@ -91,7 +91,7 @@ def main(argv: list[str]) -> int:
 
     sample, timeout, diff_limit, compare_stderr = parse_args(argv[1:])
     py_cmd = [sys.executable, "-S", str(PY_REF), *sample]
-    rs_cmd = ["cargo", "run", "--quiet", "--bin", "generate4readme", "--", *sample]
+    rs_cmd = ["cargo", "run", "--quiet", "--features", "rust-tool-bins", "--bin", "rgenerate4readme", "--", *sample]
     py = run(py_cmd, timeout=timeout, env=python_env())
     rs = run(rs_cmd, timeout=timeout)
 

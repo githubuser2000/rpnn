@@ -29,6 +29,7 @@ The active ABI artifacts are:
   target/$PROFILE/libreta_render.so
   target/$PROFILE/libreta_arch.so
   target/$PROFILE/libreta_runtime.so
+  target/$PROFILE/rgrundStrukHtml
   target/$PROFILE/libretaprompt_commands.so
   target/$PROFILE/libretaprompt_input.so
 

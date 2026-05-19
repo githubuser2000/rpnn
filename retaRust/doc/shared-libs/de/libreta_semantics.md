@@ -26,6 +26,18 @@ Topologie und Prägarbe: lokale Parameterinformationen werden als Sektionen betr
 - `reta_semantics_abi_role_de`
 - `reta_semantics_abi_role_en`
 
+
+## Reale Code-Auslagerung
+
+Diese Bibliothek enthält jetzt die semantischen Wahl- und Prompt-Auswahlinventare (`WAHL15`, `WAHL16`, Hauptschalter, Sektionsschalter).
+
+Zusätzliche Symbole:
+
+- `reta_semantics_choice_counts_json`
+- `reta_semantics_wahl15_value`
+- `reta_semantics_wahl16_value`
+- `reta_semantics_free_string`
+
 ## Build-Regel
 
 `build.sh` baut zuerst die privaten Core-Bibliotheken und danach `libreta.so` mit `RETA_LINK_CORE_SPLIT_LIBS=1`. Dadurch muss `rreta` nur direkt gegen `libreta.so` linken; die privaten Core-Bibliotheken erscheinen als `DT_NEEDED` von `libreta.so`.

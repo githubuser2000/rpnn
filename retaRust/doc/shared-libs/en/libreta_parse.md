@@ -26,6 +26,17 @@ Morphism family from raw text or `argv` into a canonical request. The library sh
 - `reta_parse_abi_role_de`
 - `reta_parse_abi_role_en`
 
+
+## Real code extraction
+
+This library now contains the shell/prompt tokenizer `split_shell_like`. This is the first real parsing function behind this ABI boundary.
+
+Additional symbols:
+
+- `reta_parse_shell_token_count`
+- `reta_parse_shell_tokens_json`
+- `reta_parse_free_string`
+
 ## Build rule
 
 `build.sh` builds the private core libraries first and then builds `libreta.so` with `RETA_LINK_CORE_SPLIT_LIBS=1`. As a result, `rreta` links directly only to `libreta.so`; the private core libraries appear as `DT_NEEDED` entries of `libreta.so`.

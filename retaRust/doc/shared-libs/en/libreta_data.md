@@ -26,6 +26,20 @@ Relational basis: objects are words, aliases, CSV rows, columns, and catalog rec
 - `reta_data_abi_role_de`
 - `reta_data_abi_role_en`
 
+
+## Real code extraction
+
+This library is no longer only an ABI anchor. It now contains the generated `Words` data structure and alias projections from the Python-source-of-truth logic. Therefore it should not have the exact same size as the small stub-like components anymore.
+
+Additional symbols:
+
+- `reta_data_words_entry_count`
+- `reta_data_shared_words_json`
+- `reta_data_all_main_alias_groups_json`
+- `reta_data_parameter_alias_groups_for_main_json`
+- `reta_data_resolve_parameter_main_alias`
+- `reta_data_free_string`
+
 ## Build rule
 
 `build.sh` builds the private core libraries first and then builds `libreta.so` with `RETA_LINK_CORE_SPLIT_LIBS=1`. As a result, `rreta` links directly only to `libreta.so`; the private core libraries appear as `DT_NEEDED` entries of `libreta.so`.

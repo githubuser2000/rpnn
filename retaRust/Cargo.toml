@@ -8,6 +8,7 @@ default-run = "rreta"
 [features]
 default = []
 split-facade = []
+rust-tool-bins = []
 
 [dependencies]
 reta_architecture = { path = "crates/reta_architecture" }
@@ -25,125 +26,155 @@ crate-type = ["rlib", "cdylib"]
 [[bin]]
 name = "rreta"
 path = "src/bin/reta.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rgrundStrukHtml"
 path = "src/bin/grundStrukHtml.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_inspect"
 path = "src/bin/reta_arch_inspect.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_materialize"
 path = "src/bin/reta_arch_materialize.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_html_classes"
 path = "src/bin/reta_arch_html_classes.rs"
+required-features = ["rust-tool-bins"]
 
 
 [[bin]]
 name = "rreta_arch_column_order"
 path = "src/bin/reta_arch_column_order.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_row_order"
 path = "src/bin/reta_arch_row_order.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_view"
 path = "src/bin/reta_arch_view.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_view_output"
 path = "src/bin/reta_arch_view_output.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_output_flags"
 path = "src/bin/reta_arch_output_flags.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_numbering"
 path = "src/bin/reta_arch_numbering.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_layout"
 path = "src/bin/reta_arch_layout.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_html_output"
 path = "src/bin/reta_arch_html_output.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_row_styles"
 path = "src/bin/reta_arch_row_styles.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_cell_styles"
 path = "src/bin/reta_arch_cell_styles.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_style_composition"
 path = "src/bin/reta_arch_style_composition.rs"
+required-features = ["rust-tool-bins"]
 
 
 [[bin]]
 name = "rreta_arch_style_parity"
 path = "src/bin/reta_arch_style_parity.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_shell_styles"
 path = "src/bin/reta_arch_shell_styles.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_virtual_columns"
 path = "src/bin/reta_arch_virtual_columns.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_virtual_parity"
 path = "src/bin/reta_arch_virtual_parity.rs"
+required-features = ["rust-tool-bins"]
 
 
 [[bin]]
 name = "rreta_arch_commit_audit"
 path = "src/bin/reta_arch_commit_audit.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_transaction"
 path = "src/bin/reta_arch_activation_transaction.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_journal"
 path = "src/bin/reta_arch_activation_journal.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_replay"
 path = "src/bin/reta_arch_activation_replay.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_ledger"
 path = "src/bin/reta_arch_activation_ledger.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_store"
 path = "src/bin/reta_arch_activation_store.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_persistence"
 path = "src/bin/reta_arch_activation_persistence.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_file"
 path = "src/bin/reta_arch_activation_file.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_view_output_shadow"
 path = "src/bin/reta_arch_view_output_shadow.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rgenerate4readme"
 path = "src/bin/generate4readme.rs"
+required-features = ["rust-tool-bins"]
 
 #[[bin]]
 #name = r"reta_domain_probe"
@@ -189,43 +220,54 @@ resolver = "2"
 [[bin]]
 name = "rreta_arch_view_output_parity"
 path = "src/bin/reta_arch_view_output_parity.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_recovery"
 path = "src/bin/reta_arch_activation_recovery.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_readiness"
 path = "src/bin/reta_arch_activation_readiness.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_activation_promotion"
 path = "src/bin/reta_arch_activation_promotion.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_language_parity"
 path = "src/bin/reta_arch_language_parity.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_language_coverage"
 path = "src/bin/reta_arch_language_coverage.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_language_sync"
 path = "src/bin/reta_arch_language_sync.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_prompt_language_completion"
 path = "src/bin/reta_arch_prompt_language_completion.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_prompt_language_guard"
 path = "src/bin/reta_arch_prompt_language_guard.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_prompt_language_commit"
 path = "src/bin/reta_arch_prompt_language_commit.rs"
+required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_prompt_activation_readiness"
 path = "src/bin/reta_arch_prompt_activation_readiness.rs"
+required-features = ["rust-tool-bins"]

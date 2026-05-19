@@ -253,6 +253,8 @@ def build_command_for_bin(root: Path, name: str, profile: str, args: List[str], 
         cmd.append("--release")
     if package != "reta":
         cmd.extend(["-p", package])
+    else:
+        cmd.extend(["--features", "rust-tool-bins"])
     cmd.extend(["--bin", name, "--", *args])
     return cmd
 
@@ -266,6 +268,8 @@ def build_selected(root: Path, names: Iterable[str], profile: str, out_dir: Path
             cmd.append("--release")
         if package != "reta":
             cmd.extend(["-p", package])
+        else:
+            cmd.extend(["--features", "rust-tool-bins"])
         cmd.extend(["--bin", name])
         results.append(run_command(f"build__{name}", cmd, root, out_dir, timeout))
     return results

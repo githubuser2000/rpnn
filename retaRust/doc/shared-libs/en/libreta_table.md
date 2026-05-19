@@ -26,6 +26,17 @@ Sheaf: compatible local column, row, and parameter sections are glued into a glo
 - `reta_table_abi_role_de`
 - `reta_table_abi_role_en`
 
+
+## Real code extraction
+
+This library now contains concrete table helper logic for natural width calculation and budget shrinking. Full table materialization can keep moving behind the same boundary.
+
+Additional symbols:
+
+- `reta_table_natural_widths_json`
+- `reta_table_shrink_widths_json`
+- `reta_table_free_string`
+
 ## Build rule
 
 `build.sh` builds the private core libraries first and then builds `libreta.so` with `RETA_LINK_CORE_SPLIT_LIBS=1`. As a result, `rreta` links directly only to `libreta.so`; the private core libraries appear as `DT_NEEDED` entries of `libreta.so`.

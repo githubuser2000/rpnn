@@ -26,6 +26,18 @@ Topology and presheaf: local parameter information is treated as sections whose 
 - `reta_semantics_abi_role_de`
 - `reta_semantics_abi_role_en`
 
+
+## Real code extraction
+
+This library now contains the semantic choice and prompt-selection inventories (`WAHL15`, `WAHL16`, main switches, section switches).
+
+Additional symbols:
+
+- `reta_semantics_choice_counts_json`
+- `reta_semantics_wahl15_value`
+- `reta_semantics_wahl16_value`
+- `reta_semantics_free_string`
+
 ## Build rule
 
 `build.sh` builds the private core libraries first and then builds `libreta.so` with `RETA_LINK_CORE_SPLIT_LIBS=1`. As a result, `rreta` links directly only to `libreta.so`; the private core libraries appear as `DT_NEEDED` entries of `libreta.so`.

@@ -85,12 +85,26 @@ def run_probe(root: Path, script: str, extra: Iterable[str] = ()) -> dict:
     return run_command(script, [sys.executable, str(path), "--pretty", *extra], root)
 
 
+def cargo_args_with_tool_feature(args: Sequence[str]) -> list[str]:
+    normalized = list(args)
+    if "--bin" not in normalized or "--features" in normalized:
+        return normalized
+    # Root-package diagnostic bins are feature-gated so normal shared-library
+    # builds do not accidentally produce heavy Rust executables.  Bins from
+    # other packages already carry their own package selector and do not need it.
+    if "-p" in normalized or "--package" in normalized:
+        return normalized
+    insert_at = 1 if normalized else 0
+    return normalized[:insert_at] + ["--features", "rust-tool-bins"] + normalized[insert_at:]
+
+
 def cargo_command(root: Path, args: Sequence[str], *, timeout: int | None = None) -> dict:
+    normalized_args = cargo_args_with_tool_feature(args)
     cargo = shutil.which("cargo")
     if not cargo:
         return {
-            "label": "cargo " + " ".join(args),
-            "command": ["cargo", *args],
+            "label": "cargo " + " ".join(normalized_args),
+            "command": ["cargo", *normalized_args],
             "returncode": 0,
             "passed": True,
             "skipped": True,
@@ -99,7 +113,7 @@ def cargo_command(root: Path, args: Sequence[str], *, timeout: int | None = None
             "stderr_tail": "",
             "elapsed_ms": 0,
         }
-    return run_command("cargo " + " ".join(args), [cargo, *args], root, timeout=timeout)
+    return run_command("cargo " + " ".join(normalized_args), [cargo, *normalized_args], root, timeout=timeout)
 
 
 def binary_path(root: Path, name: str) -> Path:

@@ -30,8 +30,7 @@ pub mod reta_arch_shadow;
 
 #[path = "../../../src/reta_runtime_bridge.rs"]
 mod reta_runtime_bridge;
-#[path = "../../../src/reta_split_abi.rs"]
-mod reta_split_abi;
+mod component_abi;
 
 #[path = "../../../src/ffi.rs"]
 pub mod ffi;
@@ -125,7 +124,7 @@ pub fn preload_reta_runtime() -> Result<(), String> {
         .get_or_init(|| {
             let _ = shared_words();
             let _ = shared_architecture();
-            let _ = crate::reta_split_abi::preload_reta_split_shared_libraries();
+            let _ = crate::component_abi::preload_reta_runtime_component_libraries();
             Ok(())
         })
         .clone()
@@ -236,7 +235,7 @@ pub extern "C" fn reta_runtime_abi_version() -> u32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn reta_runtime_abi_anchor() -> u64 {
-    0x21A7_0002_0000_0007 ^ (RETA_RUNTIME_ABI_VERSION as u64)
+    0x21A7_0002_0000_0007 ^ (RETA_RUNTIME_ABI_VERSION as u64) ^ crate::component_abi::preload_reta_runtime_component_libraries()
 }
 
 #[unsafe(no_mangle)]

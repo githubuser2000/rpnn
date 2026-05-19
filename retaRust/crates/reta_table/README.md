@@ -18,3 +18,8 @@ The detailed German and English documentation is in:
 
 - `doc/shared-libs/de/libreta_table.md`
 - `doc/shared-libs/en/libreta_table.md`
+
+Real component exports now include:
+
+- `reta_table_natural_widths_json`
+- `reta_table_shrink_widths_json`

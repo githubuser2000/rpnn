@@ -5,3 +5,5 @@ for a in rreta rrp rrpl rrpe rrpb
 do
   "target/debug/$a" -h
 done
+
+test -x "target/debug/rgrundStrukHtml"

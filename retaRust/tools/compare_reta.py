@@ -2,7 +2,7 @@
 """Bitgenauer Vergleich zwischen gebündelter Python-Referenz und Rust-reta.
 
 Python bleibt die Wahrheit. Dieses Werkzeug läuft dieselben argv-Samples gegen
-`python_reference/reta.py` und `cargo run --bin reta` und diffed die Ausgaben.
+`python_reference/reta.py` und den schlanken Launcher `target/*/rreta` und diffed die Ausgaben.
 """
 from __future__ import annotations
 
@@ -56,27 +56,60 @@ def _rust_library_filename() -> str:
     return "libreta.so"
 
 
+def _rust_binary_filename() -> str:
+    return "rreta.exe" if os.name == "nt" else "rreta"
+
+
+def _target_profiles() -> list[str]:
+    profile = os.environ.get("RETA_COMPARE_PROFILE")
+    return [profile] if profile else ["debug", "release"]
+
+
+def _find_rust_binary() -> Path | None:
+    for profile in _target_profiles():
+        if not profile:
+            continue
+        candidate = ROOT / "target" / profile / _rust_binary_filename()
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _rust_env() -> dict[str, str]:
     env = os.environ.copy()
-    debug_lib = ROOT / "target" / "debug" / _rust_library_filename()
-    release_lib = ROOT / "target" / "release" / _rust_library_filename()
-    if debug_lib.exists():
-        env["RETA_LIB_PATH"] = str(debug_lib)
-    elif release_lib.exists():
-        env["RETA_LIB_PATH"] = str(release_lib)
+    target_dirs = [ROOT / "target" / profile for profile in _target_profiles() if profile]
+    for target_dir in target_dirs:
+        lib = target_dir / _rust_library_filename()
+        if lib.exists() and "RETA_LIB_PATH" not in env:
+            env["RETA_LIB_PATH"] = str(lib)
+    for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "PATH"):
+        parts = [str(path) for path in target_dirs if path.exists()]
+        if env.get(var):
+            parts.append(env[var])
+        if parts:
+            env[var] = os.pathsep.join(parts)
     return env
 
 
 def prepare_rust_library() -> int:
-    # Das reta-Binary ist ein dünner Loader um die cdylib. `cargo run --bin reta`
-    # baut diese Library nicht in jedem Cargo-Pfad implizit mit. Deshalb bauen
-    # wir die Lib vorher gezielt und setzen RETA_LIB_PATH für den Vergleich.
-    completed = subprocess.run(
-        ["cargo", "build", "--quiet", "--package", "reta", "--lib"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-    )
+    # Der normale Build erzeugt inzwischen C-Launcher plus Shared-Library-Topologie.
+    # Dadurch bleibt rreta klein und zieht den schweren Rust-Kern nicht als eigenes Binary.
+    build_script = ROOT / "build.sh"
+    bash = shutil.which("bash")
+    if build_script.exists() and bash is not None:
+        completed = subprocess.run(
+            [bash, str(build_script), os.environ.get("RETA_COMPARE_PROFILE", "debug")],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+    else:
+        completed = subprocess.run(
+            ["cargo", "build", "--quiet", "--package", "reta", "--lib"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
     if completed.returncode != 0:
         print("Rust-Library konnte nicht gebaut werden:", file=sys.stderr)
         if completed.stdout:
@@ -123,12 +156,12 @@ def run_python(sample: list[str], *, timeout: float) -> RunResult:
 
 
 def run_rust(sample: list[str], *, timeout: float) -> RunResult:
-    return _run(
-        "rust",
-        ["cargo", "run", "--quiet", "--bin", "reta", "--", *sample],
-        sample,
-        timeout=timeout,
-    )
+    binary = _find_rust_binary()
+    if binary is not None:
+        command = [str(binary), *sample]
+    else:
+        command = ["cargo", "run", "--quiet", "--features", "rust-tool-bins", "--bin", "rreta", "--", *sample]
+    return _run("rust", command, sample, timeout=timeout)
 
 
 def unified_diff(left: str, right: str, *, fromfile: str, tofile: str, limit: int) -> str:

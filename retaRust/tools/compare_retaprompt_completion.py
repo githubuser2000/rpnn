@@ -139,6 +139,8 @@ def rust_completions(rust_repo: Path, line: str, mode: str, context: str) -> Lis
         "--quiet",
         "-p",
         "retaprompt_input",
+        "--features",
+        "completion-probe",
         "--bin",
         "retaprompt_completion_probe",
         "--",

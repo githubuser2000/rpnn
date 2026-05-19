@@ -44,8 +44,8 @@ HTML von stdin parsen und schreibt `htmlclassesPy.jsonl`-kompatible JSONL-Zeilen
 ## Befehle
 
 ```bash
-cargo build -p retaprompt_input --bin retaprompt_completion_probe
-cargo run -p retaprompt_input --bin retaprompt_completion_probe -- --line 'reta -zeilen --zeit=h'
+cargo build -p retaprompt_input --features completion-probe --bin retaprompt_completion_probe
+cargo run -p retaprompt_input --features completion-probe --bin retaprompt_completion_probe -- --line 'reta -zeilen --zeit=h'
 
 python3 tools/compare_retaprompt_completion.py --python-repo ../reta --rust-repo .
 

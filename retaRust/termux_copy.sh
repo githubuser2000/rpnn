@@ -11,5 +11,5 @@ TARGET_DIR="target/$PROFILE"
 BIN_DIR="$HOME/../usr/bin"
 LIB_DIR="$HOME/../usr/lib"
 
-cp "$TARGET_DIR"/{rrp,rrpl,rrpe,rrpb,rreta} "$BIN_DIR/"
+cp "$TARGET_DIR"/{rrp,rrpl,rrpe,rrpb,rreta,rgrundStrukHtml} "$BIN_DIR/"
 cp "$TARGET_DIR"/*.so "$LIB_DIR/"

@@ -35,6 +35,11 @@ Netzwerk: Aufgaben sind Knoten oder Kanten, Queues bestimmen Ordnung, Semaphore 
 - `reta_runtime_core_all_main_alias_groups_json`
 - `reta_runtime_core_parameter_alias_groups_for_main_json`
 
+
+## Neue Komponenten-Abhängigkeiten
+
+`libreta_runtime.so` verlinkt jetzt zusätzlich gegen `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, `libreta_render.so` und `libreta_arch.so`. Der Runtime-Anker ruft deren ABI-Anker auf, damit die `DT_NEEDED`-Topologie nicht wieder zu leeren Stubs degeneriert.
+
 ## Build-Regel
 
 `build.sh` baut diese Library vor `libreta.so`. Danach wird `libreta.so` mit `--features split-facade` gegen die prefixed Runtime-Core-Symbole gelinkt.

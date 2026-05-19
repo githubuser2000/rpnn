@@ -7,3 +7,7 @@ In the split build, `libreta.so` should be small, while `libreta_runtime.so` car
 The prompt programs remain split: `rrpb` uses only `libretaprompt_commands.so`, while `rrp`, `rrpl`, and `rrpe` also use `libretaprompt_input.so` for autocomplete and autosuggest.
 
 See `doc/shared-libs/en/README.md` for the per-library documentation.
+
+## Current correction state
+
+`rgrundStrukHtml` is now built as a tiny C launcher and uses `libreta_render.so` directly; `libreta_render.so` additionally links against `libreta_semantics.so`. In addition, `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, and `libreta_render.so` export real component functions. The build scripts verify that these five libraries do not collapse back to the exact same stub size.

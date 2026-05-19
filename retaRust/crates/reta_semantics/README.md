@@ -18,3 +18,9 @@ The detailed German and English documentation is in:
 
 - `doc/shared-libs/de/libreta_semantics.md`
 - `doc/shared-libs/en/libreta_semantics.md`
+
+Real component exports now include:
+
+- `reta_semantics_choice_counts_json`
+- `reta_semantics_wahl15_value`
+- `reta_semantics_wahl16_value`

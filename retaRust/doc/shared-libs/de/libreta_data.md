@@ -26,6 +26,20 @@ Relationale Basis: Objekte sind Wörter, Aliase, CSV-Zeilen, Spalten und Katalog
 - `reta_data_abi_role_de`
 - `reta_data_abi_role_en`
 
+
+## Reale Code-Auslagerung
+
+Diese Bibliothek ist nicht mehr nur ein ABI-Anker. Sie enthält jetzt die generierte `Words`-Datenstruktur und Alias-Projektionen aus der Python-Source-of-Truth-Logik. Dadurch darf sie nicht mehr dieselbe Größe wie die anderen kleinen Stub-Komponenten haben.
+
+Zusätzliche Symbole:
+
+- `reta_data_words_entry_count`
+- `reta_data_shared_words_json`
+- `reta_data_all_main_alias_groups_json`
+- `reta_data_parameter_alias_groups_for_main_json`
+- `reta_data_resolve_parameter_main_alias`
+- `reta_data_free_string`
+
 ## Build-Regel
 
 `build.sh` baut zuerst die privaten Core-Bibliotheken und danach `libreta.so` mit `RETA_LINK_CORE_SPLIT_LIBS=1`. Dadurch muss `rreta` nur direkt gegen `libreta.so` linken; die privaten Core-Bibliotheken erscheinen als `DT_NEEDED` von `libreta.so`.

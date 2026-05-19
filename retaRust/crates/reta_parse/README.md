@@ -18,3 +18,8 @@ The detailed German and English documentation is in:
 
 - `doc/shared-libs/de/libreta_parse.md`
 - `doc/shared-libs/en/libreta_parse.md`
+
+Real component exports now include:
+
+- `reta_parse_shell_token_count`
+- `reta_parse_shell_tokens_json`

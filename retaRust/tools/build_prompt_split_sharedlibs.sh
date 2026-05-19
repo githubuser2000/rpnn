@@ -110,6 +110,33 @@ verify_facade_smaller_than_runtime() {
   fi
 }
 
+verify_component_size_diversity() {
+  local libs=(
+    "$TARGET_DIR/libreta_data.so"
+    "$TARGET_DIR/libreta_parse.so"
+    "$TARGET_DIR/libreta_semantics.so"
+    "$TARGET_DIR/libreta_table.so"
+    "$TARGET_DIR/libreta_render.so"
+  )
+  local first_size=""
+  local all_same=1
+  local lib size
+  for lib in "${libs[@]}"; do
+    verify_file_exists "$lib"
+    size=$(wc -c < "$lib")
+    if [[ -z "$first_size" ]]; then
+      first_size="$size"
+    elif [[ "$size" != "$first_size" ]]; then
+      all_same=0
+    fi
+  done
+  if [[ "$all_same" == "1" ]]; then
+    echo "split-size check failed: data/parse/semantics/table/render .so files all have the same size ($first_size bytes)." >&2
+    echo "The component libraries are expected to export real code, not identical ABI stubs." >&2
+    exit 1
+  fi
+}
+
 verify_dynamic_needed() {
   local binary="$1"
   shift
@@ -174,6 +201,7 @@ done
 verify_file_exists "$TARGET_DIR/libretaprompt_commands.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_input.so"
 verify_file_exists "$TARGET_DIR/rreta"
+verify_file_exists "$TARGET_DIR/rgrundStrukHtml"
 verify_file_exists "$TARGET_DIR/csv/religion.csv"
 verify_file_exists "$TARGET_DIR/rrp"
 verify_file_exists "$TARGET_DIR/rrpl"
@@ -191,6 +219,12 @@ verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_run_and
 verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_run_argv
 verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_free_string
 verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_shared_words_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_data.so" reta_data_shared_words_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_parse.so" reta_parse_shell_tokens_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_semantics.so" reta_semantics_choice_counts_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_table.so" reta_table_natural_widths_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_render.so" reta_render_grundstruk_html
+verify_component_size_diversity
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_and_print_from_env_ffi
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_argv
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_core_split_abi_anchor
@@ -209,8 +243,12 @@ verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_from_env
 
 verify_dynamic_needed "$TARGET_DIR/libreta.so" "${CORE_SPLIT_LIBRARIES[@]}"
+verify_dynamic_needed "$TARGET_DIR/libreta_runtime.so" reta_data reta_parse reta_semantics reta_table reta_render reta_arch
+verify_dynamic_needed "$TARGET_DIR/libreta_render.so" reta_semantics
 verify_facade_smaller_than_runtime
 verify_dynamic_needed "$TARGET_DIR/rreta" reta
+verify_dynamic_needed "$TARGET_DIR/rgrundStrukHtml" reta_render
+verify_dynamic_not_needed "$TARGET_DIR/rgrundStrukHtml" reta reta_data reta_parse reta_semantics reta_table reta_arch reta_runtime
 verify_dynamic_not_needed "$TARGET_DIR/rreta" "${CORE_SPLIT_LIBRARIES[@]}"
 verify_dynamic_needed "$TARGET_DIR/rrp"  retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
@@ -247,7 +285,7 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     { "path": "$TARGET_DIR/libreta_parse.so", "role": "argv/text parsing and input morphisms" },
     { "path": "$TARGET_DIR/libreta_semantics.so", "role": "semantic selection, topology and presheaf boundary" },
     { "path": "$TARGET_DIR/libreta_table.so", "role": "table materialization, state, views and sheaf gluing" },
-    { "path": "$TARGET_DIR/libreta_render.so", "role": "rendering functors for shell/text/html/bbcode output" },
+    { "path": "$TARGET_DIR/libreta_render.so", "role": "rendering functors for shell/text/html/bbcode output", "links_to": ["libreta_semantics.so"] },
     { "path": "$TARGET_DIR/libreta_arch.so", "role": "category/topology/morphism/universal-property metadata" },
     { "path": "$TARGET_DIR/libreta_runtime.so", "role": "execution network, FIFO/LIFO/queue/stack/duplex/semaphore runtime and heavy Reta engine carrier" }
   ],
@@ -291,6 +329,12 @@ cat > "$MANIFEST" <<MANIFEST_JSON
       ]
     },
     {
+      "path": "$TARGET_DIR/rgrundStrukHtml",
+      "links_to": ["libreta_render.so"],
+      "transitive_links_to": ["libreta_semantics.so"],
+      "note": "tiny C launcher; HTML rendering code lives in libreta_render.so; semantic inventories are kept behind libreta_semantics.so"
+    },
+    {
       "path": "$TARGET_DIR/rrp",
       "links_to": ["libretaprompt_input.so", "libretaprompt_commands.so"]
     },
@@ -310,6 +354,7 @@ cat > "$MANIFEST" <<MANIFEST_JSON
   ],
   "notes": [
     "rreta remains a tiny C launcher that needs only libreta.so directly.",
+    "rgrundStrukHtml is also a tiny C launcher and calls libreta_render.so directly; libreta_render.so records its semantic dependency on libreta_semantics.so.",
     "libreta.so is a thin split-facade build and forwards heavy execution to libreta_runtime.so.",
     "rrp, rrpl and rrpe intentionally carry DT_NEEDED entries for both prompt split libraries.",
     "rrpb intentionally carries only the command library dependency.",
@@ -320,6 +365,7 @@ MANIFEST_JSON
 
 printf 'built dynamic split shared libraries and launchers:\n'
 printf '  %s -> %s\n' "$TARGET_DIR/rreta" "libreta.so"
+printf '  %s -> %s -> %s\n' "$TARGET_DIR/rgrundStrukHtml" "libreta_render.so" "libreta_semantics.so"
 printf '  %s -> %s\n' "$TARGET_DIR/libreta.so" "libreta_{data,parse,semantics,table,render,arch,runtime}.so"
 for library in "${CORE_SPLIT_LIBRARIES[@]}"; do
   printf '  %s\n' "$TARGET_DIR/lib${library}.so"

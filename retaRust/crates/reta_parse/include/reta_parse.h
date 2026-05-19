@@ -18,6 +18,10 @@ const char *reta_parse_abi_math_de(void);
 const char *reta_parse_abi_math_en(void);
 const char *reta_parse_abi_manifest_json(void);
 
+size_t reta_parse_shell_token_count(const char *line);
+char *reta_parse_shell_tokens_json(const char *line);
+void reta_parse_free_string(char *ptr);
+
 #ifdef __cplusplus
 }
 #endif

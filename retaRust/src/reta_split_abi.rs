@@ -6,10 +6,14 @@
 //! concrete `DT_NEEDED` entries and keeps the public executable contract small:
 //! `rreta -> libreta.so -> libreta_{data,parse,semantics,table,render,arch,runtime}.so`.
 
+#[cfg(not(reta_runtime_core_carrier))]
 use std::os::raw::c_char;
 
+#[cfg(not(reta_runtime_core_carrier))]
 const ABI_VERSION: u32 = 1;
-const MANIFEST_JSON: &[u8] = b"{\"abi_version\":1,\"facade\":\"libreta.so\",\"private_core_libraries\":[\"libreta_data.so\",\"libreta_parse.so\",\"libreta_semantics.so\",\"libreta_table.so\",\"libreta_render.so\",\"libreta_arch.so\",\"libreta_runtime.so\"],\"dependency_rule\":\"rreta links to libreta.so; libreta.so links to private core split libraries\"}\0";
+#[cfg(not(reta_runtime_core_carrier))]
+const MANIFEST_JSON: &[u8] = b"{\"abi_version\":1,\"facade\":\"libreta.so\",\"private_core_libraries\":[\"libreta_data.so\",\"libreta_parse.so\",\"libreta_semantics.so\",\"libreta_table.so\",\"libreta_render.so\",\"libreta_arch.so\",\"libreta_runtime.so\"],\"dependency_rule\":\"rreta links to libreta.so; libreta.so links to private core split libraries; libreta_runtime.so links to concrete component libraries\"}\0";
+
 #[cfg(reta_link_core_split_libs)]
 unsafe extern "C" {
     fn reta_data_abi_anchor() -> u64;
@@ -45,22 +49,26 @@ pub fn preload_reta_split_shared_libraries() -> u64 {
     linked_core_anchor()
 }
 
-#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
+#[cfg(not(reta_runtime_core_carrier))]
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_core_split_abi_version() -> u32 {
     ABI_VERSION
 }
 
-#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
+#[cfg(not(reta_runtime_core_carrier))]
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_core_split_abi_anchor() -> u64 {
     preload_reta_split_shared_libraries()
 }
 
-#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
+#[cfg(not(reta_runtime_core_carrier))]
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_core_split_abi_manifest_json() -> *const c_char {
     MANIFEST_JSON.as_ptr().cast()
 }
 
-#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
+#[cfg(not(reta_runtime_core_carrier))]
+#[unsafe(no_mangle)]
 pub extern "C" fn reta_core_split_abi_is_linked() -> u8 {
     if cfg!(reta_link_core_split_libs) { 1 } else { 0 }
 }

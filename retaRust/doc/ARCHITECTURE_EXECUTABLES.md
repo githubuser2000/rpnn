@@ -6,6 +6,7 @@ The important normal binaries remain:
 
 - `rreta`: current visible `reta` path.
 - `rrp`, `rrpl`, `rrpb`, `rrpe`: retaprompt frontends.
+- `rgrundStrukHtml`: tiny C launcher for `libreta_render.so` HTML generation.
 
 The architecture binaries are useful because they produce machine-readable JSON for targeted checks. The most useful script for collecting those outputs is:
 
@@ -66,7 +67,7 @@ because it verifies:
 
 ## Build-Hinweis seit Shared-Library-Split
 
-Der normale `./build.sh` baut für maximale Auslagerung in `.so`-Bibliotheken nur die Library-Ziele und die kleinen C-Launcher `rreta`, `rrp`, `rrpl`, `rrpe`, `rrpb`. Die Diagnose-Binaries aus dieser Datei werden nur explizit gebaut:
+Der normale `./build.sh` baut für maximale Auslagerung in `.so`-Bibliotheken nur die Library-Ziele und die kleinen C-Launcher `rreta`, `rgrundStrukHtml`, `rrp`, `rrpl`, `rrpe`, `rrpb`. Die Diagnose-Binaries aus dieser Datei werden nur explizit gebaut:
 
 ```bash
 RETA_BUILD_RUST_TOOL_BINS=1 ./build.sh release

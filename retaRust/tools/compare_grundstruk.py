@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vergleicht grundStrukHtml.py gegen das Rust-Binary grundStrukHtml."""
+"""Vergleicht grundStrukHtml.py gegen den schlanken Rust/C-Launcher rgrundStrukHtml."""
 from __future__ import annotations
 
 import difflib
@@ -45,11 +45,65 @@ def run_python(blank: bool, *, timeout: float):
     return run(args, timeout=timeout, env=python_env())
 
 
+def rust_launcher_name() -> str:
+    return "rgrundStrukHtml.exe" if os.name == "nt" else "rgrundStrukHtml"
+
+
+def rust_runtime_env() -> dict[str, str]:
+    env = os.environ.copy()
+    target_dirs = [ROOT / "target" / "debug", ROOT / "target" / "release"]
+    for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "PATH"):
+        parts = [str(path) for path in target_dirs if path.exists()]
+        if env.get(var):
+            parts.append(env[var])
+        if parts:
+            env[var] = os.pathsep.join(parts)
+    return env
+
+
+def find_rust_launcher() -> Path | None:
+    profile = os.environ.get("RETA_COMPARE_PROFILE")
+    profiles = [profile] if profile else ["debug", "release"]
+    for candidate_profile in profiles:
+        if not candidate_profile:
+            continue
+        candidate = ROOT / "target" / candidate_profile / rust_launcher_name()
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def prepare_rust_launcher() -> int:
+    if find_rust_launcher() is not None:
+        return 0
+    build_script = ROOT / "build.sh"
+    bash = shutil.which("bash")
+    if not build_script.exists() or bash is None:
+        print("build.sh oder bash fehlt; rgrundStrukHtml kann nicht gebaut werden.", file=sys.stderr)
+        return 2
+    completed = subprocess.run(
+        [bash, str(build_script), os.environ.get("RETA_COMPARE_PROFILE", "debug")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        print("rgrundStrukHtml konnte nicht über build.sh gebaut werden:", file=sys.stderr)
+        if completed.stdout:
+            print(completed.stdout, file=sys.stderr, end="")
+        if completed.stderr:
+            print(completed.stderr, file=sys.stderr, end="")
+    return completed.returncode
+
+
 def run_rust(blank: bool, *, timeout: float):
-    args = ["cargo", "run", "--quiet", "--bin", "grundStrukHtml"]
+    launcher = find_rust_launcher()
+    if launcher is None:
+        raise RuntimeError("rgrundStrukHtml wurde nicht gebaut")
+    args = [str(launcher)]
     if blank:
-        args.extend(["--", "blank"])
-    return run(args, timeout=timeout)
+        args.append("blank")
+    return run(args, timeout=timeout, env=rust_runtime_env())
 
 
 def stdout_of(result) -> str:
@@ -71,9 +125,9 @@ def main() -> int:
     if not (PY_REF_DIR / "csv" / "religion.csv").exists():
         print("python_reference/csv/religion.csv fehlt", file=sys.stderr)
         return 2
-    if shutil.which("cargo") is None:
-        print("cargo nicht gefunden; Rust-Vergleich kann hier nicht laufen.", file=sys.stderr)
-        return 2
+    build_rc = prepare_rust_launcher()
+    if build_rc != 0:
+        return build_rc
 
     timeout = float(os.environ.get("RETA_COMPARE_TIMEOUT", "120"))
     diff_limit = int(os.environ.get("RETA_COMPARE_DIFF_LINES", "200"))

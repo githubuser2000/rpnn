@@ -2,15 +2,6 @@ use std::env;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
-const COMPONENT_LIBS: &[&str] = &[
-    "reta_data",
-    "reta_parse",
-    "reta_semantics",
-    "reta_table",
-    "reta_render",
-    "reta_arch",
-];
-
 fn target_profile_dir() -> PathBuf {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by Cargo"));
     for ancestor in out_dir.ancestors() {
@@ -29,24 +20,18 @@ fn target_profile_dir() -> PathBuf {
 }
 
 fn main() {
-    println!("cargo:rustc-check-cfg=cfg(reta_link_core_split_libs)");
-    println!("cargo:rustc-check-cfg=cfg(reta_runtime_core_carrier)");
-    println!("cargo:rustc-check-cfg=cfg(reta_runtime_link_core_components)");
-    println!("cargo:rerun-if-env-changed=RETA_RUNTIME_LINK_CORE_COMPONENTS");
-    println!("cargo:rustc-cfg=reta_runtime_core_carrier");
+    println!("cargo:rustc-check-cfg=cfg(reta_render_link_semantics)");
+    println!("cargo:rerun-if-env-changed=RETA_RENDER_LINK_SEMANTICS");
 
-    if env::var("RETA_RUNTIME_LINK_CORE_COMPONENTS").ok().as_deref() != Some("1") {
+    if env::var("RETA_RENDER_LINK_SEMANTICS").ok().as_deref() != Some("1") {
         return;
     }
 
     let target_dir = target_profile_dir();
-    println!("cargo:rustc-cfg=reta_runtime_link_core_components");
+    println!("cargo:rustc-cfg=reta_render_link_semantics");
     println!("cargo:rustc-link-search=native={}", target_dir.display());
     println!("cargo:rustc-cdylib-link-arg=-Wl,-rpath,$ORIGIN");
     println!("cargo:rustc-cdylib-link-arg=-Wl,-rpath,$ORIGIN/lib");
     println!("cargo:rustc-cdylib-link-arg=-Wl,-rpath,$ORIGIN/../lib");
-
-    for lib in COMPONENT_LIBS {
-        println!("cargo:rustc-link-lib=dylib={lib}");
-    }
+    println!("cargo:rustc-link-lib=dylib=reta_semantics");
 }

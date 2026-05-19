@@ -26,6 +26,17 @@ Garbe: kompatible lokale Spalten-/Zeilen-/Parameter-Sektionen werden zu einer gl
 - `reta_table_abi_role_de`
 - `reta_table_abi_role_en`
 
+
+## Reale Code-Auslagerung
+
+Diese Bibliothek enthält jetzt konkrete Tabellen-Hilfslogik zur Breitenberechnung und Budget-Schrumpfung. Die vollständige Tabellenmaterialisierung kann hinter derselben Grenze weiter verschoben werden.
+
+Zusätzliche Symbole:
+
+- `reta_table_natural_widths_json`
+- `reta_table_shrink_widths_json`
+- `reta_table_free_string`
+
 ## Build-Regel
 
 `build.sh` baut zuerst die privaten Core-Bibliotheken und danach `libreta.so` mit `RETA_LINK_CORE_SPLIT_LIBS=1`. Dadurch muss `rreta` nur direkt gegen `libreta.so` linken; die privaten Core-Bibliotheken erscheinen als `DT_NEEDED` von `libreta.so`.

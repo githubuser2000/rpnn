@@ -35,6 +35,11 @@ Network: tasks are nodes or edges, queues determine ordering, semaphores limit r
 - `reta_runtime_core_all_main_alias_groups_json`
 - `reta_runtime_core_parameter_alias_groups_for_main_json`
 
+
+## New component dependencies
+
+`libreta_runtime.so` now also links against `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, `libreta_render.so`, and `libreta_arch.so`. The runtime anchor calls their ABI anchors so the `DT_NEEDED` topology does not collapse back into empty stubs.
+
 ## Build rule
 
 `build.sh` builds this library before `libreta.so`. Then `libreta.so` is built with `--features split-facade` and linked against the prefixed runtime-core symbols.

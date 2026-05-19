@@ -18,3 +18,10 @@ The detailed German and English documentation is in:
 
 - `doc/shared-libs/de/libreta_data.md`
 - `doc/shared-libs/en/libreta_data.md`
+
+Real component exports now include:
+
+- `reta_data_shared_words_json`
+- `reta_data_all_main_alias_groups_json`
+- `reta_data_parameter_alias_groups_for_main_json`
+- `reta_data_resolve_parameter_main_alias`
