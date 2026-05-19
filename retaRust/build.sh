@@ -209,6 +209,25 @@ copy_runtime_data() {
   fi
 }
 
+run_prompt_frontend_source_guard() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 tools/guard_prompt_frontend_sources.py
+  else
+    echo "warning: python3 unavailable; skipping prompt frontend source guard" >&2
+  fi
+}
+
+# Historical Rust prompt frontends were the source of oversized rrp/rrpl/rrpe/rrpb
+# binaries.  They are retired for the active build path.  The public launchers
+# are linked below from C and verified by tools/guard_prompt_launcher_topology.sh.
+if [[ "${RETA_BUILD_RUST_FRONTEND_BINS:-0}" == "1" ]]; then
+  echo "RETA_BUILD_RUST_FRONTEND_BINS=1 is retired because it embeds prompt code into rrp/rrpl/rrpe/rrpb." >&2
+  echo "Use ./build.sh ${PROFILE} and the generated tiny C launchers instead." >&2
+  exit 1
+fi
+
+run_prompt_frontend_source_guard
+
 # First build the private Reta core split libraries.  The second cargo call
 # links libreta.so against these already existing .so files via build.rs and
 # RETA_LINK_CORE_SPLIT_LIBS=1.  This keeps rreta small:
@@ -241,16 +260,6 @@ if [[ "${RETA_BUILD_RUST_TOOL_BINS:-0}" == "1" ]]; then
     --features rust-tool-bins \
     "${CARGO_FLAGS[@]}"
   RETA_LINK_CORE_SPLIT_LIBS=1 cargo build -p reta --lib --features split-facade "${CARGO_FLAGS[@]}"
-fi
-
-if [[ "${RETA_BUILD_RUST_FRONTEND_BINS:-0}" == "1" ]]; then
-  cargo build \
-    -p retaprompt_frontends \
-    --bin rrp \
-    --bin rrpl \
-    --bin rrpe \
-    --bin rrpb \
-    "${CARGO_FLAGS[@]}"
 fi
 
 mkdir -p "$TARGET_DIR"
@@ -290,6 +299,8 @@ verify_needed "$TARGET_DIR/rrpb" retaprompt_commands
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_autosuggestion_at_cursor_json
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_free_string
 verify_not_needed "$TARGET_DIR/rrpb" retaprompt_input
+
+tools/guard_prompt_launcher_topology.sh "$TARGET_DIR"
 
 copy_runtime_data
 cat <<BUILD_COMPLETE

@@ -1,4 +1,0 @@
-Nächster harter Block für echte Bitgenauigkeit:
-1. Python-vs-Rust Vergleich für reale reta-Ausgaben
-2. danach tiefe Table-/Output-Parität
-3. dann Generator-/Edge-Case-Parität

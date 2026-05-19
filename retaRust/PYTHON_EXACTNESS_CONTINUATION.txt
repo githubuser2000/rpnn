@@ -1,7 +1,0 @@
-Fortsetzung strikt nach Python.
-Regeln:
-- Python ist die einzige Wahrheit
-- keine semantische Vereinfachung
-- keine bessere Architektur
-- nicht rust-idiomatisch als Ziel
-- weitere Schritte müssen reale Ausgabe-Diffs gegen Python eliminieren

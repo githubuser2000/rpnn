@@ -33,6 +33,14 @@ PROMPT_SPLIT_LIBRARIES=(
   retaprompt_input
 )
 
+guard_prompt_frontend_sources() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 tools/guard_prompt_frontend_sources.py
+  else
+    echo "warning: python3 unavailable; skipping prompt frontend source guard" >&2
+  fi
+}
+
 guard_against_static_regression() {
   if grep -Eq 'crate-type[[:space:]]*=.*staticlib' Cargo.toml crates/*/Cargo.toml 2>/dev/null; then
     echo "dynamic .so build guard failed: staticlib crate-type found in Cargo.toml" >&2
@@ -188,6 +196,7 @@ verify_no_static_archive() {
 }
 
 guard_against_static_regression
+guard_prompt_frontend_sources
 
 ./build.sh "$PROFILE"
 
@@ -258,6 +267,8 @@ verify_dynamic_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpe" retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpb" retaprompt_commands
 verify_dynamic_not_needed "$TARGET_DIR/rrpb" retaprompt_input
+
+tools/guard_prompt_launcher_topology.sh "$TARGET_DIR"
 
 cat > "$MANIFEST" <<MANIFEST_JSON
 {
@@ -373,6 +384,8 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     "libreta.so is a thin split-facade build and forwards heavy execution to libreta_runtime.so.",
     "rrp, rrpl and rrpe intentionally carry DT_NEEDED entries for both prompt split libraries.",
     "rrpb intentionally carries only the command library dependency.",
+    "Prompt launcher size and payload are guarded by tools/guard_prompt_launcher_topology.sh with RETA_PROMPT_LAUNCHER_MAX_BYTES defaulting to 262144.",
+    "Prompt frontend sources are guarded by tools/guard_prompt_frontend_sources.py so public bins do not call retaprompt Rust APIs directly.",
     "The heavy non-interactive Reta engine is now outside libreta.so, primarily in libreta_runtime.so; finer distribution into data/parse/semantics/table/render can continue behind the same ABI topology."
   ]
 }

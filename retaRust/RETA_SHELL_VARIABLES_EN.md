@@ -55,7 +55,8 @@ RETA_PARALLEL_WORKERS=2 RETA_PARALLEL_THRESHOLD=512 ./target/release/rreta -h
 | `RETA_RENDER_LINK_SEMANTICS` | Build | Enables the edge `libreta_render.so -> libreta_semantics.so`. | `1` or unset. | Set by build scripts. | Without it, `rgrundStrukHtml` loses the intended render/semantics topology. |
 | `RETA_RUNTIME_LINK_CORE_COMPONENTS` | Build | Enables edges from `libreta_runtime.so` to data, parse, semantics, table, render, and arch. | `1` or unset. | Set by build scripts. | Without it, isolated stubs can reappear. |
 | `RETA_BUILD_RUST_TOOL_BINS` | Build | Additionally builds heavy Rust diagnostic and tool binaries. | `1` or unset/`0`. | Set only for developer diagnostics. | Do not use for package size measurements; final public binaries are C launchers. |
-| `RETA_BUILD_RUST_FRONTEND_BINS` | Build | Additionally builds historical Rust prompt frontend binaries. | `1` or unset/`0`. | Set for `cargo run` or local frontend tests. | The package path replaces these binaries with tiny C launchers. |
+| `RETA_BUILD_RUST_FRONTEND_BINS` | Build | Retired/blocked variable that used to build heavy Rust prompt frontends. | Must stay unset or `0`. | Do not set it anymore. | `1` intentionally fails the build so `rrp/rrpl/rrpe/rrpb` cannot become large again. |
+| `RETA_PROMPT_LAUNCHER_MAX_BYTES` | Build/guard | Maximum allowed size of a prompt launcher. | Positive byte count, default `262144`. | Raise only when a platform legitimately makes C launchers larger. | Do not use as a workaround for Rust payload; inspect `tools/guard_prompt_launcher_topology.sh` first. |
 | `PROFILE` | Cargo/script | Cargo profile; in scripts it is derived from the first argument, `debug` or `release`. | `debug` or `release`. | Prefer `./build.sh debug` or `./build.sh release` over manual export. | Cargo also sets `PROFILE` inside build scripts. |
 | `OUT_DIR` | Cargo | Cargo-provided output directory for build scripts. | Directory. | Do not set manually. | Used by Rust `build.rs` files for generated linker shims. |
 | `CARGO_MANIFEST_DIR` | Cargo | Cargo-provided path to the current crate manifest. | Directory. | Do not set manually. | Useful for build-script path resolution. |
@@ -159,7 +160,7 @@ These names appear in `build.sh`, `tools/*.sh`, or `termux_copy.sh`. They are do
 1. Do not keep build variables permanently exported in your shell. The scripts set `RETA_LINK_CORE_SPLIT_LIBS`, `RETA_RENDER_LINK_SEMANTICS`, and `RETA_RUNTIME_LINK_CORE_COMPONENTS` only for the correct Cargo calls.
 2. Use `RETA_LIB_PATH` only for the Reta facade. Prompt commands expect `libreta.so` there, not `libreta_runtime.so`.
 3. Use `RETA_RENDER_LIB_PATH` only for the HTML renderer launcher. `rgrundStrukHtml` should enter through `libreta_render.so` as much as possible.
-4. For reproducible size measurements, keep `RETA_BUILD_RUST_TOOL_BINS=0` and `RETA_BUILD_RUST_FRONTEND_BINS=0` or leave them unset.
+4. For reproducible size measurements, keep `RETA_BUILD_RUST_TOOL_BINS=0` and keep `RETA_BUILD_RUST_FRONTEND_BINS` unset/`0`; `1` is now a deliberate build failure.
 5. For autocomplete/autosuggest debugging, do not modify the launchers. The logic lives in `libretaprompt_input.so`, especially in the prompt completion layer.
 6. For Python/Rust parity, set architecture-comparison variables per test run, not globally in `.profile`.
 7. For Termux, install into `$HOME/../usr/bin` and `$HOME/../usr/lib` or rely on package RUNPATH.
@@ -417,15 +418,29 @@ RETA_ARCH_COMPARE_PY=1 RETA_PARALLEL_WORKERS=1 target/release/rreta -h
 
 **Area:** Build
 
-**Meaning:** Additionally builds historical Rust prompt frontend binaries.
+**Meaning:** Retired/blocked. This variable used to build additional Rust prompt frontend binaries. That path is exactly what made `rrp`, `rrpl`, `rrpe`, and `rrpb` unnecessarily large again.
 
-**Valid values:** `1` or unset/`0`.
+**Valid values:** unset or `0`.
 
-**Typical use:** Set for `cargo run` or local frontend tests.
+**Typical use:** Do not set it anymore. The correct path is `./build.sh release` or `./tools/package_prompt_split_sharedlibs.sh release`; both create tiny C launchers.
 
-**Risk:** The package path replaces these binaries with tiny C launchers.
+**Risk:** `1` intentionally fails the build. This is a protection against size regression, not a bug.
 
-**Programmer note:** Read this variable as close as possible to the boundary where it is needed. Avoid hidden global assumptions inside executables. In the current shared-library architecture, runtime decisions belong in libraries; launchers should only forward paths, argv, and exit codes.
+**Programmer note:** Prompt behavior belongs in `libretaprompt_input.so` and `libretaprompt_commands.so`. Executables must be ABI launchers only. The guard scripts `tools/guard_prompt_frontend_sources.py` and `tools/guard_prompt_launcher_topology.sh` enforce this rule.
+
+### `RETA_PROMPT_LAUNCHER_MAX_BYTES`
+
+**Area:** Build/guard
+
+**Meaning:** Size ceiling for the final prompt launchers `rrp`, `rrpl`, `rrpe`, and `rrpb`. The default is `262144` bytes.
+
+**Valid values:** Positive byte count.
+
+**Typical use:** Normally leave unset. Raise it only on a platform where a real C launcher legitimately carries more toolchain or loader metadata.
+
+**Risk:** Do not use this variable to accept a Rust payload inside the launchers. If the guard fails, first check whether `rrp/rrpl/rrpe/rrpb` came from Rust binaries instead of `tools/launchers/*.c`.
+
+**Programmer note:** `tools/guard_prompt_launcher_topology.sh` checks size, `DT_NEEDED` edges, forbidden direct `libreta*.so` edges, and Rust-payload symbols.
 
 ### `PROFILE`
 

@@ -212,7 +212,7 @@ default-members = [
   "crates/reta_runtime",
   "crates/retaprompt_input",
   "crates/retaprompt_commands",
-  "crates/retaprompt_frontends"
+  "crates/retaprompt_frontends",
 ]
 resolver = "2"
 

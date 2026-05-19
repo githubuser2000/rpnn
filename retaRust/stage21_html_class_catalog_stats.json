@@ -1,9 +1,0 @@
-{
-  "source": "python_arch_reference/htmlclassesPy.jsonl",
-  "target": "crates/reta_architecture/src/html_class_catalog.rs",
-  "record_count": 1372,
-  "unique_column_count": 1041,
-  "text_record_count": 1254,
-  "class_record_count": 695,
-  "column_744_records": 1
-}

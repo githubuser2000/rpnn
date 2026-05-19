@@ -1,8 +1,0 @@
-{
-  "status": "single project bitexact continuation 2",
-  "single_project_only": true,
-  "csv_loader_integrated": true,
-  "main_and_side_paras_added": true,
-  "known_cli_error_case_more_exact": true,
-  "rule": "python is truth; no second project; no idiomatic redesign"
-}

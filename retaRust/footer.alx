@@ -1,0 +1,7 @@
+<div style="text-align: center;">
+<h3><a style="color: black;" href="javascript:window.location.href=window.location.href.split('?')[0]">Ich ohne Parameter</a></h3>
+<h3><a style="color: black;" href="javascript:window.location.href=window.location.href.split('?')[0]+'?preselect=no_universal'">Ich ohne Universelles vorselektiert</a></h3>
+<h3><a style="color: black;" href="javascript:window.location.href=window.location.href.split('?')[0]+'?preselect=nothing'">Ich gänzlich ohne Vorselektion</a></h3>
+</div>
+</div>
+</body></html>

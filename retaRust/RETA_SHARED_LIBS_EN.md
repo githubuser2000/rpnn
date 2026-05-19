@@ -55,3 +55,5 @@ doc/shell-variables/en/README.md
 ```
 
 For programmers, the important distinction is this: variables such as `RETA_LINK_CORE_SPLIT_LIBS`, `RETA_RENDER_LINK_SEMANTICS`, and `RETA_RUNTIME_LINK_CORE_COMPONENTS` are build-topology switches. Variables such as `RETA_LIB_PATH`, `RETA_RENDER_LIB_PATH`, `RETA_CSV_PATH`, and `LD_LIBRARY_PATH` are runtime/loader helpers. None of these variables is a reason to move algorithms back into executables.
+
+The prompt launcher size policy is also documented in `PROMPT_LAUNCHER_SIZE_POLICY_EN.md`; the German version is in `PROMPT_LAUNCHER_SIZE_POLICY_DE.md`.

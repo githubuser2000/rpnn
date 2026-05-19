@@ -92,23 +92,23 @@ Damit bleibt in den finalen Prompt-Executables praktisch nur der ABI-Sprung in d
 Command-ABI-Anker, damit `libretaprompt_commands.so` nicht durch Linker-`--as-needed`
 aus der Abhängigkeitsliste herausfällt.
 
-Die Cargo-Frontend-Binaries bleiben für lokale Smoke-Tests sichtbar. Dadurch funktionieren Befehle wie:
+Die alte Anweisung, zusätzliche Rust-Frontend-Binaries für `rrp`, `rrpl`, `rrpe` und `rrpb` zu bauen, ist retired. Sie war die Ursache dafür, dass die Executables wieder groß wurden. `RETA_BUILD_RUST_FRONTEND_BINS=1` führt im aktiven Buildpfad absichtlich zu einem Fehler.
+
+Die im Workspace sichtbaren Cargo-Targets sind ebenfalls nur noch ABI-Launcher: Sie enthalten keine direkten Aufrufe auf `retaprompt_input::...` oder `retaprompt_commands::...`. Für reproduzierbare kleine Endartefakte gilt trotzdem der Skriptweg:
 
 ```bash
-cargo run --bin rrp -- -h
-cargo run --bin rrpl -- -h
-cargo run --bin rrpe -- -h
-cargo run --bin rrpb -- -h
+./build.sh release
+tools/guard_prompt_launcher_topology.sh target/release
 ```
 
-Der normale `build.sh`- und Paketweg baut sie trotzdem nicht als finale Executables. Wer sie zusätzlich testweise bauen will, kann das explizit tun:
+Die neue Regression-Sicherung besteht aus zwei Teilen:
 
 ```bash
-RETA_BUILD_RUST_FRONTEND_BINS=1 ./build.sh debug
+python3 tools/guard_prompt_frontend_sources.py
+tools/guard_prompt_launcher_topology.sh target/release
 ```
 
-Danach werden die finalen `rrp`, `rrpl`, `rrpe`, `rrpb` wieder durch die
-C-Launcher ersetzt.
+Der Source-Guard verhindert, dass die Rust-Binärquellen wieder Prompt-Crate-APIs direkt aufrufen. Der Topology-Guard verhindert, dass die finalen Dateien zu groß sind, Rust-Payload enthalten oder die falschen `.so`-Kanten besitzen.
 
 
 

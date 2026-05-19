@@ -55,7 +55,8 @@ RETA_PARALLEL_WORKERS=2 RETA_PARALLEL_THRESHOLD=512 ./target/release/rreta -h
 | `RETA_RENDER_LINK_SEMANTICS` | Build | Aktiviert die Link-Kante `libreta_render.so -> libreta_semantics.so`. | `1` oder unset. | Wird durch die Build-Skripte gesetzt. | Ohne diese Variable verliert `rgrundStrukHtml` die gewünschte Render/Semantik-Topologie. |
 | `RETA_RUNTIME_LINK_CORE_COMPONENTS` | Build | Aktiviert die Link-Kanten von `libreta_runtime.so` zu `data`, `parse`, `semantics`, `table`, `render` und `arch`. | `1` oder unset. | Wird durch die Build-Skripte gesetzt. | Ohne diese Variable entstehen wieder isolierte Stubs. |
 | `RETA_BUILD_RUST_TOOL_BINS` | Build | Baut zusätzlich schwere Rust-Diagnose- und Tool-Binaries. | `1` oder unset/`0`. | Nur bei Entwicklerdiagnose setzen. | Nicht für Paketgrößenmessung verwenden; finale öffentliche Binaries sind C-Launcher. |
-| `RETA_BUILD_RUST_FRONTEND_BINS` | Build | Baut zusätzlich historische Rust-Prompt-Frontend-Binaries. | `1` oder unset/`0`. | Nur für `cargo run`/lokale Frontend-Tests setzen. | Der Paketweg ersetzt diese Binaries durch kleine C-Launcher. |
+| `RETA_BUILD_RUST_FRONTEND_BINS` | Build | Retired/gesperrt: frühere Variable zum Bauen schwerer Rust-Prompt-Frontends. | Muss unset oder `0` bleiben. | Nicht mehr setzen. | `1` bricht den Build absichtlich ab, damit `rrp/rrpl/rrpe/rrpb` nicht wieder groß werden. |
+| `RETA_PROMPT_LAUNCHER_MAX_BYTES` | Build/Guard | Maximale erlaubte Größe eines Prompt-Launchers. | Positive Bytezahl, Standard `262144`. | Nur anheben, wenn C-Launcher auf einer Plattform legitime Zusatzgröße brauchen. | Nicht als Workaround für Rust-Payload erhöhen; erst `tools/guard_prompt_launcher_topology.sh` lesen. |
 | `PROFILE` | Cargo/Script | Cargo-Profil; in Skripten aus dem ersten Argument `debug` oder `release` abgeleitet. | `debug` oder `release`. | Nicht direkt setzen; `./build.sh debug` oder `./build.sh release` verwenden. | Cargo selbst setzt `PROFILE` in Build-Skripten. |
 | `OUT_DIR` | Cargo | Von Cargo gesetztes Ausgabeverzeichnis für Build-Skripte. | Verzeichnis. | Nicht manuell setzen. | Wird in Rust-`build.rs` für generierte Linker-Shims verwendet. |
 | `CARGO_MANIFEST_DIR` | Cargo | Von Cargo gesetzter Pfad zum aktuellen Crate-Manifest. | Verzeichnis. | Nicht manuell setzen. | Hilfreich für Build-Script-Pfadberechnung. |
@@ -159,7 +160,7 @@ Diese Namen stehen in `build.sh`, `tools/*.sh` oder `termux_copy.sh`. Sie sind d
 1. Setze Build-Variablen nicht dauerhaft in deiner Shell. Die Skripte setzen `RETA_LINK_CORE_SPLIT_LIBS`, `RETA_RENDER_LINK_SEMANTICS` und `RETA_RUNTIME_LINK_CORE_COMPONENTS` bewusst nur für die passenden Cargo-Aufrufe.
 2. Nutze `RETA_LIB_PATH` nur für die Reta-Fassade. Prompt-Kommandos erwarten dort `libreta.so`, nicht `libreta_runtime.so`.
 3. Nutze `RETA_RENDER_LIB_PATH` nur für den HTML-Renderer-Launcher. `rgrundStrukHtml` soll maximal über `libreta_render.so` gehen.
-4. Für reproduzierbare Paketgrößen: `RETA_BUILD_RUST_TOOL_BINS=0` und `RETA_BUILD_RUST_FRONTEND_BINS=0` lassen oder unset.
+4. Für reproduzierbare Paketgrößen: `RETA_BUILD_RUST_TOOL_BINS=0` lassen und `RETA_BUILD_RUST_FRONTEND_BINS` unset/`0` halten; `1` ist jetzt eine Build-Fehlermeldung.
 5. Für Debugging von Autocomplete/Autosuggest: Nicht die Launcher anfassen. Die Logik liegt in `libretaprompt_input.so`, insbesondere in der Prompt-Completion-Schicht.
 6. Für Python/Rust-Parität: Architekturvergleichsvariablen nur pro Testlauf setzen, nicht global in `.profile`.
 7. Für Termux: bevorzugt in `$HOME/../usr/bin` und `$HOME/../usr/lib` installieren oder RUNPATH im Paketlayout verwenden.
@@ -417,15 +418,29 @@ RETA_ARCH_COMPARE_PY=1 RETA_PARALLEL_WORKERS=1 target/release/rreta -h
 
 **Bereich:** Build
 
-**Bedeutung:** Baut zusätzlich historische Rust-Prompt-Frontend-Binaries.
+**Bedeutung:** Retired/gesperrt. Diese Variable stand früher für zusätzliche Rust-Prompt-Frontend-Binaries. Genau dieser Pfad hat `rrp`, `rrpl`, `rrpe` und `rrpb` wieder unnötig groß gemacht.
 
-**Gültige Werte:** `1` oder unset/`0`.
+**Gültige Werte:** unset oder `0`.
 
-**Typischer Einsatz:** Nur für `cargo run`/lokale Frontend-Tests setzen.
+**Typischer Einsatz:** Nicht mehr setzen. Der korrekte Pfad ist `./build.sh release` oder `./tools/package_prompt_split_sharedlibs.sh release`; beide erzeugen kleine C-Launcher.
 
-**Risiko:** Der Paketweg ersetzt diese Binaries durch kleine C-Launcher.
+**Risiko:** `1` bricht den Build absichtlich ab. Das ist kein Fehler, sondern ein Schutz gegen Größenregression.
 
-**Programmiererhinweis:** Prüfe diese Variable möglichst nah an der Grenze, an der sie gebraucht wird. Baue keine versteckten globalen Annahmen in Executables ein. Für die aktuelle Shared-Library-Architektur gilt: Runtime-Entscheidungen gehören in Libraries, Launcher sollen nur Pfade, argv und Exit-Codes weiterreichen.
+**Programmiererhinweis:** Prompt-Logik gehört in `libretaprompt_input.so` und `libretaprompt_commands.so`. Die Executables dürfen nur ABI-Launcher sein. Die Guard-Skripte `tools/guard_prompt_frontend_sources.py` und `tools/guard_prompt_launcher_topology.sh` prüfen diese Regel.
+
+### `RETA_PROMPT_LAUNCHER_MAX_BYTES`
+
+**Bereich:** Build/Guard
+
+**Bedeutung:** Obergrenze für die Dateigröße der finalen Prompt-Launcher `rrp`, `rrpl`, `rrpe` und `rrpb`. Der Standardwert ist `262144` Bytes.
+
+**Gültige Werte:** Positive ganze Bytezahl.
+
+**Typischer Einsatz:** Normalerweise nicht setzen. Nur bei einer Plattform anheben, auf der ein echter C-Launcher durch Toolchain-/Loader-Metadaten größer ist.
+
+**Risiko:** Diese Variable darf nicht benutzt werden, um eine Rust-Payload in den Launchern zu akzeptieren. Wenn der Guard anschlägt, zuerst prüfen, ob `rrp/rrpl/rrpe/rrpb` wieder aus Rust-Binaries statt aus `tools/launchers/*.c` stammen.
+
+**Programmiererhinweis:** Der Guard `tools/guard_prompt_launcher_topology.sh` prüft Größe, `DT_NEEDED`-Kanten, verbotene `libreta*.so`-Kanten und Rust-Payload-Symbole.
 
 ### `PROFILE`
 

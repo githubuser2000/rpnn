@@ -73,7 +73,7 @@ Der normale `./build.sh` baut für maximale Auslagerung in `.so`-Bibliotheken nu
 RETA_BUILD_RUST_TOOL_BINS=1 ./build.sh release
 ```
 
-Damit bleibt der normale Runtime-Pfad klein, während die Architekturwerkzeuge für Tests weiterhin verfügbar bleiben.
+Damit bleibt der normale Runtime-Pfad klein, während die Architekturwerkzeuge für Tests weiterhin verfügbar bleiben. Für `rrp`, `rrpl`, `rrpe` und `rrpb` gibt es zusätzlich eine harte Regression-Sicherung: `tools/guard_prompt_frontend_sources.py` verbietet direkte Prompt-Crate-Aufrufe in den Launcher-Quellen, und `tools/guard_prompt_launcher_topology.sh` prüft Größe, Rust-Payload-Symbole und die korrekten `.so`-Abhängigkeiten.
 
 ## Binary catalog
 

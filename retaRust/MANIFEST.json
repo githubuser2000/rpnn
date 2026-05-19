@@ -1,6 +1,0 @@
-{
-  "focus": "bitexact direction pass",
-  "subset_count": 379,
-  "rule": "python is truth; no semantic simplification; not idiomatic; bitexact direction",
-  "next_target": "deeper output behavior and table parity"
-}

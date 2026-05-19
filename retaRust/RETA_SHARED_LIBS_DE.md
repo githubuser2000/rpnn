@@ -55,3 +55,5 @@ doc/shell-variables/en/README.md
 ```
 
 Für Programmierer ist besonders wichtig: Variablen wie `RETA_LINK_CORE_SPLIT_LIBS`, `RETA_RENDER_LINK_SEMANTICS` und `RETA_RUNTIME_LINK_CORE_COMPONENTS` sind Build-Topologie-Schalter. Variablen wie `RETA_LIB_PATH`, `RETA_RENDER_LIB_PATH`, `RETA_CSV_PATH` und `LD_LIBRARY_PATH` sind Laufzeit-/Loader-Hilfen. Keine dieser Variablen rechtfertigt, Algorithmik wieder in die Executables zu verschieben.
+
+Die Größenpolicy für die Prompt-Launcher liegt zusätzlich in `PROMPT_LAUNCHER_SIZE_POLICY_DE.md`; die englische Fassung in `PROMPT_LAUNCHER_SIZE_POLICY_EN.md`.

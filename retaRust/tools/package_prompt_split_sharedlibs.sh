@@ -18,9 +18,11 @@ esac
 ./tools/build_prompt_split_sharedlibs.sh "$PROFILE"
 
 TARGET_DIR="${CARGO_TARGET_DIR:-target}/$PROFILE"
+tools/guard_prompt_launcher_topology.sh "$TARGET_DIR"
+
 OUT_DIR="$TARGET_DIR/retaprompt_split_sharedlibs_package"
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/include" "$OUT_DIR/doc/shared-libs" "$OUT_DIR/doc/shell-variables"
+mkdir -p "$OUT_DIR/include" "$OUT_DIR/doc/shared-libs" "$OUT_DIR/doc/shell-variables" "$OUT_DIR/tools"
 
 CORE_SPLIT_LIBRARIES=(
   reta_data
@@ -79,6 +81,10 @@ copy_required RETA_SHELL_VARIABLES_DE.md "$OUT_DIR/"
 copy_required RETA_SHELL_VARIABLES_EN.md "$OUT_DIR/"
 copy_required RETAPROMPT_SHAREDLIB.md "$OUT_DIR/"
 copy_required RETAPROMPT_STATICLIB.md "$OUT_DIR/STATIC_ARCHIVES_RETIRED.md"
+copy_required PROMPT_LAUNCHER_SIZE_POLICY_DE.md "$OUT_DIR/"
+copy_required PROMPT_LAUNCHER_SIZE_POLICY_EN.md "$OUT_DIR/"
+copy_required tools/guard_prompt_launcher_topology.sh "$OUT_DIR/tools/"
+copy_required tools/guard_prompt_frontend_sources.py "$OUT_DIR/tools/"
 
 for archive in \
   "$OUT_DIR/libreta.a" \
@@ -171,18 +177,23 @@ Dependency chain:
 Size rule:
 - libreta.so must be smaller than libreta_runtime.so.
 - The build scripts fail when libreta.so becomes the heavy engine carrier again.
+- rrp, rrpl, rrpe and rrpb must stay below RETA_PROMPT_LAUNCHER_MAX_BYTES, default 262144 bytes.
+- tools/guard_prompt_launcher_topology.sh rejects Rust payload symbols in prompt launchers.
 
 Documentation rule:
 - RETA_SHARED_LIBS_DE.md and RETA_SHARED_LIBS_EN.md describe the complete .so topology.
 - doc/shared-libs/de/*.md and doc/shared-libs/en/*.md contain large programmer documentation for every .so library.
 - RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md describe runtime, build, linker, prompt, architecture and script variables.
 - doc/shell-variables/de/README.md and doc/shell-variables/en/README.md contain the same large shell-variable documentation inside the documentation tree.
+- PROMPT_LAUNCHER_SIZE_POLICY_DE.md and PROMPT_LAUNCHER_SIZE_POLICY_EN.md document the hard launcher-size rule.
+- tools/guard_prompt_launcher_topology.sh and tools/guard_prompt_frontend_sources.py are included for local verification.
 
 Artifact rule:
 - This package intentionally contains only dynamic .so libraries and C launchers.
 - Static archives (.a) are not part of this package.
-- Rust prompt frontend executables are not built by default in build.sh.
+- Heavy Rust prompt frontend executables are retired; RETA_BUILD_RUST_FRONTEND_BINS=1 intentionally fails.
 - Autocomplete and autosuggest logic belongs to libretaprompt_input.so, not to the executables.
+- rrpb is command-only. rrp, rrpl and rrpe keep both prompt .so libraries as direct dependencies.
 LAYOUT
 
 printf 'packaged dynamic split shared libraries and launchers in:\n'
