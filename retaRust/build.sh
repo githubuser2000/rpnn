@@ -245,7 +245,10 @@ fi
 if [[ "${RETA_BUILD_RUST_FRONTEND_BINS:-0}" == "1" ]]; then
   cargo build \
     -p retaprompt_frontends \
-    --features retaprompt_frontends/rust-frontends \
+    --bin rrp \
+    --bin rrpl \
+    --bin rrpe \
+    --bin rrpb \
     "${CARGO_FLAGS[@]}"
 fi
 

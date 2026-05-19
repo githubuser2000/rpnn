@@ -11,3 +11,6 @@ See `doc/shared-libs/en/README.md` for the per-library documentation.
 ## Current correction state
 
 `rgrundStrukHtml` is now built as a tiny C launcher and uses `libreta_render.so` directly; `libreta_render.so` additionally links against `libreta_semantics.so`. In addition, `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, and `libreta_render.so` export real component functions. The build scripts verify that these five libraries do not collapse back to the exact same stub size.
+
+
+`cargo run --bin rreta -- -h` and `cargo run --bin rgrundStrukHtml -- -h` work again without feature flags. `rgrundStrukHtml` is also a dynamic launcher in the Cargo path and loads `libreta_render.so` instead of embedding `reta::shared::grundstruk_exact` directly.

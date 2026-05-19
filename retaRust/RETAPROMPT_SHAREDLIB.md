@@ -90,13 +90,22 @@ Damit bleibt in den finalen Prompt-Executables praktisch nur der ABI-Sprung in d
 Command-ABI-Anker, damit `libretaprompt_commands.so` nicht durch Linker-`--as-needed`
 aus der Abhängigkeitsliste herausfällt.
 
-Wer die alten Rust-Frontend-Binaries trotzdem testweise bauen will, kann das explizit tun. Die Cargo-Bins sind dafür hinter der Feature-Flag `rust-frontends` gated; `build.sh` setzt sie nur in diesem expliziten Modus:
+Die Cargo-Frontend-Binaries bleiben für lokale Smoke-Tests sichtbar. Dadurch funktionieren Befehle wie:
+
+```bash
+cargo run --bin rrp -- -h
+cargo run --bin rrpl -- -h
+cargo run --bin rrpe -- -h
+cargo run --bin rrpb -- -h
+```
+
+Der normale `build.sh`- und Paketweg baut sie trotzdem nicht als finale Executables. Wer sie zusätzlich testweise bauen will, kann das explizit tun:
 
 ```bash
 RETA_BUILD_RUST_FRONTEND_BINS=1 ./build.sh debug
 ```
 
-Danach werden die finalen `rrp`, `rrpl`, `rrpe`, `rrpb` trotzdem wieder durch die
+Danach werden die finalen `rrp`, `rrpl`, `rrpe`, `rrpb` wieder durch die
 C-Launcher ersetzt.
 
 

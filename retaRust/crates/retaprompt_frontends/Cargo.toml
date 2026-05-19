@@ -11,6 +11,8 @@ retaprompt_commands = { path = "../retaprompt_commands" }
 serde_json = "1"
 
 [features]
+# Kept for compatibility with older scripts. Public rrp/rrpl/rrpe/rrpb Cargo bins
+# are no longer gated, so `cargo run --bin rrp -- -h` works without features.
 rust-frontends = []
 
 #[[bin]]
@@ -20,22 +22,18 @@ rust-frontends = []
 [[bin]]
 name = "rrp"
 path = "src/bin/rp.rs"
-required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpl"
 path = "src/bin/rpl.rs"
-required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpb"
 path = "src/bin/rpb.rs"
-required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpe"
 path = "src/bin/rpe.rs"
-required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rretaprompt_arch_inspect"

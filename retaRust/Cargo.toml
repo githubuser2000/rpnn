@@ -8,6 +8,8 @@ default-run = "rreta"
 [features]
 default = []
 split-facade = []
+# Public cargo-run launchers rreta and rgrundStrukHtml are always visible.
+# This feature gates only the heavier diagnostic/tool binaries.
 rust-tool-bins = []
 
 [dependencies]
@@ -26,12 +28,10 @@ crate-type = ["rlib", "cdylib"]
 [[bin]]
 name = "rreta"
 path = "src/bin/reta.rs"
-required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rgrundStrukHtml"
 path = "src/bin/grundStrukHtml.rs"
-required-features = ["rust-tool-bins"]
 
 [[bin]]
 name = "rreta_arch_inspect"
