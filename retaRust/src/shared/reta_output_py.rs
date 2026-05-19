@@ -3221,7 +3221,7 @@ impl Program {
     ) -> Vec<Vec<String>> {
         let mut out_lines: Vec<String> = vec![];
         if newTable.is_empty() {
-            self.finallyDisplayLines = out_lines.clone();
+            self.finallyDisplayLines = out_lines;
             self.numlen = numlen;
             self.finallyDisplayLinesByChunks = vec![];
             return newTable;
@@ -3229,7 +3229,7 @@ impl Program {
 
         let col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
         if col_count == 0 {
-            self.finallyDisplayLines = out_lines.clone();
+            self.finallyDisplayLines = out_lines;
             self.numlen = numlen;
             self.finallyDisplayLinesByChunks = vec![];
             return newTable;
@@ -3334,7 +3334,7 @@ impl Program {
         }
 
         self.finallyDisplayLinesByChunks = chunked_lines;
-        self.finallyDisplayLines = out_lines.clone();
+        self.finallyDisplayLines = out_lines;
         self.numlen = numlen;
         newTable
     }

@@ -5,6 +5,7 @@
 //! `libreta_runtime.so`.  The other private core libraries remain linked
 //! through `reta_split_abi` so the executable topology is still explicit.
 
+use std::ffi::c_void;
 use std::os::raw::c_char;
 
 #[repr(C)]
@@ -17,10 +18,27 @@ pub struct RetaFfiResponse {
     pub exit_code: i32,
 }
 
+pub type RetaStreamChunkCallback =
+    unsafe extern "C" fn(kind: u8, data: *const u8, len: usize, user_data: *mut c_void) -> i32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RetaFfiStreamResponse {
+    pub exit_code: i32,
+    pub stdout_chunks: usize,
+    pub stderr_chunks: usize,
+    pub stdout_bytes: usize,
+    pub stderr_bytes: usize,
+    pub stdout_lines: usize,
+    pub stderr_lines: usize,
+    pub callback_error: i32,
+}
+
 unsafe extern "C" {
     fn reta_runtime_core_run_and_print_from_env_ffi() -> i32;
     fn reta_runtime_core_abi_version() -> u32;
     fn reta_runtime_core_run_argv(argc: usize, argv: *const *const c_char, stdin_text: *const c_char, terminal_width: usize, stdout_is_tty: u8, stderr_is_tty: u8, stdin_is_tty: u8) -> RetaFfiResponse;
+    fn reta_runtime_core_run_argv_stream(argc: usize, argv: *const *const c_char, stdin_text: *const c_char, terminal_width: usize, stdout_is_tty: u8, stderr_is_tty: u8, stdin_is_tty: u8, callback: Option<RetaStreamChunkCallback>, user_data: *mut c_void) -> RetaFfiStreamResponse;
     fn reta_runtime_core_free_string(ptr: *mut c_char);
     fn reta_runtime_core_shared_words_json() -> *mut c_char;
     fn reta_runtime_core_csv_catalog_snapshot_json() -> *mut c_char;
@@ -104,6 +122,34 @@ pub unsafe extern "C" fn reta_run_argv(argc: usize, argv: *const *const c_char, 
 pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
     preload_private_core_libraries();
     unsafe { reta_runtime_core_free_string(ptr) };
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_run_argv_stream(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+    callback: Option<RetaStreamChunkCallback>,
+    user_data: *mut c_void,
+) -> RetaFfiStreamResponse {
+    preload_private_core_libraries();
+    unsafe {
+        reta_runtime_core_run_argv_stream(
+            argc,
+            argv,
+            stdin_text,
+            terminal_width,
+            stdout_is_tty,
+            stderr_is_tty,
+            stdin_is_tty,
+            callback,
+            user_data,
+        )
+    }
 }
 
 #[unsafe(no_mangle)]

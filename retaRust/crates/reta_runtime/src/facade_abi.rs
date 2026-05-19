@@ -2,6 +2,7 @@
 //! `libreta.so` facade.  The public names stay in `libreta.so`; these
 //! prefixed symbols avoid self-recursive linker binding in the facade.
 
+use std::ffi::c_void;
 use std::os::raw::c_char;
 
 #[unsafe(no_mangle)]
@@ -22,6 +23,33 @@ pub unsafe extern "C" fn reta_runtime_core_run_argv(argc: usize, argv: *const *c
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reta_runtime_core_free_string(ptr: *mut c_char) {
     unsafe { crate::ffi::reta_free_string(ptr) };
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reta_runtime_core_run_argv_stream(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+    callback: Option<crate::ffi::RetaStreamChunkCallback>,
+    user_data: *mut c_void,
+) -> crate::ffi::RetaFfiStreamResponse {
+    unsafe {
+        crate::ffi::reta_run_argv_stream(
+            argc,
+            argv,
+            stdin_text,
+            terminal_width,
+            stdout_is_tty,
+            stderr_is_tty,
+            stdin_is_tty,
+            callback,
+            user_data,
+        )
+    }
 }
 
 #[unsafe(no_mangle)]

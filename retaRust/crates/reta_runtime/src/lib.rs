@@ -17,6 +17,8 @@ pub mod shared;
 pub mod reta_begin_py;
 #[path = "../../../src/reta_output_py.rs"]
 pub mod reta_output_py;
+#[path = "../../../src/reta_output_stream.rs"]
+pub mod reta_output_stream;
 #[path = "../../../src/reta_program_types.rs"]
 pub mod reta_program_types;
 #[path = "../../../src/reta_resulting_table_py.rs"]
@@ -49,7 +51,8 @@ pub use crate::reta_program_types::{
     DiagnosticLevel, ResultingTable, RetaDiagnostic, RetaError, RetaInput, RetaMetadata,
     RetaOptions, RetaRequest, RetaResponse, RetaRuntime,
 };
-pub use crate::reta_workflow_py::run_reta;
+pub use crate::reta_output_stream::{OutputStreamKind, OutputStreamNetworkConfig, OutputStreamStats};
+pub use crate::reta_workflow_py::{run_reta, run_reta_streamed, RetaStreamedResponse};
 
 #[derive(Debug, Clone, Default)]
 pub struct RetaRunResult {
@@ -167,10 +170,27 @@ pub fn print_reta_result(result: &RetaRunResult) {
 }
 
 pub fn run_reta_and_print_from_env() -> i32 {
-    let result = run_reta_from_env_args();
-    let exit_code = result.exit_code();
-    print_reta_result(&result);
-    exit_code
+    use std::io::Write as _;
+
+    let argv = std::env::args().collect::<Vec<_>>();
+    let request = build_cli_request(&argv, None, RetaRuntime::default());
+    let mut stdout = std::io::stdout().lock();
+    let mut stderr = std::io::stderr().lock();
+
+    match crate::reta_workflow_py::run_reta_streamed(request, |kind, bytes| match kind {
+        crate::reta_output_stream::OutputStreamKind::Stdout => stdout
+            .write_all(bytes)
+            .map_err(|error| error.to_string()),
+        crate::reta_output_stream::OutputStreamKind::Stderr => stderr
+            .write_all(bytes)
+            .map_err(|error| error.to_string()),
+    }) {
+        Ok(response) => response.exit_code,
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            error.exit_code()
+        }
+    }
 }
 
 #[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]

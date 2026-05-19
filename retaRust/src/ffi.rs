@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json;
 
+use crate::reta_output_stream::OutputStreamKind;
 use crate::{build_cli_request, run_reta, RetaRuntime};
 
 pub const RETA_ABI_VERSION: u32 = 2;
@@ -21,6 +22,25 @@ pub struct RetaFfiResponse {
     pub stderr_text: *mut c_char,
     pub stderr_len: usize,
     pub exit_code: i32,
+}
+
+pub const RETA_STREAM_KIND_STDOUT: u8 = 1;
+pub const RETA_STREAM_KIND_STDERR: u8 = 2;
+
+pub type RetaStreamChunkCallback =
+    unsafe extern "C" fn(kind: u8, data: *const u8, len: usize, user_data: *mut c_void) -> i32;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RetaFfiStreamResponse {
+    pub exit_code: i32,
+    pub stdout_chunks: usize,
+    pub stderr_chunks: usize,
+    pub stdout_bytes: usize,
+    pub stderr_bytes: usize,
+    pub stdout_lines: usize,
+    pub stderr_lines: usize,
+    pub callback_error: i32,
 }
 
 #[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
@@ -51,6 +71,144 @@ pub unsafe extern "C" fn reta_run_argv(
     })) {
         Ok(response) => response,
         Err(_) => ffi_error_response(101, "panic inside reta_run_argv\n"),
+    }
+}
+
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
+pub unsafe extern "C" fn reta_run_argv_stream(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+    callback: Option<RetaStreamChunkCallback>,
+    user_data: *mut c_void,
+) -> RetaFfiStreamResponse {
+    match catch_unwind(AssertUnwindSafe(|| unsafe {
+        reta_run_argv_stream_impl(
+            argc,
+            argv,
+            stdin_text,
+            terminal_width,
+            stdout_is_tty,
+            stderr_is_tty,
+            stdin_is_tty,
+            callback,
+            user_data,
+        )
+    })) {
+        Ok(response) => response,
+        Err(_) => {
+            let mut response = empty_stream_response(101);
+            response.callback_error = emit_stream_error(
+                callback,
+                user_data,
+                "panic inside reta_run_argv_stream\n".as_bytes(),
+            );
+            response
+        }
+    }
+}
+
+unsafe fn reta_run_argv_stream_impl(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+    callback: Option<RetaStreamChunkCallback>,
+    user_data: *mut c_void,
+) -> RetaFfiStreamResponse {
+    let Some(callback) = callback else {
+        let mut response = empty_stream_response(2);
+        response.callback_error = -1;
+        return response;
+    };
+
+    let args = match unsafe { read_argv(argc, argv) } {
+        Ok(args) => args,
+        Err(message) => {
+            let mut response = empty_stream_response(2);
+            response.callback_error = emit_stream_error(
+                Some(callback),
+                user_data,
+                format!("reta ffi error: {message}\n").as_bytes(),
+            );
+            return response;
+        }
+    };
+    let stdin_text = match unsafe { read_optional_string(stdin_text) } {
+        Ok(stdin_text) => stdin_text,
+        Err(message) => {
+            let mut response = empty_stream_response(2);
+            response.callback_error = emit_stream_error(
+                Some(callback),
+                user_data,
+                format!("reta ffi stdin error: {message}\n").as_bytes(),
+            );
+            return response;
+        }
+    };
+
+    let request = build_cli_request(
+        &args,
+        stdin_text,
+        RetaRuntime {
+            terminal_width: if terminal_width == 0 {
+                None
+            } else {
+                Some(terminal_width)
+            },
+            stdout_is_tty: Some(stdout_is_tty != 0),
+            stderr_is_tty: Some(stderr_is_tty != 0),
+            stdin_is_tty: Some(stdin_is_tty != 0),
+        },
+    );
+
+    let mut callback_error = 0;
+    let result = crate::reta_workflow_py::run_reta_streamed(request, |kind, bytes| {
+        let stream_kind = match kind {
+            OutputStreamKind::Stdout => RETA_STREAM_KIND_STDOUT,
+            OutputStreamKind::Stderr => RETA_STREAM_KIND_STDERR,
+        };
+        let status = unsafe { emit_stream_callback(callback, user_data, stream_kind, bytes) };
+        if status == 0 {
+            Ok(())
+        } else {
+            callback_error = status;
+            Err(format!("stream callback returned {status}"))
+        }
+    });
+
+    match result {
+        Ok(response) => RetaFfiStreamResponse {
+            exit_code: response.exit_code,
+            stdout_chunks: response.stream_stats.stdout_chunks,
+            stderr_chunks: response.stream_stats.stderr_chunks,
+            stdout_bytes: response.stream_stats.stdout_bytes,
+            stderr_bytes: response.stream_stats.stderr_bytes,
+            stdout_lines: response.stream_stats.stdout_lines,
+            stderr_lines: response.stream_stats.stderr_lines,
+            callback_error,
+        },
+        Err(error) => {
+            let mut response = empty_stream_response(error.exit_code());
+            if callback_error != 0 {
+                response.exit_code = 120;
+                response.callback_error = callback_error;
+            } else {
+                response.callback_error = emit_stream_error(
+                    Some(callback),
+                    user_data,
+                    format!("reta failed: {error}\n").as_bytes(),
+                );
+            }
+            response
+        }
     }
 }
 
@@ -1557,6 +1715,36 @@ where
         Ok(Err(error)) => json_error_string(&error.to_string()),
         Err(_) => json_error_string("panic inside reta JSON FFI export"),
     }
+}
+
+fn empty_stream_response(exit_code: i32) -> RetaFfiStreamResponse {
+    RetaFfiStreamResponse {
+        exit_code,
+        ..RetaFfiStreamResponse::default()
+    }
+}
+
+fn emit_stream_error(
+    callback: Option<RetaStreamChunkCallback>,
+    user_data: *mut c_void,
+    bytes: &[u8],
+) -> i32 {
+    let Some(callback) = callback else {
+        return -1;
+    };
+    unsafe { emit_stream_callback(callback, user_data, RETA_STREAM_KIND_STDERR, bytes) }
+}
+
+unsafe fn emit_stream_callback(
+    callback: RetaStreamChunkCallback,
+    user_data: *mut c_void,
+    kind: u8,
+    bytes: &[u8],
+) -> i32 {
+    if bytes.is_empty() {
+        return 0;
+    }
+    unsafe { callback(kind, bytes.as_ptr(), bytes.len(), user_data) }
 }
 
 fn ffi_error_response<S: Into<String>>(exit_code: i32, stderr_text: S) -> RetaFfiResponse {

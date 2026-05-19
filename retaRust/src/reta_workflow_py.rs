@@ -1,10 +1,78 @@
+use crate::reta_output_stream::{
+    stream_lines, OutputStreamKind, OutputStreamNetworkConfig, OutputStreamStats,
+};
 use crate::reta_program_types::{
     DiagnosticLevel, RetaDiagnostic, RetaError, RetaMetadata, RetaRequest, RetaResponse,
+    RetaRuntime,
 };
 use crate::reta_runtime_bridge::with_runtime_override;
+use crate::shared::reta_program_types::Program;
 use crate::{fresh_program_from_template, preload_reta_runtime, shared_words};
 
+struct RetaPreparedRun {
+    program: Program,
+    runtime: RetaRuntime,
+    diagnostics: Vec<RetaDiagnostic>,
+    committed_shadow_lines: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RetaStreamedResponse {
+    pub exit_code: i32,
+    pub diagnostics: Vec<RetaDiagnostic>,
+    pub metadata: RetaMetadata,
+    pub stream_stats: OutputStreamStats,
+}
+
 pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
+    let prepared = execute_reta_program(request)?;
+    Ok(response_from_prepared_run(prepared))
+}
+
+pub fn run_reta_streamed<E>(
+    request: RetaRequest,
+    mut emit: E,
+) -> Result<RetaStreamedResponse, RetaError>
+where
+    E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
+{
+    let mut prepared = execute_reta_program(request)?;
+    let exit_code = if prepared.program.cliErrors.is_empty() {
+        0
+    } else {
+        1
+    };
+    let metadata = metadata_from_prepared_run(&prepared);
+    release_non_visible_buffers_for_streaming(&mut prepared.program);
+    let config = OutputStreamNetworkConfig::from_env();
+    let mut stream_stats = OutputStreamStats::default();
+
+    let stderr_stats = stream_lines(
+        &prepared.program.cliErrors,
+        OutputStreamKind::Stderr,
+        &config,
+        &mut emit,
+    )
+    .map_err(RetaError::Execution)?;
+    stream_stats.merge(stderr_stats);
+
+    let stdout_lines = match prepared.committed_shadow_lines.as_ref() {
+        Some(lines) => lines.as_slice(),
+        None => prepared.program.finallyDisplayLines.as_slice(),
+    };
+    let stdout_stats = stream_lines(stdout_lines, OutputStreamKind::Stdout, &config, &mut emit)
+        .map_err(RetaError::Execution)?;
+    stream_stats.merge(stdout_stats);
+
+    Ok(RetaStreamedResponse {
+        exit_code,
+        diagnostics: prepared.diagnostics,
+        metadata,
+        stream_stats,
+    })
+}
+
+fn execute_reta_program(request: RetaRequest) -> Result<RetaPreparedRun, RetaError> {
     let argv = normalize_program_argv(&request.raw_args);
     let _architecture_run = reta_architecture::RetaRunArchitecture::from_cli_args(&argv);
     let (arch_clean_argv, _) =
@@ -15,7 +83,7 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
     preload_reta_runtime().map_err(RetaError::Execution)?;
 
     let runtime = request.runtime.clone();
-    let program = with_runtime_override(Some(runtime.clone()), || {
+    let mut program = with_runtime_override(Some(runtime.clone()), || {
         let mut program = fresh_program_from_template(legacy_argv);
         let words = shared_words();
         program.runAllesLikePythonInit(words);
@@ -528,59 +596,100 @@ pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
             }),
     );
 
-    let rendered_text = if let Some(lines) = committed_shadow_lines.as_ref() {
+    // The final streaming path reads either committed_shadow_lines or
+    // finallyDisplayLines.  The chunk mirror is only legacy bookkeeping here
+    // and would otherwise duplicate a large part of the visible output.
+    program.finallyDisplayLinesByChunks = Vec::new();
+    if committed_shadow_lines.is_some() {
+        program.finallyDisplayLines = Vec::new();
+    }
+
+    Ok(RetaPreparedRun {
+        program,
+        runtime,
+        diagnostics,
+        committed_shadow_lines,
+    })
+}
+
+fn response_from_prepared_run(prepared: RetaPreparedRun) -> RetaResponse {
+    let rendered_text = if let Some(lines) = prepared.committed_shadow_lines.as_ref() {
         join_output_lines(lines)
-    } else if !program.finallyDisplayLines.is_empty() {
-        join_output_lines(&program.finallyDisplayLines)
+    } else if !prepared.program.finallyDisplayLines.is_empty() {
+        join_output_lines(&prepared.program.finallyDisplayLines)
     } else {
         String::new()
     };
 
-    let stderr_text = if program.cliErrors.is_empty() {
+    let stderr_text = if prepared.program.cliErrors.is_empty() {
         String::new()
     } else {
-        let mut text = program.cliErrors.join("\n");
+        let mut text = prepared.program.cliErrors.join("\n");
         if !text.is_empty() {
             text.push('\n');
         }
         text
     };
 
-    let exit_code = if program.cliErrors.is_empty() { 0 } else { 1 };
+    let exit_code = if prepared.program.cliErrors.is_empty() {
+        0
+    } else {
+        1
+    };
+    let metadata = metadata_from_prepared_run(&prepared);
 
-    let metadata = RetaMetadata {
-        effective_width: runtime.terminal_width.or_else(|| {
-            if program.shellWidth > 0 {
-                Some(program.shellWidth as usize)
-            } else if program.textWidth > 0 {
-                Some(program.textWidth as usize)
+    RetaResponse {
+        rendered_text,
+        stderr_text,
+        exit_code,
+        diagnostics: prepared.diagnostics,
+        metadata,
+    }
+}
+
+fn release_non_visible_buffers_for_streaming(program: &mut Program) {
+    program.__resultingTable = Vec::new();
+    program.tables = Vec::new();
+    program.old2Rows = Vec::new();
+    program.newerTable = Vec::new();
+    program.oldRows = Vec::new();
+    program.newerRows = Vec::new();
+    program.oldTable = Vec::new();
+    program.finallyDisplayTable = Vec::new();
+    program.rowsOfcombi = Vec::new();
+    program.rowsOfcombiNot = Vec::new();
+    program.finallyDisplayLinesByChunks = Vec::new();
+}
+
+fn metadata_from_prepared_run(prepared: &RetaPreparedRun) -> RetaMetadata {
+    RetaMetadata {
+        effective_width: prepared.runtime.terminal_width.or_else(|| {
+            if prepared.program.shellWidth > 0 {
+                Some(prepared.program.shellWidth as usize)
+            } else if prepared.program.textWidth > 0 {
+                Some(prepared.program.textWidth as usize)
             } else {
                 None
             }
         }),
-        selected_columns: program
+        selected_columns: prepared
+            .program
             .spaltenreihenfolgeundnurdiese
             .iter()
             .map(ToString::to_string)
             .collect(),
-        rows_emitted: committed_shadow_lines
+        rows_emitted: prepared
+            .committed_shadow_lines
             .as_ref()
             .map(Vec::len)
             .unwrap_or_else(|| {
-                program
+                prepared
+                    .program
                     .__resultingTable
                     .len()
-                    .max(program.finallyDisplayLines.len())
+                    .max(prepared.program.finallyDisplayLines.len())
             }),
-    };
-
-    Ok(RetaResponse {
-        rendered_text,
-        stderr_text,
-        exit_code,
-        diagnostics,
-        metadata,
-    })
+    }
 }
 
 fn normalize_program_argv(raw_args: &[String]) -> Vec<String> {

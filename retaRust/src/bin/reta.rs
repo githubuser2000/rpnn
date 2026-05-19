@@ -1,8 +1,9 @@
 use std::env;
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
 use std::io::{self, IsTerminal, Read, Write};
 use std::os::raw::c_char;
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use libloading::{library_filename, Library, Symbol};
 
@@ -25,11 +26,49 @@ type RetaRunArgvFn = unsafe extern "C" fn(
     stdin_is_tty: u8,
 ) -> RetaFfiResponse;
 
+type RetaStreamChunkFn = unsafe extern "C" fn(
+    kind: u8,
+    data: *const u8,
+    len: usize,
+    user_data: *mut c_void,
+) -> i32;
+
+#[repr(C)]
+struct RetaFfiStreamResponse {
+    exit_code: i32,
+    stdout_chunks: usize,
+    stderr_chunks: usize,
+    stdout_bytes: usize,
+    stderr_bytes: usize,
+    stdout_lines: usize,
+    stderr_lines: usize,
+    callback_error: i32,
+}
+
+type RetaRunArgvStreamFn = unsafe extern "C" fn(
+    argc: usize,
+    argv: *const *const c_char,
+    stdin_text: *const c_char,
+    terminal_width: usize,
+    stdout_is_tty: u8,
+    stderr_is_tty: u8,
+    stdin_is_tty: u8,
+    callback: Option<RetaStreamChunkFn>,
+    user_data: *mut c_void,
+) -> RetaFfiStreamResponse;
+
 type RetaFreeStringFn = unsafe extern "C" fn(ptr: *mut c_char);
 type RetaAbiVersionFn = unsafe extern "C" fn() -> u32;
 
 const EXPECTED_RETA_ABI_VERSION: u32 = 2;
 const MAX_FFI_RESPONSE_BYTES: usize = 1024 * 1024 * 1024;
+const RETA_STREAM_KIND_STDOUT: u8 = 1;
+const RETA_STREAM_KIND_STDERR: u8 = 2;
+
+struct LauncherStreamContext {
+    stdout: Mutex<io::Stdout>,
+    stderr: Mutex<io::Stderr>,
+}
 
 fn main() {
     std::process::exit(real_main());
@@ -67,6 +106,54 @@ fn real_main() -> i32 {
             return 127;
         }
 
+        let argv_cstrings = args
+            .iter()
+            .map(|arg| to_c_string_lossy(arg))
+            .collect::<Vec<_>>();
+        let argv_ptrs = argv_cstrings
+            .iter()
+            .map(|arg| arg.as_ptr())
+            .collect::<Vec<_>>();
+        let stdin_cstring = stdin_text.as_deref().map(to_c_string_lossy);
+        let stdin_ptr = stdin_cstring
+            .as_ref()
+            .map_or(std::ptr::null(), |text| text.as_ptr());
+        let terminal_width = detect_terminal_width().unwrap_or(0);
+        let stdout_is_tty = io::stdout().is_terminal() as u8;
+        let stderr_is_tty = io::stderr().is_terminal() as u8;
+        let stdin_is_tty = io::stdin().is_terminal() as u8;
+
+        if let Ok(run_stream) = library.get::<RetaRunArgvStreamFn>(b"reta_run_argv_stream") {
+            let context = LauncherStreamContext {
+                stdout: Mutex::new(io::stdout()),
+                stderr: Mutex::new(io::stderr()),
+            };
+            let response = run_stream(
+                argv_ptrs.len(),
+                argv_ptrs.as_ptr(),
+                stdin_ptr,
+                terminal_width,
+                stdout_is_tty,
+                stderr_is_tty,
+                stdin_is_tty,
+                Some(launcher_stream_chunk),
+                &context as *const LauncherStreamContext as *mut c_void,
+            );
+
+            let _ = context.stdout.lock().map(|mut stdout| stdout.flush());
+            let _ = context.stderr.lock().map(|mut stderr| stderr.flush());
+
+            if response.callback_error != 0 {
+                let _ = writeln!(
+                    io::stderr(),
+                    "reta launcher stream callback failed: {}",
+                    response.callback_error
+                );
+                return 120;
+            }
+            return response.exit_code;
+        }
+
         let run: Symbol<'_, RetaRunArgvFn> = match library.get(b"reta_run_argv") {
             Ok(symbol) => symbol,
             Err(error) => {
@@ -89,26 +176,14 @@ fn real_main() -> i32 {
             }
         };
 
-        let argv_cstrings = args
-            .iter()
-            .map(|arg| to_c_string_lossy(arg))
-            .collect::<Vec<_>>();
-        let argv_ptrs = argv_cstrings
-            .iter()
-            .map(|arg| arg.as_ptr())
-            .collect::<Vec<_>>();
-        let stdin_cstring = stdin_text.as_deref().map(to_c_string_lossy);
-
         let response = run(
             argv_ptrs.len(),
             argv_ptrs.as_ptr(),
-            stdin_cstring
-                .as_ref()
-                .map_or(std::ptr::null(), |text| text.as_ptr()),
-            detect_terminal_width().unwrap_or(0),
-            io::stdout().is_terminal() as u8,
-            io::stderr().is_terminal() as u8,
-            io::stdin().is_terminal() as u8,
+            stdin_ptr,
+            terminal_width,
+            stdout_is_tty,
+            stderr_is_tty,
+            stdin_is_tty,
         );
 
         let stderr_text =
@@ -257,6 +332,45 @@ unsafe fn take_owned_response_string(
         free(ptr);
     }
     text
+}
+
+unsafe extern "C" fn launcher_stream_chunk(
+    kind: u8,
+    data: *const u8,
+    len: usize,
+    user_data: *mut c_void,
+) -> i32 {
+    if user_data.is_null() {
+        return -10;
+    }
+    if data.is_null() && len != 0 {
+        return -11;
+    }
+
+    let context = unsafe { &*(user_data as *const LauncherStreamContext) };
+    let bytes = if len == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(data, len) }
+    };
+
+    let result = match kind {
+        RETA_STREAM_KIND_STDOUT => write_stream_chunk(&context.stdout, bytes),
+        RETA_STREAM_KIND_STDERR => write_stream_chunk(&context.stderr, bytes),
+        _ => return -12,
+    };
+
+    match result {
+        Ok(()) => 0,
+        Err(_) => -13,
+    }
+}
+
+fn write_stream_chunk<W: Write>(stream: &Mutex<W>, bytes: &[u8]) -> io::Result<()> {
+    let mut guard = stream
+        .lock()
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, "stream mutex poisoned"))?;
+    guard.write_all(bytes)
 }
 
 unsafe fn read_c_string_lossy_with_known_len(

@@ -157,3 +157,37 @@ RETA_PARALLEL=0 target/debug/rreta -zeilen --alles -spalten --alles
 
 Allow global parallelism but limit workers:
 
+```bash
+RETA_PARALLEL=1 RETA_JOBS=2 target/debug/rreta -zeilen --alles -spalten --alles
+```
+
+## Final-output streaming variables
+
+The CLI launcher now prefers the streaming ABI `reta_run_argv_stream` when the
+loaded `libreta.so` exports it.  This path avoids the previous final memory
+spike where all rendered lines were joined into one large `String`, copied into
+a C string, copied back into the launcher, and only then written to stdout.
+
+The streaming handoff uses bounded FIFO queues (`std::sync::mpsc::sync_channel`).
+Those queues act as semaphores/back-pressure: if stdout or stderr is slower than
+the producer, producers block instead of growing an unbounded output buffer.
+Stdout and stderr use the same callback interface, so the engine-to-launcher
+handoff is duplex; stdin remains part of the request.  For larger outputs the
+work may be split into several ordered producer queues through the central
+`RETA_OUTPUT` worker budget.  Each queue remains FIFO, and
+the consumer drains queues in visible line order.  LIFO is intentionally not used
+for visible output because CSV, HTML and shell output must stay byte-stable and
+ordered.
+
+| Variable | Default | Meaning |
+|---|---:|---|
+| `RETA_OUTPUT_QUEUE_CAPACITY` | `64` | Maximum queued line frames per producer queue before the producer blocks. |
+| `RETA_OUTPUT_CHUNK_BYTES` | `65536` | Maximum normal chunk size passed from the library to the launcher callback. Very long single lines may be emitted as line bytes plus newline. |
+| `RETA_OUTPUT_STREAM_MIN_LINES` | `256` | Minimum lines per worker for the final streaming handoff. |
+| `RETA_OUTPUT_STREAM_MIN_ITEMS` | same as above | Compatibility alias used only if `RETA_OUTPUT_STREAM_MIN_LINES` is unset. |
+
+Example with explicit bounded streaming and two global jobs:
+
+```bash
+RETA_JOBS=2 RETA_OUTPUT_QUEUE_CAPACITY=16 RETA_OUTPUT_CHUNK_BYTES=32768 target/debug/rreta -zeilen --alles -spalten --alles
+```
