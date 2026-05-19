@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Shell variable documentation: RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,7 +20,7 @@ esac
 TARGET_DIR="${CARGO_TARGET_DIR:-target}/$PROFILE"
 OUT_DIR="$TARGET_DIR/retaprompt_split_sharedlibs_package"
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/include" "$OUT_DIR/doc/shared-libs"
+mkdir -p "$OUT_DIR/include" "$OUT_DIR/doc/shared-libs" "$OUT_DIR/doc/shell-variables"
 
 CORE_SPLIT_LIBRARIES=(
   reta_data
@@ -68,11 +69,14 @@ copy_required "$TARGET_DIR/rrpe" "$OUT_DIR/"
 copy_required "$TARGET_DIR/rrpb" "$OUT_DIR/"
 copy_required_dir "$TARGET_DIR/csv" "$OUT_DIR/csv"
 copy_required_dir doc/shared-libs "$OUT_DIR/doc/shared-libs"
+copy_required_dir doc/shell-variables "$OUT_DIR/doc/shell-variables"
 copy_required crates/retaprompt_input/include/retaprompt_input.h "$OUT_DIR/include/"
 copy_required crates/retaprompt_commands/include/retaprompt_commands.h "$OUT_DIR/include/"
 copy_required "$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json" "$OUT_DIR/"
 copy_required RETA_SHARED_LIBS_DE.md "$OUT_DIR/"
 copy_required RETA_SHARED_LIBS_EN.md "$OUT_DIR/"
+copy_required RETA_SHELL_VARIABLES_DE.md "$OUT_DIR/"
+copy_required RETA_SHELL_VARIABLES_EN.md "$OUT_DIR/"
 copy_required RETAPROMPT_SHAREDLIB.md "$OUT_DIR/"
 copy_required RETAPROMPT_STATICLIB.md "$OUT_DIR/STATIC_ARCHIVES_RETIRED.md"
 
@@ -168,11 +172,17 @@ Size rule:
 - libreta.so must be smaller than libreta_runtime.so.
 - The build scripts fail when libreta.so becomes the heavy engine carrier again.
 
+Documentation rule:
+- RETA_SHARED_LIBS_DE.md and RETA_SHARED_LIBS_EN.md describe the complete .so topology.
+- doc/shared-libs/de/*.md and doc/shared-libs/en/*.md contain large programmer documentation for every .so library.
+- RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md describe runtime, build, linker, prompt, architecture and script variables.
+- doc/shell-variables/de/README.md and doc/shell-variables/en/README.md contain the same large shell-variable documentation inside the documentation tree.
+
 Artifact rule:
 - This package intentionally contains only dynamic .so libraries and C launchers.
 - Static archives (.a) are not part of this package.
 - Rust prompt frontend executables are not built by default in build.sh.
-- The per-library German and English Markdown documentation is in doc/shared-libs/.
+- Autocomplete and autosuggest logic belongs to libretaprompt_input.so, not to the executables.
 LAYOUT
 
 printf 'packaged dynamic split shared libraries and launchers in:\n'

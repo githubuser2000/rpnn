@@ -159,6 +159,20 @@ struct AutosuggestionHint {
     accept_action: RightArrowAcceptAction,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CursorAutosuggestion {
+    pub display: String,
+    pub insert: String,
+    pub accept_action: RightArrowAcceptAction,
+    pub cursor: usize,
+    pub replace_start: usize,
+    pub replace_len: usize,
+    pub replacement: String,
+    pub cursor_ghost: String,
+    pub tail_after_replace: String,
+    pub is_cursor_local: bool,
+}
+
 #[derive(Clone, Debug)]
 struct CompletionCandidate {
     value: String,
@@ -358,6 +372,37 @@ pub fn autosuggestion_for_input_in_mode_with_context(
     .map(|hint| hint.display)
 }
 
+pub fn autosuggestion_for_input_at_cursor(
+    input: &str,
+    cursor: usize,
+) -> Option<CursorAutosuggestion> {
+    autosuggestion_for_input_at_cursor_in_mode_with_context(
+        input,
+        cursor,
+        PromptModus::Normal,
+        &[],
+        &[],
+    )
+}
+
+pub fn autosuggestion_for_input_at_cursor_in_mode_with_context(
+    input: &str,
+    cursor: usize,
+    prompt_mode: PromptModus,
+    stored_prefix_tokens: &[String],
+    stored_commands: &[String],
+) -> Option<CursorAutosuggestion> {
+    let cursor = safe_cursor_position(input, cursor);
+    autosuggestion_from_context_candidates_at_cursor(
+        input,
+        cursor,
+        prompt_mode,
+        stored_prefix_tokens,
+        stored_commands,
+    )
+    .map(|hint| CursorAutosuggestion::from_hint(input, cursor, hint))
+}
+
 pub fn candidates_for_prefix(prefix: &str) -> Vec<String> {
     filter_candidate_values(&prompt_metadata().vocabulary, prefix, false)
 }
@@ -459,10 +504,14 @@ impl Hinter for PromptContextHinter {
             &runtime_state.stored_prefix_tokens,
             &runtime_state.stored_commands,
         ) {
-            let display = hint.display.clone();
             self.right_arrow_state.update(hint.right_arrow_snapshot());
             self.current_hint = hint;
-            return render_autosuggestion_hint(&display, use_ansi_coloring);
+            return render_autosuggestion_hint_for_line(
+                line,
+                cursor,
+                &self.current_hint,
+                use_ansi_coloring,
+            );
         }
 
         if cursor == line.len() {
@@ -518,6 +567,44 @@ impl AutosuggestionHint {
             cursor_at_end: true,
             accept_action: self.accept_action.clone(),
         }
+    }
+}
+
+impl CursorAutosuggestion {
+    fn from_hint(line: &str, cursor: usize, hint: AutosuggestionHint) -> Self {
+        let cursor = safe_cursor_position(line, cursor);
+        let mut out = Self {
+            display: hint.display.clone(),
+            insert: hint.insert.clone(),
+            accept_action: hint.accept_action.clone(),
+            cursor,
+            ..Self::default()
+        };
+
+        match hint.accept_action {
+            RightArrowAcceptAction::ReplaceRange {
+                replace_start,
+                replace_len,
+                replacement,
+            } => {
+                out.replace_start = replace_start;
+                out.replace_len = replace_len;
+                out.replacement = replacement.clone();
+                if let Some((ghost, tail_after_replace)) =
+                    cursor_local_ghost_and_tail(line, cursor, replace_start, replace_len, &replacement)
+                {
+                    out.cursor_ghost = ghost;
+                    out.tail_after_replace = tail_after_replace;
+                    out.is_cursor_local = true;
+                }
+            }
+            RightArrowAcceptAction::Insert(text) => {
+                out.replacement = text;
+            }
+            RightArrowAcceptAction::None => {}
+        }
+
+        out
     }
 }
 
@@ -740,12 +827,112 @@ fn autosuggestion_from_history(before_cursor: &str, history: &dyn History) -> Op
     })
 }
 
+fn render_autosuggestion_hint_for_line(
+    line: &str,
+    cursor: usize,
+    hint: &AutosuggestionHint,
+    use_ansi_coloring: bool,
+) -> String {
+    if use_ansi_coloring {
+        if let Some(rendered) = render_cursor_local_replacement_hint(line, cursor, hint) {
+            return rendered;
+        }
+    }
+
+    render_autosuggestion_hint(&hint.display, use_ansi_coloring)
+}
+
+fn render_cursor_local_replacement_hint(
+    line: &str,
+    cursor: usize,
+    hint: &AutosuggestionHint,
+) -> Option<String> {
+    let RightArrowAcceptAction::ReplaceRange {
+        replace_start,
+        replace_len,
+        replacement,
+    } = &hint.accept_action
+    else {
+        return None;
+    };
+
+    let cursor = safe_cursor_position(line, cursor);
+    let (ghost, tail_after_replace) = cursor_local_ghost_and_tail(
+        line,
+        cursor,
+        *replace_start,
+        *replace_len,
+        replacement,
+    )?;
+
+    if ghost.is_empty() || cursor >= line.len() {
+        return None;
+    }
+
+    let tail_after_cursor = &line[cursor..];
+    let move_to_cursor = terminal_move_left_sequence(display_cell_width(tail_after_cursor));
+    let printed_width = display_cell_width(&ghost) + display_cell_width(&tail_after_replace);
+    let move_back_to_cursor = terminal_move_left_sequence(printed_width);
+
+    Some(format!(
+        "{move_to_cursor}\x1b[90m{ghost}\x1b[0m{tail_after_replace}\x1b[K{move_back_to_cursor}"
+    ))
+}
+
 fn render_autosuggestion_hint(hint: &str, use_ansi_coloring: bool) -> String {
     if use_ansi_coloring && !hint.is_empty() {
         format!("\x1b[90m{hint}\x1b[0m")
     } else {
         hint.to_string()
     }
+}
+
+fn cursor_local_ghost_and_tail(
+    line: &str,
+    cursor: usize,
+    replace_start: usize,
+    replace_len: usize,
+    replacement: &str,
+) -> Option<(String, String)> {
+    let replace_end = replace_start.checked_add(replace_len)?;
+    if replace_start > cursor
+        || cursor > replace_end
+        || replace_end > line.len()
+        || !line.is_char_boundary(replace_start)
+        || !line.is_char_boundary(cursor)
+        || !line.is_char_boundary(replace_end)
+    {
+        return None;
+    }
+
+    let typed_fragment = &line[replace_start..cursor];
+    if typed_fragment.is_empty() {
+        return None;
+    }
+
+    let ghost = if replacement.starts_with(typed_fragment) {
+        let suffix_start = typed_fragment.len();
+        if !replacement.is_char_boundary(suffix_start) {
+            return None;
+        }
+        replacement[suffix_start..].to_string()
+    } else {
+        format!(" → {replacement}")
+    };
+
+    Some((ghost, line[replace_end..].to_string()))
+}
+
+fn terminal_move_left_sequence(width: usize) -> String {
+    if width == 0 {
+        String::new()
+    } else {
+        format!("\x1b[{width}D")
+    }
+}
+
+fn display_cell_width(text: &str) -> usize {
+    text.chars().filter(|ch| !ch.is_control()).count()
 }
 
 fn first_autosuggestion_token(hint: &str) -> String {
@@ -2392,10 +2579,11 @@ fn with_negative_variants_and_any(values: &[&'static str]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        autosuggestion_for_input, autosuggestion_for_input_in_mode_with_context,
-        autosuggestion_from_context_candidates, autosuggestion_from_context_candidates_at_cursor,
-        candidates_for_input, completion_replace_end_for_line,
-        candidates_for_input_in_mode_with_context, normalize_completion_text, PromptModus,
+        autosuggestion_for_input, autosuggestion_for_input_at_cursor,
+        autosuggestion_for_input_in_mode_with_context, autosuggestion_from_context_candidates,
+        autosuggestion_from_context_candidates_at_cursor, candidates_for_input,
+        completion_replace_end_for_line, candidates_for_input_in_mode_with_context,
+        normalize_completion_text, render_autosuggestion_hint_for_line, PromptModus,
         RightArrowAcceptAction,
     };
 
@@ -2864,6 +3052,46 @@ mod tests {
                 replacement: "-zeilen".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn public_cursor_autosuggestion_exposes_local_ghost_and_replacement() {
+        let line = "reta -ze --zeit=heute";
+        let cursor = "reta -ze".len();
+        let hint = autosuggestion_for_input_at_cursor(line, cursor)
+            .expect("expected cursor-local autosuggestion");
+
+        assert!(hint.is_cursor_local);
+        assert_eq!(hint.cursor_ghost, "ilen");
+        assert_eq!(hint.tail_after_replace, " --zeit=heute");
+        assert_eq!(
+            hint.accept_action,
+            RightArrowAcceptAction::ReplaceRange {
+                replace_start: "reta ".len(),
+                replace_len: "-ze".len(),
+                replacement: "-zeilen".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn rendered_midline_autosuggestion_moves_hint_back_to_cursor() {
+        let line = "reta -ze --zeit=heute";
+        let cursor = "reta -ze".len();
+        let hint = autosuggestion_from_context_candidates_at_cursor(
+            line,
+            cursor,
+            PromptModus::Normal,
+            &[],
+            &[],
+        )
+        .expect("expected midline autosuggestion");
+        let rendered = render_autosuggestion_hint_for_line(line, cursor, &hint, true);
+
+        assert!(rendered.starts_with("\x1b["));
+        assert!(rendered.contains("ilen"));
+        assert!(rendered.contains(" --zeit=heute"));
+        assert!(rendered.ends_with('D'));
     }
 
     #[test]

@@ -1,8 +1,8 @@
-# Reta shared-library topology
+# Reta shared-library topology — English programmer documentation
 
-This documentation describes every built `.so` library in English.
+This documentation describes **all currently built `.so` libraries** of the Reta/retaPrompt architecture. It is written for programmers: ABI, headers, ownership, build checks, `DT_NEEDED`, RPATH/RUNPATH, common regressions, and extension rules.
 
-## Target structure
+## Target topology
 
 ```text
 rreta
@@ -27,27 +27,31 @@ rrpb
   -> libretaprompt_commands.so
 ```
 
-## Rule
+## Principle
 
-The executables stay small. Program logic lives in `.so` libraries. `libreta.so` is now deliberately only the stable thin facade; the heavy non-interactive Reta core lives in `libreta_runtime.so` and is reached through private `reta_runtime_core_*` symbols. The other private core libraries form the explicit internal topology. `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, and `libreta_render.so` now contain first concrete domain logic; `rgrundStrukHtml` uses `libreta_render.so` directly.
+Final executables stay small. Program logic lives in `.so` libraries. `libreta.so` is the thin public facade; `libreta_runtime.so` carries the heavy non-interactive core. `rgrundStrukHtml` uses `libreta_render.so` directly. `rrpb` remains command-only. `rrp`, `rrpl`, and `rrpe` use both the input and command libraries.
 
-## Stub size rule
+## Autocomplete/autosuggest boundary
 
-The build scripts also check that `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, and `libreta_render.so` do not all have exactly the same size again. Equal sizes for all five would indicate empty ABI stubs.
-
-## Size rule
-
-`libreta.so` must be smaller than `libreta_runtime.so`. The build scripts fail if `libreta.so` becomes the heavy engine carrier again.
+Autocomplete and autosuggest belong to `libretaprompt_input.so`. The C launchers contain no algorithm for that. Mid-cursor autosuggest is computed in the shared library and is additionally exported as ABI diagnostics via `retaprompt_input_autosuggestion_at_cursor_json`.
 
 ## Per-library documents
 
-- [libreta.so](libreta.md)
-- [libreta_data.so](libreta_data.md)
-- [libreta_parse.so](libreta_parse.md)
-- [libreta_semantics.so](libreta_semantics.md)
-- [libreta_table.so](libreta_table.md)
-- [libreta_render.so](libreta_render.md)
-- [libreta_arch.so](libreta_arch.md)
-- [libreta_runtime.so](libreta_runtime.md)
-- [libretaprompt_commands.so](libretaprompt_commands.md)
-- [libretaprompt_input.so](libretaprompt_input.md)
+- [libreta.so](libreta.md) — public stable Reta C ABI facade
+- [libreta_data.so](libreta_data.md) — data, words, aliases, CSV/catalog projections
+- [libreta_parse.so](libreta_parse.md) — parsing, tokenization, and input morphisms
+- [libreta_semantics.so](libreta_semantics.md) — semantics, selection spaces, topology, and presheaf
+- [libreta_table.so](libreta_table.md) — tables, view state, width logic, and sheaf gluing
+- [libreta_render.so](libreta_render.md) — rendering functors, especially GrundStrukHtml
+- [libreta_arch.so](libreta_arch.md) — architecture metadata, category, morphism, and topology
+- [libreta_runtime.so](libreta_runtime.md) — execution network and heavy Reta core carrier
+- [libretaprompt_commands.so](libretaprompt_commands.md) — retaPrompt command side and command morphisms
+- [libretaprompt_input.so](libretaprompt_input.md) — retaPrompt input, autocomplete, autosuggest, and history
+
+## Additional documentation
+
+- `RETA_SHARED_LIBS_DE.md` — German root overview.
+- `RETA_SHARED_LIBS_EN.md` — English root overview.
+- `RETA_SHELL_VARIABLES_DE.md` — large German documentation of shell/environment variables.
+- `RETA_SHELL_VARIABLES_EN.md` — large English documentation of shell/environment variables.
+- `doc/shell-variables/de/README.md` and `doc/shell-variables/en/README.md` — packageable variant of the variable documentation.

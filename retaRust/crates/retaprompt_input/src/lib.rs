@@ -1,5 +1,8 @@
 #![allow(non_snake_case)]
 
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+
 pub use reta_architecture;
 
 pub mod shared {
@@ -310,4 +313,126 @@ pub extern "C" fn retaprompt_input_run_rpl_from_env() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_rpe_from_env() -> i32 {
     ffi_guard_i32("retaprompt_input_run_rpe_from_env", run_rpe_from_env)
+}
+
+
+fn ffi_string_or_null(text: String) -> *mut c_char {
+    match CString::new(text) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+fn json_escape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 8);
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch => out.push(ch),
+        }
+    }
+    out
+}
+
+fn json_string(text: &str) -> String {
+    format!("\"{}\"", json_escape(text))
+}
+
+fn accept_action_json(action: &completion::RightArrowAcceptAction) -> String {
+    match action {
+        completion::RightArrowAcceptAction::None => "{\"kind\":\"none\"}".to_string(),
+        completion::RightArrowAcceptAction::Insert(text) => {
+            format!("{{\"kind\":\"insert\",\"text\":{}}}", json_string(text))
+        }
+        completion::RightArrowAcceptAction::ReplaceRange {
+            replace_start,
+            replace_len,
+            replacement,
+        } => format!(
+            "{{\"kind\":\"replace_range\",\"replace_start\":{},\"replace_len\":{},\"replacement\":{}}}",
+            replace_start,
+            replace_len,
+            json_string(replacement)
+        ),
+    }
+}
+
+
+fn safe_ffi_cursor_position(line: &str, cursor: usize) -> usize {
+    let mut pos = cursor.min(line.len());
+    while pos > 0 && !line.is_char_boundary(pos) {
+        pos -= 1;
+    }
+    pos
+}
+
+fn cursor_autosuggestion_json(line: &str, cursor: usize) -> String {
+    let cursor = safe_ffi_cursor_position(line, cursor);
+    match completion::autosuggestion_for_input_at_cursor(line, cursor) {
+        Some(hint) => format!(
+            concat!(
+                "{{",
+                "\"present\":true,",
+                "\"cursor\":{},",
+                "\"display\":{},",
+                "\"insert\":{},",
+                "\"replace_start\":{},",
+                "\"replace_len\":{},",
+                "\"replacement\":{},",
+                "\"cursor_ghost\":{},",
+                "\"tail_after_replace\":{},",
+                "\"is_cursor_local\":{},",
+                "\"accept_action\":{}",
+                "}}"
+            ),
+            hint.cursor,
+            json_string(&hint.display),
+            json_string(&hint.insert),
+            hint.replace_start,
+            hint.replace_len,
+            json_string(&hint.replacement),
+            json_string(&hint.cursor_ghost),
+            json_string(&hint.tail_after_replace),
+            if hint.is_cursor_local { "true" } else { "false" },
+            accept_action_json(&hint.accept_action),
+        ),
+        None => format!(
+            "{{\"present\":false,\"cursor\":{},\"display\":\"\",\"insert\":\"\",\"accept_action\":{{\"kind\":\"none\"}}}}",
+            cursor
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_autosuggestion_at_cursor_json(
+    line: *const c_char,
+    cursor: usize,
+) -> *mut c_char {
+    if line.is_null() {
+        return ffi_string_or_null(
+            "{\"present\":false,\"error\":\"line pointer is null\"}".to_string(),
+        );
+    }
+
+    let text = unsafe { CStr::from_ptr(line) };
+    match text.to_str() {
+        Ok(line) => ffi_string_or_null(cursor_autosuggestion_json(line, cursor)),
+        Err(_) => ffi_string_or_null(
+            "{\"present\":false,\"error\":\"line is not valid UTF-8\"}".to_string(),
+        ),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe {
+            let _ = CString::from_raw(ptr);
+        }
+    }
 }

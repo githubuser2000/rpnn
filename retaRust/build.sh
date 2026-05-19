@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Shell variable documentation: RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -286,6 +287,8 @@ verify_needed "$TARGET_DIR/rrp"  retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpe" retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpb" retaprompt_commands
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_autosuggestion_at_cursor_json
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_free_string
 verify_not_needed "$TARGET_DIR/rrpb" retaprompt_input
 
 copy_runtime_data

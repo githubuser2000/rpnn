@@ -1,16 +1,57 @@
-# Reta `.so`-Split — deutsche Übersicht
+# Reta `.so`-Split — deutsche große Übersicht
 
-Die Struktur ist jetzt als echte dünne Fassade umgesetzt: `rreta` linkt direkt nur gegen `libreta.so`; `libreta.so` exportiert die stabile öffentliche ABI und leitet die schwere Engine-Ausführung an `libreta_runtime.so` weiter. Die übrigen privaten Core-Bibliotheken bleiben als Topologie- und ABI-Grenzen eingebunden.
+Diese Datei ist die zentrale deutsche Übersicht zur dynamischen `.so`-Topologie. Die ausführlichen Einzeldokumente stehen unter `doc/shared-libs/de/`.
 
-Damit gilt im Split-Build: `libreta.so` soll klein sein, `libreta_runtime.so` trägt den schweren nicht-interaktiven Reta-Core. Das Build-Skript prüft diese Größenrichtung und bricht ab, wenn `libreta.so` wieder größer oder gleich groß wie `libreta_runtime.so` wird.
+## Aktive Topologie
 
-Die Prompt-Programme bleiben getrennt: `rrpb` verwendet nur `libretaprompt_commands.so`, während `rrp`, `rrpl` und `rrpe` zusätzlich `libretaprompt_input.so` für Autocomplete und Autosuggest verwenden.
+```text
+rreta -> libreta.so -> libreta_data.so + libreta_parse.so + libreta_semantics.so + libreta_table.so + libreta_render.so + libreta_arch.so + libreta_runtime.so
+rgrundStrukHtml -> libreta_render.so -> libreta_semantics.so
+rrp/rrpl/rrpe -> libretaprompt_input.so + libretaprompt_commands.so
+rrpb -> libretaprompt_commands.so
+```
 
-Siehe `doc/shared-libs/de/README.md` für die Einzeldokumentation jeder Bibliothek.
+## Kernregeln
 
-## Aktueller Korrekturstand
+- `libreta.so` bleibt klein und öffentlich.
+- `libreta_runtime.so` trägt den schweren nicht-interaktiven Reta-Kern.
+- `libreta_render.so` trägt die HTML-Erzeugung für `rgrundStrukHtml`.
+- `libretaprompt_input.so` trägt interaktive Eingabe, Autocomplete, Autosuggest und History.
+- `libretaprompt_commands.so` trägt die Command-Seite und ist die einzige Prompt-Library für `rrpb`.
+- Die finalen Executables werden im normalen Build als C-Launcher gebaut.
+- Static Archives sind im aktiven Pfad absichtlich deaktiviert.
 
-`rgrundStrukHtml` wird jetzt als kleiner C-Launcher gebaut und nutzt `libreta_render.so` direkt; `libreta_render.so` verlinkt zusätzlich gegen `libreta_semantics.so`. Außerdem exportieren `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so` und `libreta_render.so` reale Komponentenfunktionen. Die Build-Skripte prüfen, dass diese fünf Bibliotheken nicht wieder alle exakt dieselbe Stub-Größe haben.
+## Alle `.so`-Dokumente
 
+- [libreta.so](libreta.md) — öffentliche, stabile Reta-C-ABI-Fassade
+- [libreta_data.so](libreta_data.md) — Daten, Wörter, Aliase, CSV-/Katalog-Projektionen
+- [libreta_parse.so](libreta_parse.md) — Parsing, Tokenisierung und Input-Morphismen
+- [libreta_semantics.so](libreta_semantics.md) — Semantik, Auswahlräume, Topologie und Prägarbe
+- [libreta_table.so](libreta_table.md) — Tabellen, View-Zustand, Breitenlogik und Garben-Verklebung
+- [libreta_render.so](libreta_render.md) — Rendering-Funktoren, insbesondere GrundStrukHtml
+- [libreta_arch.so](libreta_arch.md) — Architektur-Metadaten, Kategorie, Morphismus und Topologie
+- [libreta_runtime.so](libreta_runtime.md) — Ausführungsnetzwerk und schwerer Reta-Core-Träger
+- [libretaprompt_commands.so](libretaprompt_commands.md) — retaPrompt-Befehlsseite und Command-Morphismen
+- [libretaprompt_input.so](libretaprompt_input.md) — retaPrompt-Eingabe, Autocomplete, Autosuggest und History
 
-`cargo run --bin rreta -- -h` und `cargo run --bin rgrundStrukHtml -- -h` funktionieren wieder ohne Feature-Flag. `rgrundStrukHtml` ist auch im Cargo-Pfad ein dynamischer Launcher und lädt `libreta_render.so`, statt `reta::shared::grundstruk_exact` direkt einzubetten.
+## Shellvariablen
+
+Die sehr große Dokumentation der Build-, Runtime- und internen Shellvariablen liegt in `RETA_SHELL_VARIABLES_DE.md` und `doc/shell-variables/de/README.md`.
+
+## Ergänzende Shellvariablen-Dokumentation
+
+Die Shared-Library-Topologie wird nicht nur durch Rust-Code und C-Launcher bestimmt, sondern auch durch Build-, Linker-, Loader- und Runtime-Variablen. Die ausführliche deutsche Dokumentation liegt in:
+
+```text
+RETA_SHELL_VARIABLES_DE.md
+doc/shell-variables/de/README.md
+```
+
+Die englische Fassung liegt in:
+
+```text
+RETA_SHELL_VARIABLES_EN.md
+doc/shell-variables/en/README.md
+```
+
+Für Programmierer ist besonders wichtig: Variablen wie `RETA_LINK_CORE_SPLIT_LIBS`, `RETA_RENDER_LINK_SEMANTICS` und `RETA_RUNTIME_LINK_CORE_COMPONENTS` sind Build-Topologie-Schalter. Variablen wie `RETA_LIB_PATH`, `RETA_RENDER_LIB_PATH`, `RETA_CSV_PATH` und `LD_LIBRARY_PATH` sind Laufzeit-/Loader-Hilfen. Keine dieser Variablen rechtfertigt, Algorithmik wieder in die Executables zu verschieben.

@@ -1,38 +1,71 @@
-# libreta_data.so — data and catalogs
+# libreta_data.so — data, words, aliases, CSV/catalog projections
 
-## Purpose
+## Programmer summary
 
-Boundary for words, aliases, CSV/HTML catalogs, static tables, language values, and data sources. This library is where data access and immutable catalog logic move behind the facade.
+`libreta_data.so` is the shared-library boundary for: **data, words, aliases, CSV/catalog projections**.
 
-## Direct integration
+This component is the data space of the Reta topology. It contains real alias and word projections and must not collapse back into an empty 494 KB stub.
 
-Direct user of this library: `libreta.so`.
+This file is intentionally detailed. It explains not only _what_ is built, but also _why_ this ABI boundary exists, which dependencies are allowed, how memory ownership works, which failure modes are common, and how to verify the library in practice.
 
-Direct target dependencies: no direct private mandatory dependency inside this layer.
+## Artifact and source locations
+
+| Field | Value |
+|---|---|
+| Artifact | `target/<profile>/libreta_data.so` |
+| Crate | `reta_data` |
+| Rust source | `crates/reta_data/src/lib.rs` |
+| C header | `crates/reta_data/include/reta_data.h` |
+| Documentation | `doc/shared-libs/de/libreta_data.md` and `doc/shared-libs/en/libreta_data.md` |
+| Build profile | `debug` or `release` via `./build.sh <profile>` |
+
+## Direct consumers
+
+- `libreta.so`
+- `libreta_runtime.so`
+- `future data/alias tools`
+
+## Direct dynamic dependencies
+
+- keine direkte private Pflichtabhängigkeit / no direct private mandatory dependency
+
+Important: “direct” means `DT_NEEDED` or intentional dynamic loading. Transitive dependencies are not the direct responsibility of this library. That distinction keeps `rrpb` command-only, makes `rrp`/`rrpl`/`rrpe` carry both prompt libraries, and keeps `rgrundStrukHtml` directly linked to `libreta_render.so`.
 
 ## Architecture boundary
 
-This `.so` is an intentional ABI boundary. Rust-internal types should not cross it. The outside surface exports stable C symbols, simple integer values, and null-terminated strings. That keeps the topology stable while more Rust code can later move out of `libreta.so` and behind this library.
+This library is a real ABI boundary. Internal code may change as long as the C surface remains stable. The boundary is not meant to leak arbitrary Rust objects. Only these shapes should cross it:
+
+- fixed-width integers such as `uint32_t`, `uint64_t`, `int32_t`, `size_t`, `uint8_t`,
+- C strings as `const char *` for borrowed static data,
+- C strings as `char *` for allocated return values,
+- simple C structs explicitly defined by the header,
+- exit codes or JSON as language-neutral textual data.
+
+The following are not acceptable ABI contracts:
+
+- Rust references,
+- Rust `String`, `Vec`, `HashMap`, `BTreeMap`, `IndexMap`,
+- panic propagation across the ABI boundary,
+- implicit ownership where the caller has to guess who frees memory,
+- undocumented unofficial symbols.
 
 ## Mathematical role
 
-Relational basis: objects are words, aliases, CSV rows, columns, and catalog records; morphisms are lookup, normalization, and projection.
+relational basis: words, aliases, and catalog entries are objects; lookup, normalization, and projection are morphisms.
 
-## Important ABI symbols
+This mathematical role is not decoration. It is a practical architecture rule: similar morphisms belong in the same library family, but every tiny function does not get its own `.so`. This keeps the topology understandable and loader/ABI complexity manageable.
+
+## Public ABI symbols
 
 - `reta_data_abi_version`
 - `reta_data_abi_anchor`
-- `reta_data_abi_manifest_json`
+- `reta_data_abi_library_name`
+- `reta_data_abi_crate_name`
 - `reta_data_abi_role_de`
 - `reta_data_abi_role_en`
-
-
-## Real code extraction
-
-This library is no longer only an ABI anchor. It now contains the generated `Words` data structure and alias projections from the Python-source-of-truth logic. Therefore it should not have the exact same size as the small stub-like components anymore.
-
-Additional symbols:
-
+- `reta_data_abi_math_de`
+- `reta_data_abi_math_en`
+- `reta_data_abi_manifest_json`
 - `reta_data_words_entry_count`
 - `reta_data_shared_words_json`
 - `reta_data_all_main_alias_groups_json`
@@ -40,10 +73,180 @@ Additional symbols:
 - `reta_data_resolve_parameter_main_alias`
 - `reta_data_free_string`
 
-## Build rule
+Machine-readable view:
 
-`build.sh` builds the private core libraries first and then builds `libreta.so` with `RETA_LINK_CORE_SPLIT_LIBS=1`. As a result, `rreta` links directly only to `libreta.so`; the private core libraries appear as `DT_NEEDED` entries of `libreta.so`.
+```text
+reta_data_abi_version
+reta_data_abi_anchor
+reta_data_abi_library_name
+reta_data_abi_crate_name
+reta_data_abi_role_de
+reta_data_abi_role_en
+reta_data_abi_math_de
+reta_data_abi_math_en
+reta_data_abi_manifest_json
+reta_data_words_entry_count
+reta_data_shared_words_json
+reta_data_all_main_alias_groups_json
+reta_data_parameter_alias_groups_for_main_json
+reta_data_resolve_parameter_main_alias
+reta_data_free_string
+```
 
-## Non-goal
+## Memory ownership
 
-This library should not become a second public program interface beside `libreta.so`. Public program execution remains stable through the facade.
+JSON strings returned by data functions; release with reta_data_free_string.
+
+General rule for all Reta and retaPrompt shared libraries:
+
+```c
+char *ptr = some_library_function(...);
+/* read, copy, or print ptr */
+some_matching_library_free_string(ptr);
+```
+
+Wrong:
+
+```c
+char *ptr = reta_data_shared_words_json();
+reta_free_string(ptr);              /* wrong: different library */
+free(ptr);                          /* wrong: different allocator */
+```
+
+Right:
+
+```c
+char *ptr = reta_data_shared_words_json();
+reta_data_free_string(ptr);         /* right: same ABI family */
+```
+
+## Error and panic model
+
+The ABI must not propagate Rust panics into C. Entry points that start external program paths or return exit codes are guarded. For string-returning functions, robust clients should still be defensive:
+
+- check for null pointers,
+- avoid invalid inputs,
+- keep UTF-8 assumptions explicit,
+- parse JSON instead of executing or blindly concatenating it,
+- do not ignore exit codes.
+
+## Threading and reentrancy
+
+The library should not be treated as a global mutable singleton contract. Internally, there may still be caches, `OnceLock`s, or runtime initialization. For programmers this means:
+
+- concurrent use is safe only where no mutable session is shared,
+- returned C strings are owned by the caller until the matching free function is called,
+- global environment variables such as `RETA_CSV_PATH` or `RETA_LIB_PATH` should be set before the first call,
+- tests that change environment variables should isolate processes.
+
+## Build path
+
+Typical build:
+
+```bash
+./build.sh release
+```
+
+Verified shared-library build:
+
+```bash
+./tools/build_prompt_split_sharedlibs.sh release
+```
+
+Packaging:
+
+```bash
+./tools/package_prompt_split_sharedlibs.sh release
+```
+
+Important build rules:
+
+- Dynamic `.so` libraries are built; `.a` archives are not part of the active path.
+- Final public executables are created as tiny C launchers in the normal package path.
+- `libreta.so` remains a facade.
+- `libreta_runtime.so` carries the heavy Reta core.
+- `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, and `libreta_render.so` must not all have the exact same stub size.
+
+## Dynamic link verification
+
+Useful commands:
+
+```bash
+readelf -d target/release/libreta_data.so
+nm -D --defined-only target/release/libreta_data.so
+```
+
+For launchers as well:
+
+```bash
+readelf -d target/release/rreta
+readelf -d target/release/rgrundStrukHtml
+readelf -d target/release/rrp
+readelf -d target/release/rrpb
+```
+
+The expected topology is not cosmetic. It prevents code from drifting back into executables or the wrong `.so` carrier.
+
+## RPATH/RUNPATH and installation
+
+The launchers are built with search paths that support these layouts:
+
+```text
+$ORIGIN
+$ORIGIN/lib
+$ORIGIN/../lib
+```
+
+On Termux the usual copy target is `$HOME/../usr/bin` and `$HOME/../usr/lib`. Portable packages may keep executables next to libraries or in `bin/` with libraries in `../lib/`.
+
+## Common regressions
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| Library missing at program start | RPATH/RUNPATH or install layout is wrong | `readelf -d <executable>` |
+| Symbol missing | Crate not built as `cdylib` or export removed | `nm -D --defined-only` |
+| Executable large again | Rust binary used instead of C launcher | `file`, `readelf -d`, build script |
+| All components same size | Components collapsed back into ABI stubs | size check in `build.sh` |
+| Facade huge again | `split-facade` inactive or engine moved into `libreta.so` | size rule `libreta.so < libreta_runtime.so` |
+| Crash while freeing | wrong free function or `free()` used | ownership rules |
+
+## Test and review checklist
+
+- Check the ABI version before use when a client loads the library directly.
+- Do not pass Rust types across the C boundary.
+- Release strings allocated by this library with the matching free function from the same library.
+- Do not use a free function from another library just because the type is also `char *`.
+- When packaging, verify RPATH/RUNPATH and `DT_NEEDED` with `readelf -d`.
+- Use `nm -D --defined-only` when checking exported symbols.
+- For size regressions, check whether a library collapsed back into a stub or heavy code moved into the wrong .so.
+- Do not introduce cyclic public ABI dependencies.
+
+## Extension rules
+
+Assign new functionality to a responsibility before exporting it:
+
+1. Data/catalog? Use `libreta_data.so`.
+2. Text/argv/token? Use `libreta_parse.so`.
+3. Selection, meaning, parameter space? Use `libreta_semantics.so`.
+4. Table, view, width, materialization? Use `libreta_table.so`.
+5. Output format, HTML, BBCode, plaintext? Use `libreta_render.so`.
+6. Architecture metadata, topology, morphism counts? Use `libreta_arch.so`.
+7. Execution, engine, scheduler, queue, semaphore? Use `libreta_runtime.so`.
+8. Prompt command without interactive input? Use `libretaprompt_commands.so`.
+9. Prompt input, completion, suggest, history? Use `libretaprompt_input.so`.
+10. Public Reta ABI? Only then use `libreta.so`.
+
+## Minimal C usage shape
+
+```c
+#include "reta_data.h"
+
+int main(void) {
+    /* This example is intentionally generic. Details are in the header. */
+    return 0;
+}
+```
+
+## Maintenance note
+
+This documentation is part of the ABI. If a symbol is added, removed, or semantically changed, this file must be updated together with the header and build checks. An undocumented `.so` boundary is incomplete in this project.

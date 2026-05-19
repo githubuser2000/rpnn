@@ -1,4 +1,5 @@
 #!/bin/bash
+# Shell variable documentation: RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md
 set -euo pipefail
 
 PROFILE="${1:-release}"

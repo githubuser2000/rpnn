@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Shell variable documentation: RETA_SHELL_VARIABLES_DE.md and RETA_SHELL_VARIABLES_EN.md
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -241,6 +242,8 @@ verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rp_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_autosuggestion_at_cursor_json
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_free_string
 
 verify_dynamic_needed "$TARGET_DIR/libreta.so" "${CORE_SPLIT_LIBRARIES[@]}"
 verify_dynamic_needed "$TARGET_DIR/libreta_runtime.so" reta_data reta_parse reta_semantics reta_table reta_render reta_arch
@@ -296,7 +299,19 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     },
     {
       "path": "$TARGET_DIR/libretaprompt_input.so",
-      "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe"
+      "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe",
+      "required_symbols": [
+        "retaprompt_input_run_kind_from_env",
+        "retaprompt_input_run_current_executable_from_env",
+        "retaprompt_input_run_any_current_executable_from_env",
+        "retaprompt_input_run_launcher_kind_from_env",
+        "retaprompt_input_run_rp_from_env",
+        "retaprompt_input_run_rpl_from_env",
+        "retaprompt_input_run_rpe_from_env",
+        "retaprompt_input_autosuggestion_at_cursor_json",
+        "retaprompt_input_free_string"
+      ],
+      "cursor_local_autosuggest": true
     }
   ],
   "forbidden_static_archives": [
