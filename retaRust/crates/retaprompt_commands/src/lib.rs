@@ -62,7 +62,7 @@ pub mod shared {
 pub mod domain {
     pub mod python_source_of_truth {
         use std::collections::BTreeMap;
-        use std::ffi::{CStr, CString};
+        use std::ffi::CString;
         use std::os::raw::c_char;
         use std::sync::{Mutex, OnceLock};
 

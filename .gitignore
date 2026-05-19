@@ -35,7 +35,11 @@ retaRust/target/release/*
 retaRust/target/release/.*
 target/
 **/target/
+**/middle.alx
+middle.alx
+retaRust/middle.alx
 __pycache__/
+**/__pycache__/
 *.pyc
 *.orig
 *.rej

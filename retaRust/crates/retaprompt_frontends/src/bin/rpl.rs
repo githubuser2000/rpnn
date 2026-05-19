@@ -1,6 +1,6 @@
-#[path = "../abi_launcher.rs"]
-mod abi_launcher;
+#[path = "../abi_input_launcher.rs"]
+mod abi_input_launcher;
 
 fn main() {
-    std::process::exit(abi_launcher::run_input_prompt(2));
+    std::process::exit(abi_input_launcher::run_input_prompt(2));
 }

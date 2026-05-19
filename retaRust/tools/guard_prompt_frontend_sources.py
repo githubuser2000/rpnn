@@ -36,6 +36,7 @@ LEGACY_PROMPT_FRONTEND_PATHS = [
     ROOT / "src" / "bin" / "rpb.rs",
     ROOT / "crates" / "retaprompt",
     ROOT / "crates" / "retaprompt_frontends" / "src" / "bin" / "retaprompt_launcher.rs",
+    ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_launcher.rs",
 ]
 
 
@@ -95,26 +96,33 @@ def guard_public_bin(filename: str, required_links: tuple[str, ...]) -> None:
             "The final packaged C launchers still carry the required DT_NEEDED links."
         )
 
-    if 'abi_launcher::run_' not in text:
-        fail(f"{path.relative_to(ROOT)} must delegate only to crates/retaprompt_frontends/src/abi_launcher.rs")
-
     if filename == "rpb.rs":
-        if 'run_command_prompt(3)' not in text:
+        if 'abi_command_launcher::run_command_prompt(3)' not in text:
             fail("rrpb must run only through the command shared library ABI")
+        if 'abi_input_launcher' in text or 'run_input_prompt' in text:
+            fail("rrpb must be command-only and must not call the input prompt launcher")
     else:
         expected_kind = {"rp.rs": "1", "rpl.rs": "2", "rpe.rs": "4"}[filename]
-        if f'run_input_prompt({expected_kind})' not in text:
+        if f'abi_input_launcher::run_input_prompt({expected_kind})' not in text:
             fail(f"{path.relative_to(ROOT)} must run through the input shared library ABI with kind {expected_kind}")
+        if 'abi_command_launcher' in text or 'run_command_prompt' in text:
+            fail(f"{path.relative_to(ROOT)} must not use the command-only launcher")
 
-    launcher = read(ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_launcher.rs")
+    common = read(ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_common.rs")
+    input_launcher = read(ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_input_launcher.rs")
+    command_launcher = read(ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_command_launcher.rs")
+
     for library in required_links:
-        if library == "retaprompt_input" and "PromptLibraryKind::Input" not in launcher:
-            fail("abi_launcher.rs must know how to load libretaprompt_input.so")
-        if library == "retaprompt_commands" and "PromptLibraryKind::Commands" not in launcher:
-            fail("abi_launcher.rs must know how to load libretaprompt_commands.so")
+        if library == "retaprompt_input" and "libretaprompt_input.so" not in input_launcher:
+            fail("abi_input_launcher.rs must know how to load libretaprompt_input.so")
+        if library == "retaprompt_commands" and "libretaprompt_commands.so" not in (input_launcher + command_launcher):
+            fail("prompt ABI launcher files must know how to load libretaprompt_commands.so")
 
-    if filename == "rpb.rs" and "run_input_prompt" in text:
-        fail("rrpb must be command-only and must not call the input prompt launcher")
+    if "retaprompt_input" in command_launcher or "INPUT_LIBRARY" in command_launcher:
+        fail("abi_command_launcher.rs must remain command-only and must not mention libretaprompt_input.so")
+
+    if "LoadedPromptLibrary" not in common or "libloading" not in common:
+        fail("abi_common.rs must contain the dlopen/libloading shared-library loader")
 
 
 def guard_frontend_cargo_toml() -> None:

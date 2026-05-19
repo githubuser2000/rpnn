@@ -5,7 +5,9 @@ fn main() {
     // dynamic-loader search path for sibling cdylibs.  The final packaged
     // executables are still C launchers with explicit DT_NEEDED edges, built and
     // guarded by build.sh.
-    println!("cargo:rerun-if-changed=src/abi_launcher.rs");
+    println!("cargo:rerun-if-changed=src/abi_common.rs");
+    println!("cargo:rerun-if-changed=src/abi_input_launcher.rs");
+    println!("cargo:rerun-if-changed=src/abi_command_launcher.rs");
     println!("cargo:rerun-if-env-changed=RETAPROMPT_INPUT_LIB_PATH");
     println!("cargo:rerun-if-env-changed=RETAPROMPT_COMMANDS_LIB_PATH");
 }

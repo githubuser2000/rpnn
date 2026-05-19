@@ -290,10 +290,11 @@ RETA_LINK_CORE_SPLIT_LIBS=1 cargo build -p reta --lib --features split-facade "$
 refresh_cdylib_from_deps reta
 cargo build -p reta_architecture --lib "${CARGO_FLAGS[@]}"
 refresh_cdylib_from_deps reta_architecture
-cargo build -p retaprompt_commands --lib "${CARGO_FLAGS[@]}"
-refresh_cdylib_from_deps retaprompt_commands
-cargo build -p retaprompt_input --lib "${CARGO_FLAGS[@]}"
-refresh_cdylib_from_deps retaprompt_input
+# Build the split prompt libraries in one Cargo invocation.  retaprompt_input
+# depends on retaprompt_commands; separate invocations can make Cargo rebuild
+# retaprompt_commands as a dependency and print duplicate warnings on Termux.
+cargo build -p retaprompt_commands -p retaprompt_input --lib "${CARGO_FLAGS[@]}"
+refresh_cdylibs_from_deps retaprompt_commands retaprompt_input
 
 if [[ "${RETA_BUILD_RUST_TOOL_BINS:-0}" == "1" ]]; then
   # Diagnostic Rust bins need the full in-crate Rust API.  Build them, then
