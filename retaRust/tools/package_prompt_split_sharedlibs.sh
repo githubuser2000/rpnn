@@ -43,13 +43,13 @@ copy_required_dir() {
 }
 
 copy_required "$TARGET_DIR/libreta.so" "$OUT_DIR/"
-copy_required "$TARGET_DIR/reta" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rreta" "$OUT_DIR/"
 copy_required "$TARGET_DIR/libretaprompt_input.so" "$OUT_DIR/"
 copy_required "$TARGET_DIR/libretaprompt_commands.so" "$OUT_DIR/"
-copy_required "$TARGET_DIR/rp" "$OUT_DIR/"
-copy_required "$TARGET_DIR/rpl" "$OUT_DIR/"
-copy_required "$TARGET_DIR/rpe" "$OUT_DIR/"
-copy_required "$TARGET_DIR/rpb" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rrp" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rrpl" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rrpe" "$OUT_DIR/"
+copy_required "$TARGET_DIR/rrpb" "$OUT_DIR/"
 copy_required_dir "$TARGET_DIR/csv" "$OUT_DIR/csv"
 copy_required crates/retaprompt_input/include/retaprompt_input.h "$OUT_DIR/include/"
 copy_required crates/retaprompt_commands/include/retaprompt_commands.h "$OUT_DIR/include/"
@@ -71,25 +71,25 @@ cat > "$OUT_DIR/RUN_LAYOUT.txt" <<'LAYOUT'
 Supported runtime layouts:
 
 1. All files in one directory:
-- reta
+- rreta
 - libreta.so
 - libretaprompt_commands.so
 - libretaprompt_input.so
-- rp
-- rpl
-- rpe
-- rpb
+- rrp
+- rrpl
+- rrpe
+- rrpb
 - csv/religion.csv and the other runtime CSV files
 
 2. Executables in one directory and libraries in ./lib:
-- ./reta ./rp ./rpl ./rpe ./rpb
+- ./rreta ./rrp ./rrpl ./rrpe ./rrpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
 - ./csv/religion.csv and the other runtime CSV files
 
 3. Executables in bin and libraries in ../lib relative to bin:
-- ./bin/reta ./bin/rp ./bin/rpl ./bin/rpe ./bin/rpb
+- ./bin/rreta ./bin/rrp ./bin/rrpl ./bin/rrpe ./bin/rrpb
 - ./lib/libreta.so
 - ./lib/libretaprompt_commands.so
 - ./lib/libretaprompt_input.so
@@ -110,13 +110,14 @@ Runtime CSV search order:
 - current working directory/csv
 
 Dependency chain:
-- reta -> libreta.so
-- rp/rpl/rpe -> libretaprompt_input.so
-- rpb -> libretaprompt_commands.so
+- rreta -> libreta.so
+- rrp/rrpl/rrpe -> libretaprompt_input.so + libretaprompt_commands.so
+- rrpb -> libretaprompt_commands.so
 
 Artifact rule:
-- This package intentionally contains only dynamic .so libraries and launchers.
+- This package intentionally contains only dynamic .so libraries and C launchers.
 - Static archives (.a) are not part of this package.
+- Rust prompt frontend executables are not built by default in build.sh.
 LAYOUT
 
 printf 'packaged dynamic split shared libraries and launchers in:\n'

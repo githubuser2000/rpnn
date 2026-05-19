@@ -1,6 +1,6 @@
 [package]
 name = "retaprompt_frontends"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 autobins = false
 publish = false
@@ -10,6 +10,9 @@ retaprompt_input = { path = "../retaprompt_input" }
 retaprompt_commands = { path = "../retaprompt_commands" }
 serde_json = "1"
 
+[features]
+rust-frontends = []
+
 #[[bin]]
 #name = "retaprompt_launcher"
 #path = "src/bin/retaprompt_launcher.rs"
@@ -17,18 +20,22 @@ serde_json = "1"
 [[bin]]
 name = "rrp"
 path = "src/bin/rp.rs"
+required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpl"
 path = "src/bin/rpl.rs"
+required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpb"
 path = "src/bin/rpb.rs"
+required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rrpe"
 path = "src/bin/rpe.rs"
+required-features = ["rust-frontends"]
 
 [[bin]]
 name = "rretaprompt_arch_inspect"

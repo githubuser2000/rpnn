@@ -23,7 +23,7 @@ guard_against_static_regression() {
 
   if grep -Eq 'prompt-abi' Cargo.toml 2>/dev/null; then
     echo "dynamic .so build guard failed: prompt-abi gating is present in Cargo.toml" >&2
-    echo "the less-invasive path keeps the public Rust modules available without prompt-abi gating" >&2
+    echo "the shared-library path keeps the public Rust modules available without prompt-abi gating" >&2
     exit 1
   fi
 }
@@ -55,6 +55,47 @@ verify_dynamic_symbol() {
   fi
 }
 
+verify_dynamic_needed() {
+  local executable="$1"
+  shift
+
+  if ! command -v readelf >/dev/null 2>&1; then
+    echo "warning: readelf unavailable; skipping DT_NEEDED check for $executable" >&2
+    return 0
+  fi
+
+  local needed
+  needed="$(readelf -d "$executable" 2>/dev/null | awk '/NEEDED/ {print $0}')"
+  local library
+  for library in "$@"; do
+    if ! grep -Fq "lib${library}.so" <<<"$needed"; then
+      echo "expected DT_NEEDED dependency missing from $executable: lib${library}.so" >&2
+      echo "$needed" >&2
+      exit 1
+    fi
+  done
+}
+
+verify_dynamic_not_needed() {
+  local executable="$1"
+  shift
+
+  if ! command -v readelf >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local needed
+  needed="$(readelf -d "$executable" 2>/dev/null | awk '/NEEDED/ {print $0}')"
+  local library
+  for library in "$@"; do
+    if grep -Fq "lib${library}.so" <<<"$needed"; then
+      echo "unexpected DT_NEEDED dependency in $executable: lib${library}.so" >&2
+      echo "$needed" >&2
+      exit 1
+    fi
+  done
+}
+
 verify_no_static_archive() {
   local path="$1"
   if [[ -e "$path" ]]; then
@@ -73,12 +114,12 @@ MANIFEST="$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"
 verify_file_exists "$TARGET_DIR/libreta.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_commands.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_input.so"
-verify_file_exists "$TARGET_DIR/reta"
+verify_file_exists "$TARGET_DIR/rreta"
 verify_file_exists "$TARGET_DIR/csv/religion.csv"
-verify_file_exists "$TARGET_DIR/rp"
-verify_file_exists "$TARGET_DIR/rpl"
-verify_file_exists "$TARGET_DIR/rpe"
-verify_file_exists "$TARGET_DIR/rpb"
+verify_file_exists "$TARGET_DIR/rrp"
+verify_file_exists "$TARGET_DIR/rrpl"
+verify_file_exists "$TARGET_DIR/rrpe"
+verify_file_exists "$TARGET_DIR/rrpb"
 
 verify_no_static_archive "$TARGET_DIR/libreta.a"
 verify_no_static_archive "$TARGET_DIR/libretaprompt_commands.a"
@@ -99,11 +140,19 @@ verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_from_env
 
+verify_dynamic_needed "$TARGET_DIR/rreta" reta
+verify_dynamic_needed "$TARGET_DIR/rrp" retaprompt_input retaprompt_commands
+verify_dynamic_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
+verify_dynamic_needed "$TARGET_DIR/rrpe" retaprompt_input retaprompt_commands
+verify_dynamic_needed "$TARGET_DIR/rrpb" retaprompt_commands
+verify_dynamic_not_needed "$TARGET_DIR/rrpb" retaprompt_input
+
 cat > "$MANIFEST" <<MANIFEST_JSON
 {
-  "build_mode": "plain-cargo-cdylib-plus-c-launchers",
+  "build_mode": "plain-cargo-cdylib-plus-c-launchers-with-split-prompt-dependencies",
   "artifact_type": "dynamic-shared-libraries",
   "static_archives_intentionally_not_built": true,
+  "rust_frontend_executables_intentionally_not_built_by_default": true,
   "shared_libraries": [
     {
       "path": "$TARGET_DIR/libreta.so",
@@ -112,7 +161,7 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     },
     {
       "path": "$TARGET_DIR/libretaprompt_commands.so",
-      "role": "retaPrompt command library with the public commands ABI",
+      "role": "retaPrompt command library for rrpb and the command side of rrp/rrpl/rrpe",
       "required_symbols": [
         "retaprompt_commands_run_kind_from_env",
         "retaprompt_commands_run_current_executable_from_env",
@@ -124,7 +173,7 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     },
     {
       "path": "$TARGET_DIR/libretaprompt_input.so",
-      "role": "retaPrompt input/launcher library with the public input ABI",
+      "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe",
       "required_symbols": [
         "retaprompt_input_run_kind_from_env",
         "retaprompt_input_run_current_executable_from_env",
@@ -146,44 +195,46 @@ cat > "$MANIFEST" <<MANIFEST_JSON
   ],
   "launchers": [
     {
-      "path": "$TARGET_DIR/reta",
+      "path": "$TARGET_DIR/rreta",
       "links_to": ["libreta.so"]
     },
     {
-      "path": "$TARGET_DIR/rp",
-      "links_to": ["libretaprompt_input.so"]
+      "path": "$TARGET_DIR/rrp",
+      "links_to": ["libretaprompt_input.so", "libretaprompt_commands.so"]
     },
     {
-      "path": "$TARGET_DIR/rpl",
-      "links_to": ["libretaprompt_input.so"]
+      "path": "$TARGET_DIR/rrpl",
+      "links_to": ["libretaprompt_input.so", "libretaprompt_commands.so"]
     },
     {
-      "path": "$TARGET_DIR/rpe",
-      "links_to": ["libretaprompt_input.so"]
+      "path": "$TARGET_DIR/rrpe",
+      "links_to": ["libretaprompt_input.so", "libretaprompt_commands.so"]
     },
     {
-      "path": "$TARGET_DIR/rpb",
-      "links_to": ["libretaprompt_commands.so"]
+      "path": "$TARGET_DIR/rrpb",
+      "links_to": ["libretaprompt_commands.so"],
+      "must_not_link_to": ["libretaprompt_input.so"]
     }
   ],
   "notes": [
-    "This wrapper intentionally does not rebuild shim libraries or static archives.",
-    "It preserves the simple cargo-build-plus-launcher-link flow from build.sh.",
-    "In the current Rust source layout this build does not remove duplicate code between cdylibs."
+    "The prompt executables are C launchers, not Rust frontend binaries.",
+    "rrp, rrpl and rrpe intentionally carry DT_NEEDED entries for both prompt split libraries.",
+    "rrpb intentionally carries only the command library dependency.",
+    "The current Rust cdylib source layout can still duplicate Rust dependency code inside the shared objects themselves; this build removes that code from the executables and verifies launcher-level dynamic dependencies."
   ]
 }
 MANIFEST_JSON
 
-printf 'built dynamic shared libraries and launchers with the plain build path:\n'
+printf 'built dynamic shared libraries and launchers with split prompt dependencies:\n'
 printf '  %s\n' "$TARGET_DIR/libreta.so"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_commands.so"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_input.so"
-printf '  %s\n' "$TARGET_DIR/reta"
+printf '  %s\n' "$TARGET_DIR/rreta"
 printf '  %s\n' "$TARGET_DIR/csv"
-printf '  %s\n' "$TARGET_DIR/rp"
-printf '  %s\n' "$TARGET_DIR/rpl"
-printf '  %s\n' "$TARGET_DIR/rpe"
-printf '  %s\n' "$TARGET_DIR/rpb"
+printf '  %s -> %s + %s\n' "$TARGET_DIR/rrp" "libretaprompt_input.so" "libretaprompt_commands.so"
+printf '  %s -> %s + %s\n' "$TARGET_DIR/rrpl" "libretaprompt_input.so" "libretaprompt_commands.so"
+printf '  %s -> %s + %s\n' "$TARGET_DIR/rrpe" "libretaprompt_input.so" "libretaprompt_commands.so"
+printf '  %s -> %s\n' "$TARGET_DIR/rrpb" "libretaprompt_commands.so"
 printf '\nstatic archives intentionally not built:\n'
 printf '  %s\n' "$TARGET_DIR/libreta.a"
 printf '  %s\n' "$TARGET_DIR/libretaprompt_commands.a"

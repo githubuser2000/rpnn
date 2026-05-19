@@ -1,4 +1,7 @@
+#!/usr/bin/env sh
+set -eu
+./build.sh debug
 for a in rreta rrp rrpl rrpe rrpb rgrundStrukHtml
 do
-	cargo run --bin $a -- -h
+  "target/debug/$a" -h
 done

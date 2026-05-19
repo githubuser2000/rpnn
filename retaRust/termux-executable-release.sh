@@ -1,4 +1,7 @@
+#!/usr/bin/env sh
+set -eu
+./build.sh release
 for a in rreta rrp rrpl rrpe rrpb rgrundStrukHtml
 do
-	cargo run --release --bin $a -- -h
+  "target/release/$a" -h
 done
