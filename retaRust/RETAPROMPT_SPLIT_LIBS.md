@@ -3,7 +3,8 @@
 ## Gewollte Rollen
 
 - `libreta.so`
-  - nur `reta`
+  - öffentliche `reta`-Fassade
+  - hängt intern an `libreta_data.so`, `libreta_parse.so`, `libreta_semantics.so`, `libreta_table.so`, `libreta_render.so`, `libreta_arch.so` und `libreta_runtime.so`
 - `libretaprompt_commands.so`
   - retaPrompt-Command-Library
   - direkte Command-Seite für `rrpb`
@@ -14,7 +15,7 @@
 
 ## Direkte Launcher-Zuordnung
 
-- `rreta` -> `libreta.so`
+- `rreta` -> `libreta.so` -> sieben private Reta-Core-`.so`s
 - `rrpb` -> `libretaprompt_commands.so`
 - `rrp`  -> `libretaprompt_input.so` + `libretaprompt_commands.so`
 - `rrpl` -> `libretaprompt_input.so` + `libretaprompt_commands.so`
@@ -26,9 +27,11 @@ und die Command-Seite die eigentliche Befehlslogik trägt.
 
 ## Binary-Regel
 
-Die Prompt-Executables werden im normalen `build.sh` nicht als Rust-Frontend-Binaries
+Die finalen Executables werden im normalen `build.sh` nicht als Rust-Frontend-Binaries
 gebaut, sondern nach dem Cargo-Build als kleine C-Launcher erzeugt. Dadurch wandert
-maximal viel Code aus den Executables in die `.so`-Artefakte.
+maximal viel Code aus den Executables in die `.so`-Artefakte. Für Reta gilt zusätzlich:
+`libreta.so` ist nur die stabile Fassade und trägt per `DT_NEEDED` die sieben privaten
+Core-Bibliotheken.
 
 Die Prüfung ist hart:
 
@@ -47,3 +50,10 @@ Die vollständige Entdoppelung zwischen den Rust-`cdylib`-Artefakten selbst ist 
 noch nicht automatisch gelöst. Rust-`cdylib`-Abhängigkeiten können weiterhin Code in
 die jeweiligen Shared Objects einbetten. Diese Änderung zieht aber die ausführbaren
 Frontends auf die richtige dynamische Split-Struktur herunter.
+
+## Dokumentation
+
+Zu jeder gebauten `.so` gibt es deutsche und englische Markdown-Dokumentation in:
+
+- `doc/shared-libs/de/`
+- `doc/shared-libs/en/`

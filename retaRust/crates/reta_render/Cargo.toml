@@ -1,0 +1,11 @@
+[package]
+name = "reta_render"
+version = "0.7.0"
+edition = "2024"
+autobins = false
+publish = false
+
+[lib]
+name = "reta_render"
+path = "src/lib.rs"
+crate-type = ["cdylib"]

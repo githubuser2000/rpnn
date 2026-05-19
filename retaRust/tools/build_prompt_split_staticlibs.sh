@@ -15,14 +15,26 @@ case "$PROFILE" in
 esac
 
 cat >&2 <<MESSAGE
-static retaPrompt archives are retired in this source tree.
+static retaPrompt/Reta archives are retired in this source tree.
 
-This project now keeps the retaPrompt split on the dynamic .so path:
+This project now keeps both splits on the dynamic .so path:
   ./tools/build_prompt_split_sharedlibs.sh $PROFILE
 
-No libretaprompt_input.a, libretaprompt_commands.a, or libreta.a is built by
-this compatibility wrapper. This intentionally prevents the old static archive
-path from drifting away from the Python/Rust architecture again.
+The active ABI artifacts are:
+  target/$PROFILE/libreta.so
+  target/$PROFILE/libreta_data.so
+  target/$PROFILE/libreta_parse.so
+  target/$PROFILE/libreta_semantics.so
+  target/$PROFILE/libreta_table.so
+  target/$PROFILE/libreta_render.so
+  target/$PROFILE/libreta_arch.so
+  target/$PROFILE/libreta_runtime.so
+  target/$PROFILE/libretaprompt_commands.so
+  target/$PROFILE/libretaprompt_input.so
+
+No lib*.a archive is built by this compatibility wrapper. This intentionally
+prevents the old static archive path from drifting away from the shared-library
+architecture again.
 MESSAGE
 
 exec ./tools/build_prompt_split_sharedlibs.sh "$PROFILE"

@@ -1,0 +1,11 @@
+[package]
+name = "reta_semantics"
+version = "0.7.0"
+edition = "2024"
+autobins = false
+publish = false
+
+[lib]
+name = "reta_semantics"
+path = "src/lib.rs"
+crate-type = ["cdylib"]

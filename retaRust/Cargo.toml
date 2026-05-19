@@ -5,6 +5,10 @@ edition = "2024"
 autobins = false
 default-run = "rreta"
 
+[features]
+default = []
+split-facade = []
+
 [dependencies]
 reta_architecture = { path = "crates/reta_architecture" }
 indexmap = { version = "2", features = ["serde"] }
@@ -154,6 +158,13 @@ path = "src/bin/generate4readme.rs"
 members = [
   ".",
   "crates/reta_architecture",
+  "crates/reta_data",
+  "crates/reta_parse",
+  "crates/reta_semantics",
+  "crates/reta_table",
+  "crates/reta_render",
+  "crates/reta_arch",
+  "crates/reta_runtime",
   "crates/retaprompt_input",
   "crates/retaprompt_commands",
   "crates/retaprompt_frontends"
@@ -161,6 +172,13 @@ members = [
 default-members = [
   ".",
   "crates/reta_architecture",
+  "crates/reta_data",
+  "crates/reta_parse",
+  "crates/reta_semantics",
+  "crates/reta_table",
+  "crates/reta_render",
+  "crates/reta_arch",
+  "crates/reta_runtime",
   "crates/retaprompt_input",
   "crates/retaprompt_commands",
   "crates/retaprompt_frontends"

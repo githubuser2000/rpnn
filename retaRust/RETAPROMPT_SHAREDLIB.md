@@ -5,7 +5,15 @@
 Die aktive Aufteilung ist:
 
 - `libreta.so`
-  - `reta`-Kern und öffentliche `reta`-ABI
+  - öffentliche `reta`-ABI und stabile Fassade
+  - hängt intern an den sieben privaten Reta-Core-Bibliotheken:
+    - `libreta_data.so`
+    - `libreta_parse.so`
+    - `libreta_semantics.so`
+    - `libreta_table.so`
+    - `libreta_render.so`
+    - `libreta_arch.so`
+    - `libreta_runtime.so`
 - `libretaprompt_commands.so`
   - retaPrompt-Command-Seite
   - öffentliche ABI:
@@ -31,7 +39,7 @@ Die aktive Aufteilung ist:
 
 Der normale Build erzeugt die Prompt-Executables als kleine C-Launcher:
 
-- `rreta` -> `libreta.so`
+- `rreta` -> `libreta.so` -> `libreta_data.so` + `libreta_parse.so` + `libreta_semantics.so` + `libreta_table.so` + `libreta_render.so` + `libreta_arch.so` + `libreta_runtime.so`
 - `rrpb` -> `libretaprompt_commands.so`
 - `rrp`  -> `libretaprompt_input.so` + `libretaprompt_commands.so`
 - `rrpl` -> `libretaprompt_input.so` + `libretaprompt_commands.so`
@@ -67,8 +75,8 @@ Zum Paketieren:
 
 ## Was aus den Executables herausgezogen wurde
 
-`build.sh` baut standardmäßig nicht mehr die Rust-Frontend-Binaries aus
-`retaprompt_frontends`. Stattdessen werden nach dem Library-Build diese Launcher
+`build.sh` baut standardmäßig nur die Library-Ziele und nicht die Rust-Tool- oder
+Rust-Frontend-Binaries. Stattdessen werden nach dem Library-Build diese Launcher
 erzeugt:
 
 - `tools/launchers/rp.c`
@@ -91,6 +99,16 @@ RETA_BUILD_RUST_FRONTEND_BINS=1 ./build.sh debug
 Danach werden die finalen `rrp`, `rrpl`, `rrpe`, `rrpb` trotzdem wieder durch die
 C-Launcher ersetzt.
 
+
+## Autocomplete und Autosuggest mitten in der Eingabe
+
+`libretaprompt_input.so` unterstützt Autocomplete und Autosuggest jetzt auch dann,
+wenn der Cursor nicht am Ende der Eingabe steht. Die Completion ersetzt den Token
+unter dem Cursor bis zum Token-Ende statt nur am Zeilenende anzuhängen. Autosuggest
+erzeugt in diesem Fall eine `ReplaceRange`-Aktion, damit die rechte Pfeiltaste den
+vorhandenen Token-Teil ersetzt. History-Hints bleiben absichtlich auf das Zeilenende
+begrenzt, weil sie komplette frühere Eingaben fortsetzen.
+
 ## Maschinelle Prüfung
 
 Der Build prüft mit `readelf`, falls verfügbar:
@@ -99,12 +117,26 @@ Der Build prüft mit `readelf`, falls verfügbar:
 - `rrpb` braucht `libretaprompt_commands.so`
 - `rrpb` braucht nicht `libretaprompt_input.so`
 
-Zusätzlich prüft `tools/build_prompt_split_sharedlibs.sh` die exportierten ABI-Symbole der
-drei `.so`-Libraries.
+Zusätzlich prüft `tools/build_prompt_split_sharedlibs.sh` die exportierten ABI-Symbole von
+`libreta.so`, `libreta_runtime.so`, den sieben privaten Reta-Core-Bibliotheken und den zwei Prompt-Bibliotheken. Außerdem bricht der Build ab, wenn `libreta.so` nicht kleiner als `libreta_runtime.so` ist.
 
 ## Ehrliche Grenze
 
-Diese Änderung minimiert die finalen Executables und korrigiert deren dynamische
-Library-Zuordnung. Sie garantiert noch nicht, dass zwischen den Rust-`cdylib`-Dateien
+Diese Änderung minimiert die finalen Executables, korrigiert deren dynamische
+Library-Zuordnung und sorgt jetzt auch dafür, dass `libreta.so` nur noch die dünne
+öffentliche Fassade ist. Der schwere nicht-interaktive Kern liegt in
+`libreta_runtime.so`. Sie garantiert noch nicht, dass zwischen allen Rust-`cdylib`-Dateien
 selbst keinerlei Rust-Code doppelt eingebettet ist. Dafür müsste die interne
-Rust-Code-Besitzstruktur weiter auf echte ABI-Grenzen umgebaut werden.
+Rust-Code-Besitzstruktur weiter auf feinere echte ABI-Grenzen umgebaut werden.
+
+## Reta-Core-Split
+
+Die neue Reta-Core-Topologie ist separat dokumentiert:
+
+- Deutsch: `RETA_SHARED_LIBS_DE.md` und `doc/shared-libs/de/README.md`
+- English: `RETA_SHARED_LIBS_EN.md` und `doc/shared-libs/en/README.md`
+
+Die Kernregel lautet: `rreta` hängt direkt nur an `libreta.so`; `libreta.so` hängt an den
+sieben privaten Core-Bibliotheken. Damit bleibt die öffentliche ABI stabil, während
+Daten, Parsing, Semantik, Tabelle, Rendering, Architektur und Runtime als eigene
+`.so`-Grenzen aktiviert sind.

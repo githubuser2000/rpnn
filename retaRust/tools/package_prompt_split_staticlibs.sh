@@ -15,9 +15,9 @@ case "$PROFILE" in
 esac
 
 cat >&2 <<MESSAGE
-static retaPrompt packaging is retired in this source tree.
+static retaPrompt/Reta packaging is retired in this source tree.
 
-Use the dynamic .so package instead:
+Use the dynamic .so package with the Reta core split and prompt split instead:
   ./tools/package_prompt_split_sharedlibs.sh $PROFILE
 
 This compatibility wrapper delegates to the shared-library package and does not

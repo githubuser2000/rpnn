@@ -63,6 +63,17 @@ because it verifies:
 744 -> Neues M (13) Kontinuum
 ```
 
+
+## Build-Hinweis seit Shared-Library-Split
+
+Der normale `./build.sh` baut für maximale Auslagerung in `.so`-Bibliotheken nur die Library-Ziele und die kleinen C-Launcher `rreta`, `rrp`, `rrpl`, `rrpe`, `rrpb`. Die Diagnose-Binaries aus dieser Datei werden nur explizit gebaut:
+
+```bash
+RETA_BUILD_RUST_TOOL_BINS=1 ./build.sh release
+```
+
+Damit bleibt der normale Runtime-Pfad klein, während die Architekturwerkzeuge für Tests weiterhin verfügbar bleiben.
+
 ## Binary catalog
 
 | Binary | Kategorie | Zweck | Nützliche Ausgabe | Legacy-Lines? |

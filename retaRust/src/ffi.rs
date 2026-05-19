@@ -23,12 +23,12 @@ pub struct RetaFfiResponse {
     pub exit_code: i32,
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_abi_version() -> u32 {
     RETA_ABI_VERSION
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_run_argv(
     argc: usize,
     argv: *const *const c_char,
@@ -114,7 +114,7 @@ unsafe fn reta_run_argv_impl(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
@@ -129,34 +129,34 @@ pub unsafe extern "C" fn reta_free_string(ptr: *mut c_char) {
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_shared_words_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(crate::shared_words()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_csv_catalog_snapshot_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(&reta_architecture::bootstrap_csv_catalog().snapshot())
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_csv_catalog_assets_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&reta_architecture::csv_asset_records()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_html_class_catalog_snapshot_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&reta_architecture::html_class_catalog_snapshot()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_html_class_catalog_records_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&reta_architecture::html_class_owned_records()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_materialization_json(
     argc: usize,
     argv: *const *const c_char,
@@ -175,7 +175,7 @@ pub unsafe extern "C" fn reta_architecture_table_materialization_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_column_order_json(
     argc: usize,
     argv: *const *const c_char,
@@ -206,7 +206,7 @@ pub unsafe extern "C" fn reta_architecture_column_order_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_row_order_json(
     argc: usize,
     argv: *const *const c_char,
@@ -238,7 +238,7 @@ pub unsafe extern "C" fn reta_architecture_row_order_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_json(
     argc: usize,
     argv: *const *const c_char,
@@ -258,7 +258,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_virtual_columns_json(
     argc: usize,
     argv: *const *const c_char,
@@ -291,7 +291,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_columns_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_virtual_parity_json(
     argc: usize,
     argv: *const *const c_char,
@@ -319,7 +319,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_virtual_parity_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_commit_audit_json(
     argc: usize,
     argv: *const *const c_char,
@@ -353,7 +353,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_commit_audit_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_transaction_json(
     argc: usize,
     argv: *const *const c_char,
@@ -390,7 +390,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_transaction_jso
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_journal_json(
     argc: usize,
     argv: *const *const c_char,
@@ -430,7 +430,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_journal_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_replay_json(
     argc: usize,
     argv: *const *const c_char,
@@ -469,7 +469,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_replay_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_ledger_json(
     argc: usize,
     argv: *const *const c_char,
@@ -508,7 +508,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_ledger_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_store_json(
     argc: usize,
     argv: *const *const c_char,
@@ -554,7 +554,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_store_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_persistence_json(
     argc: usize,
     argv: *const *const c_char,
@@ -600,7 +600,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_persistence_jso
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_file_json(
     argc: usize,
     argv: *const *const c_char,
@@ -641,7 +641,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_file_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_recovery_json(
     argc: usize,
     argv: *const *const c_char,
@@ -682,7 +682,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_recovery_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_readiness_json(
     argc: usize,
     argv: *const *const c_char,
@@ -723,7 +723,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_readiness_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_activation_promotion_json(
     argc: usize,
     argv: *const *const c_char,
@@ -764,7 +764,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_activation_promotion_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_language_parity_json(
     argc: usize,
     argv: *const *const c_char,
@@ -785,7 +785,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_language_parity_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_language_coverage_json(
     argc: usize,
     argv: *const *const c_char,
@@ -806,7 +806,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_language_coverage_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_language_sync_json(
     argc: usize,
     argv: *const *const c_char,
@@ -827,7 +827,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_language_sync_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_prompt_language_completion_json(
     input: *const c_char,
 ) -> *mut c_char {
@@ -847,7 +847,7 @@ pub unsafe extern "C" fn reta_architecture_prompt_language_completion_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_prompt_language_guard_json(
     input: *const c_char,
 ) -> *mut c_char {
@@ -868,7 +868,7 @@ pub unsafe extern "C" fn reta_architecture_prompt_language_guard_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_prompt_activation_readiness_json(
     input: *const c_char,
     argc: usize,
@@ -898,7 +898,7 @@ pub unsafe extern "C" fn reta_architecture_prompt_activation_readiness_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     argc: usize,
     argv: *const *const c_char,
@@ -918,7 +918,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_numbering_json(
     argc: usize,
     argv: *const *const c_char,
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_numbering_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_layout_json(
     argc: usize,
     argv: *const *const c_char,
@@ -979,7 +979,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_layout_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_html_attributes_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1019,7 +1019,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_html_attributes_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_row_styles_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1061,7 +1061,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_row_styles_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_cell_styles_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1105,7 +1105,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_cell_styles_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_style_composition_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1147,7 +1147,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_composition_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_output_options_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1174,7 +1174,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_options_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1211,7 +1211,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_output_parity_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_shell_styles_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1264,7 +1264,7 @@ pub unsafe extern "C" fn reta_architecture_table_view_shell_styles_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_table_view_style_parity_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1307,12 +1307,12 @@ pub unsafe extern "C" fn reta_architecture_table_view_style_parity_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_architecture_snapshot_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&crate::shared_architecture().snapshot_ref()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_cli_plan_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1328,7 +1328,7 @@ pub unsafe extern "C" fn reta_architecture_cli_plan_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_activation_plan_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1349,7 +1349,7 @@ pub unsafe extern "C" fn reta_architecture_activation_plan_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_shadow_cli_plan_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1367,7 +1367,7 @@ pub unsafe extern "C" fn reta_architecture_shadow_cli_plan_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
     program_name: *const c_char,
     prompt_input: *const c_char,
@@ -1387,26 +1387,26 @@ pub unsafe extern "C" fn reta_architecture_prompt_shadow_plan_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_architecture_shadow_commit_policy_json() -> *mut c_char {
     ffi_json_result(|| serde_json::to_string(&reta_architecture::ShadowCommitPolicy::default()))
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_architecture_prompt_commit_policy_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(&reta_architecture::ShadowPromptCommitPolicy::default())
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_architecture_table_view_output_commit_policy_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(&reta_architecture::ShadowTableViewOutputCommitPolicy::default())
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {
     ffi_json_result(|| {
         let runtime = crate::shared_architecture();
@@ -1421,7 +1421,7 @@ pub extern "C" fn reta_architecture_governance_snapshot_json() -> *mut c_char {
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_execution_network_plan_json(
     argc: usize,
     argv: *const *const c_char,
@@ -1441,7 +1441,7 @@ pub unsafe extern "C" fn reta_execution_network_plan_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_parity_probe_plan_json() -> *mut c_char {
     ffi_json_result(|| {
         let harness = reta_architecture::bootstrap_parity_harness();
@@ -1450,7 +1450,7 @@ pub extern "C" fn reta_parity_probe_plan_json() -> *mut c_char {
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
     ffi_json_result(|| {
         serde_json::to_string(
@@ -1459,7 +1459,7 @@ pub extern "C" fn reta_all_main_alias_groups_json() -> *mut c_char {
     })
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_parameter_alias_groups_for_main_json(
     canonical_main: *const c_char,
 ) -> *mut c_char {
@@ -1478,7 +1478,7 @@ pub unsafe extern "C" fn reta_parameter_alias_groups_for_main_json(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(reta_runtime_core_carrier), unsafe(no_mangle))]
 pub unsafe extern "C" fn reta_resolve_parameter_main_alias(
     main_alias: *const c_char,
 ) -> *mut c_char {

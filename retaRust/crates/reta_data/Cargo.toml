@@ -1,0 +1,11 @@
+[package]
+name = "reta_data"
+version = "0.7.0"
+edition = "2024"
+autobins = false
+publish = false
+
+[lib]
+name = "reta_data"
+path = "src/lib.rs"
+crate-type = ["cdylib"]

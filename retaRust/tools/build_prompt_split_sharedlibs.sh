@@ -14,10 +14,28 @@ case "$PROFILE" in
     ;;
 esac
 
+TARGET_DIR="${CARGO_TARGET_DIR:-target}/$PROFILE"
+MANIFEST="$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"
+
+CORE_SPLIT_LIBRARIES=(
+  reta_data
+  reta_parse
+  reta_semantics
+  reta_table
+  reta_render
+  reta_arch
+  reta_runtime
+)
+
+PROMPT_SPLIT_LIBRARIES=(
+  retaprompt_commands
+  retaprompt_input
+)
+
 guard_against_static_regression() {
   if grep -Eq 'crate-type[[:space:]]*=.*staticlib' Cargo.toml crates/*/Cargo.toml 2>/dev/null; then
     echo "dynamic .so build guard failed: staticlib crate-type found in Cargo.toml" >&2
-    echo "remove the staticlib crate-type before using the retaPrompt shared-library path" >&2
+    echo "remove the staticlib crate-type before using the shared-library path" >&2
     exit 1
   fi
 
@@ -55,21 +73,58 @@ verify_dynamic_symbol() {
   fi
 }
 
+verify_dynamic_symbol_absent() {
+  local library="$1"
+  local symbol="$2"
+
+  if command -v nm >/dev/null 2>&1; then
+    if nm -D --defined-only "$library" 2>/dev/null | awk '{print $NF}' | grep -Fxq "$symbol"; then
+      echo "unexpected exported symbol in $library: $symbol" >&2
+      exit 1
+    fi
+  elif command -v readelf >/dev/null 2>&1; then
+    if readelf -Ws "$library" 2>/dev/null | awk '{print $8}' | grep -Fxq "$symbol"; then
+      echo "unexpected exported symbol in $library: $symbol" >&2
+      exit 1
+    fi
+  else
+    echo "warning: neither nm nor readelf is available; exported-symbol absence check skipped" >&2
+  fi
+}
+
+verify_facade_smaller_than_runtime() {
+  local facade="$TARGET_DIR/libreta.so"
+  local runtime="$TARGET_DIR/libreta_runtime.so"
+
+  if [[ ! -f "$facade" || ! -f "$runtime" ]]; then
+    echo "missing size-check input: $facade or $runtime" >&2
+    exit 1
+  fi
+
+  local facade_size runtime_size
+  facade_size=$(wc -c < "$facade")
+  runtime_size=$(wc -c < "$runtime")
+  if (( facade_size >= runtime_size )); then
+    echo "split-size check failed: libreta.so ($facade_size bytes) is not smaller than libreta_runtime.so ($runtime_size bytes)" >&2
+    exit 1
+  fi
+}
+
 verify_dynamic_needed() {
-  local executable="$1"
+  local binary="$1"
   shift
 
   if ! command -v readelf >/dev/null 2>&1; then
-    echo "warning: readelf unavailable; skipping DT_NEEDED check for $executable" >&2
+    echo "warning: readelf unavailable; skipping DT_NEEDED check for $binary" >&2
     return 0
   fi
 
   local needed
-  needed="$(readelf -d "$executable" 2>/dev/null | awk '/NEEDED/ {print $0}')"
+  needed="$(readelf -d "$binary" 2>/dev/null | awk '/NEEDED/ {print $0}')"
   local library
   for library in "$@"; do
     if ! grep -Fq "lib${library}.so" <<<"$needed"; then
-      echo "expected DT_NEEDED dependency missing from $executable: lib${library}.so" >&2
+      echo "expected DT_NEEDED dependency missing from $binary: lib${library}.so" >&2
       echo "$needed" >&2
       exit 1
     fi
@@ -77,7 +132,7 @@ verify_dynamic_needed() {
 }
 
 verify_dynamic_not_needed() {
-  local executable="$1"
+  local binary="$1"
   shift
 
   if ! command -v readelf >/dev/null 2>&1; then
@@ -85,11 +140,11 @@ verify_dynamic_not_needed() {
   fi
 
   local needed
-  needed="$(readelf -d "$executable" 2>/dev/null | awk '/NEEDED/ {print $0}')"
+  needed="$(readelf -d "$binary" 2>/dev/null | awk '/NEEDED/ {print $0}')"
   local library
   for library in "$@"; do
     if grep -Fq "lib${library}.so" <<<"$needed"; then
-      echo "unexpected DT_NEEDED dependency in $executable: lib${library}.so" >&2
+      echo "unexpected DT_NEEDED dependency in $binary: lib${library}.so" >&2
       echo "$needed" >&2
       exit 1
     fi
@@ -108,10 +163,14 @@ guard_against_static_regression
 
 ./build.sh "$PROFILE"
 
-TARGET_DIR="target/$PROFILE"
-MANIFEST="$TARGET_DIR/retaprompt_split_sharedlibs_manifest.json"
-
 verify_file_exists "$TARGET_DIR/libreta.so"
+for library in "${CORE_SPLIT_LIBRARIES[@]}"; do
+  verify_file_exists "$TARGET_DIR/lib${library}.so"
+  verify_no_static_archive "$TARGET_DIR/lib${library}.a"
+  verify_dynamic_symbol "$TARGET_DIR/lib${library}.so" "${library}_abi_anchor"
+  verify_dynamic_symbol "$TARGET_DIR/lib${library}.so" "${library}_abi_manifest_json"
+done
+
 verify_file_exists "$TARGET_DIR/libretaprompt_commands.so"
 verify_file_exists "$TARGET_DIR/libretaprompt_input.so"
 verify_file_exists "$TARGET_DIR/rreta"
@@ -126,6 +185,15 @@ verify_no_static_archive "$TARGET_DIR/libretaprompt_commands.a"
 verify_no_static_archive "$TARGET_DIR/libretaprompt_input.a"
 
 verify_dynamic_symbol "$TARGET_DIR/libreta.so" reta_run_and_print_from_env_ffi
+verify_dynamic_symbol "$TARGET_DIR/libreta.so" reta_core_split_abi_anchor
+verify_dynamic_symbol "$TARGET_DIR/libreta.so" reta_core_split_abi_manifest_json
+verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_run_and_print_from_env_ffi
+verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_run_argv
+verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_free_string
+verify_dynamic_symbol "$TARGET_DIR/libreta_runtime.so" reta_runtime_core_shared_words_json
+verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_and_print_from_env_ffi
+verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_argv
+verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_core_split_abi_anchor
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_kind_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_current_executable_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rp_from_env
@@ -140,8 +208,11 @@ verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_from_env
 
+verify_dynamic_needed "$TARGET_DIR/libreta.so" "${CORE_SPLIT_LIBRARIES[@]}"
+verify_facade_smaller_than_runtime
 verify_dynamic_needed "$TARGET_DIR/rreta" reta
-verify_dynamic_needed "$TARGET_DIR/rrp" retaprompt_input retaprompt_commands
+verify_dynamic_not_needed "$TARGET_DIR/rreta" "${CORE_SPLIT_LIBRARIES[@]}"
+verify_dynamic_needed "$TARGET_DIR/rrp"  retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpe" retaprompt_input retaprompt_commands
 verify_dynamic_needed "$TARGET_DIR/rrpb" retaprompt_commands
@@ -149,44 +220,56 @@ verify_dynamic_not_needed "$TARGET_DIR/rrpb" retaprompt_input
 
 cat > "$MANIFEST" <<MANIFEST_JSON
 {
-  "build_mode": "plain-cargo-cdylib-plus-c-launchers-with-split-prompt-dependencies",
+  "build_mode": "reta-core-facade-plus-private-core-shared-libraries-and-split-prompt-shared-libraries",
   "artifact_type": "dynamic-shared-libraries",
   "static_archives_intentionally_not_built": true,
   "rust_frontend_executables_intentionally_not_built_by_default": true,
-  "shared_libraries": [
-    {
-      "path": "$TARGET_DIR/libreta.so",
-      "role": "reta core library in the current source layout",
-      "required_symbols": ["reta_run_and_print_from_env_ffi"]
-    },
+  "core_facade": {
+    "path": "$TARGET_DIR/libreta.so",
+    "role": "stable public C ABI facade for rreta",
+    "required_symbols": [
+      "reta_run_and_print_from_env_ffi",
+      "reta_core_split_abi_anchor",
+      "reta_core_split_abi_manifest_json"
+    ],
+    "links_to": [
+      "libreta_data.so",
+      "libreta_parse.so",
+      "libreta_semantics.so",
+      "libreta_table.so",
+      "libreta_render.so",
+      "libreta_arch.so",
+      "libreta_runtime.so"
+    ]
+  },
+  "core_private_shared_libraries": [
+    { "path": "$TARGET_DIR/libreta_data.so", "role": "data, words, aliases, CSV and catalogs" },
+    { "path": "$TARGET_DIR/libreta_parse.so", "role": "argv/text parsing and input morphisms" },
+    { "path": "$TARGET_DIR/libreta_semantics.so", "role": "semantic selection, topology and presheaf boundary" },
+    { "path": "$TARGET_DIR/libreta_table.so", "role": "table materialization, state, views and sheaf gluing" },
+    { "path": "$TARGET_DIR/libreta_render.so", "role": "rendering functors for shell/text/html/bbcode output" },
+    { "path": "$TARGET_DIR/libreta_arch.so", "role": "category/topology/morphism/universal-property metadata" },
+    { "path": "$TARGET_DIR/libreta_runtime.so", "role": "execution network, FIFO/LIFO/queue/stack/duplex/semaphore runtime and heavy Reta engine carrier" }
+  ],
+  "prompt_shared_libraries": [
     {
       "path": "$TARGET_DIR/libretaprompt_commands.so",
-      "role": "retaPrompt command library for rrpb and the command side of rrp/rrpl/rrpe",
-      "required_symbols": [
-        "retaprompt_commands_run_kind_from_env",
-        "retaprompt_commands_run_current_executable_from_env",
-        "retaprompt_commands_run_rp_from_env",
-        "retaprompt_commands_run_rpl_from_env",
-        "retaprompt_commands_run_rpb_from_env",
-        "retaprompt_commands_run_rpe_from_env"
-      ]
+      "role": "retaPrompt command library for rrpb and the command side of rrp/rrpl/rrpe"
     },
     {
       "path": "$TARGET_DIR/libretaprompt_input.so",
-      "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe",
-      "required_symbols": [
-        "retaprompt_input_run_kind_from_env",
-        "retaprompt_input_run_current_executable_from_env",
-        "retaprompt_input_run_any_current_executable_from_env",
-        "retaprompt_input_run_launcher_kind_from_env",
-        "retaprompt_input_run_rp_from_env",
-        "retaprompt_input_run_rpl_from_env",
-        "retaprompt_input_run_rpe_from_env"
-      ]
+      "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe"
     }
   ],
   "forbidden_static_archives": [
     "$TARGET_DIR/libreta.a",
+    "$TARGET_DIR/libreta_data.a",
+    "$TARGET_DIR/libreta_parse.a",
+    "$TARGET_DIR/libreta_semantics.a",
+    "$TARGET_DIR/libreta_table.a",
+    "$TARGET_DIR/libreta_render.a",
+    "$TARGET_DIR/libreta_arch.a",
+    "$TARGET_DIR/libreta_runtime.a",
     "$TARGET_DIR/libretaprompt_commands.a",
     "$TARGET_DIR/libretaprompt_input.a"
   ],
@@ -196,7 +279,16 @@ cat > "$MANIFEST" <<MANIFEST_JSON
   "launchers": [
     {
       "path": "$TARGET_DIR/rreta",
-      "links_to": ["libreta.so"]
+      "links_to": ["libreta.so"],
+      "must_not_link_to": [
+        "libreta_data.so",
+        "libreta_parse.so",
+        "libreta_semantics.so",
+        "libreta_table.so",
+        "libreta_render.so",
+        "libreta_arch.so",
+        "libreta_runtime.so"
+      ]
     },
     {
       "path": "$TARGET_DIR/rrp",
@@ -217,26 +309,23 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     }
   ],
   "notes": [
-    "The prompt executables are C launchers, not Rust frontend binaries.",
+    "rreta remains a tiny C launcher that needs only libreta.so directly.",
+    "libreta.so is a thin split-facade build and forwards heavy execution to libreta_runtime.so.",
     "rrp, rrpl and rrpe intentionally carry DT_NEEDED entries for both prompt split libraries.",
     "rrpb intentionally carries only the command library dependency.",
-    "The current Rust cdylib source layout can still duplicate Rust dependency code inside the shared objects themselves; this build removes that code from the executables and verifies launcher-level dynamic dependencies."
+    "The heavy non-interactive Reta engine is now outside libreta.so, primarily in libreta_runtime.so; finer distribution into data/parse/semantics/table/render can continue behind the same ABI topology."
   ]
 }
 MANIFEST_JSON
 
-printf 'built dynamic shared libraries and launchers with split prompt dependencies:\n'
-printf '  %s\n' "$TARGET_DIR/libreta.so"
-printf '  %s\n' "$TARGET_DIR/libretaprompt_commands.so"
-printf '  %s\n' "$TARGET_DIR/libretaprompt_input.so"
-printf '  %s\n' "$TARGET_DIR/rreta"
-printf '  %s\n' "$TARGET_DIR/csv"
+printf 'built dynamic split shared libraries and launchers:\n'
+printf '  %s -> %s\n' "$TARGET_DIR/rreta" "libreta.so"
+printf '  %s -> %s\n' "$TARGET_DIR/libreta.so" "libreta_{data,parse,semantics,table,render,arch,runtime}.so"
+for library in "${CORE_SPLIT_LIBRARIES[@]}"; do
+  printf '  %s\n' "$TARGET_DIR/lib${library}.so"
+done
 printf '  %s -> %s + %s\n' "$TARGET_DIR/rrp" "libretaprompt_input.so" "libretaprompt_commands.so"
 printf '  %s -> %s + %s\n' "$TARGET_DIR/rrpl" "libretaprompt_input.so" "libretaprompt_commands.so"
 printf '  %s -> %s + %s\n' "$TARGET_DIR/rrpe" "libretaprompt_input.so" "libretaprompt_commands.so"
 printf '  %s -> %s\n' "$TARGET_DIR/rrpb" "libretaprompt_commands.so"
-printf '\nstatic archives intentionally not built:\n'
-printf '  %s\n' "$TARGET_DIR/libreta.a"
-printf '  %s\n' "$TARGET_DIR/libretaprompt_commands.a"
-printf '  %s\n' "$TARGET_DIR/libretaprompt_input.a"
 printf '\nmanifest:\n  %s\n' "$MANIFEST"

@@ -395,29 +395,36 @@ pub fn candidates_for_input_in_mode_with_context(
 
 impl ReedlineCompleter for PromptContextCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
-        let before_cursor = safe_prefix(line, pos);
         let runtime_state = self
             .runtime
             .lock()
             .map(|state| state.clone())
             .unwrap_or_default();
 
-        completion_candidates_for_line_in_mode_with_context(
-            before_cursor,
+        completion_candidates_for_line_at_cursor_in_mode_with_context(
+            line,
+            pos,
             runtime_state.prompt_mode,
             &runtime_state.stored_prefix_tokens,
             &runtime_state.stored_commands,
         )
         .into_iter()
-        .map(|candidate| Suggestion {
-            value: candidate.value,
-            display_override: None,
-            description: candidate.description,
-            style: None,
-            extra: None,
-            span: Span::new(candidate.replace_start, before_cursor.len()),
-            append_whitespace: candidate.append_whitespace,
-            match_indices: None,
+        .map(|candidate| {
+            let replace_end = completion_replace_end_for_line(line, pos, candidate.replace_start);
+            Suggestion {
+                value: candidate.value,
+                display_override: None,
+                description: candidate.description,
+                style: None,
+                extra: None,
+                span: Span::new(candidate.replace_start, replace_end),
+                append_whitespace: should_append_completion_whitespace(
+                    line,
+                    replace_end,
+                    candidate.append_whitespace,
+                ),
+                match_indices: None,
+            }
         })
         .collect()
     }
@@ -436,9 +443,8 @@ impl Hinter for PromptContextHinter {
         self.right_arrow_state
             .update(RightArrowAutosuggestSnapshot::default());
 
-        let Some(before_cursor) = safe_line_end_prefix(line, pos) else {
-            return String::new();
-        };
+        let cursor = safe_cursor_position(line, pos);
+        let before_cursor = &line[..cursor];
 
         let runtime_state = self
             .runtime
@@ -446,8 +452,9 @@ impl Hinter for PromptContextHinter {
             .map(|state| state.clone())
             .unwrap_or_default();
 
-        if let Some(hint) = autosuggestion_from_context_candidates(
-            before_cursor,
+        if let Some(hint) = autosuggestion_from_context_candidates_at_cursor(
+            line,
+            cursor,
             runtime_state.prompt_mode,
             &runtime_state.stored_prefix_tokens,
             &runtime_state.stored_commands,
@@ -458,11 +465,13 @@ impl Hinter for PromptContextHinter {
             return render_autosuggestion_hint(&display, use_ansi_coloring);
         }
 
-        if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
-            self.current_hint = AutosuggestionHint::insertable(hint);
-            self.right_arrow_state
-                .update(self.current_hint.right_arrow_snapshot());
-            return render_autosuggestion_hint(&self.current_hint.display, use_ansi_coloring);
+        if cursor == line.len() {
+            if let Some(hint) = autosuggestion_from_history(before_cursor, history) {
+                self.current_hint = AutosuggestionHint::insertable(hint);
+                self.right_arrow_state
+                    .update(self.current_hint.right_arrow_snapshot());
+                return render_autosuggestion_hint(&self.current_hint.display, use_ansi_coloring);
+            }
         }
 
         String::new()
@@ -533,6 +542,33 @@ fn autosuggestion_from_context_candidates(
     .find(|hint| !hint.display.trim().is_empty())
 }
 
+fn autosuggestion_from_context_candidates_at_cursor(
+    line: &str,
+    pos: usize,
+    prompt_mode: PromptModus,
+    stored_prefix_tokens: &[String],
+    stored_commands: &[String],
+) -> Option<AutosuggestionHint> {
+    let cursor = safe_cursor_position(line, pos);
+    let before_cursor = &line[..cursor];
+    if before_cursor.trim().is_empty() {
+        return None;
+    }
+
+    completion_candidates_for_line_at_cursor_in_mode_with_context(
+        line,
+        cursor,
+        prompt_mode,
+        stored_prefix_tokens,
+        stored_commands,
+    )
+    .into_iter()
+    .filter_map(|candidate| {
+        autosuggestion_hint_for_candidate_at_cursor(line, cursor, &candidate)
+    })
+    .find(|hint| !hint.display.trim().is_empty())
+}
+
 fn autosuggestion_hint_for_candidate(
     before_cursor: &str,
     candidate: &CompletionCandidate,
@@ -542,6 +578,72 @@ fn autosuggestion_hint_for_candidate(
     }
 
     structural_dash_replacement_hint_for_candidate(before_cursor, candidate)
+}
+
+fn autosuggestion_hint_for_candidate_at_cursor(
+    line: &str,
+    pos: usize,
+    candidate: &CompletionCandidate,
+) -> Option<AutosuggestionHint> {
+    let cursor = safe_cursor_position(line, pos);
+    let before_cursor = &line[..cursor];
+    let replace_end = completion_replace_end_for_line(line, cursor, candidate.replace_start);
+
+    if replace_end <= cursor {
+        if cursor < line.len() {
+            return replacement_hint_for_candidate_at_cursor(line, cursor, cursor, candidate);
+        }
+        return autosuggestion_hint_for_candidate(before_cursor, candidate);
+    }
+
+    replacement_hint_for_candidate_at_cursor(line, cursor, replace_end, candidate)
+}
+
+fn replacement_hint_for_candidate_at_cursor(
+    line: &str,
+    pos: usize,
+    replace_end: usize,
+    candidate: &CompletionCandidate,
+) -> Option<AutosuggestionHint> {
+    if candidate.replace_start > pos
+        || replace_end > line.len()
+        || candidate.replace_start > replace_end
+        || !line.is_char_boundary(candidate.replace_start)
+        || !line.is_char_boundary(pos)
+        || !line.is_char_boundary(replace_end)
+    {
+        return None;
+    }
+
+    let typed_fragment = &line[candidate.replace_start..pos];
+    if typed_fragment.trim().is_empty() || typed_fragment.chars().any(char::is_whitespace) {
+        return None;
+    }
+
+    let replacement = completion_replacement_text_for_line(line, replace_end, candidate);
+    let existing = &line[candidate.replace_start..replace_end];
+    if normalize_completion_text(existing) == normalize_completion_text(&replacement) {
+        return None;
+    }
+
+    let typed_normalized = normalize_completion_text(typed_fragment);
+    let replacement_normalized = normalize_completion_text(&replacement);
+    let dash_typed = normalize_dash_insensitive_fragment(typed_fragment);
+    let dash_replacement = normalize_dash_insensitive_fragment(&replacement);
+
+    if !replacement_normalized.starts_with(&typed_normalized)
+        && !(is_structural_dash_candidate(&candidate.value)
+            && dash_replacement.starts_with(&dash_typed))
+    {
+        return None;
+    }
+
+    Some(AutosuggestionHint::replacement(
+        format!(" → {replacement}"),
+        candidate.replace_start,
+        replace_end.saturating_sub(candidate.replace_start),
+        replacement,
+    ))
 }
 
 fn suffix_hint_for_candidate(
@@ -665,11 +767,108 @@ fn first_autosuggestion_token(hint: &str) -> String {
     out
 }
 
-fn safe_line_end_prefix(line: &str, pos: usize) -> Option<&str> {
-    if pos != line.len() {
-        return None;
+fn safe_cursor_position(line: &str, pos: usize) -> usize {
+    safe_prefix(line, pos).len()
+}
+
+fn completion_replace_end_for_line(line: &str, pos: usize, replace_start: usize) -> usize {
+    let cursor = safe_cursor_position(line, pos);
+    if replace_start > cursor || !line.is_char_boundary(replace_start) {
+        return cursor;
     }
-    Some(safe_prefix(line, pos))
+
+    for segment in split_tokens_with_positions(line) {
+        let token_end = segment.start + segment.text.len();
+        if replace_start >= segment.start
+            && replace_start <= token_end
+            && cursor >= segment.start
+            && cursor <= token_end
+        {
+            return value_aware_replace_end(&segment, replace_start, cursor)
+                .unwrap_or(token_end);
+        }
+    }
+
+    cursor
+}
+
+fn value_aware_replace_end(
+    segment: &TokenSegment,
+    replace_start: usize,
+    cursor: usize,
+) -> Option<usize> {
+    let local_replace_start = replace_start.checked_sub(segment.start)?;
+    let local_cursor = cursor.checked_sub(segment.start)?;
+    let eq_index = segment.text.find('=')?;
+
+    if local_replace_start <= eq_index {
+        return Some(segment.start + segment.text.len());
+    }
+
+    let mut round = 0i32;
+    let mut square = 0i32;
+    let mut curly = 0i32;
+
+    for (idx, ch) in segment.text.char_indices() {
+        if idx < eq_index + 1 {
+            continue;
+        }
+        if idx >= local_cursor {
+            break;
+        }
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            _ => {}
+        }
+    }
+
+    for (relative_idx, ch) in segment.text[local_cursor..].char_indices() {
+        let idx = local_cursor + relative_idx;
+        match ch {
+            '(' => round += 1,
+            ')' => round -= 1,
+            '[' => square += 1,
+            ']' => square -= 1,
+            '{' => curly += 1,
+            '}' => curly -= 1,
+            ',' if round == 0 && square == 0 && curly == 0 => {
+                return Some(segment.start + idx);
+            }
+            _ => {}
+        }
+    }
+
+    Some(segment.start + segment.text.len())
+}
+
+fn should_append_completion_whitespace(
+    line: &str,
+    replace_end: usize,
+    candidate_append_whitespace: bool,
+) -> bool {
+    candidate_append_whitespace
+        && !line[replace_end..]
+            .chars()
+            .next()
+            .map(char::is_whitespace)
+            .unwrap_or(false)
+}
+
+fn completion_replacement_text_for_line(
+    line: &str,
+    replace_end: usize,
+    candidate: &CompletionCandidate,
+) -> String {
+    let mut replacement = candidate.value.clone();
+    if should_append_completion_whitespace(line, replace_end, candidate.append_whitespace) {
+        replacement.push(' ');
+    }
+    replacement
 }
 
 fn completion_candidates_for_line(before_cursor: &str) -> Vec<CompletionCandidate> {
@@ -686,6 +885,23 @@ fn completion_candidates_for_line_in_mode(
     prompt_mode: PromptModus,
 ) -> Vec<CompletionCandidate> {
     completion_candidates_for_line_in_mode_with_context(before_cursor, prompt_mode, &[], &[])
+}
+
+fn completion_candidates_for_line_at_cursor_in_mode_with_context(
+    line: &str,
+    pos: usize,
+    prompt_mode: PromptModus,
+    stored_prefix_tokens: &[String],
+    stored_commands: &[String],
+) -> Vec<CompletionCandidate> {
+    let cursor = safe_cursor_position(line, pos);
+    let before_cursor = &line[..cursor];
+    completion_candidates_for_line_in_mode_with_context(
+        before_cursor,
+        prompt_mode,
+        stored_prefix_tokens,
+        stored_commands,
+    )
 }
 
 fn completion_candidates_for_line_in_mode_with_context(
@@ -2177,7 +2393,8 @@ fn with_negative_variants_and_any(values: &[&'static str]) -> Vec<String> {
 mod tests {
     use super::{
         autosuggestion_for_input, autosuggestion_for_input_in_mode_with_context,
-        autosuggestion_from_context_candidates, candidates_for_input,
+        autosuggestion_from_context_candidates, autosuggestion_from_context_candidates_at_cursor,
+        candidates_for_input, completion_replace_end_for_line,
         candidates_for_input_in_mode_with_context, normalize_completion_text, PromptModus,
         RightArrowAcceptAction,
     };
@@ -2611,6 +2828,40 @@ mod tests {
                 replace_start: "reta -zeilen ".len(),
                 replace_len: "zeit".len(),
                 replacement: "--zeit=".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn midline_completion_replaces_the_token_under_the_cursor() {
+        let line = "reta -zeilen --zeit=heute";
+        let cursor = "reta -ze".len();
+        assert_eq!(
+            completion_replace_end_for_line(line, cursor, "reta ".len()),
+            "reta -zeilen".len()
+        );
+    }
+
+    #[test]
+    fn midline_autosuggestion_replaces_existing_token_tail_instead_of_appending() {
+        let line = "reta -zeilen --zeit=heute";
+        let cursor = "reta -ze".len();
+        let hint = autosuggestion_from_context_candidates_at_cursor(
+            line,
+            cursor,
+            PromptModus::Normal,
+            &[],
+            &[],
+        )
+        .expect("expected midline autosuggestion");
+
+        assert_eq!(hint.display, " → -zeilen");
+        assert_eq!(
+            hint.accept_action,
+            RightArrowAcceptAction::ReplaceRange {
+                replace_start: "reta ".len(),
+                replace_len: "-zeilen".len(),
+                replacement: "-zeilen".to_string(),
             }
         );
     }

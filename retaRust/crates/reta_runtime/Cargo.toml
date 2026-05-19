@@ -1,0 +1,20 @@
+[package]
+name = "reta_runtime"
+version = "0.7.0"
+edition = "2024"
+autobins = false
+publish = false
+build = "build.rs"
+
+[lib]
+name = "reta_runtime"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+reta_architecture = { path = "../reta_architecture" }
+indexmap = { version = "2", features = ["serde"] }
+hypher = { version = "0.1.7", default-features = false, features = ["german"] }
+libloading = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

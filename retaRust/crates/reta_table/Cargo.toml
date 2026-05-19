@@ -1,0 +1,11 @@
+[package]
+name = "reta_table"
+version = "0.7.0"
+edition = "2024"
+autobins = false
+publish = false
+
+[lib]
+name = "reta_table"
+path = "src/lib.rs"
+crate-type = ["cdylib"]

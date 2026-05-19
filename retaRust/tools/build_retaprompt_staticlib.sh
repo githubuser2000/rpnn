@@ -22,6 +22,13 @@ Use the dynamic shared-library build instead:
 
 The active ABI artifacts are:
   target/$PROFILE/libreta.so
+  target/$PROFILE/libreta_data.so
+  target/$PROFILE/libreta_parse.so
+  target/$PROFILE/libreta_semantics.so
+  target/$PROFILE/libreta_table.so
+  target/$PROFILE/libreta_render.so
+  target/$PROFILE/libreta_arch.so
+  target/$PROFILE/libreta_runtime.so
   target/$PROFILE/libretaprompt_commands.so
   target/$PROFILE/libretaprompt_input.so
 MESSAGE
