@@ -11,6 +11,10 @@ split-facade = []
 # Public cargo-run launchers rreta and rgrundStrukHtml are always visible.
 # This feature gates only the heavier diagnostic/tool binaries.
 rust-tool-bins = []
+# Compatibility alias so `cargo run --features rust-frontends --bin rrp -- ...`
+# stays accepted from the workspace root. The prompt binaries themselves remain
+# thin dlopen launchers and do not embed retaprompt Rust code.
+rust-frontends = []
 
 [dependencies]
 reta_architecture = { path = "crates/reta_architecture" }

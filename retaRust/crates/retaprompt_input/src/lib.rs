@@ -3,6 +3,8 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+pub const RETAPROMPT_INPUT_ABI_GENERATION: u32 = 2026051902;
+
 pub use reta_architecture;
 
 pub mod shared {
@@ -118,6 +120,14 @@ impl PromptInputFrontendKind {
             Self::Rp => PromptFrontendProfile::rp(),
             Self::Rpl => PromptFrontendProfile::rpl(),
             Self::Rpe => PromptFrontendProfile::rpe(),
+        }
+    }
+
+    pub const fn program_name(self) -> &'static str {
+        match self {
+            Self::Rp => "rp",
+            Self::Rpl => "rpl",
+            Self::Rpe => "rpe",
         }
     }
 }
@@ -257,6 +267,11 @@ pub fn run_launcher_kind_from_abi_value(kind: i32) -> i32 {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_abi_generation() -> u32 {
+    RETAPROMPT_INPUT_ABI_GENERATION
+}
+
 fn ffi_guard_i32<F>(name: &str, f: F) -> i32
 where
     F: FnOnce() -> i32,
@@ -270,10 +285,97 @@ where
     }
 }
 
+
+unsafe fn argv_from_c(
+    argc: usize,
+    argv: *const *const c_char,
+    fallback_program_name: &str,
+) -> Result<Vec<String>, String> {
+    if argc == 0 {
+        return Ok(vec![fallback_program_name.to_string()]);
+    }
+    if argv.is_null() {
+        return Err("argv pointer is null while argc is non-zero".to_string());
+    }
+
+    let mut out = Vec::with_capacity(argc);
+    for index in 0..argc {
+        let ptr = unsafe { *argv.add(index) };
+        if ptr.is_null() {
+            out.push(String::new());
+        } else {
+            out.push(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned());
+        }
+    }
+    if out.is_empty() {
+        out.push(fallback_program_name.to_string());
+    }
+    Ok(out)
+}
+
+fn run_kind_from_c_argv(kind: PromptInputFrontendKind, argc: usize, argv: *const *const c_char) -> i32 {
+    let fallback_program = kind.program_name();
+    match unsafe { argv_from_c(argc, argv, fallback_program) } {
+        Ok(argv) => run_kind(argv, kind),
+        Err(message) => {
+            eprintln!("retaprompt_input argv ABI error: {message}");
+            2
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn retaprompt_input_run_kind_from_env(kind: i32) -> i32 {
     ffi_guard_i32("retaprompt_input_run_kind_from_env", || {
         run_kind_from_abi_value(kind)
+    })
+}
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_run_kind_argv(
+    kind: i32,
+    argc: usize,
+    argv: *const *const c_char,
+) -> i32 {
+    ffi_guard_i32("retaprompt_input_run_kind_argv", || {
+        match PromptInputFrontendKind::from_abi_value(kind) {
+            Some(kind) => run_kind_from_c_argv(kind, argc, argv),
+            None => {
+                eprintln!("invalid retaprompt input kind: {kind}");
+                1
+            }
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_run_rp_argv(
+    argc: usize,
+    argv: *const *const c_char,
+) -> i32 {
+    ffi_guard_i32("retaprompt_input_run_rp_argv", || {
+        run_kind_from_c_argv(PromptInputFrontendKind::Rp, argc, argv)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_run_rpl_argv(
+    argc: usize,
+    argv: *const *const c_char,
+) -> i32 {
+    ffi_guard_i32("retaprompt_input_run_rpl_argv", || {
+        run_kind_from_c_argv(PromptInputFrontendKind::Rpl, argc, argv)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn retaprompt_input_run_rpe_argv(
+    argc: usize,
+    argv: *const *const c_char,
+) -> i32 {
+    ffi_guard_i32("retaprompt_input_run_rpe_argv", || {
+        run_kind_from_c_argv(PromptInputFrontendKind::Rpe, argc, argv)
     })
 }
 

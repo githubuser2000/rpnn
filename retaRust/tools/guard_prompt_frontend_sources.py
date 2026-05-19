@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prevent rrp/rrpl/rrpe/rrpb from regressing into heavy Rust frontends.
 
-The public prompt executables are ABI launchers.  All interactive behavior,
+The public prompt executables are ABI launchers. Cargo-run launchers use dlopen; final packaged launchers use C/DT_NEEDED.  All interactive behavior,
 autocomplete/autosuggest logic, command parsing and command execution must live
 behind libretaprompt_input.so and/or libretaprompt_commands.so.
 """
@@ -85,23 +85,36 @@ def guard_public_bin(filename: str, required_links: tuple[str, ...]) -> None:
         if pattern.search(text):
             fail(
                 f"{path.relative_to(ROOT)} calls a retaprompt Rust crate API. "
-                "Use only extern \"C\" ABI symbols so behavior remains in the .so libraries."
+                "Use only the ABI launcher/dlopen layer so behavior remains in the .so libraries."
             )
 
-    if "extern \"C\"" not in text:
-        fail(f"{path.relative_to(ROOT)} is not an ABI launcher; missing extern \"C\" block")
+    if '#[link(name =' in text:
+        fail(
+            f"{path.relative_to(ROOT)} uses #[link]. Cargo-run prompt frontends must use "
+            "runtime dlopen to avoid stale-symbol and loader-path failures on Android/Termux. "
+            "The final packaged C launchers still carry the required DT_NEEDED links."
+        )
 
+    if 'abi_launcher::run_' not in text:
+        fail(f"{path.relative_to(ROOT)} must delegate only to crates/retaprompt_frontends/src/abi_launcher.rs")
+
+    if filename == "rpb.rs":
+        if 'run_command_prompt(3)' not in text:
+            fail("rrpb must run only through the command shared library ABI")
+    else:
+        expected_kind = {"rp.rs": "1", "rpl.rs": "2", "rpe.rs": "4"}[filename]
+        if f'run_input_prompt({expected_kind})' not in text:
+            fail(f"{path.relative_to(ROOT)} must run through the input shared library ABI with kind {expected_kind}")
+
+    launcher = read(ROOT / "crates" / "retaprompt_frontends" / "src" / "abi_launcher.rs")
     for library in required_links:
-        expected = f'#[link(name = "{library}")]'
-        if expected not in text:
-            fail(f"{path.relative_to(ROOT)} is missing direct ABI link attribute {expected}")
+        if library == "retaprompt_input" and "PromptLibraryKind::Input" not in launcher:
+            fail("abi_launcher.rs must know how to load libretaprompt_input.so")
+        if library == "retaprompt_commands" and "PromptLibraryKind::Commands" not in launcher:
+            fail("abi_launcher.rs must know how to load libretaprompt_commands.so")
 
-    if filename == "rpb.rs" and "retaprompt_input" in text:
-        fail("rrpb must be command-only and must not reference retaprompt_input")
-
-    if filename in {"rp.rs", "rpl.rs", "rpe.rs"}:
-        if "retain_direct_dependency" not in text:
-            fail(f"{path.relative_to(ROOT)} must retain the direct retaprompt_commands.so dependency")
+    if filename == "rpb.rs" and "run_input_prompt" in text:
+        fail("rrpb must be command-only and must not call the input prompt launcher")
 
 
 def guard_frontend_cargo_toml() -> None:

@@ -63,6 +63,19 @@ must_not_need() {
   done
 }
 
+
+verify_help_smoke() {
+  local path="$1"
+  local output
+  local ld_path="$TARGET_DIR:$TARGET_DIR/deps:${LD_LIBRARY_PATH:-}"
+  if ! output="$(LD_LIBRARY_PATH="$ld_path" DYLD_LIBRARY_PATH="$ld_path" "$path" -h 2>&1)"; then
+    fail "$path -h failed. Output: $output"
+  fi
+  if ! grep -Fq "Prompt-Schicht" <<<"$output"; then
+    fail "$path -h did not print prompt help. This usually means a stale libretaprompt_commands.so/libretaprompt_input.so is being used. Output: $output"
+  fi
+}
+
 verify_no_rust_payload() {
   local path="$1"
 
@@ -91,6 +104,10 @@ must_need "$TARGET_DIR/rrpe" libretaprompt_input.so libretaprompt_commands.so
 must_need "$TARGET_DIR/rrpb" libretaprompt_commands.so
 
 must_not_need "$TARGET_DIR/rrpb" libretaprompt_input.so
+
+for exe in rrp rrpl rrpe rrpb; do
+  verify_help_smoke "$TARGET_DIR/$exe"
+done
 
 # The prompt launchers must not pull the non-interactive Reta core directly.
 for exe in rrp rrpl rrpe rrpb; do

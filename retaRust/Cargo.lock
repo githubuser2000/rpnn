@@ -1226,6 +1226,7 @@ dependencies = [
 name = "retaprompt_frontends"
 version = "0.7.0"
 dependencies = [
+ "libloading",
  "retaprompt_commands",
  "retaprompt_input",
  "serde_json",

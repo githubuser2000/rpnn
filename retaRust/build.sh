@@ -156,6 +156,43 @@ verify_dynamic_symbol_absent() {
   fi
 }
 
+refresh_cdylib_from_deps() {
+  local library="$1"
+  local root_lib="$TARGET_DIR/lib${library}.so"
+  local deps_dir="$TARGET_DIR/deps"
+
+  if [[ ! -d "$deps_dir" ]]; then
+    return 0
+  fi
+
+  local newest=""
+  local old_nullglob
+  old_nullglob="$(shopt -p nullglob || true)"
+  shopt -s nullglob
+  local candidates=("$deps_dir/lib${library}.so" "$deps_dir/lib${library}-"*.so)
+  eval "$old_nullglob" 2>/dev/null || true
+
+  if (( ${#candidates[@]} == 0 )); then
+    return 0
+  fi
+
+  newest="$(ls -t "${candidates[@]}" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$newest" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$root_lib" || "$newest" -nt "$root_lib" ]]; then
+    cp "$newest" "$root_lib"
+  fi
+}
+
+refresh_cdylibs_from_deps() {
+  local library
+  for library in "$@"; do
+    refresh_cdylib_from_deps "$library"
+  done
+}
+
 verify_facade_smaller_than_runtime() {
   local facade="$TARGET_DIR/libreta.so"
   local runtime="$TARGET_DIR/libreta_runtime.so"
@@ -198,6 +235,7 @@ link_launcher() {
     "${library_args[@]}" \
     -Wl,--as-needed \
     -Wl,-rpath,'$ORIGIN' \
+    -Wl,-rpath,'$ORIGIN/deps' \
     -Wl,-rpath,'$ORIGIN/lib' \
     -Wl,-rpath,'$ORIGIN/../lib'
 }
@@ -238,17 +276,24 @@ for package in "${CORE_COMPONENT_BASE_PACKAGES[@]}"; do
 done
 
 cargo build "${CORE_COMPONENT_BUILD_ARGS[@]}" "${CARGO_FLAGS[@]}"
+refresh_cdylibs_from_deps "${CORE_COMPONENT_BASE_PACKAGES[@]}"
 RETA_RENDER_LINK_SEMANTICS=1 cargo build -p reta_render "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps reta_render
 RETA_RUNTIME_LINK_CORE_COMPONENTS=1 cargo build -p reta_runtime "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps reta_runtime
 
 # Build only library targets by default.  This keeps Rust application code out
 # of the executables: rreta/rrp/rrpl/rrpe/rrpb are linked below as tiny C
 # launchers.  Set RETA_BUILD_RUST_TOOL_BINS=1 only when the diagnostic Rust
 # binaries are explicitly needed.
 RETA_LINK_CORE_SPLIT_LIBS=1 cargo build -p reta --lib --features split-facade "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps reta
 cargo build -p reta_architecture --lib "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps reta_architecture
 cargo build -p retaprompt_commands --lib "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps retaprompt_commands
 cargo build -p retaprompt_input --lib "${CARGO_FLAGS[@]}"
+refresh_cdylib_from_deps retaprompt_input
 
 if [[ "${RETA_BUILD_RUST_TOOL_BINS:-0}" == "1" ]]; then
   # Diagnostic Rust bins need the full in-crate Rust API.  Build them, then
@@ -260,6 +305,7 @@ if [[ "${RETA_BUILD_RUST_TOOL_BINS:-0}" == "1" ]]; then
     --features rust-tool-bins \
     "${CARGO_FLAGS[@]}"
   RETA_LINK_CORE_SPLIT_LIBS=1 cargo build -p reta --lib --features split-facade "${CARGO_FLAGS[@]}"
+  refresh_cdylib_from_deps reta
 fi
 
 mkdir -p "$TARGET_DIR"
@@ -296,6 +342,17 @@ verify_needed "$TARGET_DIR/rrp"  retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpl" retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpe" retaprompt_input retaprompt_commands
 verify_needed "$TARGET_DIR/rrpb" retaprompt_commands
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_abi_generation
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_kind_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rp_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpl_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpb_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpe_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_abi_generation
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_kind_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rp_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_autosuggestion_at_cursor_json
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_free_string
 verify_not_needed "$TARGET_DIR/rrpb" retaprompt_input

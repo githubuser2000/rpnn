@@ -1,5 +1,6 @@
 #include "../../crates/retaprompt_input/include/retaprompt_input.h"
 #include "../../crates/retaprompt_commands/include/retaprompt_commands.h"
+#include <stdio.h>
 
 #if defined(__GNUC__) || defined(__clang__)
 #define RETAPROMPT_USED __attribute__((used))
@@ -7,17 +8,32 @@
 #define RETAPROMPT_USED
 #endif
 
-typedef int (*retaprompt_command_entrypoint)(void);
+typedef int (*retaprompt_command_entrypoint_argv)(size_t argc, const char *const *argv);
 
 /*
- * The interactive prompt frontends execute through libretaprompt_input.so,
- * but they intentionally keep libretaprompt_commands.so as a direct runtime
- * dependency too.  Autocomplete/autosuggest and command execution belong to
- * the prompt split, so the launcher must not collapse to input-only linkage.
+ * rrpe executes through libretaprompt_input.so, but libretaprompt_commands.so is
+ * intentionally retained as a direct dependency.  The launcher contains no
+ * prompt behavior; it only checks ABI generations and forwards argc/argv.
  */
-RETAPROMPT_USED static retaprompt_command_entrypoint retaprompt_commands_abi_anchor =
-    retaprompt_commands_run_rpe_from_env;
+RETAPROMPT_USED static retaprompt_command_entrypoint_argv retaprompt_commands_abi_anchor =
+    retaprompt_commands_run_rpe_argv;
 
-int main(void) {
-    return retaprompt_input_run_rpe_from_env();
+static int retaprompt_check_generation(const char *library_name, unsigned int actual, unsigned int expected) {
+    if (actual != expected) {
+        fprintf(stderr,
+                "%s has ABI generation %u, expected %u. Rebuild with ./build.sh debug or ./build.sh release.\n",
+                library_name,
+                actual,
+                expected);
+        return 127;
+    }
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    int status = retaprompt_check_generation("libretaprompt_input.so", retaprompt_input_abi_generation(), RETAPROMPT_INPUT_ABI_GENERATION);
+    if (status != 0) return status;
+    status = retaprompt_check_generation("libretaprompt_commands.so", retaprompt_commands_abi_generation(), RETAPROMPT_COMMANDS_ABI_GENERATION);
+    if (status != 0) return status;
+    return retaprompt_input_run_rpe_argv((size_t)argc, (const char *const *)argv);
 }

@@ -4,5 +4,5 @@ do
 done
 for a in rrp rrpl rrpe rrpb
 do
-	cargo run --release --bin $a -- -h
+	cargo run --release --features="rust-frontends" --bin $a -- -h
 done

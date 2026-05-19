@@ -106,3 +106,29 @@ Der Paketweg baut die Shared Libraries und linkt danach die kleinen C-Launcher a
 `tools/launchers`. `RETA_BUILD_RUST_FRONTEND_BINS=1` ist absichtlich retired und führt
 im aktiven Buildpfad zum Fehler, weil diese Variable früher die Größenregression
 verursacht hat.
+
+
+## ABI generation guard gegen stale `.so`-Dateien
+
+Die Cargo-Targets verwenden `#[link(name = "retaprompt_commands")]` und
+`#[link(name = "retaprompt_input")]`. Cargo behandelt diese Shared Libraries nicht wie
+normale Rust-Abhängigkeiten und baut sie deshalb bei `cargo run --bin rrpb -- -h` nicht
+automatisch neu. Damit kein alter `target/debug/libretaprompt_commands.so` still benutzt
+wird, referenzieren die Launcher jetzt diese Symbole:
+
+```text
+retaprompt_commands_abi_generation
+retaprompt_input_abi_generation
+```
+
+Wenn eine alte `.so` im Target-Verzeichnis liegt, bricht der Build früh mit einer klaren
+Meldung ab. Danach einmal den Split-Build neu ausführen:
+
+```bash
+./build.sh debug
+cargo run --bin rrpb -- -h
+```
+
+`rrpb -h` muss die Prompt-Hilfe aus `libretaprompt_commands.so` drucken. Wenn stattdessen
+nur die One-Shot-Usage erscheint, ist das ein stale-library Fehler und der Topologie-Guard
+bricht im Skriptpfad ab.

@@ -238,19 +238,30 @@ verify_component_size_diversity
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_and_print_from_env_ffi
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_run_argv
 verify_dynamic_symbol_absent "$TARGET_DIR/libreta_runtime.so" reta_core_split_abi_anchor
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_abi_generation
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_kind_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_kind_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_current_executable_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rp_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rp_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpl_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpl_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpb_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpb_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpe_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_commands.so" retaprompt_commands_run_rpe_argv
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_abi_generation
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_kind_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_kind_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_current_executable_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_any_current_executable_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_launcher_kind_from_env
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rp_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rp_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpl_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_from_env
+verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_run_rpe_argv
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_autosuggestion_at_cursor_json
 verify_dynamic_symbol "$TARGET_DIR/libretaprompt_input.so" retaprompt_input_free_string
 
@@ -306,19 +317,29 @@ cat > "$MANIFEST" <<MANIFEST_JSON
   "prompt_shared_libraries": [
     {
       "path": "$TARGET_DIR/libretaprompt_commands.so",
-      "role": "retaPrompt command library for rrpb and the command side of rrp/rrpl/rrpe"
+      "role": "retaPrompt command library for rrpb and the command side of rrp/rrpl/rrpe",
+      "required_symbols": [
+        "retaprompt_commands_run_kind_from_env",
+        "retaprompt_commands_run_kind_argv",
+        "retaprompt_commands_run_rpb_from_env",
+        "retaprompt_commands_run_rpb_argv"
+      ]
     },
     {
       "path": "$TARGET_DIR/libretaprompt_input.so",
       "role": "retaPrompt input/autocomplete/autosuggest library for rrp, rrpl and rrpe",
       "required_symbols": [
         "retaprompt_input_run_kind_from_env",
+        "retaprompt_input_run_kind_argv",
         "retaprompt_input_run_current_executable_from_env",
         "retaprompt_input_run_any_current_executable_from_env",
         "retaprompt_input_run_launcher_kind_from_env",
         "retaprompt_input_run_rp_from_env",
+        "retaprompt_input_run_rp_argv",
         "retaprompt_input_run_rpl_from_env",
+        "retaprompt_input_run_rpl_argv",
         "retaprompt_input_run_rpe_from_env",
+        "retaprompt_input_run_rpe_argv",
         "retaprompt_input_autosuggestion_at_cursor_json",
         "retaprompt_input_free_string"
       ],
@@ -386,6 +407,7 @@ cat > "$MANIFEST" <<MANIFEST_JSON
     "rrpb intentionally carries only the command library dependency.",
     "Prompt launcher size and payload are guarded by tools/guard_prompt_launcher_topology.sh with RETA_PROMPT_LAUNCHER_MAX_BYTES defaulting to 262144.",
     "Prompt frontend sources are guarded by tools/guard_prompt_frontend_sources.py so public bins do not call retaprompt Rust APIs directly.",
+    "Cargo-run prompt frontends use dlopen instead of #[link] so Termux does not fail before main() with stale cdylib symbols.",
     "The heavy non-interactive Reta engine is now outside libreta.so, primarily in libreta_runtime.so; finer distribution into data/parse/semantics/table/render can continue behind the same ABI topology."
   ]
 }
