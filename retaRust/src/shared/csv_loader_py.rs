@@ -1,16 +1,18 @@
 #![allow(non_snake_case)]
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
+use crate::shared::embedded_csv_assets;
 use crate::shared::reta_py::Program;
 
 
 static SHARED_CSV_ROOT: OnceLock<PathBuf> = OnceLock::new();
-static PARSED_CSV_CACHE: OnceLock<RwLock<HashMap<PathBuf, Vec<Vec<String>>>>> = OnceLock::new();
+static PARSED_CSV_CACHE: OnceLock<RwLock<HashMap<String, Vec<Vec<String>>>>> = OnceLock::new();
 static PROCESSED_RELIGION_CACHE: OnceLock<RwLock<HashMap<(String, String), Vec<Vec<String>>>>> = OnceLock::new();
 
 fn shared_csv_root() -> &'static PathBuf {
@@ -64,8 +66,14 @@ fn dedup_csv_root_candidates(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     deduped
 }
 
-fn parsed_csv_cache() -> &'static RwLock<HashMap<PathBuf, Vec<Vec<String>>>> {
+fn parsed_csv_cache() -> &'static RwLock<HashMap<String, Vec<Vec<String>>>> {
     PARSED_CSV_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn explicit_csv_path_override_is_set() -> bool {
+    std::env::var("RETA_CSV_PATH")
+        .map(|path| !path.trim().is_empty())
+        .unwrap_or(false)
 }
 
 fn processed_religion_cache() -> &'static RwLock<HashMap<(String, String), Vec<Vec<String>>>> {
@@ -121,8 +129,51 @@ impl Program {
         CsvFileNames::new()
     }
 
+    fn csv_override_file_path_exact_path(&self, csvFileName: &str) -> Option<PathBuf> {
+        if !explicit_csv_path_override_is_set() {
+            return None;
+        }
+
+        let exact_path = self.csv_path(csvFileName);
+        if exact_path.is_file() {
+            return Some(exact_path);
+        }
+
+        if let Some(stripped_name) = embedded_csv_assets::stripped_language_alias_name(csvFileName) {
+            let stripped_path = self.csv_path(stripped_name);
+            if stripped_path.is_file() {
+                return Some(stripped_path);
+            }
+        }
+
+        None
+    }
+
+    fn csv_cache_key_exact_path(&self, csvFileName: &str) -> String {
+        if let Some(path) = self.csv_override_file_path_exact_path(csvFileName) {
+            return format!("file:{}", path.display());
+        }
+        if let Some(name) = embedded_csv_assets::canonical_embedded_csv_name(csvFileName) {
+            return format!("embedded:{name}");
+        }
+        format!("file:{}", self.csv_path(csvFileName).display())
+    }
+
+    fn load_csv_text_cow_exact_path(&self, csvFileName: &str) -> io::Result<Cow<'static, str>> {
+        if let Some(path) = self.csv_override_file_path_exact_path(csvFileName) {
+            return fs::read_to_string(path).map(Cow::Owned);
+        }
+
+        if let Some(text) = embedded_csv_assets::embedded_csv_text(csvFileName) {
+            return Ok(Cow::Borrowed(text));
+        }
+
+        fs::read_to_string(self.csv_path(csvFileName)).map(Cow::Owned)
+    }
+
     pub fn load_csv_text_exact_path(&self, csvFileName: &str) -> io::Result<String> {
-        fs::read_to_string(self.csv_path(csvFileName))
+        self.load_csv_text_cow_exact_path(csvFileName)
+            .map(|text| text.into_owned())
     }
 
     fn parse_semicolon_csv_python_like(&self, text: &str) -> Vec<Vec<String>> {
@@ -174,19 +225,19 @@ impl Program {
     }
 
     pub fn load_csv_rows_semicolon_exact_path(&self, csvFileName: &str) -> io::Result<Vec<Vec<String>>> {
-        let path = self.csv_path(csvFileName);
+        let cache_key = self.csv_cache_key_exact_path(csvFileName);
 
         if let Ok(cache) = parsed_csv_cache().read() {
-            if let Some(rows) = cache.get(&path) {
+            if let Some(rows) = cache.get(&cache_key) {
                 return Ok(rows.clone());
             }
         }
 
-        let text = fs::read_to_string(&path)?;
+        let text = self.load_csv_text_cow_exact_path(csvFileName)?;
         let rows = self.parse_semicolon_csv_python_like(&text);
 
         if let Ok(mut cache) = parsed_csv_cache().write() {
-            cache.entry(path).or_insert_with(|| rows.clone());
+            cache.entry(cache_key).or_insert_with(|| rows.clone());
         }
 
         Ok(rows)
@@ -328,6 +379,9 @@ impl Program {
 
 #[cfg(test)]
 mod csv_source_guard_tests {
+    use crate::shared::embedded_csv_assets;
+    use crate::shared::reta_py::Program;
+
     use std::collections::BTreeSet;
     use std::fs;
     use std::path::Path;
@@ -373,6 +427,28 @@ mod csv_source_guard_tests {
                 CsvManifestEntry { name, bytes, fnv1a64 }
             })
             .collect()
+    }
+
+    #[test]
+    fn embedded_csv_assets_are_available_in_the_library() {
+        assert!(
+            embedded_csv_assets::embedded_csv_asset_count() >= 19,
+            "the shared library should embed the canonical csv/*.csv files"
+        );
+        assert!(embedded_csv_assets::has_embedded_csv("religion.csv"));
+        assert!(embedded_csv_assets::has_embedded_csv("en-religion.csv"));
+        assert!(embedded_csv_assets::embedded_csv_text("religion.csv")
+            .map(|text| !text.is_empty())
+            .unwrap_or(false));
+    }
+
+    #[test]
+    fn loader_can_read_religion_from_embedded_assets() {
+        let program = Program::new(vec!["reta".to_string()]);
+        let rows = program
+            .load_csv_rows_semicolon_exact_path("religion.csv")
+            .expect("embedded religion.csv should load without a runtime csv directory");
+        assert!(!rows.is_empty());
     }
 
     fn assert_csv_dir_matches_reta_manifest(relative_dir: &str, manifest: &[CsvManifestEntry]) {
