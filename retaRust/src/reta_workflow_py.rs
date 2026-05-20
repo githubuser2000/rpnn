@@ -36,16 +36,30 @@ pub fn run_reta_streamed<E>(
 where
     E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
 {
-    let mut prepared = execute_reta_program(request, true)?;
+    let config = OutputStreamNetworkConfig::from_env();
+    let active_outcome = crate::reta_output_stream::with_active_output_stream(
+        &config,
+        &mut emit,
+        || execute_reta_program(request, true),
+    );
+
+    let renderer_streamed_stdout = active_outcome.stdout_used;
+    let mut stream_stats = active_outcome.stats;
+    if let Some(error) = active_outcome.error {
+        return Err(RetaError::Execution(error));
+    }
+
+    let mut prepared = active_outcome.result?;
     let exit_code = if prepared.program.cliErrors.is_empty() {
         0
     } else {
         1
     };
-    let metadata = metadata_from_prepared_run(&prepared);
+    let mut metadata = metadata_from_prepared_run(&prepared);
+    if renderer_streamed_stdout && metadata.rows_emitted == 0 {
+        metadata.rows_emitted = stream_stats.stdout_lines;
+    }
     release_non_visible_buffers_for_streaming(&mut prepared.program);
-    let config = OutputStreamNetworkConfig::from_env();
-    let mut stream_stats = OutputStreamStats::default();
 
     let stderr_stats = stream_lines(
         &prepared.program.cliErrors,
@@ -56,13 +70,16 @@ where
     .map_err(RetaError::Execution)?;
     stream_stats.merge(stderr_stats);
 
-    let stdout_lines = match prepared.committed_shadow_lines.as_ref() {
-        Some(lines) => lines.as_slice(),
-        None => prepared.program.finallyDisplayLines.as_slice(),
-    };
-    let stdout_stats = stream_lines(stdout_lines, OutputStreamKind::Stdout, &config, &mut emit)
-        .map_err(RetaError::Execution)?;
-    stream_stats.merge(stdout_stats);
+    if !renderer_streamed_stdout {
+        let stdout_lines = match prepared.committed_shadow_lines.as_ref() {
+            Some(lines) => lines.as_slice(),
+            None => prepared.program.finallyDisplayLines.as_slice(),
+        };
+        let stdout_stats =
+            stream_lines(stdout_lines, OutputStreamKind::Stdout, &config, &mut emit)
+                .map_err(RetaError::Execution)?;
+        stream_stats.merge(stdout_stats);
+    }
 
     Ok(RetaStreamedResponse {
         exit_code,
@@ -655,6 +672,11 @@ fn response_from_prepared_run(prepared: RetaPreparedRun) -> RetaResponse {
 }
 
 fn release_non_visible_buffers_for_streaming(program: &mut Program) {
+    program.relitable = Vec::new();
+    program.rowsAsNumbers = Vec::new();
+    program.CSVsAlreadRead.clear();
+    program.dataDict = Vec::new();
+    program.dataDicts = Vec::new();
     program.__resultingTable = Vec::new();
     program.tables = Vec::new();
     program.old2Rows = Vec::new();

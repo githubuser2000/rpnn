@@ -1,8 +1,10 @@
 #![allow(non_snake_case)]
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::mpsc;
 
 use crate::shared::lib4tables_enum_py::{tableTags2_for_column, ST};
+use crate::reta_output_stream::{self, OrderedStreamItem};
 use crate::shared::parallel_runtime::{self, ParallelArea};
 use crate::shared::words_py::Words;
 use hypher::{hyphenate, Lang};
@@ -1111,6 +1113,45 @@ impl Program {
         Self::wrap_text_py(stripped, certaintextwidth)
     }
 
+    pub(crate) fn prepare_display_lines_only_py(
+        &mut self,
+        paramLines: &[String],
+        paramLinesNot: &[String],
+        relitable_len: usize,
+    ) -> Vec<String> {
+        if relitable_len == 0 {
+            return Vec::new();
+        }
+
+        let physical_max_row = relitable_len.saturating_sub(1) as i64;
+        let max_row = if self.hoechsteZeile > 0 {
+            std::cmp::min(physical_max_row, self.hoechsteZeile)
+        } else {
+            physical_max_row
+        };
+        let mut selected_rows =
+            self.selected_rows_from_param_lines_py(paramLines, paramLinesNot, max_row);
+        selected_rows = dedup_preserve_order_i64(selected_rows);
+        if !self.keineUeberschriften && !selected_rows.contains(&0) {
+            selected_rows.insert(0, 0);
+        }
+
+        let mut old2newTable: Vec<i64> = selected_rows
+            .into_iter()
+            .filter(|row_no| *row_no >= 0 && (*row_no as usize) < relitable_len)
+            .collect();
+        if old2newTable.is_empty() {
+            old2newTable = (0..(relitable_len as i64)).collect();
+        }
+
+        let mut finallyDisplayLines: Vec<String> =
+            old2newTable.iter().map(|n| n.to_string()).collect();
+        if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
+            finallyDisplayLines[0] = String::new();
+        }
+        finallyDisplayLines
+    }
+
     pub(crate) fn prepare4out_py(
         &mut self,
         paramLines: Vec<String>,
@@ -1199,38 +1240,43 @@ impl Program {
         if let Some((guard, ranges)) =
             parallel_runtime::reserve_ranges(ParallelArea::Output, selected_rows.len(), 4)
         {
-            let prepared_rows: Vec<(i64, Vec<String>)> = std::thread::scope(|scope| {
+            let queue_capacity = reta_output_stream::OutputStreamNetworkConfig::from_env()
+                .queue_capacity
+                .max(1);
+            std::thread::scope(|scope| {
                 let _budget_guard = guard;
-                let mut handles = Vec::new();
+                let mut receivers = Vec::with_capacity(ranges.len());
+                let mut handles = Vec::with_capacity(ranges.len());
                 for (start, end) in ranges {
                     let selected_rows = &selected_rows;
                     let prepare_row = &prepare_row;
+                    let (tx, rx) = mpsc::sync_channel::<(i64, Vec<String>)>(queue_capacity);
+                    receivers.push(rx);
                     handles.push(scope.spawn(move || {
                         let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
-                        let mut local_rows: Vec<(i64, Vec<String>)> = Vec::new();
                         for row_no in selected_rows[start..end].iter().copied() {
                             if let Some(prepared_row) = prepare_row(row_no) {
-                                local_rows.push(prepared_row);
+                                if tx.send(prepared_row).is_err() {
+                                    break;
+                                }
                             }
                         }
-                        local_rows
                     }));
                 }
 
-                let mut rows: Vec<(i64, Vec<String>)> = Vec::new();
-                for handle in handles {
-                    match handle.join() {
-                        Ok(mut local_rows) => rows.append(&mut local_rows),
-                        Err(payload) => std::panic::resume_unwind(payload),
+                for rx in receivers {
+                    while let Ok((old_row_no, prepared_row)) = rx.recv() {
+                        newTable.push(prepared_row);
+                        old2newTable.push(old_row_no);
                     }
                 }
-                rows
-            });
 
-            for (old_row_no, prepared_row) in prepared_rows {
-                newTable.push(prepared_row);
-                old2newTable.push(old_row_no);
-            }
+                for handle in handles {
+                    if let Err(payload) = handle.join() {
+                        std::panic::resume_unwind(payload);
+                    }
+                }
+            });
         } else {
             for row_no in selected_rows.iter().copied() {
                 if let Some((old_row_no, prepared_row)) = prepare_row(row_no) {
@@ -2939,6 +2985,673 @@ impl Program {
         })
     }
 
+    fn emit_separated_text_item_py(
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+        first: &mut bool,
+        sep: &'static [u8],
+        text: String,
+    ) -> Result<(), String> {
+        if !*first {
+            emit(OrderedStreamItem::Static(sep))?;
+        }
+        *first = false;
+        emit(OrderedStreamItem::Text(text))
+    }
+
+    fn emit_html_cell_item_py(
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+        first_cell: &mut bool,
+        attrs: String,
+        text: String,
+    ) -> Result<(), String> {
+        if !*first_cell {
+            emit(OrderedStreamItem::Static(b" "))?;
+        }
+        *first_cell = false;
+        emit(OrderedStreamItem::Text(format!("<td{}>", attrs)))?;
+        emit(OrderedStreamItem::Text(text))?;
+        emit(OrderedStreamItem::Static(b"</td>"))
+    }
+
+    fn stream_csv_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Ok(());
+        }
+        let is_header = row_number.is_none();
+        let mut first = true;
+        if self.nummeriere {
+            Self::emit_separated_text_item_py(
+                emit,
+                &mut first,
+                b";",
+                Self::csv_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)),
+            )?;
+            let label = finallyDisplayLines
+                .get(row_idx)
+                .cloned()
+                .unwrap_or_default();
+            Self::emit_separated_text_item_py(
+                emit,
+                &mut first,
+                b";",
+                Self::csv_escape_cell_py(&label),
+            )?;
+        }
+        for cell in row {
+            let limited = self.limit_cell_height_py(cell);
+            Self::emit_separated_text_item_py(
+                emit,
+                &mut first,
+                b";",
+                Self::csv_escape_cell_py(&limited),
+            )?;
+        }
+        emit(OrderedStreamItem::Newline)
+    }
+
+    fn first_streamed_markdown_header_idx_py(
+        &self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+    ) -> Option<usize> {
+        for (row_idx, row) in newTable.iter().enumerate() {
+            let row_number = finallyDisplayLines
+                .get(row_idx)
+                .and_then(|s| s.trim().parse::<i64>().ok());
+            if self.should_skip_structured_row_py(row, row_number) {
+                continue;
+            }
+            if row_number.is_none() {
+                return Some(row_idx);
+            }
+        }
+        None
+    }
+
+    fn stream_markdown_separator_items_py(
+        cells_len: usize,
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        emit(OrderedStreamItem::Static(b"|"))?;
+        for idx in 0..cells_len {
+            if idx > 0 {
+                emit(OrderedStreamItem::Static(b"|"))?;
+            }
+            emit(OrderedStreamItem::Static(b":--:"))?;
+        }
+        emit(OrderedStreamItem::Static(b"|"))?;
+        emit(OrderedStreamItem::Newline)
+    }
+
+    fn stream_emacs_separator_items_py(
+        cells_len: usize,
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        emit(OrderedStreamItem::Static(b"|"))?;
+        for idx in 0..cells_len {
+            if idx > 0 {
+                emit(OrderedStreamItem::Static(b"+"))?;
+            }
+            emit(OrderedStreamItem::Static(b"----"))?;
+        }
+        emit(OrderedStreamItem::Static(b"|"))?;
+        emit(OrderedStreamItem::Newline)
+    }
+
+    fn stream_markdown_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        first_header_idx: Option<usize>,
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Ok(());
+        }
+        let is_header = row_number.is_none();
+        let cells_len = row.len() + if self.nummeriere { 2 } else { 0 };
+        emit(OrderedStreamItem::Static(b"|"))?;
+        if self.nummeriere {
+            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(
+                &self.row_prefix_text_py(row_number, is_header),
+            )))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(
+                &finallyDisplayLines
+                    .get(row_idx)
+                    .cloned()
+                    .unwrap_or_default(),
+            )))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+        }
+        for cell in row {
+            let limited = self.limit_cell_height_py(cell);
+            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(&limited)))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+        }
+        emit(OrderedStreamItem::Newline)?;
+        if first_header_idx == Some(row_idx) {
+            Self::stream_markdown_separator_items_py(cells_len, emit)?;
+        }
+        Ok(())
+    }
+
+    fn stream_emacs_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Ok(());
+        }
+        let is_header = row_number.is_none();
+        let cells_len = row.len() + if self.nummeriere { 2 } else { 0 };
+        emit(OrderedStreamItem::Static(b"|"))?;
+        if self.nummeriere {
+            emit(OrderedStreamItem::Text(self.row_prefix_text_py(
+                row_number,
+                is_header,
+            )))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+            emit(OrderedStreamItem::Text(
+                finallyDisplayLines
+                    .get(row_idx)
+                    .cloned()
+                    .unwrap_or_default(),
+            ))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+        }
+        for cell in row {
+            let limited = self.limit_cell_height_py(cell);
+            emit(OrderedStreamItem::Text(limited))?;
+            emit(OrderedStreamItem::Static(b"|"))?;
+        }
+        emit(OrderedStreamItem::Newline)?;
+        if is_header {
+            Self::stream_emacs_separator_items_py(cells_len, emit)?;
+        }
+        Ok(())
+    }
+
+    fn stream_html_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        displayed_columns: &[Option<u32>],
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Ok(());
+        }
+        let is_header = row_idx == 0 && row_number.is_none();
+        emit(OrderedStreamItem::Text(format!(
+            "<tr{}>",
+            Self::html_row_style_py(row_number, is_header)
+        )))?;
+        let mut first_cell = true;
+        if self.nummeriere {
+            let prefix_raw = self.row_prefix_text_py(row_number, is_header);
+            let label_raw = finallyDisplayLines
+                .get(row_idx)
+                .cloned()
+                .unwrap_or_default();
+            let prefix_text = Self::html_escape_cell_py(&prefix_raw);
+            let label_text = Self::html_escape_cell_py(&label_raw);
+            let prefix_attrs = self.html_python_cell_attrs_exact_py(
+                Some(-2),
+                0,
+                Some(&prefix_raw),
+                row_number,
+                is_header,
+            );
+            let label_attrs = self.html_python_cell_attrs_exact_py(
+                Some(-1),
+                1,
+                Some(&label_raw),
+                row_number,
+                is_header,
+            );
+            Self::emit_html_cell_item_py(emit, &mut first_cell, prefix_attrs, prefix_text)?;
+            Self::emit_html_cell_item_py(emit, &mut first_cell, label_attrs, label_text)?;
+        }
+        for (visible_idx, cell) in row.iter().enumerate() {
+            let html_col_idx = if self.nummeriere {
+                visible_idx + 2
+            } else {
+                visible_idx
+            };
+            let original_col = displayed_columns.get(visible_idx).cloned().flatten();
+            let limited = self.limit_cell_height_py(cell);
+            let escaped = Self::html_escape_cell_py(&limited);
+            let attrs = self.html_python_cell_attrs_exact_py(
+                original_col.map(|col| col as i64),
+                html_col_idx,
+                Some(&limited),
+                row_number,
+                is_header,
+            );
+            Self::emit_html_cell_item_py(emit, &mut first_cell, attrs, escaped)?;
+        }
+        emit(OrderedStreamItem::Static(b"</tr>"))?;
+        emit(OrderedStreamItem::Newline)
+    }
+
+    fn stream_bbcode_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Ok(());
+        }
+        let is_header = row_number.is_none();
+        emit(OrderedStreamItem::Text(
+            Self::bbcode_row_begin_py(row_number, is_header).to_string(),
+        ))?;
+        if self.nummeriere {
+            emit(OrderedStreamItem::Static(b"[td]"))?;
+            emit(OrderedStreamItem::Text(self.row_prefix_text_py(
+                row_number,
+                is_header,
+            )))?;
+            emit(OrderedStreamItem::Static(b"[/td]"))?;
+            emit(OrderedStreamItem::Static(b"[td]"))?;
+            emit(OrderedStreamItem::Text(
+                finallyDisplayLines
+                    .get(row_idx)
+                    .cloned()
+                    .unwrap_or_default(),
+            ))?;
+            emit(OrderedStreamItem::Static(b"[/td]"))?;
+        }
+        for cell in row {
+            let limited = self.limit_cell_height_py(cell).replace('\n', "<br>");
+            emit(OrderedStreamItem::Static(b"[td]"))?;
+            emit(OrderedStreamItem::Text(limited))?;
+            emit(OrderedStreamItem::Static(b"[/td]"))?;
+        }
+        emit(OrderedStreamItem::Static(b"[/tr]"))?;
+        emit(OrderedStreamItem::Newline)
+    }
+
+    pub(crate) fn stream_structured_output_direct_py(
+        &mut self,
+        paramLines: &[String],
+        paramLinesNot: &[String],
+        relitable: Vec<Vec<String>>,
+        rowsAsNumbers: Vec<i64>,
+    ) -> bool {
+        if relitable.is_empty() {
+            self.finallyDisplayLines = Vec::new();
+            self.finallyDisplayLinesByChunks = Vec::new();
+            self.numlen = 0;
+            return true;
+        }
+
+        let out_type = self.outType.clone();
+        if out_type == "shell" || !reta_output_stream::active_streaming_enabled() {
+            return false;
+        }
+
+        let physical_max_row = relitable.len().saturating_sub(1) as i64;
+        let max_row = if self.hoechsteZeile > 0 {
+            std::cmp::min(physical_max_row, self.hoechsteZeile)
+        } else {
+            physical_max_row
+        };
+        let mut selected_rows =
+            self.selected_rows_from_param_lines_py(paramLines, paramLinesNot, max_row);
+        selected_rows = dedup_preserve_order_i64(selected_rows);
+        if !self.keineUeberschriften && !selected_rows.contains(&0) {
+            selected_rows.insert(0, 0);
+        }
+
+        let mut old2newTable: Vec<i64> = selected_rows
+            .into_iter()
+            .filter(|row_no| *row_no >= 0 && (*row_no as usize) < relitable.len())
+            .collect();
+        if old2newTable.is_empty() {
+            old2newTable = (0..(relitable.len() as i64)).collect();
+        }
+
+        let mut selected_cols: Vec<i64> = if rowsAsNumbers.is_empty() {
+            if relitable[0].is_empty() {
+                Vec::new()
+            } else {
+                (0..(relitable[0].len() as i64)).collect()
+            }
+        } else {
+            rowsAsNumbers
+        };
+        selected_cols = dedup_preserve_order_i64(selected_cols);
+
+        let display_widths: Vec<usize> = (1..=selected_cols.len())
+            .map(|row_to_display| {
+                self.prepare4out_width_for_display_col_py(row_to_display, selected_cols.len())
+            })
+            .collect();
+
+        let rowsRange = selected_cols.clone();
+        let visible_rows_range =
+            self.onlyThatColumns_i64_py(rowsRange.clone(), self.spaltenreihenfolgeundnurdiese.clone());
+        for original_col in visible_rows_range.iter().copied() {
+            self.register_visible_column_metadata_exact_py(original_col);
+        }
+
+        let mut finallyDisplayLines: Vec<String> = old2newTable.iter().map(|n| n.to_string()).collect();
+        if !finallyDisplayLines.is_empty() && !self.keineUeberschriften {
+            finallyDisplayLines[0] = String::new();
+        }
+        let numlen = old2newTable
+            .last()
+            .map(|v| v.to_string().len() as i64)
+            .unwrap_or(0);
+
+        let only_columns = self.spaltenreihenfolgeundnurdiese.clone();
+        let prepare_visible_row = |row_idx: usize| -> Vec<String> {
+            let Some(row_no) = old2newTable.get(row_idx).copied() else {
+                return Vec::new();
+            };
+            if row_no < 0 {
+                return Vec::new();
+            }
+            let source_idx = row_no as usize;
+            let Some(source_row) = relitable.get(source_idx) else {
+                return Vec::new();
+            };
+
+            let mut prepared: Vec<String> = Vec::new();
+            let mut row_to_display = 0usize;
+            for original_col in selected_cols.iter().copied() {
+                if original_col < 0 {
+                    continue;
+                }
+                let col_idx = original_col as usize;
+                if let Some(cell) = source_row.get(col_idx) {
+                    row_to_display += 1;
+                    let certaintextwidth = display_widths
+                        .get(row_to_display.saturating_sub(1))
+                        .copied()
+                        .unwrap_or(0);
+                    let prepared_cell = if certaintextwidth == 0 {
+                        cell.trim().to_string()
+                    } else {
+                        Self::wrap_text_py(cell.trim(), certaintextwidth).join("\n")
+                    };
+                    prepared.push(prepared_cell);
+                }
+            }
+
+            if only_columns.is_empty() {
+                return prepared;
+            }
+            let mut filtered: Vec<String> = Vec::new();
+            for i in only_columns.iter() {
+                if *i <= 0 {
+                    continue;
+                }
+                let idx = (*i - 1) as usize;
+                if idx < prepared.len() {
+                    filtered.push(prepared[idx].clone());
+                }
+            }
+            if filtered.is_empty() {
+                prepared
+            } else {
+                filtered
+            }
+        };
+
+        let this: &Program = &*self;
+        let config = reta_output_stream::OutputStreamNetworkConfig::from_env();
+        let min_rows_per_worker = match out_type.as_str() {
+            "html" => 8,
+            "csv" | "markdown" | "emacs" | "bbcode" => 16,
+            _ => config.parallel_min_lines_per_worker,
+        };
+
+        let result = match out_type.as_str() {
+            "nichts" => Ok(()),
+            "csv" => reta_output_stream::stream_active_stdout_ordered_items(
+                old2newTable.len(),
+                min_rows_per_worker,
+                &config,
+                |row_idx, emit| {
+                    let row = prepare_visible_row(row_idx);
+                    this.stream_csv_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
+                },
+            ),
+            "markdown" => {
+                let mut first_header_idx = None;
+                for row_idx in 0..old2newTable.len() {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if row_number.is_none() {
+                        let row = prepare_visible_row(row_idx);
+                        if !this.should_skip_structured_row_py(&row, row_number) {
+                            first_header_idx = Some(row_idx);
+                            break;
+                        }
+                    }
+                }
+                reta_output_stream::stream_active_stdout_ordered_items(
+                    old2newTable.len(),
+                    min_rows_per_worker,
+                    &config,
+                    |row_idx, emit| {
+                        let row = prepare_visible_row(row_idx);
+                        this.stream_markdown_row_items_py(
+                            row_idx,
+                            &row,
+                            &finallyDisplayLines,
+                            first_header_idx,
+                            emit,
+                        )
+                    },
+                )
+            }
+            "emacs" => reta_output_stream::stream_active_stdout_ordered_items(
+                old2newTable.len(),
+                min_rows_per_worker,
+                &config,
+                |row_idx, emit| {
+                    let row = prepare_visible_row(row_idx);
+                    this.stream_emacs_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
+                },
+            ),
+            "html" => {
+                let displayed_columns = Self::displayed_column_numbers_for_html_py(&visible_rows_range);
+                if let Err(error) = reta_output_stream::active_stdout_line(
+                    r#"<table border=0 id="bigtable">"#,
+                ) {
+                    Err(error)
+                } else {
+                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
+                        old2newTable.len(),
+                        min_rows_per_worker,
+                        &config,
+                        |row_idx, emit| {
+                            let row = prepare_visible_row(row_idx);
+                            this.stream_html_row_items_py(
+                                row_idx,
+                                &row,
+                                &finallyDisplayLines,
+                                &displayed_columns,
+                                emit,
+                            )
+                        },
+                    );
+                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("</table>"))
+                }
+            }
+            "bbcode" => {
+                if let Err(error) = reta_output_stream::active_stdout_line("[table]") {
+                    Err(error)
+                } else {
+                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
+                        old2newTable.len(),
+                        min_rows_per_worker,
+                        &config,
+                        |row_idx, emit| {
+                            let row = prepare_visible_row(row_idx);
+                            this.stream_bbcode_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
+                        },
+                    );
+                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("[/table]"))
+                }
+            }
+            _ => Ok(()),
+        };
+
+        if let Err(error) = result {
+            reta_output_stream::active_record_stream_error(error);
+        }
+
+        self.finallyDisplayLinesByChunks = Vec::new();
+        self.finallyDisplayLines = Vec::new();
+        self.numlen = numlen;
+        self.newTable = true;
+        true
+    }
+
+    fn render_structured_output_streaming_py(
+        &mut self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        numlen: i64,
+        rowsRange: &[i64],
+    ) {
+        let out_type = self.outType.clone();
+        let this: &Program = &*self;
+        let config = reta_output_stream::OutputStreamNetworkConfig::from_env();
+        let min_rows_per_worker = match out_type.as_str() {
+            "html" => 16,
+            "csv" | "markdown" | "emacs" | "bbcode" => 32,
+            _ => config.parallel_min_lines_per_worker,
+        };
+
+        let result = match out_type.as_str() {
+            "nichts" => Ok(()),
+            "csv" => reta_output_stream::stream_active_stdout_ordered_items(
+                newTable.len(),
+                min_rows_per_worker,
+                &config,
+                |row_idx, emit| {
+                    let row = &newTable[row_idx];
+                    this.stream_csv_row_items_py(row_idx, row, finallyDisplayLines, emit)
+                },
+            ),
+            "markdown" => {
+                let first_header_idx = this.first_streamed_markdown_header_idx_py(
+                    finallyDisplayLines,
+                    newTable,
+                );
+                reta_output_stream::stream_active_stdout_ordered_items(
+                    newTable.len(),
+                    min_rows_per_worker,
+                    &config,
+                    |row_idx, emit| {
+                        let row = &newTable[row_idx];
+                        this.stream_markdown_row_items_py(
+                            row_idx,
+                            row,
+                            finallyDisplayLines,
+                            first_header_idx,
+                            emit,
+                        )
+                    },
+                )
+            }
+            "emacs" => reta_output_stream::stream_active_stdout_ordered_items(
+                newTable.len(),
+                min_rows_per_worker,
+                &config,
+                |row_idx, emit| {
+                    let row = &newTable[row_idx];
+                    this.stream_emacs_row_items_py(row_idx, row, finallyDisplayLines, emit)
+                },
+            ),
+            "html" => {
+                let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
+                if let Err(error) = reta_output_stream::active_stdout_line(
+                    r#"<table border=0 id="bigtable">"#,
+                ) {
+                    Err(error)
+                } else {
+                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
+                        newTable.len(),
+                        min_rows_per_worker,
+                        &config,
+                        |row_idx, emit| {
+                            let row = &newTable[row_idx];
+                            this.stream_html_row_items_py(
+                                row_idx,
+                                row,
+                                finallyDisplayLines,
+                                &displayed_columns,
+                                emit,
+                            )
+                        },
+                    );
+                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("</table>"))
+                }
+            }
+            "bbcode" => {
+                if let Err(error) = reta_output_stream::active_stdout_line("[table]") {
+                    Err(error)
+                } else {
+                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
+                        newTable.len(),
+                        min_rows_per_worker,
+                        &config,
+                        |row_idx, emit| {
+                            let row = &newTable[row_idx];
+                            this.stream_bbcode_row_items_py(row_idx, row, finallyDisplayLines, emit)
+                        },
+                    );
+                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("[/table]"))
+                }
+            }
+            _ => Ok(()),
+        };
+
+        if let Err(error) = result {
+            reta_output_stream::active_record_stream_error(error);
+        }
+
+        self.finallyDisplayLinesByChunks = Vec::new();
+        self.finallyDisplayLines = Vec::new();
+        self.numlen = numlen;
+    }
+
     fn render_structured_output_py(
         &mut self,
         finallyDisplayLines: &[String],
@@ -3224,6 +3937,15 @@ impl Program {
         }
 
         if self.outType != "shell" {
+            if self.streamingMemoryMode && reta_output_stream::active_streaming_enabled() {
+                self.render_structured_output_streaming_py(
+                    &finallyDisplayLines,
+                    &newTable,
+                    numlen,
+                    &rowsRange,
+                );
+                return Vec::new();
+            }
             self.render_structured_output_py(&finallyDisplayLines, &newTable, numlen, &rowsRange);
             return newTable;
         }

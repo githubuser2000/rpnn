@@ -1,14 +1,23 @@
-//! Bounded streaming handoff for final Reta output.
+//! Bounded streaming handoff for Reta output.
 //!
-//! The legacy path still keeps the byte-exact renderer intact, but this module
-//! removes the final "join everything into one huge String, then copy it again
-//! over FFI" step.  Lines are handed through a bounded FIFO queue and written
-//! in fixed-size chunks.  The bounded queue acts as the semaphore/back-pressure
-//! point: if the consumer is slower than the producer, producers block instead
-//! of growing an unbounded output buffer.  The C-ABI layer uses the same
-//! callback shape for stdout and stderr, so the final handoff is duplex from
-//! the engine to the launcher while stdin still travels in the request.
+//! This module is intentionally part of the runtime/shared-library side.  The
+//! launcher executable only supplies argv/stdin and receives byte chunks through
+//! the C callback.  The heavy renderer can therefore stream rows while the `.so`
+//! is still building them instead of first filling one giant `Vec<String>` or a
+//! giant C string.
+//!
+//! The topology is:
+//!
+//! ```text
+//! renderer workers -> bounded FIFO queues -> ordered aggregator -> chunk buffer -> callback
+//! ```
+//!
+//! The bounded queues act as semaphores/back-pressure.  A small LIFO-like stack
+//! is used implicitly by reusing the chunk buffers owned by the active stream
+//! sink; visible output itself is never LIFO because CSV/HTML/Markdown must stay
+//! byte-stable and ordered.
 
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 
@@ -17,6 +26,29 @@ use crate::shared::parallel_runtime::{self, ParallelArea};
 const DEFAULT_QUEUE_CAPACITY: usize = 64;
 const DEFAULT_CHUNK_BYTES: usize = 64 * 1024;
 const DEFAULT_PARALLEL_MIN_LINES_PER_WORKER: usize = 256;
+
+type EmitThunk = unsafe fn(*mut (), OutputStreamKind, &[u8]) -> Result<(), String>;
+
+unsafe fn call_emit_thunk<E>(
+    ptr: *mut (),
+    kind: OutputStreamKind,
+    bytes: &[u8],
+) -> Result<(), String>
+where
+    E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
+{
+    let emit = unsafe { &mut *(ptr as *mut E) };
+    emit(kind, bytes)
+}
+
+fn call_erased_emit(
+    ptr: *mut (),
+    emit_fn: EmitThunk,
+    kind: OutputStreamKind,
+    bytes: &[u8],
+) -> Result<(), String> {
+    unsafe { emit_fn(ptr, kind, bytes) }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutputStreamKind {
@@ -45,13 +77,16 @@ impl OutputStreamNetworkConfig {
     pub fn from_env() -> Self {
         let mut config = Self::default();
         config.queue_capacity = env_usize("RETA_OUTPUT_QUEUE_CAPACITY")
+            .or_else(|| env_usize("RETA_RENDER_QUEUE_CAPACITY"))
             .unwrap_or(config.queue_capacity)
             .max(1);
         config.chunk_bytes = env_usize("RETA_OUTPUT_CHUNK_BYTES")
+            .or_else(|| env_usize("RETA_RENDER_CHUNK_BYTES"))
             .unwrap_or(config.chunk_bytes)
             .max(1);
         config.parallel_min_lines_per_worker = env_usize("RETA_OUTPUT_STREAM_MIN_LINES")
             .or_else(|| env_usize("RETA_OUTPUT_STREAM_MIN_ITEMS"))
+            .or_else(|| env_usize("RETA_RENDER_MIN_ROWS"))
             .unwrap_or(config.parallel_min_lines_per_worker)
             .max(1);
         config
@@ -104,6 +139,14 @@ struct OutputFrame<'a> {
     line: &'a str,
 }
 
+#[derive(Debug)]
+pub enum OrderedStreamItem {
+    Bytes(Vec<u8>),
+    Text(String),
+    Static(&'static [u8]),
+    Newline,
+}
+
 struct ChunkBuffer {
     kind: OutputStreamKind,
     max_bytes: usize,
@@ -120,6 +163,67 @@ impl ChunkBuffer {
         }
     }
 
+    fn push_line_erased(
+        &mut self,
+        line: &str,
+        emit_ptr: *mut (),
+        emit_fn: EmitThunk,
+        stats: &mut OutputStreamStats,
+    ) -> Result<(), String> {
+        stats.add_line(self.kind);
+        self.push_bytes_erased(line.as_bytes(), emit_ptr, emit_fn, stats)?;
+        self.push_bytes_erased(b"\n", emit_ptr, emit_fn, stats)
+    }
+
+    fn push_newline_erased(
+        &mut self,
+        emit_ptr: *mut (),
+        emit_fn: EmitThunk,
+        stats: &mut OutputStreamStats,
+    ) -> Result<(), String> {
+        stats.add_line(self.kind);
+        self.push_bytes_erased(b"\n", emit_ptr, emit_fn, stats)
+    }
+
+    fn push_bytes_erased(
+        &mut self,
+        mut incoming: &[u8],
+        emit_ptr: *mut (),
+        emit_fn: EmitThunk,
+        stats: &mut OutputStreamStats,
+    ) -> Result<(), String> {
+        while !incoming.is_empty() {
+            if self.bytes.len() >= self.max_bytes {
+                self.flush_erased(emit_ptr, emit_fn, stats)?;
+            }
+
+            let remaining = self.max_bytes.saturating_sub(self.bytes.len()).max(1);
+            let take = remaining.min(incoming.len());
+            self.bytes.extend_from_slice(&incoming[..take]);
+            incoming = &incoming[take..];
+
+            if self.bytes.len() >= self.max_bytes {
+                self.flush_erased(emit_ptr, emit_fn, stats)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn flush_erased(
+        &mut self,
+        emit_ptr: *mut (),
+        emit_fn: EmitThunk,
+        stats: &mut OutputStreamStats,
+    ) -> Result<(), String> {
+        if self.bytes.is_empty() {
+            return Ok(());
+        }
+        call_erased_emit(emit_ptr, emit_fn, self.kind, &self.bytes)?;
+        stats.add_chunk(self.kind, self.bytes.len());
+        self.bytes.clear();
+        Ok(())
+    }
+
     fn push_line<E>(
         &mut self,
         line: &str,
@@ -129,29 +233,34 @@ impl ChunkBuffer {
     where
         E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
     {
-        let line_bytes = line.as_bytes();
-        let needed = line_bytes.len().saturating_add(1);
         stats.add_line(self.kind);
+        self.push_bytes(line.as_bytes(), emit, stats)?;
+        self.push_bytes(b"\n", emit, stats)
+    }
 
-        if needed > self.max_bytes {
-            self.flush(emit, stats)?;
-            let mut start = 0usize;
-            while start < line_bytes.len() {
-                let end = start.saturating_add(self.max_bytes).min(line_bytes.len());
-                emit(self.kind, &line_bytes[start..end])?;
-                stats.add_chunk(self.kind, end - start);
-                start = end;
+    fn push_bytes<E>(
+        &mut self,
+        mut incoming: &[u8],
+        emit: &mut E,
+        stats: &mut OutputStreamStats,
+    ) -> Result<(), String>
+    where
+        E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
+    {
+        while !incoming.is_empty() {
+            if self.bytes.len() >= self.max_bytes {
+                self.flush(emit, stats)?;
             }
-            emit(self.kind, b"\n")?;
-            stats.add_chunk(self.kind, 1);
-            return Ok(());
-        }
 
-        if self.bytes.len().saturating_add(needed) > self.max_bytes {
-            self.flush(emit, stats)?;
+            let remaining = self.max_bytes.saturating_sub(self.bytes.len()).max(1);
+            let take = remaining.min(incoming.len());
+            self.bytes.extend_from_slice(&incoming[..take]);
+            incoming = &incoming[take..];
+
+            if self.bytes.len() >= self.max_bytes {
+                self.flush(emit, stats)?;
+            }
         }
-        self.bytes.extend_from_slice(line_bytes);
-        self.bytes.push(b'\n');
         Ok(())
     }
 
@@ -167,6 +276,383 @@ impl ChunkBuffer {
         self.bytes.clear();
         Ok(())
     }
+}
+
+struct ActiveOutputStream {
+    emit_ptr: *mut (),
+    emit_fn: EmitThunk,
+    stdout_buffer: ChunkBuffer,
+    stderr_buffer: ChunkBuffer,
+    stats: OutputStreamStats,
+    error: Option<String>,
+    stdout_used: bool,
+    stderr_used: bool,
+}
+
+impl ActiveOutputStream {
+    fn new<E>(config: &OutputStreamNetworkConfig, emit: &mut E) -> Self
+    where
+        E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
+    {
+        Self {
+            emit_ptr: emit as *mut E as *mut (),
+            emit_fn: call_emit_thunk::<E>,
+            stdout_buffer: ChunkBuffer::new(OutputStreamKind::Stdout, config.chunk_bytes),
+            stderr_buffer: ChunkBuffer::new(OutputStreamKind::Stderr, config.chunk_bytes),
+            stats: OutputStreamStats::default(),
+            error: None,
+            stdout_used: false,
+            stderr_used: false,
+        }
+    }
+
+    fn record_error(&mut self, error: String) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+    }
+
+    fn push_kind_bytes(&mut self, kind: OutputStreamKind, bytes: &[u8]) -> Result<(), String> {
+        if let Some(error) = self.error.clone() {
+            return Err(error);
+        }
+        let result = match kind {
+            OutputStreamKind::Stdout => {
+                if !bytes.is_empty() {
+                    self.stdout_used = true;
+                }
+                self.stdout_buffer.push_bytes_erased(
+                    bytes,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+            OutputStreamKind::Stderr => {
+                if !bytes.is_empty() {
+                    self.stderr_used = true;
+                }
+                self.stderr_buffer.push_bytes_erased(
+                    bytes,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+        };
+        if let Err(error) = result.as_ref() {
+            self.record_error(error.clone());
+        }
+        result
+    }
+
+    fn push_kind_newline(&mut self, kind: OutputStreamKind) -> Result<(), String> {
+        if let Some(error) = self.error.clone() {
+            return Err(error);
+        }
+        let result = match kind {
+            OutputStreamKind::Stdout => {
+                self.stdout_used = true;
+                self.stdout_buffer.push_newline_erased(
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+            OutputStreamKind::Stderr => {
+                self.stderr_used = true;
+                self.stderr_buffer.push_newline_erased(
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+        };
+        if let Err(error) = result.as_ref() {
+            self.record_error(error.clone());
+        }
+        result
+    }
+
+    fn push_kind_line(&mut self, kind: OutputStreamKind, line: &str) -> Result<(), String> {
+        if let Some(error) = self.error.clone() {
+            return Err(error);
+        }
+        let result = match kind {
+            OutputStreamKind::Stdout => {
+                self.stdout_used = true;
+                self.stdout_buffer.push_line_erased(
+                    line,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+            OutputStreamKind::Stderr => {
+                self.stderr_used = true;
+                self.stderr_buffer.push_line_erased(
+                    line,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                )
+            }
+        };
+        if let Err(error) = result.as_ref() {
+            self.record_error(error.clone());
+        }
+        result
+    }
+
+    fn flush_all(&mut self) -> Result<(), String> {
+        if let Some(error) = self.error.clone() {
+            return Err(error);
+        }
+        self.stderr_buffer.flush_erased(self.emit_ptr, self.emit_fn, &mut self.stats)?;
+        self.stdout_buffer.flush_erased(self.emit_ptr, self.emit_fn, &mut self.stats)?;
+        Ok(())
+    }
+}
+
+std::thread_local! {
+    static ACTIVE_OUTPUT_STREAM: RefCell<Option<*mut ()>> = RefCell::new(None);
+}
+
+struct ActiveOutputStreamScope {
+    previous: Option<*mut ()>,
+}
+
+impl ActiveOutputStreamScope {
+    fn install(ptr: *mut ()) -> Self {
+        let previous = ACTIVE_OUTPUT_STREAM.with(|slot| slot.replace(Some(ptr)));
+        Self { previous }
+    }
+}
+
+impl Drop for ActiveOutputStreamScope {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        ACTIVE_OUTPUT_STREAM.with(|slot| {
+            let _ = slot.replace(previous);
+        });
+    }
+}
+
+pub struct ActiveStreamOutcome<T> {
+    pub result: T,
+    pub stats: OutputStreamStats,
+    pub stdout_used: bool,
+    pub stderr_used: bool,
+    pub error: Option<String>,
+}
+
+pub fn with_active_output_stream<E, T>(
+    config: &OutputStreamNetworkConfig,
+    emit: &mut E,
+    f: impl FnOnce() -> T,
+) -> ActiveStreamOutcome<T>
+where
+    E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
+{
+    let mut sink = ActiveOutputStream::new(config, emit);
+    let sink_ptr = &mut sink as *mut ActiveOutputStream as *mut ();
+    let scope_guard = ActiveOutputStreamScope::install(sink_ptr);
+    let result = f();
+    drop(scope_guard);
+
+    if sink.error.is_none() {
+        if let Err(error) = sink.flush_all() {
+            sink.record_error(error);
+        }
+    }
+
+    ActiveStreamOutcome {
+        result,
+        stats: sink.stats,
+        stdout_used: sink.stdout_used,
+        stderr_used: sink.stderr_used,
+        error: sink.error,
+    }
+}
+
+fn active_sink_ptr() -> Option<*mut ()> {
+    ACTIVE_OUTPUT_STREAM.with(|slot| *slot.borrow())
+}
+
+fn with_active_sink_mut<R>(f: impl FnOnce(&mut ActiveOutputStream) -> R) -> Option<R> {
+    let ptr = active_sink_ptr()?;
+    let sink = unsafe { &mut *(ptr.cast::<ActiveOutputStream>()) };
+    Some(f(sink))
+}
+
+pub fn active_streaming_enabled() -> bool {
+    active_sink_ptr().is_some()
+}
+
+pub fn active_stream_has_error() -> bool {
+    with_active_sink_mut(|sink| sink.error.is_some()).unwrap_or(false)
+}
+
+pub fn active_stream_error_message() -> Option<String> {
+    with_active_sink_mut(|sink| sink.error.clone()).flatten()
+}
+
+pub fn active_record_stream_error(error: String) {
+    let _ = with_active_sink_mut(|sink| sink.record_error(error));
+}
+
+pub fn active_stdout_line(line: &str) -> Result<(), String> {
+    active_kind_line(OutputStreamKind::Stdout, line)
+}
+
+pub fn active_stdout_bytes(bytes: &[u8]) -> Result<(), String> {
+    active_kind_bytes(OutputStreamKind::Stdout, bytes)
+}
+
+pub fn active_stdout_newline() -> Result<(), String> {
+    active_kind_newline(OutputStreamKind::Stdout)
+}
+
+fn active_kind_line(kind: OutputStreamKind, line: &str) -> Result<(), String> {
+    with_active_sink_mut(|sink| sink.push_kind_line(kind, line))
+        .unwrap_or_else(|| Err("no active reta output stream".to_string()))
+}
+
+fn active_kind_bytes(kind: OutputStreamKind, bytes: &[u8]) -> Result<(), String> {
+    with_active_sink_mut(|sink| sink.push_kind_bytes(kind, bytes))
+        .unwrap_or_else(|| Err("no active reta output stream".to_string()))
+}
+
+fn active_kind_newline(kind: OutputStreamKind) -> Result<(), String> {
+    with_active_sink_mut(|sink| sink.push_kind_newline(kind))
+        .unwrap_or_else(|| Err("no active reta output stream".to_string()))
+}
+
+fn active_stdout_item(item: OrderedStreamItem) -> Result<(), String> {
+    match item {
+        OrderedStreamItem::Bytes(bytes) => active_stdout_bytes(&bytes),
+        OrderedStreamItem::Text(text) => active_stdout_bytes(text.as_bytes()),
+        OrderedStreamItem::Static(bytes) => active_stdout_bytes(bytes),
+        OrderedStreamItem::Newline => active_stdout_newline(),
+    }
+}
+
+enum WorkerMessage {
+    Item(OrderedStreamItem),
+    Error(String),
+}
+
+pub fn stream_active_stdout_ordered_items<F>(
+    item_count: usize,
+    min_items_per_worker: usize,
+    config: &OutputStreamNetworkConfig,
+    render_item: F,
+) -> Result<(), String>
+where
+    F: Fn(usize, &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>) -> Result<(), String>
+        + Sync,
+{
+    if item_count == 0 {
+        return Ok(());
+    }
+    if !active_streaming_enabled() {
+        return Err("no active reta output stream".to_string());
+    }
+
+    let reservation = parallel_runtime::reserve_ranges(
+        ParallelArea::Output,
+        item_count,
+        min_items_per_worker.max(1),
+    );
+    let (budget_guard, ranges) = match reservation {
+        Some((guard, ranges)) => (Some(guard), ranges),
+        None => (None, vec![(0, item_count)]),
+    };
+
+    if ranges.len() <= 1 {
+        for index in 0..item_count {
+            if let Some(error) = active_stream_error_message() {
+                return Err(error);
+            }
+            let mut emit_item = |item| active_stdout_item(item);
+            render_item(index, &mut emit_item)?;
+        }
+        return Ok(());
+    }
+
+    let queue_capacity = config.queue_capacity.max(1);
+    let cancelled = Arc::new(AtomicBool::new(false));
+
+    std::thread::scope(|scope| {
+        let _budget_guard = budget_guard;
+        let render_item = &render_item;
+        let mut receivers = Vec::with_capacity(ranges.len());
+        let mut handles = Vec::with_capacity(ranges.len());
+
+        for (start, end) in ranges {
+            let (tx, rx) = mpsc::sync_channel::<WorkerMessage>(queue_capacity);
+            receivers.push(rx);
+            let cancelled_for_worker = Arc::clone(&cancelled);
+            handles.push(scope.spawn(move || {
+                let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
+                for index in start..end {
+                    if cancelled_for_worker.load(Ordering::Acquire) {
+                        break;
+                    }
+                    let mut send_item = |item| {
+                        tx.send(WorkerMessage::Item(item))
+                            .map_err(|_| "ordered output consumer stopped".to_string())
+                    };
+                    if let Err(error) = render_item(index, &mut send_item) {
+                        cancelled_for_worker.store(true, Ordering::Release);
+                        let _ = tx.send(WorkerMessage::Error(error));
+                        break;
+                    }
+                }
+            }));
+        }
+
+        let mut first_error: Option<String> = None;
+        for rx in receivers {
+            while let Ok(message) = rx.recv() {
+                match message {
+                    WorkerMessage::Item(item) => {
+                        if first_error.is_none() {
+                            if let Err(error) = active_stdout_item(item) {
+                                cancelled.store(true, Ordering::Release);
+                                first_error = Some(error);
+                            }
+                        }
+                    }
+                    WorkerMessage::Error(error) => {
+                        cancelled.store(true, Ordering::Release);
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
+                    }
+                }
+                if first_error.is_some() {
+                    break;
+                }
+            }
+            if first_error.is_some() {
+                break;
+            }
+        }
+
+        for handle in handles {
+            if handle.join().is_err() && first_error.is_none() {
+                first_error = Some("panic inside ordered output renderer".to_string());
+            }
+        }
+
+        if let Some(error) = first_error {
+            active_record_stream_error(error.clone());
+            Err(error)
+        } else {
+            Ok(())
+        }
+    })
 }
 
 pub fn stream_lines<E>(
@@ -208,9 +694,7 @@ where
 {
     let queue_capacity = config.queue_capacity.max(1);
     let chunk_bytes = config.chunk_bytes.max(1);
-
     let cancelled = Arc::new(AtomicBool::new(false));
-
     std::thread::scope(|scope| {
         let _budget_guard = budget_guard;
         let mut receivers = Vec::with_capacity(ranges.len());
@@ -359,25 +843,31 @@ mod tests {
             vec![b"ab".to_vec(), b"cd".to_vec(), b"ef".to_vec(), b"\n".to_vec()]
         );
         assert_eq!(stats.stdout_lines, 1);
-        assert_eq!(stats.stdout_chunks, 4);
         assert_eq!(stats.stdout_bytes, 7);
     }
 
     #[test]
-    fn chunk_buffer_stays_bounded_for_small_lines() {
-        let lines = vec!["aa".to_string(), "bb".to_string(), "cc".to_string()];
+    fn active_ordered_items_stream_as_single_logical_stdout() {
         let config = OutputStreamNetworkConfig {
-            queue_capacity: 2,
+            queue_capacity: 1,
             chunk_bytes: 3,
-            parallel_min_lines_per_worker: usize::MAX / 2,
+            parallel_min_lines_per_worker: 1,
         };
-        let mut chunks = Vec::new();
-        let stats = stream_lines(&lines, OutputStreamKind::Stdout, &config, &mut |_kind, bytes| {
-            chunks.push(bytes.to_vec());
+        let mut out = Vec::new();
+        let outcome = with_active_output_stream(&config, &mut |_kind, bytes| {
+            out.extend_from_slice(bytes);
             Ok(())
-        })
-        .unwrap();
-        assert_eq!(stats.stdout_chunks, 3);
-        assert_eq!(chunks, vec![b"aa\n".to_vec(), b"bb\n".to_vec(), b"cc\n".to_vec()]);
+        }, || {
+            stream_active_stdout_ordered_items(3, 1, &config, |idx, emit| {
+                emit(OrderedStreamItem::Text(format!("row{idx}")))?;
+                emit(OrderedStreamItem::Newline)
+            })
+            .unwrap();
+        });
+
+        assert!(outcome.error.is_none());
+        assert!(outcome.stdout_used);
+        assert_eq!(outcome.stats.stdout_lines, 3);
+        assert_eq!(String::from_utf8(out).unwrap(), "row0\nrow1\nrow2\n");
     }
 }

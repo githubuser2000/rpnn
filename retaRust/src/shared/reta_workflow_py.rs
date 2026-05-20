@@ -15,14 +15,13 @@ impl Program {
             self.bringAllImportantBeginThings(argv, words);
 
         self.RowsLen = RowsLen;
-        self.relitable = relitable.clone();
-        self.rowsAsNumbers = rowsAsNumbers.clone();
+        self.relitable = relitable;
+        self.rowsAsNumbers = rowsAsNumbers;
 
-        let (finallyDisplayLinesEarly, _newTableEarly, _numlenEarly, _rowsRangeEarly, _old2newTableEarly) = self.prepare4out_py(
-            paramLines.clone(),
-            paramLinesNot.clone(),
-            self.relitable.clone(),
-            self.rowsAsNumbers.clone(),
+        let finallyDisplayLinesEarly = self.prepare_display_lines_only_py(
+            &paramLines,
+            &paramLinesNot,
+            self.relitable.len(),
         );
         let mut zeilenliste: Vec<i64> = finallyDisplayLinesEarly
             .iter()
@@ -64,10 +63,48 @@ impl Program {
 
         let output_column_origins = self.selected_output_columns_py(&self.relitable, &self.rowsAsNumbers);
 
+        if self.streamingMemoryMode
+            && crate::reta_output_stream::active_streaming_enabled()
+            && self.outType != "shell"
+            && kombi13_rows.is_empty()
+            && kombi15_rows.is_empty()
+        {
+            let relitable_for_streaming = std::mem::take(&mut self.relitable);
+            let rows_for_streaming = self.rowsAsNumbers.clone();
+            if self.stream_structured_output_direct_py(
+                &paramLines,
+                &paramLinesNot,
+                relitable_for_streaming,
+                rows_for_streaming,
+            ) {
+                self.relitable = Vec::new();
+                self.rowsAsNumbers = Vec::new();
+                self.CSVsAlreadRead.clear();
+                self.tableGenerated = true;
+                self.setGeneratedSpaltenParameter();
+                self.setAllEquColumns();
+                self.__resultingTable = Vec::new();
+                self.tables = Vec::new();
+                self.old2Rows = Vec::new();
+                self.newerTable = Vec::new();
+                self.oldRows = Vec::new();
+                self.newerRows = Vec::new();
+                self.oldTable = Vec::new();
+                self.finallyDisplayTable = Vec::new();
+                return Vec::new();
+            }
+            self.relitable = Vec::new();
+        }
+
+        let relitable_for_output = if self.streamingMemoryMode {
+            std::mem::take(&mut self.relitable)
+        } else {
+            self.relitable.clone()
+        };
         let (finallyDisplayLines, mut newTable, numlen, rowsRange, _old2newTable): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
             paramLines.clone(),
             paramLinesNot.clone(),
-            self.relitable.clone(),
+            relitable_for_output,
             self.rowsAsNumbers.clone(),
         );
 
@@ -110,7 +147,11 @@ impl Program {
         );
         newTable = self.onlyThatColumns_py(newTable, self.spaltenreihenfolgeundnurdiese.clone());
         self.newTable = !newTable.is_empty();
-        if !self.streamingMemoryMode {
+        if self.streamingMemoryMode {
+            self.relitable = Vec::new();
+            self.rowsAsNumbers = Vec::new();
+            self.CSVsAlreadRead.clear();
+        } else {
             self.finallyDisplayLines = finallyDisplayLines.clone();
         }
         self.numlen = numlen;
