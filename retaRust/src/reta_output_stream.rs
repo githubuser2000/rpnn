@@ -609,15 +609,6 @@ fn active_kind_block(kind: OutputStreamKind, bytes: &[u8], line_count: usize) ->
         .unwrap_or_else(|| Err("no active reta output stream".to_string()))
 }
 
-fn active_stdout_item(item: OrderedStreamItem) -> Result<(), String> {
-    match item {
-        OrderedStreamItem::Bytes(bytes) => active_stdout_bytes(&bytes),
-        OrderedStreamItem::Text(text) => active_stdout_bytes(text.as_bytes()),
-        OrderedStreamItem::Static(bytes) => active_stdout_bytes(bytes),
-        OrderedStreamItem::Newline => active_stdout_newline(),
-    }
-}
-
 struct RenderedOutputBlock {
     bytes: Vec<u8>,
     line_count: usize,
