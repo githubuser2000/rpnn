@@ -12,20 +12,23 @@
 //! renderer workers -> bounded FIFO queues -> ordered aggregator -> chunk buffer -> callback
 //! ```
 //!
-//! The bounded queues act as semaphores/back-pressure.  A small LIFO-like stack
-//! is used implicitly by reusing the chunk buffers owned by the active stream
-//! sink; visible output itself is never LIFO because CSV/HTML/Markdown must stay
-//! byte-stable and ordered.
+//! The bounded queues act as semaphores/back-pressure.  Render workers now send
+//! bounded byte blocks instead of many tiny cell events.  A real LIFO buffer pool
+//! recycles `Vec<u8>` blocks, while a byte semaphore limits queued bytes in
+//! flight.  Visible output itself is never LIFO because CSV/HTML/Markdown/Shell
+//! must stay byte-stable and ordered.
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 
 use crate::shared::parallel_runtime::{self, ParallelArea};
 
 const DEFAULT_QUEUE_CAPACITY: usize = 64;
 const DEFAULT_CHUNK_BYTES: usize = 64 * 1024;
 const DEFAULT_PARALLEL_MIN_LINES_PER_WORKER: usize = 256;
+const DEFAULT_IN_FLIGHT_BYTES: usize = DEFAULT_CHUNK_BYTES * 8;
+const DEFAULT_BUFFER_POOL_CAPACITY: usize = 16;
 
 type EmitThunk = unsafe fn(*mut (), OutputStreamKind, &[u8]) -> Result<(), String>;
 
@@ -61,6 +64,8 @@ pub struct OutputStreamNetworkConfig {
     pub queue_capacity: usize,
     pub chunk_bytes: usize,
     pub parallel_min_lines_per_worker: usize,
+    pub in_flight_bytes: usize,
+    pub buffer_pool_capacity: usize,
 }
 
 impl Default for OutputStreamNetworkConfig {
@@ -69,6 +74,8 @@ impl Default for OutputStreamNetworkConfig {
             queue_capacity: DEFAULT_QUEUE_CAPACITY,
             chunk_bytes: DEFAULT_CHUNK_BYTES,
             parallel_min_lines_per_worker: DEFAULT_PARALLEL_MIN_LINES_PER_WORKER,
+            in_flight_bytes: DEFAULT_IN_FLIGHT_BYTES,
+            buffer_pool_capacity: DEFAULT_BUFFER_POOL_CAPACITY,
         }
     }
 }
@@ -89,7 +96,21 @@ impl OutputStreamNetworkConfig {
             .or_else(|| env_usize("RETA_RENDER_MIN_ROWS"))
             .unwrap_or(config.parallel_min_lines_per_worker)
             .max(1);
+        config.in_flight_bytes = env_usize("RETA_OUTPUT_IN_FLIGHT_BYTES")
+            .or_else(|| env_usize("RETA_OUTPUT_MAX_BYTES_IN_FLIGHT"))
+            .or_else(|| env_usize("RETA_RENDER_IN_FLIGHT_BYTES"))
+            .or_else(|| env_usize("RETA_RENDER_MAX_BYTES_IN_FLIGHT"))
+            .unwrap_or(config.in_flight_bytes)
+            .max(1);
+        config.buffer_pool_capacity = env_usize("RETA_OUTPUT_BUFFER_POOL_CAPACITY")
+            .or_else(|| env_usize("RETA_RENDER_BUFFER_POOL_CAPACITY"))
+            .unwrap_or(config.buffer_pool_capacity)
+            .max(1);
         config
+    }
+
+    fn worker_block_bytes(&self) -> usize {
+        self.chunk_bytes.min(self.in_flight_bytes).max(1)
     }
 }
 
@@ -127,9 +148,13 @@ impl OutputStreamStats {
     }
 
     fn add_line(&mut self, kind: OutputStreamKind) {
+        self.add_lines(kind, 1);
+    }
+
+    fn add_lines(&mut self, kind: OutputStreamKind, count: usize) {
         match kind {
-            OutputStreamKind::Stdout => self.stdout_lines += 1,
-            OutputStreamKind::Stderr => self.stderr_lines += 1,
+            OutputStreamKind::Stdout => self.stdout_lines += count,
+            OutputStreamKind::Stderr => self.stderr_lines += count,
         }
     }
 }
@@ -346,6 +371,53 @@ impl ActiveOutputStream {
         result
     }
 
+    fn push_kind_block(
+        &mut self,
+        kind: OutputStreamKind,
+        bytes: &[u8],
+        line_count: usize,
+    ) -> Result<(), String> {
+        if let Some(error) = self.error.clone() {
+            return Err(error);
+        }
+        let result = match kind {
+            OutputStreamKind::Stdout => {
+                if !bytes.is_empty() {
+                    self.stdout_used = true;
+                }
+                let result = self.stdout_buffer.push_bytes_erased(
+                    bytes,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                );
+                if result.is_ok() && line_count > 0 {
+                    self.stats.add_lines(kind, line_count);
+                }
+                result
+            }
+            OutputStreamKind::Stderr => {
+                if !bytes.is_empty() {
+                    self.stderr_used = true;
+                }
+                let result = self.stderr_buffer.push_bytes_erased(
+                    bytes,
+                    self.emit_ptr,
+                    self.emit_fn,
+                    &mut self.stats,
+                );
+                if result.is_ok() && line_count > 0 {
+                    self.stats.add_lines(kind, line_count);
+                }
+                result
+            }
+        };
+        if let Err(error) = result.as_ref() {
+            self.record_error(error.clone());
+        }
+        result
+    }
+
     fn push_kind_newline(&mut self, kind: OutputStreamKind) -> Result<(), String> {
         if let Some(error) = self.error.clone() {
             return Err(error);
@@ -509,6 +581,10 @@ pub fn active_stdout_bytes(bytes: &[u8]) -> Result<(), String> {
     active_kind_bytes(OutputStreamKind::Stdout, bytes)
 }
 
+fn active_stdout_block(bytes: &[u8], line_count: usize) -> Result<(), String> {
+    active_kind_block(OutputStreamKind::Stdout, bytes, line_count)
+}
+
 pub fn active_stdout_newline() -> Result<(), String> {
     active_kind_newline(OutputStreamKind::Stdout)
 }
@@ -528,6 +604,11 @@ fn active_kind_newline(kind: OutputStreamKind) -> Result<(), String> {
         .unwrap_or_else(|| Err("no active reta output stream".to_string()))
 }
 
+fn active_kind_block(kind: OutputStreamKind, bytes: &[u8], line_count: usize) -> Result<(), String> {
+    with_active_sink_mut(|sink| sink.push_kind_block(kind, bytes, line_count))
+        .unwrap_or_else(|| Err("no active reta output stream".to_string()))
+}
+
 fn active_stdout_item(item: OrderedStreamItem) -> Result<(), String> {
     match item {
         OrderedStreamItem::Bytes(bytes) => active_stdout_bytes(&bytes),
@@ -537,9 +618,274 @@ fn active_stdout_item(item: OrderedStreamItem) -> Result<(), String> {
     }
 }
 
-enum WorkerMessage {
-    Item(OrderedStreamItem),
+struct RenderedOutputBlock {
+    bytes: Vec<u8>,
+    line_count: usize,
+    reserved_bytes: usize,
+}
+
+enum WorkerBlockMessage {
+    Block(RenderedOutputBlock),
     Error(String),
+}
+
+struct ByteBufferPool {
+    stack: Mutex<Vec<Vec<u8>>>,
+    max_buffers: usize,
+    initial_capacity: usize,
+}
+
+impl ByteBufferPool {
+    fn new(max_buffers: usize, initial_capacity: usize) -> Self {
+        Self {
+            stack: Mutex::new(Vec::with_capacity(max_buffers.min(32))),
+            max_buffers: max_buffers.max(1),
+            initial_capacity: initial_capacity.max(1),
+        }
+    }
+
+    fn take(&self) -> Vec<u8> {
+        if let Ok(mut stack) = self.stack.lock() {
+            if let Some(mut bytes) = stack.pop() {
+                bytes.clear();
+                return bytes;
+            }
+        }
+        Vec::with_capacity(self.initial_capacity)
+    }
+
+    fn put(&self, mut bytes: Vec<u8>) {
+        if bytes.capacity() > self.initial_capacity.saturating_mul(4).max(self.initial_capacity) {
+            bytes = Vec::with_capacity(self.initial_capacity);
+        } else {
+            bytes.clear();
+        }
+        if let Ok(mut stack) = self.stack.lock() {
+            if stack.len() < self.max_buffers {
+                stack.push(bytes);
+            }
+        }
+    }
+}
+
+struct ByteSemaphore {
+    limit: usize,
+    used: Mutex<usize>,
+    cvar: Condvar,
+}
+
+impl ByteSemaphore {
+    fn new(limit: usize) -> Self {
+        Self {
+            limit: limit.max(1),
+            used: Mutex::new(0),
+            cvar: Condvar::new(),
+        }
+    }
+
+    fn acquire(&self, amount: usize, cancelled: &AtomicBool) -> Result<usize, String> {
+        let amount = amount.min(self.limit).max(1);
+        let mut used = self
+            .used
+            .lock()
+            .map_err(|_| "output byte semaphore poisoned".to_string())?;
+        while used.saturating_add(amount) > self.limit {
+            if cancelled.load(Ordering::Acquire) {
+                return Err("ordered output cancelled".to_string());
+            }
+            used = self
+                .cvar
+                .wait(used)
+                .map_err(|_| "output byte semaphore poisoned".to_string())?;
+        }
+        *used = used.saturating_add(amount);
+        Ok(amount)
+    }
+
+    fn release(&self, amount: usize) {
+        if amount == 0 {
+            return;
+        }
+        if let Ok(mut used) = self.used.lock() {
+            *used = used.saturating_sub(amount);
+            self.cvar.notify_all();
+        }
+    }
+
+    fn wake_all(&self) {
+        self.cvar.notify_all();
+    }
+}
+
+struct DirectBlockEmitter {
+    buffer: Vec<u8>,
+    line_count: usize,
+    max_bytes: usize,
+}
+
+impl DirectBlockEmitter {
+    fn new(max_bytes: usize) -> Self {
+        let max_bytes = max_bytes.max(1);
+        Self {
+            buffer: Vec::with_capacity(max_bytes.min(DEFAULT_CHUNK_BYTES)),
+            line_count: 0,
+            max_bytes,
+        }
+    }
+
+    fn push_item(&mut self, item: OrderedStreamItem) -> Result<(), String> {
+        match item {
+            OrderedStreamItem::Bytes(bytes) => self.push_bytes(&bytes),
+            OrderedStreamItem::Text(text) => self.push_bytes(text.as_bytes()),
+            OrderedStreamItem::Static(bytes) => self.push_bytes(bytes),
+            OrderedStreamItem::Newline => {
+                self.line_count = self.line_count.saturating_add(1);
+                self.push_bytes(b"\n")
+            }
+        }
+    }
+
+    fn push_bytes(&mut self, mut incoming: &[u8]) -> Result<(), String> {
+        while !incoming.is_empty() {
+            if self.buffer.len() >= self.max_bytes {
+                self.flush()?;
+            }
+            let remaining = self.max_bytes.saturating_sub(self.buffer.len()).max(1);
+            let take = remaining.min(incoming.len());
+            self.buffer.extend_from_slice(&incoming[..take]);
+            incoming = &incoming[take..];
+            if self.buffer.len() >= self.max_bytes {
+                self.flush()?;
+            }
+        }
+        Ok(())
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        if self.buffer.is_empty() && self.line_count == 0 {
+            return Ok(());
+        }
+        active_stdout_block(&self.buffer, self.line_count)?;
+        self.buffer.clear();
+        self.line_count = 0;
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), String> {
+        self.flush()
+    }
+}
+
+struct OrderedBlockEmitter<'a> {
+    tx: &'a mpsc::SyncSender<WorkerBlockMessage>,
+    pool: Arc<ByteBufferPool>,
+    semaphore: Arc<ByteSemaphore>,
+    cancelled: Arc<AtomicBool>,
+    buffer: Vec<u8>,
+    line_count: usize,
+    max_bytes: usize,
+}
+
+impl<'a> OrderedBlockEmitter<'a> {
+    fn new(
+        tx: &'a mpsc::SyncSender<WorkerBlockMessage>,
+        pool: Arc<ByteBufferPool>,
+        semaphore: Arc<ByteSemaphore>,
+        cancelled: Arc<AtomicBool>,
+        max_bytes: usize,
+    ) -> Self {
+        let buffer = pool.take();
+        Self {
+            tx,
+            pool,
+            semaphore,
+            cancelled,
+            buffer,
+            line_count: 0,
+            max_bytes: max_bytes.max(1),
+        }
+    }
+
+    fn push_item(&mut self, item: OrderedStreamItem) -> Result<(), String> {
+        match item {
+            OrderedStreamItem::Bytes(bytes) => self.push_bytes(&bytes),
+            OrderedStreamItem::Text(text) => self.push_bytes(text.as_bytes()),
+            OrderedStreamItem::Static(bytes) => self.push_bytes(bytes),
+            OrderedStreamItem::Newline => {
+                self.line_count = self.line_count.saturating_add(1);
+                self.push_bytes(b"\n")
+            }
+        }
+    }
+
+    fn push_bytes(&mut self, mut incoming: &[u8]) -> Result<(), String> {
+        while !incoming.is_empty() {
+            if self.cancelled.load(Ordering::Acquire) {
+                return Err("ordered output cancelled".to_string());
+            }
+            if self.buffer.len() >= self.max_bytes {
+                self.flush()?;
+            }
+            let remaining = self.max_bytes.saturating_sub(self.buffer.len()).max(1);
+            let take = remaining.min(incoming.len());
+            self.buffer.extend_from_slice(&incoming[..take]);
+            incoming = &incoming[take..];
+            if self.buffer.len() >= self.max_bytes {
+                self.flush()?;
+            }
+        }
+        Ok(())
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        if self.buffer.is_empty() && self.line_count == 0 {
+            return Ok(());
+        }
+        let next_buffer = self.pool.take();
+        let bytes = std::mem::replace(&mut self.buffer, next_buffer);
+        let line_count = std::mem::take(&mut self.line_count);
+        let reserved_bytes = match self.semaphore.acquire(bytes.len().max(1), &self.cancelled) {
+            Ok(reserved_bytes) => reserved_bytes,
+            Err(error) => {
+                self.pool.put(bytes);
+                return Err(error);
+            }
+        };
+        let block = RenderedOutputBlock {
+            bytes,
+            line_count,
+            reserved_bytes,
+        };
+        match self.tx.send(WorkerBlockMessage::Block(block)) {
+            Ok(()) => Ok(()),
+            Err(error) => match error.0 {
+                WorkerBlockMessage::Block(mut block) => {
+                    self.semaphore.release(block.reserved_bytes);
+                    let bytes = std::mem::take(&mut block.bytes);
+                    self.pool.put(bytes);
+                    Err("ordered output consumer stopped".to_string())
+                }
+                WorkerBlockMessage::Error(error) => Err(error),
+            },
+        }
+    }
+
+    fn finish(&mut self) -> Result<(), String> {
+        self.flush()
+    }
+}
+
+impl Drop for OrderedBlockEmitter<'_> {
+    fn drop(&mut self) {
+        let bytes = std::mem::take(&mut self.buffer);
+        self.pool.put(bytes);
+    }
+}
+
+fn wake_all_semaphores(semaphores: &[Arc<ByteSemaphore>]) {
+    for semaphore in semaphores {
+        semaphore.wake_all();
+    }
 }
 
 pub fn stream_active_stdout_ordered_items<F>(
@@ -570,42 +916,65 @@ where
     };
 
     if ranges.len() <= 1 {
+        let mut emitter = DirectBlockEmitter::new(config.worker_block_bytes());
         for index in 0..item_count {
             if let Some(error) = active_stream_error_message() {
                 return Err(error);
             }
-            let mut emit_item = |item| active_stdout_item(item);
+            let mut emit_item = |item| emitter.push_item(item);
             render_item(index, &mut emit_item)?;
         }
-        return Ok(());
+        return emitter.finish();
     }
 
     let queue_capacity = config.queue_capacity.max(1);
+    let producer_count = ranges.len().max(1);
+    let per_queue_in_flight = (config.in_flight_bytes / producer_count).max(1);
+    let block_bytes = config.chunk_bytes.min(per_queue_in_flight).max(1);
+    let per_queue_in_flight = per_queue_in_flight.max(block_bytes);
+    let pool_capacity = config
+        .buffer_pool_capacity
+        .saturating_add(producer_count.saturating_mul(queue_capacity))
+        .max(1);
+    let buffer_pool = Arc::new(ByteBufferPool::new(pool_capacity, block_bytes));
     let cancelled = Arc::new(AtomicBool::new(false));
 
     std::thread::scope(|scope| {
         let _budget_guard = budget_guard;
         let render_item = &render_item;
         let mut receivers = Vec::with_capacity(ranges.len());
+        let mut semaphores: Vec<Arc<ByteSemaphore>> = Vec::with_capacity(ranges.len());
         let mut handles = Vec::with_capacity(ranges.len());
 
         for (start, end) in ranges {
-            let (tx, rx) = mpsc::sync_channel::<WorkerMessage>(queue_capacity);
-            receivers.push(rx);
+            let (tx, rx) = mpsc::sync_channel::<WorkerBlockMessage>(queue_capacity);
+            let semaphore = Arc::new(ByteSemaphore::new(per_queue_in_flight));
+            receivers.push((rx, Arc::clone(&semaphore)));
+            semaphores.push(Arc::clone(&semaphore));
             let cancelled_for_worker = Arc::clone(&cancelled);
+            let pool_for_worker = Arc::clone(&buffer_pool);
             handles.push(scope.spawn(move || {
                 let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
                 for index in start..end {
                     if cancelled_for_worker.load(Ordering::Acquire) {
                         break;
                     }
-                    let mut send_item = |item| {
-                        tx.send(WorkerMessage::Item(item))
-                            .map_err(|_| "ordered output consumer stopped".to_string())
+                    let mut emitter = OrderedBlockEmitter::new(
+                        &tx,
+                        Arc::clone(&pool_for_worker),
+                        Arc::clone(&semaphore),
+                        Arc::clone(&cancelled_for_worker),
+                        block_bytes,
+                    );
+                    let render_result = {
+                        let mut send_item = |item| emitter.push_item(item);
+                        render_item(index, &mut send_item)
                     };
-                    if let Err(error) = render_item(index, &mut send_item) {
+                    let result = render_result.and_then(|_| emitter.finish());
+                    if let Err(error) = result {
                         cancelled_for_worker.store(true, Ordering::Release);
-                        let _ = tx.send(WorkerMessage::Error(error));
+                        semaphore.wake_all();
+                        let _ = tx.send(WorkerBlockMessage::Error(error));
                         break;
                     }
                 }
@@ -613,32 +982,40 @@ where
         }
 
         let mut first_error: Option<String> = None;
-        for rx in receivers {
+        for (rx, semaphore) in receivers {
             while let Ok(message) = rx.recv() {
                 match message {
-                    WorkerMessage::Item(item) => {
+                    WorkerBlockMessage::Block(mut block) => {
                         if first_error.is_none() {
-                            if let Err(error) = active_stdout_item(item) {
+                            if let Err(error) = active_stdout_block(&block.bytes, block.line_count) {
                                 cancelled.store(true, Ordering::Release);
+                                wake_all_semaphores(&semaphores);
                                 first_error = Some(error);
                             }
                         }
+                        semaphore.release(block.reserved_bytes);
+                        let bytes = std::mem::take(&mut block.bytes);
+                        buffer_pool.put(bytes);
                     }
-                    WorkerMessage::Error(error) => {
+                    WorkerBlockMessage::Error(error) => {
                         cancelled.store(true, Ordering::Release);
+                        wake_all_semaphores(&semaphores);
                         if first_error.is_none() {
                             first_error = Some(error);
                         }
                     }
                 }
                 // Do not break immediately on the first error.  Later workers may
-                // already be blocked inside bounded sync_channel::send; draining
-                // every FIFO releases them, while cancelled stops new work.
+                // already be blocked inside bounded sync_channel::send or the byte
+                // semaphore; draining every FIFO releases them, while cancelled
+                // stops new work.
             }
         }
 
         for handle in handles {
             if handle.join().is_err() && first_error.is_none() {
+                cancelled.store(true, Ordering::Release);
+                wake_all_semaphores(&semaphores);
                 first_error = Some("panic inside ordered output renderer".to_string());
             }
         }
@@ -776,6 +1153,7 @@ mod tests {
             queue_capacity: 2,
             chunk_bytes: 64,
             parallel_min_lines_per_worker: usize::MAX / 2,
+            ..OutputStreamNetworkConfig::default()
         };
         let mut out = Vec::new();
         let stats = stream_lines(&lines, OutputStreamKind::Stdout, &config, &mut |kind, bytes| {
@@ -801,6 +1179,7 @@ mod tests {
             queue_capacity: 1,
             chunk_bytes: 128,
             parallel_min_lines_per_worker: 1,
+            ..OutputStreamNetworkConfig::default()
         };
         let mut out = Vec::new();
         let stats = stream_lines_with_ranges(
@@ -827,6 +1206,7 @@ mod tests {
             queue_capacity: 1,
             chunk_bytes: 2,
             parallel_min_lines_per_worker: usize::MAX / 2,
+            ..OutputStreamNetworkConfig::default()
         };
         let mut chunks: Vec<Vec<u8>> = Vec::new();
         let stats = stream_lines(&lines, OutputStreamKind::Stdout, &config, &mut |_kind, bytes| {
@@ -849,6 +1229,8 @@ mod tests {
             queue_capacity: 1,
             chunk_bytes: 3,
             parallel_min_lines_per_worker: 1,
+            in_flight_bytes: 6,
+            buffer_pool_capacity: 2,
         };
         let mut out = Vec::new();
         let outcome = with_active_output_stream(&config, &mut |_kind, bytes| {

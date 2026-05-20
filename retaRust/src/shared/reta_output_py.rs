@@ -4014,12 +4014,54 @@ impl Program {
         let config = reta_output_stream::OutputStreamNetworkConfig::from_env();
         let min_rows_per_worker = match out_type.as_str() {
             "html" => 16,
-            "csv" | "markdown" | "emacs" | "bbcode" => 32,
+            "shell" | "csv" | "markdown" | "emacs" | "bbcode" => 32,
             _ => config.parallel_min_lines_per_worker,
         };
 
         let result = match out_type.as_str() {
             "nichts" => Ok(()),
+            "shell" => {
+                let col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
+                if col_count == 0 {
+                    Ok(())
+                } else {
+                    let max_cell_widths = Self::max_cell_widths_parallel_py(newTable, col_count);
+                    let mut widths: Vec<usize> = vec![0; col_count];
+                    for col_idx in 0..col_count {
+                        let certain = if col_idx < this.breiten.len() {
+                            this.breiten[col_idx]
+                        } else {
+                            this.textWidth
+                        };
+                        widths[col_idx] = if certain > max_cell_widths[col_idx] as i64 || certain == 0 {
+                            max_cell_widths[col_idx]
+                        } else if certain < 0 {
+                            0
+                        } else {
+                            certain as usize
+                        };
+                    }
+                    let num_prefix_width = if this.nummeriere {
+                        finallyDisplayLines
+                            .iter()
+                            .map(|s| s.chars().count())
+                            .max()
+                            .unwrap_or(0)
+                    } else {
+                        0usize
+                    };
+                    let chunks = this.shell_output_chunks_py(col_count, &widths, num_prefix_width);
+                    this.stream_shell_output_from_table_py(
+                        finallyDisplayLines,
+                        newTable,
+                        &widths,
+                        &chunks,
+                        num_prefix_width,
+                        min_rows_per_worker,
+                        &config,
+                    )
+                }
+            }
             "csv" => reta_output_stream::stream_active_stdout_ordered_items(
                 newTable.len(),
                 min_rows_per_worker,

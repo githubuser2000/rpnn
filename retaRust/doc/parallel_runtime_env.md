@@ -175,30 +175,58 @@ Stdout and stderr use the same callback interface, so the engine-to-launcher
 handoff is duplex; stdin remains part of the request.  For larger outputs the
 work may be split into several ordered producer queues through the central
 `RETA_OUTPUT` worker budget.  Each queue remains FIFO, and
-the consumer drains queues in visible line order.  LIFO is intentionally not used
-for visible output because CSV, HTML and shell output must stay byte-stable and
+the consumer drains queues in visible line order.  Since v6, structured renderers
+send bounded byte blocks instead of many tiny cell events.  Each producer queue
+has an additional byte semaphore, and rendered block buffers are recycled through
+a LIFO buffer pool.  LIFO is intentionally not used for visible output because
+CSV, HTML, BBCode, Markdown, Emacs and shell output must stay byte-stable and
 ordered.
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `RETA_OUTPUT_QUEUE_CAPACITY` | `64` | Maximum queued line/item frames per producer queue before the producer blocks. |
+| `RETA_OUTPUT_QUEUE_CAPACITY` | `64` | Maximum queued rendered block frames per producer queue before the producer blocks. |
 | `RETA_RENDER_QUEUE_CAPACITY` | same as above | Alias for renderer-side structured output queues. Used only if `RETA_OUTPUT_QUEUE_CAPACITY` is unset. |
 | `RETA_OUTPUT_CHUNK_BYTES` | `65536` | Maximum normal chunk size passed from the library to the launcher callback. Very long single rows/cells are split before the callback. |
 | `RETA_RENDER_CHUNK_BYTES` | same as above | Alias for renderer-side chunking. Used only if `RETA_OUTPUT_CHUNK_BYTES` is unset. |
 | `RETA_OUTPUT_STREAM_MIN_LINES` | `256` | Minimum lines per worker for the final fallback streaming handoff. |
 | `RETA_OUTPUT_STREAM_MIN_ITEMS` | same as above | Compatibility alias used only if `RETA_OUTPUT_STREAM_MIN_LINES` is unset. |
 | `RETA_RENDER_MIN_ROWS` | same as above | Alias for direct structured row rendering. Used only if the output stream minima above are unset. |
+| `RETA_OUTPUT_IN_FLIGHT_BYTES` | `524288` | Approximate total byte budget for rendered blocks waiting between renderer workers and the ordered consumer. Split across producer queues. |
+| `RETA_OUTPUT_MAX_BYTES_IN_FLIGHT` | same as above | Compatibility alias used only if `RETA_OUTPUT_IN_FLIGHT_BYTES` is unset. |
+| `RETA_RENDER_IN_FLIGHT_BYTES` | same as above | Renderer-side alias used only if the output byte-budget variables above are unset. |
+| `RETA_RENDER_MAX_BYTES_IN_FLIGHT` | same as above | Renderer-side compatibility alias. |
+| `RETA_OUTPUT_BUFFER_POOL_CAPACITY` | `16` | Base number of reusable `Vec<u8>` buffers kept in the LIFO pool. Queue capacity and worker count add more headroom automatically. |
+| `RETA_RENDER_BUFFER_POOL_CAPACITY` | same as above | Renderer-side alias used only if `RETA_OUTPUT_BUFFER_POOL_CAPACITY` is unset. |
 
 
 In the streaming ABI path the `.so` also installs an active scoped output sink
 while `Program::run()` is executing.  For structured output types (`html`,
-`csv`, `markdown`, `emacs`, `bbcode`) and now also `shell` without combi-table
+`csv`, `markdown`, `emacs`, `bbcode`, `shell`, `nichts`) without combi-table
 post processing, the renderer can stream directly from the selected source rows
-into ordered row/item queues.  That avoids building the full `newTable` plus a
+into ordered row-block queues.  That avoids building the full `newTable` plus a
 second rendered `Vec<String>` before writing.  Shell output keeps its required
 map/reduce width pass, then streams each terminal column chunk through bounded
 ordered FIFO queues.  The final visible stream is still written by one ordered
-consumer per logical stream; worker threads only prepare local row/cell items.
+consumer per logical stream; worker threads prepare local row/cell bytes, send
+bounded blocks, and the consumer flushes them through the active callback in
+order.
+
+The v6 block pipeline is:
+
+```text
+row/cell render workers
+  -> bounded FIFO producer queues
+  -> per-queue byte semaphore
+  -> ordered aggregator
+  -> active chunk buffer
+  -> one callback writer per logical stream
+```
+
+This lets rendering, escaping, chunking and writing overlap without allowing
+multiple direct writers to corrupt one stdout/HTML/CSV/shell stream.  Buffers are
+returned to a LIFO pool after the ordered consumer has written them.  Shutdown is
+strictly ordered: cancel flag, wake semaphores, drain queues, release buffers,
+join workers, flush active chunk buffers, then return to the FFI caller.
 
 The `rreta` launcher intentionally keeps the successfully loaded `libreta.so`
 mapped until process exit after a run.  This avoids a late `dlclose`/destructor
@@ -209,4 +237,15 @@ Example with explicit bounded streaming and two global jobs:
 
 ```bash
 RETA_JOBS=2 RETA_OUTPUT_QUEUE_CAPACITY=16 RETA_OUTPUT_CHUNK_BYTES=32768 target/debug/rreta -zeilen --alles -spalten --alles
+```
+
+Very small device / Termux resource cap example:
+
+```bash
+RETA_JOBS=1 \
+RETA_OUTPUT_QUEUE_CAPACITY=2 \
+RETA_OUTPUT_CHUNK_BYTES=8192 \
+RETA_OUTPUT_IN_FLIGHT_BYTES=16384 \
+RETA_OUTPUT_BUFFER_POOL_CAPACITY=2 \
+target/debug/rreta -spalten --alles --breite=0 -ausgabe --art=html --onetable --nocolor
 ```
