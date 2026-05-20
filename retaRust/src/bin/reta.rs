@@ -105,6 +105,7 @@ fn real_main() -> i32 {
             );
             return 127;
         }
+        drop(abi_version);
 
         let argv_cstrings = args
             .iter()
@@ -143,15 +144,23 @@ fn real_main() -> i32 {
             let _ = context.stdout.lock().map(|mut stdout| stdout.flush());
             let _ = context.stderr.lock().map(|mut stderr| stderr.flush());
 
-            if response.callback_error != 0 {
+            let exit_code = if response.callback_error != 0 {
                 let _ = writeln!(
                     io::stderr(),
                     "reta launcher stream callback failed: {}",
                     response.callback_error
                 );
-                return 120;
-            }
-            return response.exit_code;
+                120
+            } else {
+                response.exit_code
+            };
+            drop(run_stream);
+            // Do not dlclose the Rust shared library after a successful run.
+            // On small Android/Termux systems the late unload/destructor path can
+            // segfault after output has already been written correctly.  Let the
+            // OS reclaim the mapping at process exit instead.
+            std::mem::forget(library);
+            return exit_code;
         }
 
         let run: Symbol<'_, RetaRunArgvFn> = match library.get(b"reta_run_argv") {
@@ -198,7 +207,11 @@ fn real_main() -> i32 {
             let _ = write!(io::stdout().lock(), "{stdout_text}");
         }
 
-        response.exit_code
+        let exit_code = response.exit_code;
+        drop(free);
+        drop(run);
+        std::mem::forget(library);
+        exit_code
     }
 }
 

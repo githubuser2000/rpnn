@@ -2985,6 +2985,413 @@ impl Program {
         })
     }
 
+    fn shell_chunk_has_visible_row_py(
+        &self,
+        row: &[String],
+        chunk_start: usize,
+        chunk_end: usize,
+    ) -> bool {
+        if !self.keineleereninhalte {
+            return true;
+        }
+        for col_idx in chunk_start..chunk_end {
+            if let Some(cell) = row.get(col_idx) {
+                if cell
+                    .chars()
+                    .any(|ch| ch != '-' && ch != '?' && !ch.is_whitespace())
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn shell_output_chunks_py(
+        &self,
+        col_count: usize,
+        widths: &[usize],
+        num_prefix_width: usize,
+    ) -> Vec<(usize, usize)> {
+        let detected_shell_width = if self.shellWidth > 0 {
+            self.shellWidth as usize
+        } else {
+            let detected = Self::detect_terminal_columns_py();
+            if detected > 0 {
+                detected as usize
+            } else {
+                0usize
+            }
+        };
+        let chunk_budget = if detected_shell_width > 0 {
+            detected_shell_width.saturating_sub(if self.nummeriere {
+                num_prefix_width + 1
+            } else {
+                0
+            })
+        } else {
+            0usize
+        };
+
+        if self.oneTable || chunk_budget == 0 {
+            return vec![(0, col_count)];
+        }
+
+        let mut chunks: Vec<(usize, usize)> = Vec::new();
+        let mut start_col = 0usize;
+        while start_col < col_count {
+            let mut used = 0usize;
+            let mut end_col = start_col;
+
+            while end_col < col_count {
+                let add = widths.get(end_col).copied().unwrap_or(0).saturating_add(1);
+                if end_col > start_col && used.saturating_add(add) >= chunk_budget {
+                    break;
+                }
+                used = used.saturating_add(add);
+                end_col += 1;
+            }
+
+            if end_col == start_col {
+                end_col += 1;
+            }
+            chunks.push((start_col, end_col));
+            start_col = end_col;
+        }
+        chunks
+    }
+
+    fn stream_shell_row_items_py(
+        &self,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        widths: &[usize],
+        chunk_start: usize,
+        chunk_end: usize,
+        num_prefix_width: usize,
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if chunk_start >= chunk_end || !self.shell_chunk_has_visible_row_py(row, chunk_start, chunk_end) {
+            return Ok(());
+        }
+
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        let is_header = row_number.is_none();
+
+        let mut wrapped_cells: Vec<Vec<String>> = Vec::with_capacity(chunk_end.saturating_sub(chunk_start));
+        let mut max_sub = 1usize;
+        for col_idx in chunk_start..chunk_end {
+            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+            let width = widths.get(col_idx).copied().unwrap_or(0);
+            let wrapped = if width == 0 {
+                let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+                if parts.is_empty() {
+                    parts.push(String::new());
+                }
+                parts
+            } else {
+                Self::wrap_text_py(cell, width)
+            };
+            if wrapped.len() > max_sub {
+                max_sub = wrapped.len();
+            }
+            wrapped_cells.push(wrapped);
+        }
+
+        let visible_sub_count = if self.textHeight > 0 {
+            max_sub.min(self.textHeight as usize)
+        } else {
+            max_sub
+        };
+
+        for sub_idx in 0..visible_sub_count {
+            if self.nummeriere {
+                let label = if sub_idx == 0 {
+                    finallyDisplayLines
+                        .get(row_idx)
+                        .cloned()
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
+                let prefix = if is_header {
+                    " ".to_string()
+                } else if let Some(n) = row_number {
+                    if Self::zeile_which_zaehlung_py(n) % 2 == 0 {
+                        "█".to_string()
+                    } else {
+                        " ".to_string()
+                    }
+                } else {
+                    " ".to_string()
+                };
+                emit(OrderedStreamItem::Text(prefix))?;
+                emit(OrderedStreamItem::Text(format!(
+                    "{:>width$} ",
+                    label,
+                    width = num_prefix_width
+                )))?;
+            }
+
+            for (local_i, abs_i) in (chunk_start..chunk_end).enumerate() {
+                let maybe_part = wrapped_cells
+                    .get(local_i)
+                    .and_then(|parts| parts.get(sub_idx));
+                let part = maybe_part.map(String::as_str).unwrap_or("");
+                let is_rest = maybe_part.is_none();
+                let width = widths.get(abs_i).copied().unwrap_or(0);
+                let rendered = if width == 0 {
+                    part.to_string()
+                } else {
+                    format!("{:<width$}", part, width = width)
+                };
+                emit(OrderedStreamItem::Text(Self::styled_shell_text_py(
+                    &rendered,
+                    row_number,
+                    is_header,
+                    is_rest,
+                    self.nocolor,
+                )))?;
+                if abs_i + 1 != chunk_end {
+                    emit(OrderedStreamItem::Static(b" "))?;
+                }
+            }
+            emit(OrderedStreamItem::Newline)?;
+        }
+        Ok(())
+    }
+
+    fn streaming_shell_col_count_from_provider_py<F>(
+        row_count: usize,
+        min_rows_per_worker: usize,
+        row_at: &F,
+    ) -> usize
+    where
+        F: Fn(usize) -> Vec<String> + Sync,
+    {
+        if row_count == 0 {
+            return 0;
+        }
+        let serial = || {
+            let mut col_count = 0usize;
+            for row_idx in 0..row_count {
+                col_count = col_count.max(row_at(row_idx).len());
+            }
+            col_count
+        };
+        let Some((guard, ranges)) = parallel_runtime::reserve_ranges(
+            ParallelArea::Widths,
+            row_count,
+            min_rows_per_worker.max(1),
+        ) else {
+            return serial();
+        };
+
+        std::thread::scope(|scope| {
+            let _budget_guard = guard;
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
+                    let mut local = 0usize;
+                    for row_idx in start..end {
+                        local = local.max(row_at(row_idx).len());
+                    }
+                    local
+                }));
+            }
+            let mut col_count = 0usize;
+            for handle in handles {
+                match handle.join() {
+                    Ok(local) => col_count = col_count.max(local),
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+            col_count
+        })
+    }
+
+    fn streaming_shell_max_cell_widths_from_provider_py<F>(
+        row_count: usize,
+        col_count: usize,
+        min_rows_per_worker: usize,
+        row_at: &F,
+    ) -> Vec<usize>
+    where
+        F: Fn(usize) -> Vec<String> + Sync,
+    {
+        if row_count == 0 || col_count == 0 {
+            return vec![0; col_count];
+        }
+        let serial = || {
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for row_idx in 0..row_count {
+                let row = row_at(row_idx);
+                for col_idx in 0..col_count {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let cell_width = cell
+                        .split('\n')
+                        .map(|part| part.chars().count())
+                        .max()
+                        .unwrap_or(0);
+                    if cell_width > max_cell_widths[col_idx] {
+                        max_cell_widths[col_idx] = cell_width;
+                    }
+                }
+            }
+            max_cell_widths
+        };
+
+        let Some((guard, ranges)) = parallel_runtime::reserve_ranges(
+            ParallelArea::Widths,
+            row_count,
+            min_rows_per_worker.max(1),
+        ) else {
+            return serial();
+        };
+
+        std::thread::scope(|scope| {
+            let _budget_guard = guard;
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
+                    let mut local_widths: Vec<usize> = vec![0; col_count];
+                    for row_idx in start..end {
+                        let row = row_at(row_idx);
+                        for col_idx in 0..col_count {
+                            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                            let cell_width = cell
+                                .split('\n')
+                                .map(|part| part.chars().count())
+                                .max()
+                                .unwrap_or(0);
+                            if cell_width > local_widths[col_idx] {
+                                local_widths[col_idx] = cell_width;
+                            }
+                        }
+                    }
+                    local_widths
+                }));
+            }
+
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for handle in handles {
+                match handle.join() {
+                    Ok(local_widths) => {
+                        for (col_idx, width) in local_widths.into_iter().enumerate() {
+                            if width > max_cell_widths[col_idx] {
+                                max_cell_widths[col_idx] = width;
+                            }
+                        }
+                    }
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+            max_cell_widths
+        })
+    }
+
+    fn stream_shell_output_from_provider_py<F>(
+        &self,
+        row_count: usize,
+        finallyDisplayLines: &[String],
+        widths: &[usize],
+        chunks: &[(usize, usize)],
+        num_prefix_width: usize,
+        min_rows_per_worker: usize,
+        config: &reta_output_stream::OutputStreamNetworkConfig,
+        row_at: &F,
+    ) -> Result<(), String>
+    where
+        F: Fn(usize) -> Vec<String> + Sync,
+    {
+        let mut emitted_any_chunk = false;
+        for (chunk_start, chunk_end) in chunks.iter().copied() {
+            let mut chunk_has_rows = false;
+            for row_idx in 0..row_count {
+                let row = row_at(row_idx);
+                if self.shell_chunk_has_visible_row_py(&row, chunk_start, chunk_end) {
+                    chunk_has_rows = true;
+                    break;
+                }
+            }
+            if !chunk_has_rows {
+                continue;
+            }
+            if emitted_any_chunk {
+                reta_output_stream::active_stdout_newline()?;
+            }
+            emitted_any_chunk = true;
+            reta_output_stream::stream_active_stdout_ordered_items(
+                row_count,
+                min_rows_per_worker.max(1),
+                config,
+                |row_idx, emit| {
+                    let row = row_at(row_idx);
+                    self.stream_shell_row_items_py(
+                        row_idx,
+                        &row,
+                        finallyDisplayLines,
+                        widths,
+                        chunk_start,
+                        chunk_end,
+                        num_prefix_width,
+                        emit,
+                    )
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    fn stream_shell_output_from_table_py(
+        &self,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        widths: &[usize],
+        chunks: &[(usize, usize)],
+        num_prefix_width: usize,
+        min_rows_per_worker: usize,
+        config: &reta_output_stream::OutputStreamNetworkConfig,
+    ) -> Result<(), String> {
+        let mut emitted_any_chunk = false;
+        for (chunk_start, chunk_end) in chunks.iter().copied() {
+            let chunk_has_rows = newTable
+                .iter()
+                .any(|row| self.shell_chunk_has_visible_row_py(row, chunk_start, chunk_end));
+            if !chunk_has_rows {
+                continue;
+            }
+            if emitted_any_chunk {
+                reta_output_stream::active_stdout_newline()?;
+            }
+            emitted_any_chunk = true;
+            reta_output_stream::stream_active_stdout_ordered_items(
+                newTable.len(),
+                min_rows_per_worker.max(1),
+                config,
+                |row_idx, emit| {
+                    let row = &newTable[row_idx];
+                    self.stream_shell_row_items_py(
+                        row_idx,
+                        row,
+                        finallyDisplayLines,
+                        widths,
+                        chunk_start,
+                        chunk_end,
+                        num_prefix_width,
+                        emit,
+                    )
+                },
+            )?;
+        }
+        Ok(())
+    }
+
     fn emit_separated_text_item_py(
         emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
         first: &mut bool,
@@ -3316,7 +3723,7 @@ impl Program {
         }
 
         let out_type = self.outType.clone();
-        if out_type == "shell" || !reta_output_stream::active_streaming_enabled() {
+        if !reta_output_stream::active_streaming_enabled() {
             return false;
         }
 
@@ -3433,12 +3840,65 @@ impl Program {
         let config = reta_output_stream::OutputStreamNetworkConfig::from_env();
         let min_rows_per_worker = match out_type.as_str() {
             "html" => 8,
-            "csv" | "markdown" | "emacs" | "bbcode" => 16,
+            "shell" | "csv" | "markdown" | "emacs" | "bbcode" => 16,
             _ => config.parallel_min_lines_per_worker,
         };
 
         let result = match out_type.as_str() {
             "nichts" => Ok(()),
+            "shell" => {
+                let row_count = old2newTable.len();
+                let col_count = Self::streaming_shell_col_count_from_provider_py(
+                    row_count,
+                    min_rows_per_worker,
+                    &prepare_visible_row,
+                );
+                if col_count == 0 {
+                    Ok(())
+                } else {
+                    let max_cell_widths = Self::streaming_shell_max_cell_widths_from_provider_py(
+                        row_count,
+                        col_count,
+                        min_rows_per_worker,
+                        &prepare_visible_row,
+                    );
+                    let mut widths: Vec<usize> = vec![0; col_count];
+                    for col_idx in 0..col_count {
+                        let certain = if col_idx < this.breiten.len() {
+                            this.breiten[col_idx]
+                        } else {
+                            this.textWidth
+                        };
+                        widths[col_idx] = if certain > max_cell_widths[col_idx] as i64 || certain == 0 {
+                            max_cell_widths[col_idx]
+                        } else if certain < 0 {
+                            0
+                        } else {
+                            certain as usize
+                        };
+                    }
+                    let num_prefix_width = if this.nummeriere {
+                        finallyDisplayLines
+                            .iter()
+                            .map(|s| s.chars().count())
+                            .max()
+                            .unwrap_or(0)
+                    } else {
+                        0usize
+                    };
+                    let chunks = this.shell_output_chunks_py(col_count, &widths, num_prefix_width);
+                    this.stream_shell_output_from_provider_py(
+                        row_count,
+                        &finallyDisplayLines,
+                        &widths,
+                        &chunks,
+                        num_prefix_width,
+                        min_rows_per_worker,
+                        &config,
+                        &prepare_visible_row,
+                    )
+                }
+            }
             "csv" => reta_output_stream::stream_active_stdout_ordered_items(
                 old2newTable.len(),
                 min_rows_per_worker,
@@ -3978,52 +4438,27 @@ impl Program {
             0usize
         };
 
-        let detected_shell_width = if self.shellWidth > 0 {
-            self.shellWidth as usize
-        } else {
-            let detected = Self::detect_terminal_columns_py();
-            if detected > 0 {
-                detected as usize
-            } else {
-                0usize
+        let chunks = self.shell_output_chunks_py(col_count, &widths, num_prefix_width);
+
+        if self.streamingMemoryMode && reta_output_stream::active_streaming_enabled() {
+            let config = reta_output_stream::OutputStreamNetworkConfig::from_env();
+            let result = self.stream_shell_output_from_table_py(
+                &finallyDisplayLines,
+                &newTable,
+                &widths,
+                &chunks,
+                num_prefix_width,
+                16,
+                &config,
+            );
+            if let Err(error) = result {
+                reta_output_stream::active_record_stream_error(error);
             }
-        };
-        let chunk_budget = if detected_shell_width > 0 {
-            detected_shell_width.saturating_sub(if self.nummeriere {
-                num_prefix_width + 1
-            } else {
-                0
-            })
-        } else {
-            0usize
-        };
-
-        let chunks: Vec<(usize, usize)> = if self.oneTable || chunk_budget == 0 {
-            vec![(0, col_count)]
-        } else {
-            let mut chunks: Vec<(usize, usize)> = vec![];
-            let mut start_col = 0usize;
-            while start_col < col_count {
-                let mut used = 0usize;
-                let mut end_col = start_col;
-
-                while end_col < col_count {
-                    let add = widths[end_col].saturating_add(1);
-                    if end_col > start_col && used.saturating_add(add) >= chunk_budget {
-                        break;
-                    }
-                    used = used.saturating_add(add);
-                    end_col += 1;
-                }
-
-                if end_col == start_col {
-                    end_col += 1;
-                }
-                chunks.push((start_col, end_col));
-                start_col = end_col;
-            }
-            chunks
-        };
+            self.finallyDisplayLinesByChunks = Vec::new();
+            self.finallyDisplayLines = Vec::new();
+            self.numlen = numlen;
+            return Vec::new();
+        }
 
         for (chunk_index, (chunk_start, chunk_end)) in chunks.iter().cloned().enumerate() {
             let one_chunk_lines = self.render_shell_chunk_ordered_py(

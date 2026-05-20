@@ -192,12 +192,18 @@ ordered.
 
 In the streaming ABI path the `.so` also installs an active scoped output sink
 while `Program::run()` is executing.  For structured output types (`html`,
-`csv`, `markdown`, `emacs`, `bbcode`) and without combi-table post processing,
-the renderer can now stream directly from the selected source rows into ordered
-row/item queues.  That avoids building the full `newTable` plus a second rendered
-`Vec<String>` before writing.  The final visible stream is still written by one
-ordered consumer per logical stream; worker threads only prepare local row/cell
-items.
+`csv`, `markdown`, `emacs`, `bbcode`) and now also `shell` without combi-table
+post processing, the renderer can stream directly from the selected source rows
+into ordered row/item queues.  That avoids building the full `newTable` plus a
+second rendered `Vec<String>` before writing.  Shell output keeps its required
+map/reduce width pass, then streams each terminal column chunk through bounded
+ordered FIFO queues.  The final visible stream is still written by one ordered
+consumer per logical stream; worker threads only prepare local row/cell items.
+
+The `rreta` launcher intentionally keeps the successfully loaded `libreta.so`
+mapped until process exit after a run.  This avoids a late `dlclose`/destructor
+crash seen on low-resource Android/Termux systems after the output has already
+been printed correctly.
 
 Example with explicit bounded streaming and two global jobs:
 

@@ -631,12 +631,9 @@ where
                         }
                     }
                 }
-                if first_error.is_some() {
-                    break;
-                }
-            }
-            if first_error.is_some() {
-                break;
+                // Do not break immediately on the first error.  Later workers may
+                // already be blocked inside bounded sync_channel::send; draining
+                // every FIFO releases them, while cancelled stops new work.
             }
         }
 

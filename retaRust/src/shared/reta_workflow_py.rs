@@ -65,7 +65,6 @@ impl Program {
 
         if self.streamingMemoryMode
             && crate::reta_output_stream::active_streaming_enabled()
-            && self.outType != "shell"
             && kombi13_rows.is_empty()
             && kombi15_rows.is_empty()
         {
