@@ -25,7 +25,7 @@ pub struct RetaStreamedResponse {
 }
 
 pub fn run_reta(request: RetaRequest) -> Result<RetaResponse, RetaError> {
-    let prepared = execute_reta_program(request)?;
+    let prepared = execute_reta_program(request, false)?;
     Ok(response_from_prepared_run(prepared))
 }
 
@@ -36,7 +36,7 @@ pub fn run_reta_streamed<E>(
 where
     E: FnMut(OutputStreamKind, &[u8]) -> Result<(), String>,
 {
-    let mut prepared = execute_reta_program(request)?;
+    let mut prepared = execute_reta_program(request, true)?;
     let exit_code = if prepared.program.cliErrors.is_empty() {
         0
     } else {
@@ -72,19 +72,26 @@ where
     })
 }
 
-fn execute_reta_program(request: RetaRequest) -> Result<RetaPreparedRun, RetaError> {
+fn execute_reta_program(
+    request: RetaRequest,
+    streaming_memory_mode: bool,
+) -> Result<RetaPreparedRun, RetaError> {
     let argv = normalize_program_argv(&request.raw_args);
     let _architecture_run = reta_architecture::RetaRunArchitecture::from_cli_args(&argv);
-    let (arch_clean_argv, _) =
+    let (arch_clean_argv, architecture_switch) =
         reta_architecture::extract_architecture_switch_from_argv(&argv, None);
     let (legacy_argv, _) =
         reta_architecture::extract_parallel_config_from_argv(&arch_clean_argv, None);
+    let streaming_memory_mode = streaming_memory_mode
+        && !architecture_switch.mode.should_shadow_execute()
+        && !architecture_switch.trace;
 
     preload_reta_runtime().map_err(RetaError::Execution)?;
 
     let runtime = request.runtime.clone();
     let mut program = with_runtime_override(Some(runtime.clone()), || {
         let mut program = fresh_program_from_template(legacy_argv);
+        program.streamingMemoryMode = streaming_memory_mode;
         let words = shared_words();
         program.runAllesLikePythonInit(words);
         program.run(words);

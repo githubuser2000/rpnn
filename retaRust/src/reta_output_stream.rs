@@ -135,9 +135,12 @@ impl ChunkBuffer {
 
         if needed > self.max_bytes {
             self.flush(emit, stats)?;
-            if !line_bytes.is_empty() {
-                emit(self.kind, line_bytes)?;
-                stats.add_chunk(self.kind, line_bytes.len());
+            let mut start = 0usize;
+            while start < line_bytes.len() {
+                let end = start.saturating_add(self.max_bytes).min(line_bytes.len());
+                emit(self.kind, &line_bytes[start..end])?;
+                stats.add_chunk(self.kind, end - start);
+                start = end;
             }
             emit(self.kind, b"\n")?;
             stats.add_chunk(self.kind, 1);
@@ -334,6 +337,30 @@ mod tests {
 
         assert_eq!(String::from_utf8(out).unwrap(), "eins\nzwei\ndrei\nvier\n");
         assert_eq!(stats.stdout_lines, 4);
+    }
+
+    #[test]
+    fn oversized_line_is_split_into_bounded_chunks() {
+        let lines = vec!["abcdef".to_string()];
+        let config = OutputStreamNetworkConfig {
+            queue_capacity: 1,
+            chunk_bytes: 2,
+            parallel_min_lines_per_worker: usize::MAX / 2,
+        };
+        let mut chunks: Vec<Vec<u8>> = Vec::new();
+        let stats = stream_lines(&lines, OutputStreamKind::Stdout, &config, &mut |_kind, bytes| {
+            chunks.push(bytes.to_vec());
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(
+            chunks,
+            vec![b"ab".to_vec(), b"cd".to_vec(), b"ef".to_vec(), b"\n".to_vec()]
+        );
+        assert_eq!(stats.stdout_lines, 1);
+        assert_eq!(stats.stdout_chunks, 4);
+        assert_eq!(stats.stdout_bytes, 7);
     }
 
     #[test]

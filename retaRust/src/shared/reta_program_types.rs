@@ -201,6 +201,7 @@ pub struct Program {
     pub spaltenArtenKey_SpaltennummernValue: IndexMap<(usize, usize), BTreeSet<i64>>,
     pub AllSimpleCommandSpalten: Vec<i64>,
     pub lastLineNumber: i64,
+    pub streamingMemoryMode: bool,
 }
 
 impl Program {
@@ -317,6 +318,7 @@ impl Program {
             spaltenArtenKey_SpaltennummernValue: IndexMap::new(),
             AllSimpleCommandSpalten: vec![],
             lastLineNumber: 0,
+            streamingMemoryMode: false,
         }
     }
 

@@ -2947,7 +2947,6 @@ impl Program {
         rowsRange: &[i64],
     ) {
         let mut out_lines: Vec<String> = vec![];
-        let mut chunked_lines: Vec<Vec<String>> = vec![];
         let out_type = self.outType.clone();
         let this: &Program = &*self;
         match out_type.as_str() {
@@ -2985,8 +2984,7 @@ impl Program {
                         })
                     });
                 for rendered in rendered_rows {
-                    out_lines.push(rendered.line.clone());
-                    chunked_lines.push(vec![rendered.line]);
+                    out_lines.push(rendered.line);
                 }
             }
             "markdown" => {
@@ -3024,15 +3022,14 @@ impl Program {
                     });
                 let mut header_sep_done = false;
                 for rendered in rendered_rows {
-                    out_lines.push(rendered.line.clone());
-                    let mut block = vec![rendered.line];
-                    if rendered.is_header && !header_sep_done {
-                        let sep = format!("|{}|", vec![":--:"; rendered.cells_len].join("|"));
-                        out_lines.push(sep.clone());
-                        block.push(sep);
+                    let is_header = rendered.is_header;
+                    let cells_len = rendered.cells_len;
+                    out_lines.push(rendered.line);
+                    if is_header && !header_sep_done {
+                        let sep = format!("|{}|", vec![":--:"; cells_len].join("|"));
+                        out_lines.push(sep);
                         header_sep_done = true;
                     }
-                    chunked_lines.push(block);
                 }
             }
             "emacs" => {
@@ -3064,14 +3061,13 @@ impl Program {
                         })
                     });
                 for rendered in rendered_rows {
-                    out_lines.push(rendered.line.clone());
-                    let mut block = vec![rendered.line];
-                    if rendered.is_header {
-                        let sep = format!("|{}|", vec!["----"; rendered.cells_len].join("+"));
-                        out_lines.push(sep.clone());
-                        block.push(sep);
+                    let is_header = rendered.is_header;
+                    let cells_len = rendered.cells_len;
+                    out_lines.push(rendered.line);
+                    if is_header {
+                        let sep = format!("|{}|", vec!["----"; cells_len].join("+"));
+                        out_lines.push(sep);
                     }
-                    chunked_lines.push(block);
                 }
             }
             "html" => {
@@ -3142,14 +3138,10 @@ impl Program {
                         })
                     });
                 out_lines.push(r#"<table border=0 id="bigtable">"#.to_string());
-                let mut current_block = vec![r#"<table border=0 id="bigtable">"#.to_string()];
                 for rendered in rendered_rows {
-                    out_lines.push(rendered.line.clone());
-                    current_block.push(rendered.line);
+                    out_lines.push(rendered.line);
                 }
                 out_lines.push("</table>".to_string());
-                current_block.push("</table>".to_string());
-                chunked_lines.push(current_block);
             }
             "bbcode" => {
                 let rendered_rows =
@@ -3191,14 +3183,10 @@ impl Program {
                         })
                     });
                 out_lines.push("[table]".to_string());
-                let mut current_block = vec!["[table]".to_string()];
                 for rendered in rendered_rows {
-                    out_lines.push(rendered.line.clone());
-                    current_block.push(rendered.line);
+                    out_lines.push(rendered.line);
                 }
                 out_lines.push("[/table]".to_string());
-                current_block.push("[/table]".to_string());
-                chunked_lines.push(current_block);
             }
             _ => {
                 self.finallyDisplayLines = vec![];
@@ -3207,7 +3195,7 @@ impl Program {
                 return;
             }
         }
-        self.finallyDisplayLinesByChunks = chunked_lines;
+        self.finallyDisplayLinesByChunks = Vec::new();
         self.finallyDisplayLines = out_lines;
         self.numlen = numlen;
     }
@@ -3315,8 +3303,6 @@ impl Program {
             chunks
         };
 
-        let mut chunked_lines: Vec<Vec<String>> = vec![];
-
         for (chunk_index, (chunk_start, chunk_end)) in chunks.iter().cloned().enumerate() {
             let one_chunk_lines = self.render_shell_chunk_ordered_py(
                 &finallyDisplayLines,
@@ -3329,11 +3315,10 @@ impl Program {
             if chunk_index > 0 && !one_chunk_lines.is_empty() {
                 out_lines.push(String::new());
             }
-            chunked_lines.push(one_chunk_lines.clone());
             out_lines.extend(one_chunk_lines);
         }
 
-        self.finallyDisplayLinesByChunks = chunked_lines;
+        self.finallyDisplayLinesByChunks = Vec::new();
         self.finallyDisplayLines = out_lines;
         self.numlen = numlen;
         newTable
@@ -3342,10 +3327,8 @@ impl Program {
     pub fn prepareFinallyDisplayLines(&mut self) {
         self.finallyDisplayLines = vec![];
         self.finallyDisplayLinesByChunks = vec![];
-        for row in self.__resultingTable.clone() {
-            let line = row.join(" ; ");
-            self.finallyDisplayLines.push(line.clone());
-            self.finallyDisplayLinesByChunks.push(vec![line]);
+        for row in self.__resultingTable.iter() {
+            self.finallyDisplayLines.push(row.join(" ; "));
         }
     }
 

@@ -64,7 +64,7 @@ impl Program {
 
         let output_column_origins = self.selected_output_columns_py(&self.relitable, &self.rowsAsNumbers);
 
-        let (finallyDisplayLines, mut newTable, numlen, rowsRange, old2newTable): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
+        let (finallyDisplayLines, mut newTable, numlen, rowsRange, _old2newTable): (Vec<String>, Vec<Vec<String>>, i64, Vec<i64>, Vec<i64>) = self.prepare4out_py(
             paramLines.clone(),
             paramLinesNot.clone(),
             self.relitable.clone(),
@@ -80,7 +80,7 @@ impl Program {
                 kombiTable_Kombis,
                 maintable2subtable_Relation,
                 newTable,
-                old2newTable.clone(),
+                _old2newTable.clone(),
                 paramLines.clone(),
                 &csv_names.kombi13,
                 output_column_origins.clone(),
@@ -96,7 +96,7 @@ impl Program {
                 kombiTable_Kombis2,
                 maintable2subtable_Relation2,
                 newTable,
-                old2newTable.clone(),
+                _old2newTable.clone(),
                 paramLines.clone(),
                 &csv_names.kombi15,
                 output_column_origins.clone(),
@@ -110,24 +110,39 @@ impl Program {
         );
         newTable = self.onlyThatColumns_py(newTable, self.spaltenreihenfolgeundnurdiese.clone());
         self.newTable = !newTable.is_empty();
-        self.finallyDisplayLines = finallyDisplayLines.clone();
+        if !self.streamingMemoryMode {
+            self.finallyDisplayLines = finallyDisplayLines.clone();
+        }
         self.numlen = numlen;
-        let _old2newTable = old2newTable.clone();
 
-        let out: Vec<Vec<String>> = self.cliOut_py(finallyDisplayLines, newTable.clone(), numlen, visible_rows_range);
-        self.tableGenerated = self.newTable || !out.is_empty();
-        self.__resultingTable = out.clone();
-        self.addResultingTableToTables();
-        self.setOld2Rows();
-        self.setNewerTable();
-        self.setOldRows();
-        self.setNewerRows();
-        self.setRowsOfcombi();
-        self.setOldTable();
+        let out: Vec<Vec<String>> = self.cliOut_py(finallyDisplayLines, newTable, numlen, visible_rows_range);
+        let out_is_empty = out.is_empty();
+        self.tableGenerated = self.newTable || !out_is_empty;
         self.setGeneratedSpaltenParameter();
         self.setAllEquColumns();
-        self.setFinallyDisplayTable();
-        out
+
+        if self.streamingMemoryMode {
+            self.__resultingTable = Vec::new();
+            self.tables = Vec::new();
+            self.old2Rows = Vec::new();
+            self.newerTable = Vec::new();
+            self.oldRows = Vec::new();
+            self.newerRows = Vec::new();
+            self.oldTable = Vec::new();
+            self.finallyDisplayTable = Vec::new();
+            Vec::new()
+        } else {
+            self.__resultingTable = out.clone();
+            self.addResultingTableToTables();
+            self.setOld2Rows();
+            self.setNewerTable();
+            self.setOldRows();
+            self.setNewerRows();
+            self.setRowsOfcombi();
+            self.setOldTable();
+            self.setFinallyDisplayTable();
+            out
+        }
     }
 
     fn rows_of_combi_family1_numbers_py(&self) -> Vec<i64> {
@@ -615,7 +630,12 @@ impl Program {
         }
         self.__runAlles = true;
         self.__invertAlles = false;
-        self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
+        let resulting_table = self.workflowEverything(self.argv.clone(), words);
+        if self.streamingMemoryMode {
+            self.__resultingTable = Vec::new();
+        } else {
+            self.__resultingTable = resulting_table;
+        }
     }
 
     /// Python `Program.run()` only performs the workflow when the constructor was
@@ -624,7 +644,12 @@ impl Program {
     /// stateful calls diverge from the reference implementation.
     pub fn run(&mut self, words: &Words) {
         if !self.__runAlles {
-            self.__resultingTable = self.workflowEverything(self.argv.clone(), words);
+            let resulting_table = self.workflowEverything(self.argv.clone(), words);
+            if self.streamingMemoryMode {
+                self.__resultingTable = Vec::new();
+            } else {
+                self.__resultingTable = resulting_table;
+            }
         }
         self.printOrStoreLines();
         self.runDone = true;
