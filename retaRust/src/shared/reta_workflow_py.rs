@@ -446,6 +446,17 @@ impl Program {
         newerTable
     }
 
+    fn append_python_onetable_join_parts_py(cell: &mut String, parts: Vec<String>) {
+        for part in parts {
+            if cell.is_empty() {
+                *cell = part;
+            } else {
+                cell.push_str(" | ");
+                cell.push_str(&part);
+            }
+        }
+    }
+
     fn removeOneNumber_lines_py(
         &self,
         cell_lines: &[String],
@@ -558,8 +569,11 @@ impl Program {
         }
 
         let oneLinePerLine = self.outType == "html" || self.outType == "bbcode";
+        let shell_onetable_width0 = !oneLinePerLine
+            && self.oneTable
+            && (self.textWidth == 0 || self.breiteHasBeenOnceZero);
         let remove_number_now =
-            ((self.textWidth == 0 && self.oneTable) || self.outType == "html" || self.outType == "bbcode")
+            (shell_onetable_width0 || self.outType == "html" || self.outType == "bbcode")
                 && self.breiten.is_empty();
 
         for (display_row_idx, original_row_no) in old2newTable.iter().copied().enumerate() {
@@ -582,13 +596,12 @@ impl Program {
                         continue;
                     }
 
-                    let raw_prepared = preparedKombiTable[src_row_idx]
+                    let Some(raw_prepared) = preparedKombiTable[src_row_idx]
                         .get(*prepared_col_idx)
                         .cloned()
-                        .unwrap_or_default();
-                    if raw_prepared.trim().is_empty() {
+                    else {
                         continue;
-                    }
+                    };
 
                     let block = if remove_number_now {
                         let raw_lines: Vec<String> =
@@ -596,18 +609,32 @@ impl Program {
                         self.removeOneNumber_lines_py(
                             &raw_lines,
                             original_row_no,
-                            self.textWidth.max(0) as usize,
+                            if shell_onetable_width0 { 0 } else { self.textWidth.max(0) as usize },
                         ).join("\n")
                     } else {
                         raw_prepared
                     };
 
-                    if !block.trim().is_empty() {
-                        teile.push(block);
-                    }
+                    // Python `tableJoin` appends the selected Kombi cell even
+                    // when it is an empty string.  Those empty cells are not
+                    // invisible in shell `--breite=0 --onetable`: later joins
+                    // preserve them as ` | ` separators and the fixed table
+                    // width is computed from that exact text.  Dropping them
+                    // removes thousands of standalone `|` separators while
+                    // leaving all non-empty words present, which is exactly the
+                    // ALX mismatch against py reta.
+                    teile.push(block);
                 }
 
                 if teile.is_empty() {
+                    continue;
+                }
+
+                if shell_onetable_width0 {
+                    Self::append_python_onetable_join_parts_py(
+                        &mut newTable[display_row_idx][*out_col_idx],
+                        teile,
+                    );
                     continue;
                 }
 
@@ -633,8 +660,6 @@ impl Program {
                     } else {
                         teile.join("\n")
                     }
-                } else if self.textWidth == 0 && self.oneTable {
-                    teile.join(" | ")
                 } else {
                     teile.join("\n")
                 };
@@ -642,7 +667,7 @@ impl Program {
                 if newTable[display_row_idx][*out_col_idx].is_empty() {
                     newTable[display_row_idx][*out_col_idx] = merged;
                 } else if !newTable[display_row_idx][*out_col_idx].contains(&merged) {
-                    if oneLinePerLine || (self.textWidth == 0 && self.oneTable) {
+                    if oneLinePerLine {
                         newTable[display_row_idx][*out_col_idx].push_str(" | ");
                     } else {
                         newTable[display_row_idx][*out_col_idx].push('\n');
@@ -736,5 +761,49 @@ mod tests {
         assert!(program.allImportantBeginThingsDone);
         assert!(program.runDone);
         assert!(!program.__invertAlles);
+    }
+
+    #[test]
+    fn onetable_width0_kombi_join_preserves_empty_parts_like_python() {
+        let mut with_main = "main".to_string();
+        Program::append_python_onetable_join_parts_py(
+            &mut with_main,
+            vec!["".to_string(), "next".to_string(), "".to_string()],
+        );
+        assert_eq!(with_main, "main |  | next | ");
+
+        let mut initially_empty = String::new();
+        Program::append_python_onetable_join_parts_py(
+            &mut initially_empty,
+            vec!["".to_string(), "next".to_string()],
+        );
+        assert_eq!(initially_empty, "next");
+
+        let mut only_empty = String::new();
+        Program::append_python_onetable_join_parts_py(&mut only_empty, vec!["".to_string()]);
+        assert_eq!(only_empty, "");
+    }
+
+    #[test]
+    fn width0_mode_uses_breite_has_been_once_zero_even_after_textwidth_reset() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.oneTable = true;
+        program.textWidth = 80;
+        program.breiteHasBeenOnceZero = true;
+
+        let effective_width = if program.oneTable
+            && (program.textWidth == 0 || program.breiteHasBeenOnceZero)
+        {
+            0
+        } else {
+            program.textWidth.max(0) as usize
+        };
+        let rendered = program.removeOneNumber_lines_py(
+            &["(1) Mikroorganismen (1)".to_string()],
+            1,
+            effective_width,
+        );
+        assert_eq!(rendered, vec![" Mikroorganismen (1)".to_string()]);
     }
 }

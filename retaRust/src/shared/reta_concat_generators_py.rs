@@ -473,6 +473,18 @@ impl Program {
             }
             out.push_str("[/list]");
             out
+        } else if wrap_empty_lists {
+            // Python readConcatCsv wraps the shell list with an empty sentinel on
+            // both sides and then joins with " | ":
+            //   " | ".join([""] + zeileNeu + [""])
+            // Empty prim rows therefore render as " | " and non-empty rows keep
+            // the leading/trailing separators.  They are semantic placeholders in
+            // the ALX output, not cosmetic padding.
+            let mut wrapped: Vec<String> = Vec::with_capacity(items.len() + 2);
+            wrapped.push(String::new());
+            wrapped.extend(items.iter().cloned());
+            wrapped.push(String::new());
+            wrapped.join(" | ")
         } else {
             items.join(" | ")
         }
@@ -4816,5 +4828,20 @@ mod python_named_concat_helper_tests {
         last.insert(5, "für außen".to_string());
         assert_eq!(Program::PrimAnswer2(&last, 5), "für außen");
         assert_eq!(Program::PrimAnswer2(&last, 7), "");
+    }
+
+    #[test]
+    fn shell_wrap_items_keeps_python_empty_sentinels_for_prim_csv() {
+        let program = Program::new(vec!["reta".to_string()]);
+        assert_eq!(program.wrap_items_exact_py(&[], true), " | ");
+        assert_eq!(
+            program.wrap_items_exact_py(&["a".to_string(), "b".to_string()], true),
+            " | a | b | "
+        );
+        assert_eq!(program.wrap_items_exact_py(&[], false), "");
+        assert_eq!(
+            program.wrap_items_exact_py(&["a".to_string(), "b".to_string()], false),
+            "a | b"
+        );
     }
 }

@@ -59,6 +59,22 @@ pub fn determineRowWidth(row: &[String]) -> usize {
         + row.len().saturating_sub(1)
 }
 
+/// Python keeps the onetable/width-0 kombi cell as a list until the very end
+/// and then calls `" | ".join(...)`. Empty entries are therefore significant:
+/// they create leading/trailing/double separators when the cell already has
+/// content, but leading empty entries are swallowed while the cell is still
+/// Python's initial `[""]` sentinel. This helper mirrors that exact mutation.
+fn append_python_onetable_join_parts(cell: &mut String, parts: Vec<String>) {
+    for part in parts {
+        if cell.is_empty() {
+            *cell = part;
+        } else {
+            cell.push_str(" | ");
+            cell.push_str(&part);
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Default)]
 pub struct BreakoutException;
@@ -1868,7 +1884,10 @@ impl TablesCombi {
 
     pub fn removeOneNumber(&self, hinein: Vec<String>, colNum: i64) -> Vec<String> {
         let state = self.state.borrow();
-        let text_width = state.program.textWidth.max(0) as usize;
+        let width0_raw_mode = state.program.oneTable
+            && state.program.outType == "shell"
+            && (state.program.textWidth == 0 || state.program.breiteHasBeenOnceZero);
+        let text_width = if width0_raw_mode { 0 } else { state.program.textWidth.max(0) as usize };
         let mut text = hinein.join("");
         while text.ends_with('-') {
             text.pop();
@@ -1953,10 +1972,11 @@ impl TablesCombi {
 
         let state = self.state.borrow();
         let oneLinePerLine = state.program.outType == "html" || state.program.outType == "bbcode";
+        let shell_onetable_width0 = !oneLinePerLine
+            && state.program.oneTable
+            && (state.program.textWidth == 0 || state.program.breiteHasBeenOnceZero);
         let remove_number_now =
-            ((state.program.textWidth == 0 && state.program.oneTable)
-                || state.program.outType == "html"
-                || state.program.outType == "bbcode")
+            (shell_onetable_width0 || state.program.outType == "html" || state.program.outType == "bbcode")
                 && state.program.breiten.is_empty();
         drop(state);
 
@@ -1987,11 +2007,13 @@ impl TablesCombi {
                     if src_row_idx >= prepared.prepared_kombi_table.len() {
                         continue;
                     }
-                    let raw_prepared = prepared.prepared_kombi_table[src_row_idx]
+                    let Some(raw_prepared) = prepared.prepared_kombi_table[src_row_idx]
                         .get(*prepared_col_idx)
                         .cloned()
-                        .unwrap_or_default();
-                    if raw_prepared.trim().is_empty() {
+                    else {
+                        continue;
+                    };
+                    if !shell_onetable_width0 && raw_prepared.trim().is_empty() {
                         continue;
                     }
                     let block = if remove_number_now {
@@ -2000,9 +2022,17 @@ impl TablesCombi {
                     } else {
                         raw_prepared
                     };
-                    if !block.trim().is_empty() {
+                    if shell_onetable_width0 || !block.trim().is_empty() {
                         teile.push(block);
                     }
+                }
+
+
+                if shell_onetable_width0 {
+                    if !teile.is_empty() {
+                        append_python_onetable_join_parts(&mut mainTable[display_row_idx][*out_col_idx], teile);
+                    }
+                    continue;
                 }
 
                 if teile.is_empty() {
@@ -2033,7 +2063,7 @@ impl TablesCombi {
                         } else {
                             teile.join("\n")
                         }
-                    } else if state.program.textWidth == 0 && state.program.oneTable {
+                    } else if shell_onetable_width0 {
                         teile.join(" | ")
                     } else {
                         teile.join("\n")
@@ -2043,8 +2073,7 @@ impl TablesCombi {
                 if mainTable[display_row_idx][*out_col_idx].is_empty() {
                     mainTable[display_row_idx][*out_col_idx] = merged;
                 } else if !mainTable[display_row_idx][*out_col_idx].contains(&merged) {
-                    let state = self.state.borrow();
-                    if oneLinePerLine || (state.program.textWidth == 0 && state.program.oneTable) {
+                    if oneLinePerLine || shell_onetable_width0 {
                         mainTable[display_row_idx][*out_col_idx].push_str(" | ");
                     } else {
                         mainTable[display_row_idx][*out_col_idx].push('\n');
@@ -2439,5 +2468,40 @@ mod prepare_facade_tests {
             .prepare4out_LoopBody(0, 3, row, vec![1], 1);
 
         assert_eq!(wrapped, vec![vec!["abc".to_string(), "def".to_string()]]);
+    }
+
+    #[test]
+    fn onetable_width0_kombi_join_preserves_empty_parts_like_python() {
+        let mut with_main = "main".to_string();
+        append_python_onetable_join_parts(
+            &mut with_main,
+            vec!["".to_string(), "next".to_string(), "".to_string()],
+        );
+        assert_eq!(with_main, "main |  | next | ");
+
+        let mut initially_empty = String::new();
+        append_python_onetable_join_parts(
+            &mut initially_empty,
+            vec!["".to_string(), "next".to_string()],
+        );
+        assert_eq!(initially_empty, "next");
+
+        let mut only_empty = String::new();
+        append_python_onetable_join_parts(&mut only_empty, vec!["".to_string()]);
+        assert_eq!(only_empty, "");
+    }
+
+    #[test]
+    fn remove_one_number_honors_breite_zero_flag_after_textwidth_reset() {
+        let tables = Tables::new(Some(20), None);
+        {
+            let mut state = tables.state.borrow_mut();
+            state.program.outType = "shell".to_string();
+            state.program.oneTable = true;
+            state.program.textWidth = 80;
+            state.program.breiteHasBeenOnceZero = true;
+        }
+        let got = tables.getPrepare.removeOneNumber(vec!["(1) Mikroorganismen (1)".to_string()], 1);
+        assert_eq!(got, vec![" Mikroorganismen (1)".to_string()]);
     }
 }
