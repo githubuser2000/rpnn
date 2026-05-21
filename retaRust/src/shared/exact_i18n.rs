@@ -2010,7 +2010,7 @@ impl I18nSubset {
             parameterMainNames: vec!["['grundstrukturen']".to_string()],
             parameterNames: vec!["Strukturgrösse".to_string(), "Größenordnung".to_string(), "größe".to_string(), "groesse".to_string(), "gross".to_string(), "strukturgroesse".to_string(), "strukturgroeße".to_string(), "strukturgrösse".to_string(), "strukturgröße".to_string()],
             datas: vec![
-                vec![PyAtom::Int(4), PyAtom::Int(21), PyAtom::Int(54), PyAtom::Int(197), PyAtom::Int(425), PyAtom::Int(745)],
+                vec![PyAtom::Int(4), PyAtom::Int(21), PyAtom::Int(54), PyAtom::Int(197), PyAtom::Int(425)],
                 vec![],
                 vec![],
                 vec![],
@@ -2028,7 +2028,7 @@ impl I18nSubset {
             parameterMainNames: vec!["['strukturgroesse']".to_string()],
             parameterNames: vec!["Strukturgrösse".to_string(), "Größenordnung".to_string(), "größe".to_string(), "groesse".to_string(), "gross".to_string(), "strukturgroesse".to_string(), "strukturgroeße".to_string(), "strukturgrösse".to_string(), "strukturgröße".to_string()],
             datas: vec![
-                vec![PyAtom::Int(4), PyAtom::Int(21), PyAtom::Int(54), PyAtom::Int(197), PyAtom::Int(425), PyAtom::Int(745)],
+                vec![PyAtom::Int(4), PyAtom::Int(21), PyAtom::Int(54), PyAtom::Int(197), PyAtom::Int(425)],
                 vec![],
                 vec![],
                 vec![],
@@ -2046,7 +2046,7 @@ impl I18nSubset {
             parameterMainNames: vec!["['strukturgroesse']".to_string()],
             parameterNames: vec!["Organisationen".to_string(), "organisationen".to_string(), "organisation".to_string()],
             datas: vec![
-                vec![PyAtom::Int(30), PyAtom::Int(82), PyAtom::Int(425), PyAtom::Int(745)],
+                vec![PyAtom::Int(30), PyAtom::Int(82), PyAtom::Int(425)],
                 vec![],
                 vec![],
                 vec![],

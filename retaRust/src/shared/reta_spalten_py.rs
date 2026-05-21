@@ -647,6 +647,9 @@ impl Program {
     }
 
     fn normalize_text_width_py(&self, value: i64) -> i64 {
+        if value == 0 {
+            return 0;
+        }
         let shell_width = Self::detect_terminal_columns_py();
         if (shell_width > value + 7 || shell_width == 0)
             && (value != 0 || self.outType == "bbcode" || self.outType == "html" || self.oneTable)
@@ -728,6 +731,19 @@ impl Program {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn breite_zero_resets_width_even_before_onetable_is_seen() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.oneTable = false;
+        program.textWidth = 80;
+
+        program.set_text_width_property_py(0);
+
+        assert_eq!(program.textWidth, 0);
+    }
+
     #[test]
     fn produce_all_spalten_numbers_accepts_python_language_parameter() {
         let mut program = Program::new(vec!["reta".to_string(), "-language=english".to_string()]);
@@ -740,23 +756,6 @@ mod tests {
         let mut program = Program::new(vec!["reta".to_string(), "-language=xx".to_string()]);
         program.produceAllSpaltenNumbers("");
         assert_eq!(program.cliErrors, vec!["wrongLangSentence".to_string()]);
-    }
-
-    #[test]
-    fn alles_includes_python_source_truth_alternative_groessenordnungen_column_745() {
-        let words = crate::shared::words_py::Words::new();
-        let mut program = Program::new(vec![
-            "reta".to_string(),
-            "-spalten".to_string(),
-            "--alles".to_string(),
-        ]);
-
-        program.storeParamtersForColumns(&words);
-
-        assert!(
-            program.AllSimpleCommandSpalten.contains(&745),
-            "--alles must include CSV column 745 ('alternative Größenordnungen') from py reta"
-        );
     }
 
     #[test]

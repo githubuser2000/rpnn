@@ -354,7 +354,7 @@ mod tests {
     fn continuum_m_reports_synced_language_assets_and_base_744() {
         let report = continuum_m_language_coverage_smoke();
         assert!(report.ready());
-        assert_eq!(report.base_max_columns, 746);
+        assert_eq!(report.base_max_columns, 745);
         assert!(report.required_columns_legacy.contains(&493));
         assert!(report.required_columns_legacy.contains(&744));
         assert!(report.base_supports_required_columns);

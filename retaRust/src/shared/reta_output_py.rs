@@ -2752,17 +2752,46 @@ impl Program {
         })
     }
 
-    fn max_cell_widths_parallel_py(newTable: &[Vec<String>], col_count: usize) -> Vec<usize> {
+    fn shell_zero_width_onetable_py(&self) -> bool {
+        self.outType == "shell" && self.oneTable && self.textWidth == 0 && self.breiten.is_empty()
+    }
+
+    fn shell_cell_width_for_mode_py(cell: &str, flatten_newlines: bool) -> usize {
+        if flatten_newlines {
+            return cell.chars().filter(|ch| *ch != '\n').count();
+        }
+        cell.split('\n')
+            .map(|part| part.chars().count())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn shell_cell_parts_for_mode_py(cell: &str, width: usize, flatten_newlines: bool) -> Vec<String> {
+        if flatten_newlines {
+            return vec![cell.replace('\n', "")];
+        }
+        if width == 0 {
+            let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+            if parts.is_empty() {
+                parts.push(String::new());
+            }
+            parts
+        } else {
+            Self::wrap_text_py(cell, width)
+        }
+    }
+
+    fn max_cell_widths_parallel_py(
+        newTable: &[Vec<String>],
+        col_count: usize,
+        flatten_newlines: bool,
+    ) -> Vec<usize> {
         let compute_serial = || {
             let mut max_cell_widths: Vec<usize> = vec![0; col_count];
             for row in newTable {
                 for col_idx in 0..col_count {
                     let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                    let cell_width = cell
-                        .split('\n')
-                        .map(|part| part.chars().count())
-                        .max()
-                        .unwrap_or(0);
+                    let cell_width = Self::shell_cell_width_for_mode_py(cell, flatten_newlines);
                     if cell_width > max_cell_widths[col_idx] {
                         max_cell_widths[col_idx] = cell_width;
                     }
@@ -2787,11 +2816,7 @@ impl Program {
                     for row in &newTable[start..end] {
                         for col_idx in 0..col_count {
                             let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                            let cell_width = cell
-                                .split('\n')
-                                .map(|part| part.chars().count())
-                                .max()
-                                .unwrap_or(0);
+                            let cell_width = Self::shell_cell_width_for_mode_py(cell, flatten_newlines);
                             if cell_width > local_widths[col_idx] {
                                 local_widths[col_idx] = cell_width;
                             }
@@ -2850,20 +2875,16 @@ impl Program {
                 .and_then(|s| s.trim().parse::<i64>().ok());
             let is_header = row_number.is_none();
 
+            let flatten_shell_newlines = self.shell_zero_width_onetable_py();
             let mut wrapped_cells: Vec<Vec<String>> = vec![];
             let mut max_sub = 1usize;
             for col_idx in chunk_start..chunk_end {
                 let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                let wrapped = if widths[col_idx] == 0 {
-                    let mut parts: Vec<String> =
-                        cell.split('\n').map(|part| part.to_string()).collect();
-                    if parts.is_empty() {
-                        parts.push(String::new());
-                    }
-                    parts
-                } else {
-                    Self::wrap_text_py(cell, widths[col_idx])
-                };
+                let wrapped = Self::shell_cell_parts_for_mode_py(
+                    cell,
+                    widths[col_idx],
+                    flatten_shell_newlines,
+                );
                 if wrapped.len() > max_sub {
                     max_sub = wrapped.len();
                 }
@@ -3081,20 +3102,13 @@ impl Program {
             .and_then(|s| s.trim().parse::<i64>().ok());
         let is_header = row_number.is_none();
 
+        let flatten_shell_newlines = self.shell_zero_width_onetable_py();
         let mut wrapped_cells: Vec<Vec<String>> = Vec::with_capacity(chunk_end.saturating_sub(chunk_start));
         let mut max_sub = 1usize;
         for col_idx in chunk_start..chunk_end {
             let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
             let width = widths.get(col_idx).copied().unwrap_or(0);
-            let wrapped = if width == 0 {
-                let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
-                if parts.is_empty() {
-                    parts.push(String::new());
-                }
-                parts
-            } else {
-                Self::wrap_text_py(cell, width)
-            };
+            let wrapped = Self::shell_cell_parts_for_mode_py(cell, width, flatten_shell_newlines);
             if wrapped.len() > max_sub {
                 max_sub = wrapped.len();
             }
@@ -3219,6 +3233,7 @@ impl Program {
         col_count: usize,
         min_rows_per_worker: usize,
         row_at: &F,
+        flatten_newlines: bool,
     ) -> Vec<usize>
     where
         F: Fn(usize) -> Vec<String> + Sync,
@@ -3232,11 +3247,7 @@ impl Program {
                 let row = row_at(row_idx);
                 for col_idx in 0..col_count {
                     let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                    let cell_width = cell
-                        .split('\n')
-                        .map(|part| part.chars().count())
-                        .max()
-                        .unwrap_or(0);
+                    let cell_width = Self::shell_cell_width_for_mode_py(cell, flatten_newlines);
                     if cell_width > max_cell_widths[col_idx] {
                         max_cell_widths[col_idx] = cell_width;
                     }
@@ -3264,11 +3275,7 @@ impl Program {
                         let row = row_at(row_idx);
                         for col_idx in 0..col_count {
                             let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
-                            let cell_width = cell
-                                .split('\n')
-                                .map(|part| part.chars().count())
-                                .max()
-                                .unwrap_or(0);
+                            let cell_width = Self::shell_cell_width_for_mode_py(cell, flatten_newlines);
                             if cell_width > local_widths[col_idx] {
                                 local_widths[col_idx] = cell_width;
                             }
@@ -3856,11 +3863,13 @@ impl Program {
                 if col_count == 0 {
                     Ok(())
                 } else {
+                    let flatten_shell_newlines = this.shell_zero_width_onetable_py();
                     let max_cell_widths = Self::streaming_shell_max_cell_widths_from_provider_py(
                         row_count,
                         col_count,
                         min_rows_per_worker,
                         &prepare_visible_row,
+                        flatten_shell_newlines,
                     );
                     let mut widths: Vec<usize> = vec![0; col_count];
                     for col_idx in 0..col_count {
@@ -4025,7 +4034,12 @@ impl Program {
                 if col_count == 0 {
                     Ok(())
                 } else {
-                    let max_cell_widths = Self::max_cell_widths_parallel_py(newTable, col_count);
+                    let flatten_shell_newlines = this.shell_zero_width_onetable_py();
+                    let max_cell_widths = Self::max_cell_widths_parallel_py(
+                        newTable,
+                        col_count,
+                        flatten_shell_newlines,
+                    );
                     let mut widths: Vec<usize> = vec![0; col_count];
                     for col_idx in 0..col_count {
                         let certain = if col_idx < this.breiten.len() {
@@ -4452,7 +4466,12 @@ impl Program {
             return newTable;
         }
 
-        let max_cell_widths = Self::max_cell_widths_parallel_py(&newTable, col_count);
+        let flatten_shell_newlines = self.shell_zero_width_onetable_py();
+        let max_cell_widths = Self::max_cell_widths_parallel_py(
+            &newTable,
+            col_count,
+            flatten_shell_newlines,
+        );
 
         let mut widths: Vec<usize> = vec![0; col_count];
         for col_idx in 0..col_count {
@@ -4722,6 +4741,27 @@ mod tests {
         assert_eq!(
             program.finallyDisplayLines,
             vec!["abc".to_string(), "def".to_string()]
+        );
+    }
+
+
+    #[test]
+    fn shell_zero_width_onetable_flattens_embedded_cell_newlines_like_python() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiten = vec![];
+
+        assert!(program.shell_zero_width_onetable_py());
+        assert_eq!(Program::shell_cell_width_for_mode_py("a\nbc", true), 3);
+        assert_eq!(
+            Program::shell_cell_parts_for_mode_py("a\nbc", 0, true),
+            vec!["abc".to_string()]
+        );
+        assert_eq!(
+            Program::shell_cell_parts_for_mode_py("z.\u{202f}B.\tΓ", 0, true),
+            vec!["z.\u{202f}B.\tΓ".to_string()]
         );
     }
 

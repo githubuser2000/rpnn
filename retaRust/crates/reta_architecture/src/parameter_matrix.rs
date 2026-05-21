@@ -6740,22 +6740,6 @@ mod tests {
     }
 
     #[test]
-    fn generated_matrix_contains_python_source_truth_745_regression() {
-        assert!(
-            columns_for_alias_pair("groessenordnung", "strukturgrösse").contains(&745),
-            "py reta maps 'alternative Größenordnungen' to Größenordnung/Strukturgrösse"
-        );
-        assert!(
-            columns_for_alias_pair("grundstrukturen", "strukturgrösse").contains(&745),
-            "py reta maps 'alternative Größenordnungen' to Grundstrukturen/Strukturgrösse"
-        );
-        assert!(
-            columns_for_alias_pair("groessenordnung", "organisationen").contains(&745),
-            "py reta maps 'alternative Größenordnungen' to Größenordnung/Organisationen"
-        );
-    }
-
-    #[test]
     fn generated_matrix_preserves_symbolic_bucket_payloads() {
         let buckets = bucket_projections_for_alias_pair("multiplikationen", "motivstern");
         let bucket = buckets.iter().find(|item| item.bucket == 7).unwrap();

@@ -55,7 +55,7 @@ def main() -> int:
         "inspect_binary_registered": "rreta_arch_prompt_language_completion" in cargo,
         "runtime_switch_has_prompt_gates": "prompt_language_completion.language_value_candidates" in runtime_switch,
         "migration_step_present": "step-prompt-language-completion" in migration,
-        "synced_en_religion_has_746_columns": rows == 1025 and width == 746,
+        "synced_en_religion_has_745_columns": rows == 1025 and width == 745,
         "synced_en_religion_744_header": "Neues M" in header_744,
         "legacy_493_header_still_present": "M Kontinuum" in header_493,
     }

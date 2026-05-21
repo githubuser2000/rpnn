@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Probe Stage 56 language fallback for direct religion.csv column 744.
 
-The base religion.csv has been updated to 746 columns, so the matrix projection
+The base religion.csv has been updated to 745 columns, so the matrix projection
 `--kontinuum=m -> 493,744` can be directly CSV-backed in the base language.
-Language variants are now expected to be synchronized at 746 columns.  The Rust materializer must not
+Language variants are now expected to be synchronized at 745 columns.  The Rust materializer must not
 turn 744 back into a virtual column just because English/Chinese/Vietnamese/
 Korean assets are stale; it should fall back to base religion.csv for that
 projection while keeping localized assets for projections that they can satisfy.
@@ -48,9 +48,9 @@ def main() -> None:
     generator = GEN.read_text(encoding="utf-8")
 
     checks = {
-        "base_religion_has_direct_744": base_max >= 746,
+        "base_religion_has_direct_744": base_max >= 745,
         "base_744_header_is_neues_m": len(base_rows[0]) > 744 and "Neues M" in base_rows[0][744],
-        "language_variants_synced_at_746_columns": all(value == 746 for value in variant_max.values()),
+        "language_variants_synced_at_745_columns": all(value == 745 for value in variant_max.values()),
         "csv_catalog_has_required_column_helper": "csv_asset_for_language_with_required_columns" in csv_catalog,
         "generator_preserves_required_column_helper": "csv_asset_for_language_with_required_columns" in generator,
         "materialization_config_has_fallback_flag": "fallback_to_base_for_missing_language_columns" in table_materialization,

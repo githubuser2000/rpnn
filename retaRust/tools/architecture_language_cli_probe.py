@@ -65,8 +65,8 @@ def main() -> None:
         "ffi_uses_cli_materialization_config": "TableMaterializationConfig::from_cli_args(&args)" in ffi,
         "inspect_bins_use_cli_materialization_config": "TableMaterializationConfig::from_cli_args(&args)" in view_bin
         and "TableMaterializationConfig::from_cli_args(&reta_args)" in parity_bin,
-        "base_religion_has_746_columns": base_cols >= 746,
-        "en_religion_synced_746_columns": en_cols == 746,
+        "base_religion_has_745_columns": base_cols >= 745,
+        "en_religion_synced_745_columns": en_cols == 745,
     }
     report = {
         "status": "ok" if all(checks.values()) else "failed",

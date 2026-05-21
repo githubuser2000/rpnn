@@ -841,6 +841,9 @@ fn detected_shell_width(program: &Program) -> i64 {
 }
 
 fn normalize_text_width(program: &Program, requested: i64) -> i64 {
+    if requested == 0 {
+        return 0;
+    }
     let shell_width = detected_shell_width(program);
     let out_type = OutputSyntax::from_program_value(&program.outType);
     let zero_allowed = requested == 0 && (out_type.html_like() || program.oneTable);
@@ -1991,18 +1994,13 @@ impl TablesCombi {
                         .get(*prepared_col_idx)
                         .cloned()
                         .unwrap_or_default();
-                    if raw_prepared.trim().is_empty() {
-                        continue;
-                    }
                     let block = if remove_number_now {
                         let raw_lines: Vec<String> = raw_prepared.split('\n').map(|s| s.to_string()).collect();
                         self.removeOneNumber(raw_lines, original_row_no).join("\n")
                     } else {
                         raw_prepared
                     };
-                    if !block.trim().is_empty() {
-                        teile.push(block);
-                    }
+                    teile.push(block);
                 }
 
                 if teile.is_empty() {
