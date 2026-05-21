@@ -389,7 +389,7 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         max_columns: 20,
         header_columns: 20,
         nonempty_cell_count: 525,
-        byte_len: 39132,
+        byte_len: 39555,
         header_preview: "Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gegentranszendentalien | Lebewesen (Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gege",
     },
     CsvAsset {
@@ -464,10 +464,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310634,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -610,7 +610,7 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         max_columns: 20,
         header_columns: 20,
         nonempty_cell_count: 525,
-        byte_len: 39132,
+        byte_len: 39555,
         header_preview: "Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gegentranszendentalien | Lebewesen (Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gege",
     },
     CsvAsset {
@@ -685,10 +685,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310634,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -922,7 +922,7 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         max_columns: 20,
         header_columns: 20,
         nonempty_cell_count: 525,
-        byte_len: 39132,
+        byte_len: 39555,
         header_preview: "Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gegentranszendentalien | Lebewesen (Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gege",
     },
     CsvAsset {
@@ -997,10 +997,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310634,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1075,10 +1075,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310634,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1195,7 +1195,7 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         max_columns: 20,
         header_columns: 20,
         nonempty_cell_count: 525,
-        byte_len: 39132,
+        byte_len: 39555,
         header_preview: "Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gegentranszendentalien | Lebewesen (Vorzeichen: das bedeutet nicht Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber, sondern Gege",
     },
     CsvAsset {
@@ -1270,10 +1270,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310634,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1563,14 +1563,13 @@ mod tests {
     }
 
     #[test]
-    fn language_asset_with_required_columns_uses_synced_variant_after_stage62() {
-        let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493, 744]).unwrap();
-        assert_eq!(localized.name, "en-religion.csv");
-        assert_eq!(localized.language, CsvLanguage::English);
-        assert!(csv_asset_supports_columns(localized, &[493, 744]));
-        let base = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::Base, &[493, 744]).unwrap();
+    fn language_asset_with_required_columns_falls_back_to_base_when_variant_is_stale() {
+        let base = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493, 744]).unwrap();
         assert_eq!(base.name, "religion.csv");
         assert_eq!(base.language, CsvLanguage::Base);
+        let localized = csv_asset_for_language_with_required_columns("religion.csv", CsvLanguage::English, &[493]).unwrap();
+        assert_eq!(localized.name, "en-religion.csv");
+        assert_eq!(localized.language, CsvLanguage::English);
     }
 
     #[test]

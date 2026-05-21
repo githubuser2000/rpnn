@@ -586,6 +586,10 @@ impl Program {
                         .get(*prepared_col_idx)
                         .cloned()
                         .unwrap_or_default();
+                    if raw_prepared.trim().is_empty() {
+                        continue;
+                    }
+
                     let block = if remove_number_now {
                         let raw_lines: Vec<String> =
                             raw_prepared.split('\n').map(|s| s.to_string()).collect::<Vec<String>>();
@@ -598,7 +602,9 @@ impl Program {
                         raw_prepared
                     };
 
-                    teile.push(block);
+                    if !block.trim().is_empty() {
+                        teile.push(block);
+                    }
                 }
 
                 if teile.is_empty() {

@@ -647,9 +647,6 @@ impl Program {
     }
 
     fn normalize_text_width_py(&self, value: i64) -> i64 {
-        if value == 0 {
-            return 0;
-        }
         let shell_width = Self::detect_terminal_columns_py();
         if (shell_width > value + 7 || shell_width == 0)
             && (value != 0 || self.outType == "bbcode" || self.outType == "html" || self.oneTable)
@@ -730,19 +727,6 @@ impl Program {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-
-    #[test]
-    fn breite_zero_resets_width_even_before_onetable_is_seen() {
-        let mut program = Program::new(vec!["reta".to_string()]);
-        program.outType = "shell".to_string();
-        program.oneTable = false;
-        program.textWidth = 80;
-
-        program.set_text_width_property_py(0);
-
-        assert_eq!(program.textWidth, 0);
-    }
 
     #[test]
     fn produce_all_spalten_numbers_accepts_python_language_parameter() {

@@ -109,7 +109,6 @@ pub fn remove_one_number(input: &[String], col_num: i64) -> Vec<String> {
     input
         .iter()
         .map(|cell| remove_number_from_cell(cell, &needle))
-        .filter(|cell| !cell.trim().is_empty())
         .collect()
 }
 
@@ -174,6 +173,12 @@ mod tests {
     #[test]
     fn remove_one_number_preserves_other_numbers() {
         assert_eq!(remove_number_from_cell("(1/2|3)", "2"), "1|3");
+    }
+
+    #[test]
+    fn remove_one_number_keeps_empty_cells_like_python() {
+        let input = vec!["(2) tail".to_string(), "".to_string()];
+        assert_eq!(remove_one_number(&input, 2), vec!["tail".to_string(), "".to_string()]);
     }
 
     #[test]
