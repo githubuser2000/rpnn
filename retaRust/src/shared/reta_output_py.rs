@@ -2680,10 +2680,6 @@ impl Program {
         }
     }
 
-    fn markdown_escape_cell_py(text: &str) -> String {
-        text.replace('|', "\\|").replace('\n', "<br>")
-    }
-
     fn html_escape_cell_py(text: &str) -> String {
         // Cells are already decoded/escaped according to the selected output type
         // in csv_loader_py.  In HTML mode, raw CSV text is already HTML-escaped,
@@ -4040,19 +4036,6 @@ impl Program {
         Ok(())
     }
 
-    fn emit_separated_text_item_py(
-        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
-        first: &mut bool,
-        sep: &'static [u8],
-        text: String,
-    ) -> Result<(), String> {
-        if !*first {
-            emit(OrderedStreamItem::Static(sep))?;
-        }
-        *first = false;
-        emit(OrderedStreamItem::Text(text))
-    }
-
     fn emit_html_cell_item_py(
         emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
         first_cell: &mut bool,
@@ -4066,70 +4049,6 @@ impl Program {
         emit(OrderedStreamItem::Text(format!("<td{}>", attrs)))?;
         emit(OrderedStreamItem::Text(text))?;
         emit(OrderedStreamItem::Static(b"</td>"))
-    }
-
-    fn stream_csv_row_items_py(
-        &self,
-        row_idx: usize,
-        row: &[String],
-        finallyDisplayLines: &[String],
-        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
-    ) -> Result<(), String> {
-        let row_number = finallyDisplayLines
-            .get(row_idx)
-            .and_then(|s| s.trim().parse::<i64>().ok());
-        if self.should_skip_structured_row_py(row, row_number) {
-            return Ok(());
-        }
-        let is_header = row_number.is_none();
-        let mut first = true;
-        if self.nummeriere {
-            Self::emit_separated_text_item_py(
-                emit,
-                &mut first,
-                b";",
-                Self::csv_escape_cell_py(&self.row_prefix_text_py(row_number, is_header)),
-            )?;
-            let label = finallyDisplayLines
-                .get(row_idx)
-                .cloned()
-                .unwrap_or_default();
-            Self::emit_separated_text_item_py(
-                emit,
-                &mut first,
-                b";",
-                Self::csv_escape_cell_py(&label),
-            )?;
-        }
-        for cell in row {
-            let limited = self.limit_cell_height_py(cell);
-            Self::emit_separated_text_item_py(
-                emit,
-                &mut first,
-                b";",
-                Self::csv_escape_cell_py(&limited),
-            )?;
-        }
-        emit(OrderedStreamItem::Newline)
-    }
-
-    fn first_streamed_markdown_header_idx_py(
-        &self,
-        finallyDisplayLines: &[String],
-        newTable: &[Vec<String>],
-    ) -> Option<usize> {
-        for (row_idx, row) in newTable.iter().enumerate() {
-            let row_number = finallyDisplayLines
-                .get(row_idx)
-                .and_then(|s| s.trim().parse::<i64>().ok());
-            if self.should_skip_structured_row_py(row, row_number) {
-                continue;
-            }
-            if row_number.is_none() {
-                return Some(row_idx);
-            }
-        }
-        None
     }
 
     fn stream_markdown_separator_items_py(
@@ -4160,90 +4079,6 @@ impl Program {
         }
         emit(OrderedStreamItem::Static(b"|"))?;
         emit(OrderedStreamItem::Newline)
-    }
-
-    fn stream_markdown_row_items_py(
-        &self,
-        row_idx: usize,
-        row: &[String],
-        finallyDisplayLines: &[String],
-        first_header_idx: Option<usize>,
-        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
-    ) -> Result<(), String> {
-        let row_number = finallyDisplayLines
-            .get(row_idx)
-            .and_then(|s| s.trim().parse::<i64>().ok());
-        if self.should_skip_structured_row_py(row, row_number) {
-            return Ok(());
-        }
-        let is_header = row_number.is_none();
-        let cells_len = row.len() + if self.nummeriere { 2 } else { 0 };
-        emit(OrderedStreamItem::Static(b"|"))?;
-        if self.nummeriere {
-            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(
-                &self.row_prefix_text_py(row_number, is_header),
-            )))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(
-                &finallyDisplayLines
-                    .get(row_idx)
-                    .cloned()
-                    .unwrap_or_default(),
-            )))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-        }
-        for cell in row {
-            let limited = self.limit_cell_height_py(cell);
-            emit(OrderedStreamItem::Text(Self::markdown_escape_cell_py(&limited)))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-        }
-        emit(OrderedStreamItem::Newline)?;
-        if first_header_idx == Some(row_idx) {
-            Self::stream_markdown_separator_items_py(cells_len, emit)?;
-        }
-        Ok(())
-    }
-
-    fn stream_emacs_row_items_py(
-        &self,
-        row_idx: usize,
-        row: &[String],
-        finallyDisplayLines: &[String],
-        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
-    ) -> Result<(), String> {
-        let row_number = finallyDisplayLines
-            .get(row_idx)
-            .and_then(|s| s.trim().parse::<i64>().ok());
-        if self.should_skip_structured_row_py(row, row_number) {
-            return Ok(());
-        }
-        let is_header = row_number.is_none();
-        let cells_len = row.len() + if self.nummeriere { 2 } else { 0 };
-        emit(OrderedStreamItem::Static(b"|"))?;
-        if self.nummeriere {
-            emit(OrderedStreamItem::Text(self.row_prefix_text_py(
-                row_number,
-                is_header,
-            )))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-            emit(OrderedStreamItem::Text(
-                finallyDisplayLines
-                    .get(row_idx)
-                    .cloned()
-                    .unwrap_or_default(),
-            ))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-        }
-        for cell in row {
-            let limited = self.limit_cell_height_py(cell);
-            emit(OrderedStreamItem::Text(limited))?;
-            emit(OrderedStreamItem::Static(b"|"))?;
-        }
-        emit(OrderedStreamItem::Newline)?;
-        if is_header {
-            Self::stream_emacs_separator_items_py(cells_len, emit)?;
-        }
-        Ok(())
     }
 
     fn stream_html_row_items_py(
@@ -4310,49 +4145,6 @@ impl Program {
             Self::emit_html_cell_item_py(emit, &mut first_cell, attrs, escaped)?;
         }
         emit(OrderedStreamItem::Static(b"</tr>"))?;
-        emit(OrderedStreamItem::Newline)
-    }
-
-    fn stream_bbcode_row_items_py(
-        &self,
-        row_idx: usize,
-        row: &[String],
-        finallyDisplayLines: &[String],
-        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
-    ) -> Result<(), String> {
-        let row_number = finallyDisplayLines
-            .get(row_idx)
-            .and_then(|s| s.trim().parse::<i64>().ok());
-        if self.should_skip_structured_row_py(row, row_number) {
-            return Ok(());
-        }
-        let is_header = row_number.is_none();
-        emit(OrderedStreamItem::Text(
-            Self::bbcode_row_begin_py(row_number, is_header).to_string(),
-        ))?;
-        if self.nummeriere {
-            emit(OrderedStreamItem::Static(b"[td]"))?;
-            emit(OrderedStreamItem::Text(self.row_prefix_text_py(
-                row_number,
-                is_header,
-            )))?;
-            emit(OrderedStreamItem::Static(b"[/td]"))?;
-            emit(OrderedStreamItem::Static(b"[td]"))?;
-            emit(OrderedStreamItem::Text(
-                finallyDisplayLines
-                    .get(row_idx)
-                    .cloned()
-                    .unwrap_or_default(),
-            ))?;
-            emit(OrderedStreamItem::Static(b"[/td]"))?;
-        }
-        for cell in row {
-            let limited = self.limit_cell_height_py(cell).replace('\n', "<br>");
-            emit(OrderedStreamItem::Static(b"[td]"))?;
-            emit(OrderedStreamItem::Text(limited))?;
-            emit(OrderedStreamItem::Static(b"[/td]"))?;
-        }
-        emit(OrderedStreamItem::Static(b"[/tr]"))?;
         emit(OrderedStreamItem::Newline)
     }
 
@@ -4736,125 +4528,6 @@ impl Program {
         let this: &Program = &*self;
         match out_type.as_str() {
             "nichts" => {}
-            "csv" => {
-                let rendered_rows =
-                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                        let row_number = finallyDisplayLines
-                            .get(row_idx)
-                            .and_then(|s| s.trim().parse::<i64>().ok());
-                        if this.should_skip_structured_row_py(row, row_number) {
-                            return None;
-                        }
-                        let is_header = row_number.is_none();
-                        let mut fields: Vec<String> = vec![];
-                        if this.nummeriere {
-                            fields.push(Self::csv_escape_cell_py(
-                                &this.row_prefix_text_py(row_number, is_header),
-                            ));
-                            let label = finallyDisplayLines
-                                .get(row_idx)
-                                .cloned()
-                                .unwrap_or_default();
-                            fields.push(Self::csv_escape_cell_py(&label));
-                        }
-                        for cell in row {
-                            let limited = this.limit_cell_height_py(cell);
-                            fields.push(Self::csv_escape_cell_py(&limited));
-                        }
-                        let cells_len = fields.len();
-                        Some(StructuredRowRenderPy {
-                            line: fields.join(";"),
-                            is_header,
-                            cells_len,
-                        })
-                    });
-                for rendered in rendered_rows {
-                    out_lines.push(rendered.line);
-                }
-            }
-            "markdown" => {
-                let rendered_rows =
-                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                        let row_number = finallyDisplayLines
-                            .get(row_idx)
-                            .and_then(|s| s.trim().parse::<i64>().ok());
-                        if this.should_skip_structured_row_py(row, row_number) {
-                            return None;
-                        }
-                        let is_header = row_number.is_none();
-                        let mut cells: Vec<String> = vec![];
-                        if this.nummeriere {
-                            cells.push(Self::markdown_escape_cell_py(
-                                &this.row_prefix_text_py(row_number, is_header),
-                            ));
-                            cells.push(Self::markdown_escape_cell_py(
-                                &finallyDisplayLines
-                                    .get(row_idx)
-                                    .cloned()
-                                    .unwrap_or_default(),
-                            ));
-                        }
-                        for cell in row {
-                            let limited = this.limit_cell_height_py(cell);
-                            cells.push(Self::markdown_escape_cell_py(&limited));
-                        }
-                        let cells_len = cells.len();
-                        Some(StructuredRowRenderPy {
-                            line: format!("|{}|", cells.join("|")),
-                            is_header,
-                            cells_len,
-                        })
-                    });
-                let mut header_sep_done = false;
-                for rendered in rendered_rows {
-                    let is_header = rendered.is_header;
-                    let cells_len = rendered.cells_len;
-                    out_lines.push(rendered.line);
-                    if is_header && !header_sep_done {
-                        let sep = format!("|{}|", vec![":--:"; cells_len].join("|"));
-                        out_lines.push(sep);
-                        header_sep_done = true;
-                    }
-                }
-            }
-            "emacs" => {
-                let rendered_rows =
-                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                        let row_number = finallyDisplayLines
-                            .get(row_idx)
-                            .and_then(|s| s.trim().parse::<i64>().ok());
-                        if this.should_skip_structured_row_py(row, row_number) {
-                            return None;
-                        }
-                        let is_header = row_number.is_none();
-                        let mut cells: Vec<String> = vec![];
-                        if this.nummeriere {
-                            cells.push(this.row_prefix_text_py(row_number, is_header));
-                            cells.push(
-                                finallyDisplayLines
-                                    .get(row_idx)
-                                    .cloned()
-                                    .unwrap_or_default(),
-                            );
-                        }
-                        cells.extend(row.iter().map(|cell| this.limit_cell_height_py(cell)));
-                        let cells_len = cells.len();
-                        Some(StructuredRowRenderPy {
-                            line: format!("|{}|", cells.join("|")),
-                            is_header,
-                            cells_len,
-                        })
-                    });
-                for rendered in rendered_rows {
-                    let is_header = rendered.is_header;
-                    let cells_len = rendered.cells_len;
-                    out_lines.push(rendered.line);
-                    if is_header {
-                        let sep = format!("|{}|", vec!["----"; cells_len].join("+"));
-                        out_lines.push(sep);
-                    }
-                }
-            }
             "html" => {
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
                 let rendered_rows =
@@ -4927,51 +4600,6 @@ impl Program {
                     out_lines.push(rendered.line);
                 }
                 out_lines.push("</table>".to_string());
-            }
-            "bbcode" => {
-                let rendered_rows =
-                    Self::render_structured_rows_ordered_py(newTable, 32, |row_idx, row| {
-                        let row_number = finallyDisplayLines
-                            .get(row_idx)
-                            .and_then(|s| s.trim().parse::<i64>().ok());
-                        if this.should_skip_structured_row_py(row, row_number) {
-                            return None;
-                        }
-                        let is_header = row_number.is_none();
-                        let mut cells: Vec<String> = vec![];
-                        if this.nummeriere {
-                            cells.push(format!(
-                                "[td]{}[/td]",
-                                this.row_prefix_text_py(row_number, is_header)
-                            ));
-                            cells.push(format!(
-                                "[td]{}[/td]",
-                                finallyDisplayLines
-                                    .get(row_idx)
-                                    .cloned()
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        for cell in row {
-                            let limited = this.limit_cell_height_py(cell);
-                            cells.push(format!("[td]{}[/td]", limited.replace('\n', "<br>")));
-                        }
-                        let cells_len = cells.len();
-                        Some(StructuredRowRenderPy {
-                            line: format!(
-                                "{}{}[/tr]",
-                                Self::bbcode_row_begin_py(row_number, is_header),
-                                cells.join("")
-                            ),
-                            is_header,
-                            cells_len,
-                        })
-                    });
-                out_lines.push("[table]".to_string());
-                for rendered in rendered_rows {
-                    out_lines.push(rendered.line);
-                }
-                out_lines.push("[/table]".to_string());
             }
             _ => {
                 self.finallyDisplayLines = vec![];
