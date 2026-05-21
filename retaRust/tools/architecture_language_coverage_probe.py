@@ -62,11 +62,11 @@ def main() -> int:
         "inspect_binary_registered": "rreta_arch_language_coverage" in cargo,
         "runtime_gates": "table_view_language_coverage.translation_gap_report" in runtime_switch,
         "migration_step": "step-table-view-language-coverage" in migration,
-        "base_religion_has_745_columns": base_cols == 745,
-        "en_religion_synced_745_columns": en_cols == 745,
-        "cn_religion_synced_745_columns": cn_cols == 745,
-        "vn_religion_synced_745_columns": vn_cols == 745,
-        "kr_religion_synced_745_columns": kr_cols == 745,
+        "base_religion_has_746_columns": base_cols == 746,
+        "en_religion_synced_746_columns": en_cols == 746,
+        "cn_religion_synced_746_columns": cn_cols == 746,
+        "vn_religion_synced_746_columns": vn_cols == 746,
+        "kr_religion_synced_746_columns": kr_cols == 746,
         "base_has_expected_rows": base_rows == 1025,
     }
     status = "ok" if all(checks.values()) else "failed"

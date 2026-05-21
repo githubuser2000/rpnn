@@ -2012,7 +2012,7 @@ impl Words {
             parameterMainNames: vec!["['grundstrukturen']".to_string()],
             parameterNames: vec!["Strukturgrösse".to_string(), "Größenordnung".to_string(), "größe".to_string(), "groesse".to_string(), "gross".to_string(), "strukturgroesse".to_string(), "strukturgroeße".to_string(), "strukturgrösse".to_string(), "strukturgröße".to_string()],
             datas: vec![
-                vec![PyValue::Int(4), PyValue::Int(21), PyValue::Int(54), PyValue::Int(197), PyValue::Int(425)],
+                vec![PyValue::Int(4), PyValue::Int(21), PyValue::Int(54), PyValue::Int(197), PyValue::Int(425), PyValue::Int(745)],
                 vec![],
                 vec![],
                 vec![],
@@ -2030,7 +2030,7 @@ impl Words {
             parameterMainNames: vec!["['strukturgroesse']".to_string()],
             parameterNames: vec!["Strukturgrösse".to_string(), "Größenordnung".to_string(), "größe".to_string(), "groesse".to_string(), "gross".to_string(), "strukturgroesse".to_string(), "strukturgroeße".to_string(), "strukturgrösse".to_string(), "strukturgröße".to_string()],
             datas: vec![
-                vec![PyValue::Int(4), PyValue::Int(21), PyValue::Int(54), PyValue::Int(197), PyValue::Int(425)],
+                vec![PyValue::Int(4), PyValue::Int(21), PyValue::Int(54), PyValue::Int(197), PyValue::Int(425), PyValue::Int(745)],
                 vec![],
                 vec![],
                 vec![],
@@ -2048,7 +2048,7 @@ impl Words {
             parameterMainNames: vec!["['strukturgroesse']".to_string()],
             parameterNames: vec!["Organisationen".to_string(), "organisationen".to_string(), "organisation".to_string()],
             datas: vec![
-                vec![PyValue::Int(30), PyValue::Int(82), PyValue::Int(425)],
+                vec![PyValue::Int(30), PyValue::Int(82), PyValue::Int(425), PyValue::Int(745)],
                 vec![],
                 vec![],
                 vec![],
@@ -8745,7 +8745,7 @@ pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
             _("strukturgrösse"),
             _("strukturgröße"),
         ),
-        {4, 21, 54, 197, 425},
+        {4, 21, 54, 197, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,
@@ -8760,7 +8760,7 @@ pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
             _("strukturgrösse"),
             _("strukturgröße"),
         ),
-        {4, 21, 54, 197, 425},
+        {4, 21, 54, 197, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,
@@ -8769,7 +8769,7 @@ pub const PYTHON_SOURCE__WORDS_PARA_NDATA_MATRIX: &str = r#"[
             _("organisationen"),
             organisationWort,
         ),
-        {30, 82, 425},
+        {30, 82, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,

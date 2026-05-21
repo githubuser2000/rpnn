@@ -464,10 +464,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310635,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -685,10 +685,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310635,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -997,10 +997,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310635,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1075,10 +1075,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310635,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1270,10 +1270,10 @@ pub const CSV_ASSETS: &[CsvAsset] = &[
         kind: CsvAssetKind::Religion,
         delimiter: CsvDelimiter::Semicolon,
         row_count: 1025,
-        max_columns: 745,
-        header_columns: 745,
-        nonempty_cell_count: 310613,
-        byte_len: 3664706,
+        max_columns: 746,
+        header_columns: 746,
+        nonempty_cell_count: 310635,
+        byte_len: 3666526,
         header_preview: "Religionen der Föderation in unserer Galaxie Milchstraße (unabhängig vom Vorzeichen: das bedeutet nicht Antitranszendentalien, sondern Gutartigkeit oder Bösartigkeit anderen Religionen gegenüber) (14) (n, Sternpolygon) | Babylonische Tierkr",
     },
     CsvAsset {
@@ -1535,7 +1535,8 @@ mod tests {
         let asset = csv_asset_by_name("religion.csv").unwrap();
         assert_eq!(asset.kind, CsvAssetKind::Religion);
         assert_eq!(asset.row_count, 1025);
-        assert!(asset.max_columns > 700);
+        assert_eq!(asset.max_columns, 746);
+        assert_eq!(asset.header_columns, 746);
     }
 
     #[test]

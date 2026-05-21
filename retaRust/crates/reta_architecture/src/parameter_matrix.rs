@@ -1778,10 +1778,10 @@ pub const PARAMETER_MATRIX_SEEDS: &[ParameterMatrixSeed] = &[
             "strukturgrösse",
             "strukturgröße",
         ],
-        columns: &[4, 21, 54, 197, 425],
+        columns: &[4, 21, 54, 197, 425, 745],
         buckets: &[ParameterBucketProjection {
             bucket: 0,
-            integers: &[4, 21, 54, 197, 425],
+            integers: &[4, 21, 54, 197, 425, 745],
             symbols: &[],
         }],
         legacy_bucket_count: 1,
@@ -1810,10 +1810,10 @@ pub const PARAMETER_MATRIX_SEEDS: &[ParameterMatrixSeed] = &[
             "strukturgrösse",
             "strukturgröße",
         ],
-        columns: &[4, 21, 54, 197, 425],
+        columns: &[4, 21, 54, 197, 425, 745],
         buckets: &[ParameterBucketProjection {
             bucket: 0,
-            integers: &[4, 21, 54, 197, 425],
+            integers: &[4, 21, 54, 197, 425, 745],
             symbols: &[],
         }],
         legacy_bucket_count: 1,
@@ -1832,10 +1832,10 @@ pub const PARAMETER_MATRIX_SEEDS: &[ParameterMatrixSeed] = &[
             "organisationen",
         ],
         parameter_aliases: &["Organisationen", "organisationen", "organisation"],
-        columns: &[30, 82, 425],
+        columns: &[30, 82, 425, 745],
         buckets: &[ParameterBucketProjection {
             bucket: 0,
-            integers: &[30, 82, 425],
+            integers: &[30, 82, 425, 745],
             symbols: &[],
         }],
         legacy_bucket_count: 1,
@@ -6736,6 +6736,22 @@ mod tests {
         assert_eq!(
             canonical_pair_for_aliases("kontinuum", "m"),
             Some(("Kontinuum".to_string(), "M".to_string()))
+        );
+    }
+
+    #[test]
+    fn generated_matrix_contains_python_source_truth_745_regression() {
+        assert!(
+            columns_for_alias_pair("groessenordnung", "strukturgrösse").contains(&745),
+            "py reta maps 'alternative Größenordnungen' to Größenordnung/Strukturgrösse"
+        );
+        assert!(
+            columns_for_alias_pair("grundstrukturen", "strukturgrösse").contains(&745),
+            "py reta maps 'alternative Größenordnungen' to Grundstrukturen/Strukturgrösse"
+        );
+        assert!(
+            columns_for_alias_pair("groessenordnung", "organisationen").contains(&745),
+            "py reta maps 'alternative Größenordnungen' to Größenordnung/Organisationen"
         );
     }
 

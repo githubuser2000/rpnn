@@ -75,9 +75,9 @@ def main() -> None:
         and "language_parity_for_cli_args" in bin_rs,
         "workflow_diagnostic_present": "ARCH_TABLE_VIEW_LANGUAGE_PARITY" in workflow
         and "report.language_parity.ready()" in workflow,
-        "base_religion_has_direct_744": base_cols >= 745
+        "base_religion_has_direct_744": base_cols >= 746
         and "Neues M" in (base_rows[0][744] if base_cols > 744 else ""),
-        "english_religion_has_direct_744": en_cols == 745,
+        "english_religion_has_direct_744": en_cols >= 745,
         "english_religion_can_direct_493": en_cols > 493
         and bool(en_rows[0][493]),
     }

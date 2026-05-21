@@ -924,7 +924,7 @@ paraNdataMatrix: list = [
             _("strukturgrösse"),
             _("strukturgröße"),
         ),
-        {4, 21, 54, 197, 425},
+        {4, 21, 54, 197, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,
@@ -939,7 +939,7 @@ paraNdataMatrix: list = [
             _("strukturgrösse"),
             _("strukturgröße"),
         ),
-        {4, 21, 54, 197, 425},
+        {4, 21, 54, 197, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,
@@ -948,7 +948,7 @@ paraNdataMatrix: list = [
             _("organisationen"),
             organisationWort,
         ),
-        {30, 82, 425},
+        {30, 82, 425, 745},
     ),
     (
         ParametersMain.strukturgroesse,

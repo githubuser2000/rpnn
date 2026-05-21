@@ -43,7 +43,7 @@ def main() -> int:
 
     expected_pending = [lang for lang, width in variant_widths.items() if width <= 744]
     checks = {
-        "base_religion_has_745_columns": base_width == 745,
+        "base_religion_has_746_columns": base_width == 746,
         "base_744_header_is_neues_m": "Neues M" in base_744_header,
         "base_744_first_value_is_identity_wave": "Identität" in base_744_first_value and "Welle" in base_744_first_value,
         "variants_synced_for_744": expected_pending == [],

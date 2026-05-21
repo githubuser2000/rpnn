@@ -743,6 +743,23 @@ mod tests {
     }
 
     #[test]
+    fn alles_includes_python_source_truth_alternative_groessenordnungen_column_745() {
+        let words = crate::shared::words_py::Words::new();
+        let mut program = Program::new(vec![
+            "reta".to_string(),
+            "-spalten".to_string(),
+            "--alles".to_string(),
+        ]);
+
+        program.storeParamtersForColumns(&words);
+
+        assert!(
+            program.AllSimpleCommandSpalten.contains(&745),
+            "--alles must include CSV column 745 ('alternative Größenordnungen') from py reta"
+        );
+    }
+
+    #[test]
     fn spalten_equals_error_lists_left_and_right_alternatives_when_both_sides_are_wrong() {
         let mut program = Program::new(vec![
             "reta".to_string(),
