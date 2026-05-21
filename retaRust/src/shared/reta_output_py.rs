@@ -2933,9 +2933,10 @@ impl Program {
                         is_rest,
                         self.nocolor,
                     ));
-                    if abs_i + 1 != chunk_end {
-                        line.push(' ');
-                    }
+                    // Python appends the shell column separator after every rendered
+                    // cell, including the last visible cell.  That final blank is
+                    // byte-significant for --breite=0 --onetable parity.
+                    line.push(' ');
                 }
 
                 one_chunk_lines.push(line);
@@ -3161,9 +3162,9 @@ impl Program {
                     is_rest,
                     self.nocolor,
                 )))?;
-                if abs_i + 1 != chunk_end {
-                    emit(OrderedStreamItem::Static(b" "))?;
-                }
+                // Match Python tableHandling.py: line += [coloredSubCell, " "] for
+                // every rendered shell cell, including the final column.
+                emit(OrderedStreamItem::Static(b" "))?;
             }
             emit(OrderedStreamItem::Newline)?;
         }
@@ -4741,8 +4742,24 @@ mod tests {
 
         assert_eq!(
             program.finallyDisplayLines,
-            vec!["abc".to_string(), "def".to_string()]
+            vec!["abc ".to_string(), "def ".to_string()]
         );
+    }
+
+    #[test]
+    fn shell_output_keeps_python_final_column_separator_space() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.nocolor = true;
+        program.nummeriere = false;
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiteHasBeenOnceZero = true;
+
+        let table = vec![vec!["eins".to_string(), "zwei".to_string()]];
+        let _ = program.cliOut_py(vec!["1".to_string()], table, 1, vec![1]);
+
+        assert_eq!(program.finallyDisplayLines, vec!["eins zwei ".to_string()]);
     }
 
     #[test]
