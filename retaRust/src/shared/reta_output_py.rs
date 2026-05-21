@@ -208,6 +208,36 @@ struct StructuredRowRenderPy {
     cells_len: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PyStructuredOutputKind {
+    Csv,
+    Markdown,
+    Emacs,
+    Html,
+    Bbcode,
+}
+
+impl PyStructuredOutputKind {
+    fn from_out_type(out_type: &str) -> Option<Self> {
+        match out_type {
+            "csv" => Some(Self::Csv),
+            "markdown" => Some(Self::Markdown),
+            "emacs" => Some(Self::Emacs),
+            "html" => Some(Self::Html),
+            "bbcode" => Some(Self::Bbcode),
+            _ => None,
+        }
+    }
+
+    fn is_tablehandling_mode(self) -> bool {
+        !matches!(self, Self::Html)
+    }
+
+    fn body_cells_are_padded(self) -> bool {
+        matches!(self, Self::Markdown | Self::Emacs | Self::Bbcode)
+    }
+}
+
 impl Program {
     fn displayed_column_numbers_for_html_py(rowsRange: &[i64]) -> Vec<Option<u32>> {
         rowsRange
@@ -2701,6 +2731,624 @@ impl Program {
         false
     }
 
+    fn tablehandling_width_zero_raw_mode_py(&self) -> bool {
+        // Python tableHandling uses one common cell loop for shell/csv/markdown/
+        // emacs/bbcode/html.  After an explicit --breite=0 the prepared cell stays
+        // one logical string; embedded newlines are removed while rendering the
+        // concrete output syntax instead of becoming extra physical rows.
+        self.breiteHasBeenOnceZero || self.textWidth == 0 || self.shellRowsAmount == 0
+    }
+
+    fn tablehandling_cell_lines_py(&self, cell: &str) -> Vec<String> {
+        if self.tablehandling_width_zero_raw_mode_py() {
+            return vec![cell.to_string()];
+        }
+        let mut parts: Vec<String> = cell.split('\n').map(|part| part.to_string()).collect();
+        if parts.is_empty() {
+            parts.push(String::new());
+        }
+        parts
+    }
+
+    fn tablehandling_cell_measure_width_py(&self, cell: &str) -> usize {
+        if self.tablehandling_width_zero_raw_mode_py() {
+            return cell.chars().count();
+        }
+        cell.split('\n')
+            .map(|part| part.chars().count())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn tablehandling_body_width_for_col_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        col_idx: usize,
+        max_cell_width: usize,
+    ) -> usize {
+        let certain = if self.tablehandling_width_zero_raw_mode_py() {
+            0
+        } else if col_idx < self.breiten.len() {
+            self.breiten[col_idx]
+        } else {
+            self.textWidth
+        };
+        if certain > max_cell_width as i64
+            || (certain == 0 && !matches!(mode, PyStructuredOutputKind::Bbcode | PyStructuredOutputKind::Html))
+        {
+            max_cell_width
+        } else if certain < 0 {
+            0
+        } else {
+            certain as usize
+        }
+    }
+
+    fn tablehandling_body_widths_parallel_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        newTable: &[Vec<String>],
+        col_count: usize,
+    ) -> Vec<usize> {
+        let compute_serial = || {
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for row in newTable {
+                for col_idx in 0..col_count {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let cell_width = self.tablehandling_cell_measure_width_py(cell);
+                    if cell_width > max_cell_widths[col_idx] {
+                        max_cell_widths[col_idx] = cell_width;
+                    }
+                }
+            }
+            max_cell_widths
+                .into_iter()
+                .enumerate()
+                .map(|(col_idx, max_width)| {
+                    self.tablehandling_body_width_for_col_py(mode, col_idx, max_width)
+                })
+                .collect()
+        };
+
+        let Some((guard, ranges)) =
+            parallel_runtime::reserve_ranges(ParallelArea::Widths, newTable.len(), 32)
+        else {
+            return compute_serial();
+        };
+
+        let max_cell_widths = std::thread::scope(|scope| {
+            let _budget_guard = guard;
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
+                    let mut local_widths: Vec<usize> = vec![0; col_count];
+                    for row in &newTable[start..end] {
+                        for col_idx in 0..col_count {
+                            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                            let cell_width = self.tablehandling_cell_measure_width_py(cell);
+                            if cell_width > local_widths[col_idx] {
+                                local_widths[col_idx] = cell_width;
+                            }
+                        }
+                    }
+                    local_widths
+                }));
+            }
+
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for handle in handles {
+                match handle.join() {
+                    Ok(local_widths) => {
+                        for (col_idx, width) in local_widths.into_iter().enumerate() {
+                            if width > max_cell_widths[col_idx] {
+                                max_cell_widths[col_idx] = width;
+                            }
+                        }
+                    }
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+            max_cell_widths
+        });
+
+        max_cell_widths
+            .into_iter()
+            .enumerate()
+            .map(|(col_idx, max_width)| {
+                self.tablehandling_body_width_for_col_py(mode, col_idx, max_width)
+            })
+            .collect()
+    }
+
+    fn tablehandling_body_widths_from_provider_py<F>(
+        &self,
+        mode: PyStructuredOutputKind,
+        row_count: usize,
+        col_count: usize,
+        min_rows_per_worker: usize,
+        row_at: &F,
+    ) -> Vec<usize>
+    where
+        F: Fn(usize) -> Vec<String> + Sync,
+    {
+        if row_count == 0 || col_count == 0 {
+            return vec![0; col_count];
+        }
+
+        let serial = || {
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for row_idx in 0..row_count {
+                let row = row_at(row_idx);
+                for col_idx in 0..col_count {
+                    let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                    let cell_width = self.tablehandling_cell_measure_width_py(cell);
+                    if cell_width > max_cell_widths[col_idx] {
+                        max_cell_widths[col_idx] = cell_width;
+                    }
+                }
+            }
+            max_cell_widths
+                .into_iter()
+                .enumerate()
+                .map(|(col_idx, max_width)| {
+                    self.tablehandling_body_width_for_col_py(mode, col_idx, max_width)
+                })
+                .collect()
+        };
+
+        let Some((guard, ranges)) = parallel_runtime::reserve_ranges(
+            ParallelArea::Widths,
+            row_count,
+            min_rows_per_worker.max(1),
+        ) else {
+            return serial();
+        };
+
+        let max_cell_widths = std::thread::scope(|scope| {
+            let _budget_guard = guard;
+            let mut handles = Vec::new();
+            for (start, end) in ranges {
+                handles.push(scope.spawn(move || {
+                    let _depth_guard = parallel_runtime::enter_parallel_worker_scope();
+                    let mut local_widths: Vec<usize> = vec![0; col_count];
+                    for row_idx in start..end {
+                        let row = row_at(row_idx);
+                        for col_idx in 0..col_count {
+                            let cell = row.get(col_idx).map(String::as_str).unwrap_or("");
+                            let cell_width = self.tablehandling_cell_measure_width_py(cell);
+                            if cell_width > local_widths[col_idx] {
+                                local_widths[col_idx] = cell_width;
+                            }
+                        }
+                    }
+                    local_widths
+                }));
+            }
+
+            let mut max_cell_widths: Vec<usize> = vec![0; col_count];
+            for handle in handles {
+                match handle.join() {
+                    Ok(local_widths) => {
+                        for (col_idx, width) in local_widths.into_iter().enumerate() {
+                            if width > max_cell_widths[col_idx] {
+                                max_cell_widths[col_idx] = width;
+                            }
+                        }
+                    }
+                    Err(payload) => std::panic::resume_unwind(payload),
+                }
+            }
+            max_cell_widths
+        });
+
+        max_cell_widths
+            .into_iter()
+            .enumerate()
+            .map(|(col_idx, max_width)| {
+                self.tablehandling_body_width_for_col_py(mode, col_idx, max_width)
+            })
+            .collect()
+    }
+
+    fn tablehandling_prefix_text_py(&self, row_number: Option<i64>, is_header: bool) -> String {
+        if is_header {
+            " ".to_string()
+        } else {
+            row_number
+                .map(Self::zeile_which_zaehlung_py)
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| " ".to_string())
+        }
+    }
+
+    fn tablehandling_label_text_py(
+        &self,
+        row_idx: usize,
+        finallyDisplayLines: &[String],
+        numlen: i64,
+        sub_idx: usize,
+    ) -> String {
+        let width = (numlen + 1).max(0) as usize;
+        if sub_idx == 0 {
+            let mut label = finallyDisplayLines
+                .get(row_idx)
+                .cloned()
+                .unwrap_or_default();
+            label.push(' ');
+            format!("{:>width$}", label, width = width)
+        } else {
+            format!("{:>width$}", "", width = width)
+        }
+    }
+
+    fn bbcode_cell_begin_py(spalte: i64, content: Option<&str>) -> String {
+        let shifted_spalte = spalte + 2;
+        if shifted_spalte == 0 {
+            let is_even = content
+                .and_then(|value| value.trim().parse::<i64>().ok())
+                .map(|value| value % 2 == 0)
+                .unwrap_or(false);
+            if is_even {
+                r#"[td="background-color:#000000;color:#ffffff"]"#.to_string()
+            } else {
+                r#"[td="background-color:#ffffff;color:#000000"]"#.to_string()
+            }
+        } else {
+            r#"[td=""]"#.to_string()
+        }
+    }
+
+    fn tablehandling_body_cell_text_py(part: &str) -> String {
+        part.replace('\n', "")
+    }
+
+    fn tablehandling_pad_cell_py(text: String, width: usize, padded: bool) -> String {
+        if padded {
+            format!("{:<width$}", text, width = width)
+        } else {
+            text
+        }
+    }
+
+    fn render_tablehandling_structured_row_lines_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        numlen: i64,
+        widths: &[usize],
+    ) -> Vec<StructuredRowRenderPy> {
+        debug_assert!(mode.is_tablehandling_mode());
+        let row_number = finallyDisplayLines
+            .get(row_idx)
+            .and_then(|s| s.trim().parse::<i64>().ok());
+        if self.should_skip_structured_row_py(row, row_number) {
+            return Vec::new();
+        }
+        let is_header = row_number.is_none();
+        let cells_len = row.len() + if self.nummeriere { 2 } else { 0 };
+
+        let cell_lines: Vec<Vec<String>> = row
+            .iter()
+            .map(|cell| self.tablehandling_cell_lines_py(cell))
+            .collect();
+        let max_sub = cell_lines.iter().map(|parts| parts.len()).max().unwrap_or(1);
+        let visible_sub_count = if self.textHeight > 0 {
+            max_sub.min(self.textHeight as usize)
+        } else {
+            max_sub
+        };
+
+        let mut rendered_rows = Vec::new();
+        for sub_idx in 0..visible_sub_count {
+            let mut rows_empty = 0usize;
+            let mut entries_here = 0usize;
+            let mut empty_entries = 0usize;
+
+            let prefix_text = self.tablehandling_prefix_text_py(row_number, is_header);
+            let label_text = self.tablehandling_label_text_py(
+                row_idx,
+                finallyDisplayLines,
+                numlen,
+                sub_idx,
+            );
+
+            let mut csv_fields: Vec<String> = Vec::new();
+            let mut line = String::new();
+
+            match mode {
+                PyStructuredOutputKind::Csv => {
+                    if self.nummeriere {
+                        csv_fields.push(Self::csv_escape_cell_py(&prefix_text));
+                        csv_fields.push(Self::csv_escape_cell_py(&label_text));
+                    }
+                }
+                PyStructuredOutputKind::Markdown | PyStructuredOutputKind::Emacs => {
+                    if self.nummeriere {
+                        line.push('|');
+                        line.push_str(&prefix_text);
+                        line.push('|');
+                        line.push_str(&label_text);
+                    }
+                }
+                PyStructuredOutputKind::Bbcode => {
+                    line.push_str(&Self::bbcode_row_begin_py(row_number, is_header));
+                    if self.nummeriere {
+                        line.push_str(&Self::bbcode_cell_begin_py(-2, Some(&prefix_text)));
+                        line.push_str(&prefix_text);
+                        line.push_str("[/td]");
+                        line.push_str(&Self::bbcode_cell_begin_py(-1, None));
+                        line.push_str(&label_text);
+                        line.push_str("[/td]");
+                    }
+                }
+                PyStructuredOutputKind::Html => unreachable!("html uses the exact html renderer"),
+            }
+
+            for (col_idx, parts) in cell_lines.iter().enumerate() {
+                let maybe_part = parts.get(sub_idx);
+                let cell_text = if let Some(part) = maybe_part {
+                    entries_here += 1;
+                    let text = Self::tablehandling_body_cell_text_py(part);
+                    let stripped_len = text.trim().chars().count();
+                    if stripped_len == 0 || (self.keineleereninhalte && stripped_len < 2) {
+                        empty_entries += 1;
+                    }
+                    text
+                } else {
+                    rows_empty += 1;
+                    String::new()
+                };
+
+                let width = widths.get(col_idx).copied().unwrap_or(0);
+                let padded_cell = Self::tablehandling_pad_cell_py(
+                    cell_text,
+                    width,
+                    mode.body_cells_are_padded(),
+                );
+
+                match mode {
+                    PyStructuredOutputKind::Csv => {
+                        csv_fields.push(Self::csv_escape_cell_py(&padded_cell));
+                    }
+                    PyStructuredOutputKind::Markdown | PyStructuredOutputKind::Emacs => {
+                        line.push('|');
+                        line.push_str(&padded_cell);
+                        line.push(' ');
+                    }
+                    PyStructuredOutputKind::Bbcode => {
+                        line.push_str(&Self::bbcode_cell_begin_py(col_idx as i64, None));
+                        line.push_str(&padded_cell);
+                        line.push_str("[/td] ");
+                    }
+                    PyStructuredOutputKind::Html => unreachable!("html uses the exact html renderer"),
+                }
+            }
+
+            if rows_empty == row.len() || empty_entries == entries_here {
+                continue;
+            }
+
+            match mode {
+                PyStructuredOutputKind::Csv => {
+                    line = csv_fields.join(";");
+                    // Python uses csv.writer's default CRLF row terminator, then
+                    // the surrounding print/join layer adds the physical newline.
+                    line.push_str("\r\n");
+                }
+                PyStructuredOutputKind::Markdown | PyStructuredOutputKind::Emacs => {
+                    line.push('|');
+                }
+                PyStructuredOutputKind::Bbcode => {
+                    line.push_str("[/tr]");
+                }
+                PyStructuredOutputKind::Html => unreachable!("html uses the exact html renderer"),
+            }
+
+            rendered_rows.push(StructuredRowRenderPy {
+                line,
+                is_header,
+                cells_len,
+            });
+        }
+
+        rendered_rows
+    }
+
+    fn emacs_separator_after_row_py(row_number: Option<i64>, is_header: bool) -> bool {
+        if is_header {
+            return true;
+        }
+        let Some(row_number) = row_number else {
+            return false;
+        };
+        let factors = Self::prim_fak_py(row_number.abs());
+        if factors.len() <= 1 {
+            return false;
+        }
+        factors.iter().copied().collect::<BTreeSet<_>>().len() == 1
+    }
+
+    fn stream_tablehandling_structured_row_items_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        row_idx: usize,
+        row: &[String],
+        finallyDisplayLines: &[String],
+        numlen: i64,
+        widths: &[usize],
+        emit: &mut dyn FnMut(OrderedStreamItem) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for rendered in self.render_tablehandling_structured_row_lines_py(
+            mode,
+            row_idx,
+            row,
+            finallyDisplayLines,
+            numlen,
+            widths,
+        ) {
+            emit(OrderedStreamItem::Text(rendered.line))?;
+            emit(OrderedStreamItem::Newline)?;
+            match mode {
+                PyStructuredOutputKind::Markdown if rendered.is_header => {
+                    Self::stream_markdown_separator_items_py(rendered.cells_len, emit)?;
+                }
+                PyStructuredOutputKind::Emacs => {
+                    let row_number = finallyDisplayLines
+                        .get(row_idx)
+                        .and_then(|s| s.trim().parse::<i64>().ok());
+                    if Self::emacs_separator_after_row_py(row_number, rendered.is_header) {
+                        Self::stream_emacs_separator_items_py(rendered.cells_len, emit)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn tablehandling_separator_line_py(
+        mode: PyStructuredOutputKind,
+        cells_len: usize,
+    ) -> Option<String> {
+        match mode {
+            PyStructuredOutputKind::Markdown => Some(format!("{}|", "|:--:".repeat(cells_len))),
+            PyStructuredOutputKind::Emacs => {
+                Some(format!("|{}|", vec!["----"; cells_len].join("+")))
+            }
+            PyStructuredOutputKind::Csv | PyStructuredOutputKind::Bbcode => None,
+            PyStructuredOutputKind::Html => unreachable!("html uses the exact html renderer"),
+        }
+    }
+
+    fn render_tablehandling_structured_output_lines_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        numlen: i64,
+    ) -> Vec<String> {
+        debug_assert!(mode.is_tablehandling_mode());
+        let col_count = newTable.iter().map(|row| row.len()).max().unwrap_or(0);
+        let widths = self.tablehandling_body_widths_parallel_py(mode, newTable, col_count);
+        let mut out_lines = Vec::new();
+        if mode == PyStructuredOutputKind::Bbcode {
+            out_lines.push("[table]".to_string());
+        }
+
+        for (row_idx, row) in newTable.iter().enumerate() {
+            for rendered in self.render_tablehandling_structured_row_lines_py(
+                mode,
+                row_idx,
+                row,
+                finallyDisplayLines,
+                numlen,
+                &widths,
+            ) {
+                let is_header = rendered.is_header;
+                let cells_len = rendered.cells_len;
+                out_lines.push(rendered.line);
+                match mode {
+                    PyStructuredOutputKind::Markdown if is_header => {
+                        if let Some(separator) = Self::tablehandling_separator_line_py(mode, cells_len) {
+                            out_lines.push(separator);
+                        }
+                    }
+                    PyStructuredOutputKind::Emacs => {
+                        let row_number = finallyDisplayLines
+                            .get(row_idx)
+                            .and_then(|s| s.trim().parse::<i64>().ok());
+                        if Self::emacs_separator_after_row_py(row_number, is_header) {
+                            if let Some(separator) = Self::tablehandling_separator_line_py(mode, cells_len) {
+                                out_lines.push(separator);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if mode == PyStructuredOutputKind::Bbcode {
+            out_lines.push("[/table]".to_string());
+        }
+        out_lines
+    }
+
+    fn stream_tablehandling_output_from_provider_py<F>(
+        &self,
+        mode: PyStructuredOutputKind,
+        row_count: usize,
+        finallyDisplayLines: &[String],
+        numlen: i64,
+        min_rows_per_worker: usize,
+        config: &reta_output_stream::OutputStreamNetworkConfig,
+        row_at: &F,
+    ) -> Result<(), String>
+    where
+        F: Fn(usize) -> Vec<String> + Sync,
+    {
+        debug_assert!(mode.is_tablehandling_mode());
+        let col_count = Self::streaming_shell_col_count_from_provider_py(
+            row_count,
+            min_rows_per_worker.max(1),
+            row_at,
+        );
+        let widths = self.tablehandling_body_widths_from_provider_py(
+            mode,
+            row_count,
+            col_count,
+            min_rows_per_worker.max(1),
+            row_at,
+        );
+        if mode == PyStructuredOutputKind::Bbcode {
+            reta_output_stream::active_stdout_line("[table]")?;
+        }
+        reta_output_stream::stream_active_stdout_ordered_items(
+            row_count,
+            min_rows_per_worker.max(1),
+            config,
+            |row_idx, emit| {
+                let row = row_at(row_idx);
+                self.stream_tablehandling_structured_row_items_py(
+                    mode,
+                    row_idx,
+                    &row,
+                    finallyDisplayLines,
+                    numlen,
+                    &widths,
+                    emit,
+                )
+            },
+        )?;
+        if mode == PyStructuredOutputKind::Bbcode {
+            reta_output_stream::active_stdout_line("[/table]")?;
+        }
+        Ok(())
+    }
+
+    fn stream_tablehandling_output_from_table_py(
+        &self,
+        mode: PyStructuredOutputKind,
+        finallyDisplayLines: &[String],
+        newTable: &[Vec<String>],
+        numlen: i64,
+        min_rows_per_worker: usize,
+        config: &reta_output_stream::OutputStreamNetworkConfig,
+    ) -> Result<(), String> {
+        self.stream_tablehandling_output_from_provider_py(
+            mode,
+            newTable.len(),
+            finallyDisplayLines,
+            numlen,
+            min_rows_per_worker,
+            config,
+            &|row_idx| newTable.get(row_idx).cloned().unwrap_or_default(),
+        )
+    }
+
     fn shell_width_zero_raw_mode_py(&self) -> bool {
         self.outType == "shell" && (self.breiteHasBeenOnceZero || self.shellRowsAmount == 0)
     }
@@ -3901,54 +4549,19 @@ impl Program {
                     )
                 }
             }
-            "csv" => reta_output_stream::stream_active_stdout_ordered_items(
-                old2newTable.len(),
-                min_rows_per_worker,
-                &config,
-                |row_idx, emit| {
-                    let row = prepare_visible_row(row_idx);
-                    this.stream_csv_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
-                },
-            ),
-            "markdown" => {
-                let mut first_header_idx = None;
-                for row_idx in 0..old2newTable.len() {
-                    let row_number = finallyDisplayLines
-                        .get(row_idx)
-                        .and_then(|s| s.trim().parse::<i64>().ok());
-                    if row_number.is_none() {
-                        let row = prepare_visible_row(row_idx);
-                        if !this.should_skip_structured_row_py(&row, row_number) {
-                            first_header_idx = Some(row_idx);
-                            break;
-                        }
-                    }
-                }
-                reta_output_stream::stream_active_stdout_ordered_items(
+            "csv" | "markdown" | "emacs" | "bbcode" => {
+                let mode = PyStructuredOutputKind::from_out_type(out_type.as_str())
+                    .expect("matched tableHandling output type");
+                this.stream_tablehandling_output_from_provider_py(
+                    mode,
                     old2newTable.len(),
+                    &finallyDisplayLines,
+                    numlen,
                     min_rows_per_worker,
                     &config,
-                    |row_idx, emit| {
-                        let row = prepare_visible_row(row_idx);
-                        this.stream_markdown_row_items_py(
-                            row_idx,
-                            &row,
-                            &finallyDisplayLines,
-                            first_header_idx,
-                            emit,
-                        )
-                    },
+                    &prepare_visible_row,
                 )
             }
-            "emacs" => reta_output_stream::stream_active_stdout_ordered_items(
-                old2newTable.len(),
-                min_rows_per_worker,
-                &config,
-                |row_idx, emit| {
-                    let row = prepare_visible_row(row_idx);
-                    this.stream_emacs_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
-                },
-            ),
             "html" => {
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(&visible_rows_range);
                 if let Err(error) = reta_output_stream::active_stdout_line(
@@ -3972,22 +4585,6 @@ impl Program {
                         },
                     );
                     rows_result.and_then(|_| reta_output_stream::active_stdout_line("</table>"))
-                }
-            }
-            "bbcode" => {
-                if let Err(error) = reta_output_stream::active_stdout_line("[table]") {
-                    Err(error)
-                } else {
-                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
-                        old2newTable.len(),
-                        min_rows_per_worker,
-                        &config,
-                        |row_idx, emit| {
-                            let row = prepare_visible_row(row_idx);
-                            this.stream_bbcode_row_items_py(row_idx, &row, &finallyDisplayLines, emit)
-                        },
-                    );
-                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("[/table]"))
                 }
             }
             _ => Ok(()),
@@ -4064,45 +4661,18 @@ impl Program {
                     )
                 }
             }
-            "csv" => reta_output_stream::stream_active_stdout_ordered_items(
-                newTable.len(),
-                min_rows_per_worker,
-                &config,
-                |row_idx, emit| {
-                    let row = &newTable[row_idx];
-                    this.stream_csv_row_items_py(row_idx, row, finallyDisplayLines, emit)
-                },
-            ),
-            "markdown" => {
-                let first_header_idx = this.first_streamed_markdown_header_idx_py(
+            "csv" | "markdown" | "emacs" | "bbcode" => {
+                let mode = PyStructuredOutputKind::from_out_type(out_type.as_str())
+                    .expect("matched tableHandling output type");
+                this.stream_tablehandling_output_from_table_py(
+                    mode,
                     finallyDisplayLines,
                     newTable,
-                );
-                reta_output_stream::stream_active_stdout_ordered_items(
-                    newTable.len(),
+                    numlen,
                     min_rows_per_worker,
                     &config,
-                    |row_idx, emit| {
-                        let row = &newTable[row_idx];
-                        this.stream_markdown_row_items_py(
-                            row_idx,
-                            row,
-                            finallyDisplayLines,
-                            first_header_idx,
-                            emit,
-                        )
-                    },
                 )
             }
-            "emacs" => reta_output_stream::stream_active_stdout_ordered_items(
-                newTable.len(),
-                min_rows_per_worker,
-                &config,
-                |row_idx, emit| {
-                    let row = &newTable[row_idx];
-                    this.stream_emacs_row_items_py(row_idx, row, finallyDisplayLines, emit)
-                },
-            ),
             "html" => {
                 let displayed_columns = Self::displayed_column_numbers_for_html_py(rowsRange);
                 if let Err(error) = reta_output_stream::active_stdout_line(
@@ -4128,22 +4698,6 @@ impl Program {
                     rows_result.and_then(|_| reta_output_stream::active_stdout_line("</table>"))
                 }
             }
-            "bbcode" => {
-                if let Err(error) = reta_output_stream::active_stdout_line("[table]") {
-                    Err(error)
-                } else {
-                    let rows_result = reta_output_stream::stream_active_stdout_ordered_items(
-                        newTable.len(),
-                        min_rows_per_worker,
-                        &config,
-                        |row_idx, emit| {
-                            let row = &newTable[row_idx];
-                            this.stream_bbcode_row_items_py(row_idx, row, finallyDisplayLines, emit)
-                        },
-                    );
-                    rows_result.and_then(|_| reta_output_stream::active_stdout_line("[/table]"))
-                }
-            }
             _ => Ok(()),
         };
 
@@ -4165,6 +4719,20 @@ impl Program {
     ) {
         let mut out_lines: Vec<String> = vec![];
         let out_type = self.outType.clone();
+        if let Some(mode) = PyStructuredOutputKind::from_out_type(out_type.as_str()) {
+            if mode.is_tablehandling_mode() {
+                out_lines = self.render_tablehandling_structured_output_lines_py(
+                    mode,
+                    finallyDisplayLines,
+                    newTable,
+                    numlen,
+                );
+                self.finallyDisplayLinesByChunks = Vec::new();
+                self.finallyDisplayLines = out_lines;
+                self.numlen = numlen;
+                return;
+            }
+        }
         let this: &Program = &*self;
         match out_type.as_str() {
             "nichts" => {}
@@ -4768,12 +5336,102 @@ mod tests {
         program.outType = "csv".to_string();
         program.nummeriere = false;
         program.textHeight = 2;
+        program.shellRowsAmount = 80;
 
         let table = vec![vec!["a\nb\nc".to_string()]];
         let _ = program.cliOut_py(vec!["1".to_string()], table, 1, vec![1]);
 
-        let joined = program.finallyDisplayLines.join("\n");
-        assert!(joined.contains("a\nb"));
-        assert!(!joined.contains("c"));
+        assert_eq!(
+            program.finallyDisplayLines,
+            vec!["a\r\n".to_string(), "b\r\n".to_string()]
+        );
     }
+
+    #[test]
+    fn csv_output_uses_python_tablehandling_label_padding_and_crlf() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "csv".to_string();
+        program.nummeriere = true;
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiteHasBeenOnceZero = true;
+
+        let table = vec![
+            vec!["A;B".to_string()],
+            vec!["x\ny".to_string()],
+        ];
+        let _ = program.cliOut_py(vec!["".to_string(), "1".to_string()], table, 1, vec![1]);
+
+        assert_eq!(
+            program.finallyDisplayLines,
+            vec![" ;  ;\"A;B\"\r\n".to_string(), "1;1 ;xy\r\n".to_string()]
+        );
+    }
+
+    #[test]
+    fn markdown_output_uses_python_tablehandling_padding_without_escaping() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "markdown".to_string();
+        program.nummeriere = true;
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiteHasBeenOnceZero = true;
+
+        let table = vec![
+            vec!["A".to_string(), "Long".to_string()],
+            vec!["pipe|raw".to_string(), "z\nraw".to_string()],
+        ];
+        let _ = program.cliOut_py(vec!["".to_string(), "1".to_string()], table, 1, vec![1, 2]);
+
+        assert_eq!(
+            program.finallyDisplayLines,
+            vec![
+                "| |  |A        |Long  |".to_string(),
+                "|:--:|:--:|:--:|:--:|".to_string(),
+                "|1|1 |pipe|raw |zraw  |".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn emacs_output_uses_python_prime_power_separator() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "emacs".to_string();
+        program.nummeriere = false;
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiteHasBeenOnceZero = true;
+
+        let table = vec![vec!["A".to_string()], vec!["x".to_string()]];
+        let _ = program.cliOut_py(vec!["".to_string(), "4".to_string()], table, 1, vec![1]);
+
+        assert_eq!(
+            program.finallyDisplayLines,
+            vec![
+                "|A |".to_string(),
+                "|----|".to_string(),
+                "|x |".to_string(),
+                "|----|".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn bbcode_output_uses_python_tablehandling_cells_and_trailing_body_spaces() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "bbcode".to_string();
+        program.nummeriere = true;
+        program.oneTable = true;
+        program.textWidth = 0;
+        program.breiteHasBeenOnceZero = true;
+
+        let table = vec![vec!["A".to_string()], vec!["x".to_string()]];
+        let _ = program.cliOut_py(vec!["".to_string(), "1".to_string()], table, 1, vec![1]);
+
+        assert_eq!(program.finallyDisplayLines.first().map(String::as_str), Some("[table]"));
+        assert_eq!(program.finallyDisplayLines.last().map(String::as_str), Some("[/table]"));
+        assert!(program.finallyDisplayLines[1].contains("[td=\"\"]A[/td] [/tr]"));
+        assert!(program.finallyDisplayLines[2].contains("[td=\"\"]x[/td] [/tr]"));
+    }
+
 }
