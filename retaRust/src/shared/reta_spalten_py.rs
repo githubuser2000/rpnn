@@ -686,14 +686,6 @@ impl Program {
             return width;
         }
 
-        if let Ok(v) = std::env::var("COLUMNS") {
-            if let Ok(n) = v.trim().parse::<i64>() {
-                if n > 0 {
-                    return n;
-                }
-            }
-        }
-
         let try_cmd = |cmd: &str| -> Option<i64> {
             let output = std::process::Command::new("sh")
                 .arg("-lc")
@@ -708,11 +700,21 @@ impl Program {
             if n > 0 { Some(n) } else { None }
         };
 
+        // Python asks the live terminal first via os.get_terminal_size().  Do
+        // the same before trusting COLUMNS, because COLUMNS can be stale after
+        // a resize and then --breite=0 no longer follows the visible screen.
         if let Some(n) = try_cmd("stty size < /dev/tty 2>/dev/null | awk '{print $2}'") {
             return n;
         }
         if let Some(n) = try_cmd("tput cols 2>/dev/null") {
             return n;
+        }
+        if let Ok(v) = std::env::var("COLUMNS") {
+            if let Ok(n) = v.trim().parse::<i64>() {
+                if n > 0 {
+                    return n;
+                }
+            }
         }
         80
     }

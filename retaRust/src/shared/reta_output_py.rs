@@ -1101,10 +1101,12 @@ impl Program {
         row_to_display_1_based: usize,
         combi_rows: usize,
     ) -> usize {
-        // Python Prepare.setWidth(): if no terminal width/wrap context exists, keep the
-        // cell as one string. Otherwise prefer --breiten values aligned to the visible
-        // output columns, falling back to textWidth.
-        if self.breiteHasBeenOnceZero || self.shellRowsAmount == 0 {
+        // Python Prepare.setWidth(): --breite=0 does not mean "never wrap".
+        // It first resolves textWidth to the current terminal width minus the
+        // Python safety margin.  A raw/unwrapped cell is used only when the
+        // prepare-side shell width is actually zero, for example html/bbcode
+        // defaults without an explicit width.
+        if self.shellRowsAmount == 0 {
             return 0;
         }
 
@@ -2728,11 +2730,11 @@ impl Program {
     }
 
     fn tablehandling_width_zero_raw_mode_py(&self) -> bool {
-        // Python tableHandling uses one common cell loop for shell/csv/markdown/
-        // emacs/bbcode/html.  After an explicit --breite=0 the prepared cell stays
-        // one logical string; embedded newlines are removed while rendering the
-        // concrete output syntax instead of becoming extra physical rows.
-        self.breiteHasBeenOnceZero || self.textWidth == 0 || self.shellRowsAmount == 0
+        // Python tableHandling only enters the raw/unwrapped path when the
+        // effective width is still zero.  Plain shell --breite=0 normally has a
+        // positive textWidth (terminal width minus 7) and must keep wrapped
+        // cell lines.
+        self.textWidth == 0 || self.shellRowsAmount == 0
     }
 
     fn tablehandling_cell_lines_py(&self, cell: &str) -> Vec<String> {
@@ -3346,7 +3348,7 @@ impl Program {
     }
 
     fn shell_width_zero_raw_mode_py(&self) -> bool {
-        self.outType == "shell" && (self.breiteHasBeenOnceZero || self.shellRowsAmount == 0)
+        self.outType == "shell" && (self.textWidth == 0 || self.shellRowsAmount == 0)
     }
 
     fn shell_cell_measure_width_from_mode_py(cell: &str, raw_width_zero_mode: bool) -> usize {
@@ -4905,22 +4907,23 @@ mod tests {
     }
 
     #[test]
-    fn width_zero_keeps_cells_unwrapped_after_shell_width_reset() {
+    fn width_zero_wraps_after_shell_width_reset_like_python() {
         let mut program = Program::new(vec!["reta".to_string()]);
         program.outType = "shell".to_string();
         program.breiteHasBeenOnceZero = true;
         program.shellRowsAmount = 80;
         program.textWidth = 21;
-        assert_eq!(program.prepare4out_width_for_display_col_py(1, 1), 0);
+        assert_eq!(program.prepare4out_width_for_display_col_py(1, 1), 21);
     }
 
     #[test]
-    fn width_zero_shell_output_removes_embedded_cell_newlines() {
+    fn width_zero_shell_output_keeps_wrapped_cell_lines_after_width_reset() {
         let mut program = Program::new(vec!["reta".to_string()]);
         program.outType = "shell".to_string();
         program.breiteHasBeenOnceZero = true;
         program.shellRowsAmount = 80;
-        assert_eq!(program.shell_cell_parts_for_output_py("a\nb", 99), vec!["ab".to_string()]);
+        program.textWidth = 21;
+        assert_eq!(program.shell_cell_parts_for_output_py("a\nb", 99), vec!["a".to_string(), "b".to_string()]);
     }
 
     #[test]

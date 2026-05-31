@@ -228,10 +228,27 @@ fn read_stdin_if_piped() -> Option<String> {
 }
 
 fn detect_terminal_width() -> Option<usize> {
-    env::var("COLUMNS")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|width| *width > 0)
+    detect_terminal_width_cmd("stty size < /dev/tty 2>/dev/null | awk '{print $2}'")
+        .or_else(|| detect_terminal_width_cmd("tput cols 2>/dev/null"))
+        .or_else(|| {
+            env::var("COLUMNS")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|width| *width > 0)
+        })
+}
+
+fn detect_terminal_width_cmd(cmd: &str) -> Option<usize> {
+    let output = std::process::Command::new("sh")
+        .arg("-lc")
+        .arg(cmd)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let txt = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    txt.parse::<usize>().ok().filter(|width| *width > 0)
 }
 
 fn load_reta_library() -> Result<Library, String> {

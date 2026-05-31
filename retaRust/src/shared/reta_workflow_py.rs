@@ -571,7 +571,7 @@ impl Program {
         let oneLinePerLine = self.outType == "html" || self.outType == "bbcode";
         let shell_onetable_width0 = !oneLinePerLine
             && self.oneTable
-            && (self.textWidth == 0 || self.breiteHasBeenOnceZero);
+            && self.textWidth == 0;
         let remove_number_now =
             (shell_onetable_width0 || self.outType == "html" || self.outType == "bbcode")
                 && self.breiten.is_empty();
@@ -785,16 +785,14 @@ mod tests {
     }
 
     #[test]
-    fn width0_mode_uses_breite_has_been_once_zero_even_after_textwidth_reset() {
+    fn onetable_width0_mode_uses_effective_textwidth_zero() {
         let mut program = Program::new(vec!["reta".to_string()]);
         program.outType = "shell".to_string();
         program.oneTable = true;
-        program.textWidth = 80;
+        program.textWidth = 0;
         program.breiteHasBeenOnceZero = true;
 
-        let effective_width = if program.oneTable
-            && (program.textWidth == 0 || program.breiteHasBeenOnceZero)
-        {
+        let effective_width = if program.oneTable && program.textWidth == 0 {
             0
         } else {
             program.textWidth.max(0) as usize
@@ -805,5 +803,21 @@ mod tests {
             effective_width,
         );
         assert_eq!(rendered, vec![" Mikroorganismen (1)".to_string()]);
+    }
+
+    #[test]
+    fn breite_zero_flag_alone_does_not_disable_wrapping_after_width_reset() {
+        let mut program = Program::new(vec!["reta".to_string()]);
+        program.outType = "shell".to_string();
+        program.oneTable = true;
+        program.textWidth = 80;
+        program.breiteHasBeenOnceZero = true;
+
+        let effective_width = if program.oneTable && program.textWidth == 0 {
+            0
+        } else {
+            program.textWidth.max(0) as usize
+        };
+        assert_eq!(effective_width, 80);
     }
 }

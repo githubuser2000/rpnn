@@ -1886,7 +1886,7 @@ impl TablesCombi {
         let state = self.state.borrow();
         let width0_raw_mode = state.program.oneTable
             && state.program.outType == "shell"
-            && (state.program.textWidth == 0 || state.program.breiteHasBeenOnceZero);
+            && state.program.textWidth == 0;
         let text_width = if width0_raw_mode { 0 } else { state.program.textWidth.max(0) as usize };
         let mut text = hinein.join("");
         while text.ends_with('-') {
@@ -1974,7 +1974,7 @@ impl TablesCombi {
         let oneLinePerLine = state.program.outType == "html" || state.program.outType == "bbcode";
         let shell_onetable_width0 = !oneLinePerLine
             && state.program.oneTable
-            && (state.program.textWidth == 0 || state.program.breiteHasBeenOnceZero);
+            && state.program.textWidth == 0;
         let remove_number_now =
             (shell_onetable_width0 || state.program.outType == "html" || state.program.outType == "bbcode")
                 && state.program.breiten.is_empty();

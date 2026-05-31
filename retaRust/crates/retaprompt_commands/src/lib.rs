@@ -389,10 +389,27 @@ fn load_shared_words_snapshot() -> shared::words_py::Words {
 }
 
 fn detect_terminal_width() -> Option<usize> {
-    std::env::var("COLUMNS")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|width| *width > 0)
+    detect_terminal_width_cmd("stty size < /dev/tty 2>/dev/null | awk '{print $2}'")
+        .or_else(|| detect_terminal_width_cmd("tput cols 2>/dev/null"))
+        .or_else(|| {
+            std::env::var("COLUMNS")
+                .ok()
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|width| *width > 0)
+        })
+}
+
+fn detect_terminal_width_cmd(cmd: &str) -> Option<usize> {
+    let output = std::process::Command::new("sh")
+        .arg("-lc")
+        .arg(cmd)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let txt = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    txt.parse::<usize>().ok().filter(|width| *width > 0)
 }
 
 static RETA_LIBRARY: OnceLock<Result<&'static Library, String>> = OnceLock::new();
