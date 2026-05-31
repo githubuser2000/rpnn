@@ -120,6 +120,28 @@ fn absicht_with_valid_generator_after_invalid_generator_builds_reta_call() {
 }
 
 #[test]
+fn absicht_single_star_generator_builds_reta_call_not_no_output() {
+    let command = compile_rp("a [a*2 for a in range(4)]");
+    let argvs = reta_argvs(&command);
+
+    assert!(!argvs.is_empty(), "expected reta call, got {command:?}");
+    assert!(
+        argvs.iter().any(|argv| argv.iter().any(|token| token == "--menschliches=motivation")),
+        "single generator absicht command must keep motivation column, got {argvs:?}"
+    );
+    assert!(
+        argvs.iter().any(|argv| argv
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,4,6")),
+        "valid star generator row spec must expand to rows 2,4,6, got {argvs:?}"
+    );
+    assert!(
+        immediate_text(&command).map_or(true, |text| !text.contains("nichts auszugeben")),
+        "must not fall back to no-output message: {command:?}"
+    );
+}
+
+#[test]
 fn mulpri_large_number_is_unbounded_math_not_table_row_limited() {
     let command = compile_rp("mulpri 12345");
     let text = immediate_text(&command).expect("mulpri 12345 should be immediate math output");

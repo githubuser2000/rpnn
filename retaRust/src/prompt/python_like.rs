@@ -559,13 +559,41 @@ fn parse_python_raw_regex_fragment(text: &str) -> Option<&str> {
     None
 }
 
+fn token_is_python_row_expression_for_regex(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if python_row_spec_to_numbers(trimmed).is_some() {
+        return true;
+    }
+
+    let Some((left, right)) = trimmed.split_once('=') else {
+        return false;
+    };
+    let parameter = left.trim().trim_start_matches("--");
+    matches!(
+        parameter,
+        "vorhervonausschnitt"
+            | "zaehlung"
+            | "vielfachevonzahlen"
+            | "vorhervonausschnittteiler"
+            | "primzahlvielfache"
+            | "nachtraeglichneuabzaehlung"
+            | "nachtraeglichneuabzaehlungvielfache"
+    ) && python_row_spec_to_numbers(right).is_some()
+}
+
 fn token_has_python_regex_or_glob(text: &str) -> bool {
-    text.contains('*')
+    let has_regex_or_glob = text.contains('*')
         || parse_python_raw_regex_fragment(text).is_some()
         || text.contains("r\"")
         || text.contains("r'")
         || text.contains("R\"")
-        || text.contains("R'")
+        || text.contains("R'");
+
+    has_regex_or_glob && !token_is_python_row_expression_for_regex(text)
 }
 
 fn parse_special_fragment_matcher(text: &str) -> Option<SpecialFragmentMatcher> {
@@ -1346,6 +1374,10 @@ pub fn expand_python_regex_like_tokens(tokens: &[String]) -> Vec<String> {
             out.push(token.clone());
             continue;
         }
+        if token_is_python_row_expression_for_regex(token) {
+            out.push(token.clone());
+            continue;
+        }
 
         let expanded = if let Some((left, right)) = token.split_once('=') {
             if input_is_reta || left.starts_with("--") {
@@ -2000,7 +2032,11 @@ pub fn looks_like_numeric_or_fraction_range(text: &str) -> bool {
 }
 
 pub fn is_row_spec_token(text: &str) -> bool {
-    looks_like_numeric_or_fraction_range(text) || is_zeilen_angabe_between_kommas_py(text)
+    let trimmed = text.trim();
+    !trimmed.is_empty()
+        && (looks_like_numeric_or_fraction_range(trimmed)
+            || is_zeilen_angabe_between_kommas_py(trimmed)
+            || python_row_spec_to_numbers(trimmed).is_some())
 }
 
 fn is_integer_or_fraction(text: &str) -> bool {
@@ -9220,7 +9256,7 @@ mod tests {
         createRangesForBruchLists, dictToList, expand_kurz_kurz_befehl,
         expand_python_regex_like_tokens, findEqualNennerZaehler, findNennerZaehlerMakesWholeNum,
         findregEx, getDictLimtedByKeyList, grKl, isReTaParameter, is_15or16_command,
-        is_zeilen_angabe_between_kommas_py, libreta_prompt_custom_split,
+        is_row_spec_token, is_zeilen_angabe_between_kommas_py, libreta_prompt_custom_split,
         libreta_prompt_custom_split2, libreta_prompt_split_kpattern_commas_py,
         looks_like_numeric_or_fraction_range, prepare_prompt_big_output_for_stored_reta,
         prepare_prompt_big_output_for_stored_reta_prompt_overlay,
@@ -10752,6 +10788,40 @@ mod tests {
         assert!(calls[0]
             .iter()
             .any(|token| token == "--vorhervonausschnitt=1,3,5"));
+    }
+
+    #[test]
+    fn python_generator_rows_with_star_survive_regex_normalization() {
+        let generator = "[a*2 for a in range(4)]";
+        assert!(is_row_spec_token(generator));
+        assert_eq!(python_row_spec_to_numbers(generator), Some(vec![2, 4, 6]));
+        assert_eq!(
+            expand_python_regex_like_tokens(&strings(&["absicht", generator])),
+            strings(&["absicht", generator])
+        );
+        assert_eq!(
+            aufloesen(&strings(&["a", generator])),
+            strings(&["absicht", generator])
+        );
+        let expanded_reta = expand_python_regex_like_tokens(&strings(&[
+            "reta",
+            "-zeilen",
+            "--vorhervonausschnitt=[a*2 for a in range(4)]",
+            "-spalten",
+            "--*=mond",
+        ]));
+        assert!(expanded_reta
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=[a*2 for a in range(4)]"));
+
+        let calls = build_reta_calls_from_prompt_tokens(&strings(&["absicht", generator]));
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--menschliches=motivation"));
+        assert!(calls[0]
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2,4,6"));
     }
 
     #[test]
