@@ -79,6 +79,47 @@ fn p12345_is_math_output_above_table_limit_not_no_output_message() {
 }
 
 #[test]
+fn p_suffix_plus_neighbor_expr_is_unbounded_math_output() {
+    let command = compile_rp("3745+1p");
+    let text = immediate_text(&command).expect("3745+1p should be immediate math output");
+
+    assert!(text.contains("3744:"), "missing lower neighbor output: {text}");
+    assert!(text.contains("3746:"), "missing upper neighbor output: {text}");
+    assert!(text.contains("1873"), "missing factor evidence for 3746: {text}");
+    assert!(
+        !text.contains("nichts auszugeben"),
+        "3745+1p must not fall back to the no-output prompt message: {text}"
+    );
+    assert_no_invalid_absicht_thomas_table_argv(&command);
+    assert!(
+        reta_argvs(&command).is_empty(),
+        "3745+1p must not synthesize reta table argv"
+    );
+}
+
+#[test]
+fn absicht_with_valid_generator_after_invalid_generator_builds_reta_call() {
+    let command = compile_rp("a [a for range(2)]       ,    a [a*2 for a in range(2)]");
+    let argvs = reta_argvs(&command);
+
+    assert!(!argvs.is_empty(), "expected reta call, got {command:?}");
+    assert!(
+        argvs.iter().any(|argv| argv.iter().any(|token| token == "--menschliches=motivation")),
+        "generator absicht command must keep motivation column, got {argvs:?}"
+    );
+    assert!(
+        argvs.iter().any(|argv| argv
+            .iter()
+            .any(|token| token == "--vorhervonausschnitt=2")),
+        "valid generator row spec must be kept semantically as row 2, got {argvs:?}"
+    );
+    assert!(
+        immediate_text(&command).map_or(true, |text| !text.contains("nichts auszugeben")),
+        "must not fall back to no-output message: {command:?}"
+    );
+}
+
+#[test]
 fn mulpri_large_number_is_unbounded_math_not_table_row_limited() {
     let command = compile_rp("mulpri 12345");
     let text = immediate_text(&command).expect("mulpri 12345 should be immediate math output");

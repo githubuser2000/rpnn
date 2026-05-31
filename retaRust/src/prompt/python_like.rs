@@ -2000,7 +2000,7 @@ pub fn looks_like_numeric_or_fraction_range(text: &str) -> bool {
 }
 
 pub fn is_row_spec_token(text: &str) -> bool {
-    looks_like_numeric_or_fraction_range(text)
+    looks_like_numeric_or_fraction_range(text) || is_zeilen_angabe_between_kommas_py(text)
 }
 
 fn is_integer_or_fraction(text: &str) -> bool {
@@ -5533,6 +5533,10 @@ fn python_row_spec_to_numbers_with_options(
 
 pub fn python_row_spec_to_numbers(spec: &str) -> Option<Vec<i64>> {
     python_row_spec_to_numbers_with_options(spec, false, Some(python_row_multiple_limit()))
+}
+
+pub fn python_row_spec_to_numbers_unbounded(spec: &str) -> Option<Vec<i64>> {
+    python_row_spec_to_numbers_with_options(spec, false, None)
 }
 
 fn expand_fraction_range_piece(piece: &str) -> Option<Vec<(i64, i64)>> {

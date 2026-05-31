@@ -5,7 +5,8 @@ use super::python_like::{
     is_15or16_command, libreta_prompt_custom_split, prepare_prompt_big_output_for_stored_reta,
     prepare_prompt_big_output_for_stored_reta_prompt_overlay,
     prepare_prompt_big_output_for_stored_rows, prompt_words, python_row_spec_to_numbers,
-    PromptGrosseAusgabe, PromptLoescheVorSpeicherungBefehle, PromptModus, PromptSonderBefehlAktion,
+    python_row_spec_to_numbers_unbounded, PromptGrosseAusgabe, PromptLoescheVorSpeicherungBefehle,
+    PromptModus, PromptSonderBefehlAktion,
     PromptVonGrosserAusgabeSonderBefehlAusgaben,
 };
 use super::semantic_choices::{RETAPROMPT_RETA_MAIN_SWITCHES, RETAPROMPT_RETA_SECTION_SWITCHES};
@@ -1436,6 +1437,18 @@ fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
             continue;
         }
 
+        // Direct math prompt commands (`p12345`, `3745+1p`, `mulpri 12345`,
+        // `prim 12345`, ...) are not table-row selections. Python keeps the
+        // row grammar unbounded here (`BereichToNumbers2(..., False, 0)`), so
+        // plus-neighbor specs such as `3745+1` must expand to `3744,3746` even
+        // when those values are above the current table row maximum.
+        if let Some(numbers) = python_row_spec_to_numbers_unbounded(token) {
+            if !numbers.is_empty() {
+                out.extend(numbers);
+                continue;
+            }
+        }
+
         if let Some(numbers) = python_row_spec_to_numbers(token) {
             if !numbers.is_empty() {
                 out.extend(numbers);
@@ -1443,13 +1456,6 @@ fn parse_row_numbers_from_tokens(tokens: &[String]) -> Option<Vec<i64>> {
             }
         }
 
-        // Direct math prompt commands (`p12345`, `mulpri 12345`, `prim 12345`, ...)
-        // are not table-row selections.  The Python table-row parser is capped by
-        // the current reta table maximum, so values above that maximum can produce
-        // an empty row set and then fall through to the misleading "known command
-        // but nothing to output" message.  For math output we preserve the table
-        // parser for normal in-table row specs and add an unbounded single-number
-        // fallback for positive integers/ranges.
         if let Some(numbers) = parse_unbounded_direct_math_numbers(token) {
             out.extend(numbers);
         }
@@ -2004,6 +2010,27 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
     let mut lines: Vec<String> = Vec::new();
     let mut matched = false;
 
+    if token_set.contains("prim24") || token_set.contains("primfaktorzerlegungModulo24") {
+        matched = true;
+        for n in &numbers {
+            lines.push(format!(
+                "{}: {}",
+                n,
+                prime_repeat_display(prime_factors(*n, true))
+            ));
+        }
+    }
+    if token_set.contains("primfaktorenvergleich") && !numbers.is_empty() {
+        let comparison_numbers = unique_numbers_preserving_prompt_order(&numbers);
+        let render_comparison = comparison_numbers.len() > 1
+            || !(token_set.contains("mulpri") || token_set.contains("p"));
+        if render_comparison {
+            matched = true;
+            lines.extend(render_primfaktorenvergleich_like_python(
+                &comparison_numbers,
+            ));
+        }
+    }
     if token_set.contains("prim") || token_set.contains("primfaktorzerlegung") {
         matched = true;
         for n in &numbers {
@@ -2014,14 +2041,13 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
             ));
         }
     }
-    if token_set.contains("prim24") || token_set.contains("primfaktorzerlegungModulo24") {
+    if token_set.contains("multis3") {
         matched = true;
-        for n in &numbers {
-            lines.push(format!(
-                "{}: {}",
-                n,
-                prime_repeat_display(prime_factors(*n, true))
-            ));
+        // Python `multis3.mult3()` returns from inside its first numeric loop.
+        // retaPrompt therefore prints only the first computed number, even if
+        // the row parser produced several numbers.
+        if let Some(n) = numbers.first() {
+            lines.push(format!("{}: {:?}", n, factor_triples(*n)));
         }
     }
     if token_set.contains("multis") {
@@ -2034,26 +2060,6 @@ fn compile_direct_number_command(tokens: &[String]) -> Option<PromptOutput> {
             } else {
                 lines.push(format!("{}: {} (Primzahl)", n, n));
             }
-        }
-    }
-    if token_set.contains("multis3") {
-        matched = true;
-        // Python `multis3.mult3()` returns from inside its first numeric loop.
-        // retaPrompt therefore prints only the first computed number, even if
-        // the row parser produced several numbers.
-        if let Some(n) = numbers.first() {
-            lines.push(format!("{}: {:?}", n, factor_triples(*n)));
-        }
-    }
-    if token_set.contains("primfaktorenvergleich") && !numbers.is_empty() {
-        let comparison_numbers = unique_numbers_preserving_prompt_order(&numbers);
-        let render_comparison = comparison_numbers.len() > 1
-            || !(token_set.contains("mulpri") || token_set.contains("p"));
-        if render_comparison {
-            matched = true;
-            lines.extend(render_primfaktorenvergleich_like_python(
-                &comparison_numbers,
-            ));
         }
     }
     if token_set.contains("modulo") {
