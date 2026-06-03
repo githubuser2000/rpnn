@@ -279,8 +279,13 @@ impl PromptSessionBundle {
             .enumerate()
             .map(|(index, value)| (index + 1, value.clone()))
             .collect::<BTreeMap<_, _>>();
+        let delete_text_is_decimal = !text_to_delete.text.is_empty()
+            && text_to_delete.text.chars().all(|ch| ch.is_ascii_digit());
+        let delete_text_exists_as_stored_token = existing
+            .iter()
+            .any(|item| item == &text_to_delete.text);
         let use_range = self.row_ranges.is_row_range(text_to_delete.text.as_str())
-            && !existing.iter().any(|item| item == &text_to_delete.text);
+            && (!delete_text_exists_as_stored_token || !delete_text_is_decimal);
         if use_range {
             for token in self.row_ranges.range_to_numbers(&text_to_delete.text, false, 0, false) {
                 if token > 0 {
@@ -362,6 +367,26 @@ mod tests {
         let (placeholder, mode, _) = session.delete_before_storage_commands("a b c d", "2-3");
         assert_eq!(mode, PromptModus::Normal);
         assert_eq!(placeholder, "a d");
+    }
+
+    #[test]
+    fn deletion_prefers_indices_for_non_decimal_range_even_when_literal_exists() {
+        let session = bootstrap_prompt_session();
+        let (placeholder, mode, text_out) =
+            session.delete_before_storage_commands("1-2 x y", "1-2");
+        assert_eq!(mode, PromptModus::Normal);
+        assert_eq!(placeholder, "y");
+        assert_eq!(text_out, "1-2");
+    }
+
+    #[test]
+    fn deletion_keeps_decimal_literal_collision_as_word_deletion() {
+        let session = bootstrap_prompt_session();
+        let (placeholder, mode, text_out) =
+            session.delete_before_storage_commands("1 2 3", "2");
+        assert_eq!(mode, PromptModus::Normal);
+        assert_eq!(placeholder, "1 3");
+        assert_eq!(text_out, "");
     }
 }
 

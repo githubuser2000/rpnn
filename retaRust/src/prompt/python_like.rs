@@ -9771,6 +9771,12 @@ mod tests {
         assert_eq!(by_word.platzhalter, "a c");
         assert_eq!(by_word.promptMode, PromptModus::Normal);
         assert_eq!(by_word.text, "");
+
+        let non_decimal_range_literal =
+            PromptLoescheVorSpeicherungBefehle("1-2 x y", PromptModus::Speichern, "1-2");
+        assert_eq!(non_decimal_range_literal.platzhalter, "y");
+        assert_eq!(non_decimal_range_literal.promptMode, PromptModus::Normal);
+        assert_eq!(non_decimal_range_literal.text, "1-2");
     }
 
     #[test]

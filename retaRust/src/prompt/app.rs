@@ -182,6 +182,24 @@ fn apply_exact_mode_to_input(input: &str) -> String {
     format!("{trimmed} keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar")
 }
 
+fn exact_mode_applies_to_interactive_prompt_mode(prompt_mode: PromptModus) -> bool {
+    matches!(prompt_mode, PromptModus::Normal | PromptModus::AusgabeSelektiv)
+}
+
+fn apply_exact_mode_to_interactive_input(
+    input: &str,
+    exact_mode_enabled: bool,
+    prompt_mode_before_input: PromptModus,
+) -> String {
+    if exact_mode_enabled
+        && exact_mode_applies_to_interactive_prompt_mode(prompt_mode_before_input)
+    {
+        apply_exact_mode_to_input(input)
+    } else {
+        input.trim().to_string()
+    }
+}
+
 fn input_starts_with_reta(input: &str) -> bool {
     matches!(
         libreta_prompt_custom_split(input.trim()).first(),
@@ -847,13 +865,14 @@ fn run_interactive_loop(
         match editor.read_line(&prompt) {
             Ok(Signal::Success(buffer)) => {
                 let input = buffer.trim().to_string();
+                let prompt_mode_before_input = state.prompt_mode;
                 let history_line_scrubbed = promptInput(state, &input, None, &log_path);
 
-                let compile_input = if exact_mode_enabled {
-                    apply_exact_mode_to_input(&input)
-                } else {
-                    input.clone()
-                };
+                let compile_input = apply_exact_mode_to_interactive_input(
+                    &input,
+                    exact_mode_enabled,
+                    prompt_mode_before_input,
+                );
 
                 let previous_editor_mode = state.current_mode();
                 let previous_logging_enabled = state.logging_enabled;
@@ -1239,11 +1258,13 @@ fn print_output(state: &mut SessionState, output: PromptOutput) {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_exact_mode_to_input, apply_rpe_emacs_output_to_command, record_prompt_input,
+        apply_exact_mode_to_input, apply_exact_mode_to_interactive_input,
+        apply_rpe_emacs_output_to_command, record_prompt_input,
         remove_last_history_line_matching,
         scrub_prompt_history_line_if_python_togglehistory_would_skip, should_append_exact_suffix,
-        should_record_prompt_history, PromptCommand, SessionState,
+        should_record_prompt_history, PromptCommand, PromptModus, SessionState,
     };
+    use super::super::commands::{compile_command_with_state, execute_command};
 
     #[test]
     fn toggle_history_commands_are_filtered_like_python_togglehistory() {
@@ -1335,6 +1356,41 @@ mod tests {
             );
             assert_eq!(apply_exact_mode_to_input(input), input);
         }
+    }
+
+    #[test]
+    fn interactive_exact_mode_does_not_pollute_storage_or_delete_inputs() {
+        assert_eq!(
+            apply_exact_mode_to_interactive_input("2", true, PromptModus::Normal),
+            "2 keineEinZeichenZeilenPlusKeineAusgabeWelcherBefehlEsWar"
+        );
+        assert_eq!(
+            apply_exact_mode_to_interactive_input("2", true, PromptModus::LoeschenSelect),
+            "2"
+        );
+        assert_eq!(
+            apply_exact_mode_to_interactive_input("2", true, PromptModus::Speichern),
+            "2"
+        );
+    }
+
+    #[test]
+    fn delete_selection_in_exact_interactive_mode_deletes_plain_index_like_python() {
+        let mut state = SessionState::new("rp".to_string(), true, false);
+        state.prompt_mode = PromptModus::LoeschenSelect;
+        state.stored_placeholder = "a b c".to_string();
+
+        let compile_input =
+            apply_exact_mode_to_interactive_input("2", true, state.prompt_mode);
+        let command = compile_command_with_state(&compile_input, &state).unwrap();
+        match &command {
+            PromptCommand::DeleteStoredSelection(selection) => assert_eq!(selection, "2"),
+            other => panic!("expected delete selection, got {other:?}"),
+        }
+
+        execute_command(command, &mut state).unwrap();
+        assert_eq!(state.stored_placeholder, "a c");
+        assert_eq!(state.prompt_mode, PromptModus::Normal);
     }
 
     #[test]
